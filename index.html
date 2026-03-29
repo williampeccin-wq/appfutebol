@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- HARMONIA FC v1.10 — 2026-03-27 -->
+<!-- HARMONIA FC v1.11 — 2026-03-27 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -104,8 +104,6 @@ input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(26,
 /* TOGGLE */
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray)}
 .toggle-row:last-child{border-bottom:none}
-.inline-toggles{width:100%;display:flex;flex-direction:column;gap:0;margin-top:8px;padding-top:8px;border-top:1px solid var(--gray)}
-.inline-toggles .toggle-row{padding:8px 0}
 .toggle{width:42px;height:24px;border-radius:12px;background:var(--gray2);cursor:pointer;position:relative;transition:.2s;flex-shrink:0;border:none}
 .toggle.on{background:var(--green)}
 .toggle::after{content:'';width:18px;height:18px;background:var(--white);border-radius:50%;position:absolute;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
@@ -736,11 +734,13 @@ function renderActivation(phone, player){
 }
 
 async function submitActivation(phone){
-  const code = document.getElementById('act-code')?.value?.trim();
-  if(!code||code.length<6){ toast('Digite o código de 6 dígitos','err'); return; }
+  const rawCode = document.getElementById('act-code')?.value ?? '';
+  const code = String(rawCode).replace(/\D/g,'').trim();
+  if(!code||code.length!==6){ toast('Digite o código de 6 dígitos','err'); return; }
   const player = appData.players.find(p=>p.phone===phone);
   if(!player) return;
-  if(String(player.activation_code) !== String(code)){
+  const expectedCode = String(player.activation_code ?? '').replace(/\D/g,'').trim();
+  if(expectedCode !== code){
     toast('Código incorreto','err'); return;
   }
   // Code correct — show set password screen
@@ -946,13 +946,18 @@ function renderHome(){
           </div>
         </div>
         ${waitPlayers.length?`<div style="font-size:12px;color:var(--gray3)">⏳ Fila de espera: ${waitPlayers.map(p=>p.name).join(', ')}</div>`:''}
-        ${isAdmin()&&!res.result?`
+        ${isAdmin()?`
           <div style="margin-top:10px;border-top:1px solid #a5d6b7;padding-top:10px">
-            <div style="font-size:11px;font-weight:600;color:var(--green-dark);margin-bottom:6px">Declarar resultado e aplicar pontuação:</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" onclick="declareResult('A')">🏆 Time A venceu</button>
-              <button class="btn btn-primary btn-sm" onclick="declareResult('empate')" style="background:#1565c0">🤝 Empate</button>
-              <button class="btn btn-primary btn-sm" onclick="declareResult('B')" style="background:#c62828">🏆 Time B venceu</button>
+            <div style="font-size:11px;font-weight:600;color:var(--green-dark);margin-bottom:6px">Resultado do último jogo e pontuação do campeonato:</div>
+            <div style="font-size:11px;color:var(--gray3);margin-bottom:8px">${res.result ? 'Resultado atual salvo: '+resultLabel : 'Nenhum resultado salvo ainda.'}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <select id="last-game-result-select" style="flex:1;min-width:180px;padding:9px 10px;border:1px solid var(--gray2);border-radius:10px;background:#fff">
+                <option value="">Selecione o resultado</option>
+                <option value="A" ${res.result==='A'?'selected':''}>🏆 Time A venceu</option>
+                <option value="empate" ${res.result==='empate'?'selected':''}>🤝 Empate</option>
+                <option value="B" ${res.result==='B'?'selected':''}>🏆 Time B venceu</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="saveLastGameResultManual()">${res.result ? 'Salvar alteração' : 'Salvar resultado'}</button>
             </div>
           </div>
         `:''}
@@ -1125,11 +1130,8 @@ function renderPlayers(){
     const hasCode = !!p.activation_code;
     const statusIcon = activated?'🟢':hasCode?'🟡':'🔴';
     const statusTip = activated?'Ativo':hasCode?`Código: ${p.activation_code}`:'Sem código';
-    const mensalidadeLabel = p.mens_ok?'✓ Em dia':'✗ Em aberto';
-    const isFallbackAdmin = !p.is_admin && ADMIN_PHONES.includes(p.phone);
-    const adminLabel = isFallbackAdmin ? '🔒 Admin por fallback' : (playerIsAdmin(p)?'✅ Admin':'— Jogador padrão');
     return `
-    <div class="admin-row" style="flex-wrap:wrap;gap:6px;align-items:flex-start">
+    <div class="admin-row" style="flex-wrap:wrap;gap:6px">
       <div class="player-avatar ${activated?'av-green':'av-gray'}" style="width:32px;height:32px;font-size:12px">${getInitials(p.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
@@ -1143,23 +1145,6 @@ function renderPlayers(){
           ${!activated?`<button class="icon-btn" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="generateCode('${p.id}')">Gerar código</button>`:''}
           ${activated?`<button class="icon-btn" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="resetPassword('${p.id}')">Resetar senha</button>`:''}
         </div>
-        ${isAdmin()?`
-        <div class="inline-toggles">
-          <div class="toggle-row">
-            <div>
-              <div style="font-size:13px;font-weight:600">Mensalidade em dia</div>
-              <div style="font-size:11px;color:var(--gray3)">${mensalidadeLabel}</div>
-            </div>
-            <button class="toggle ${p.mens_ok?'on':''}" onclick="togglePlayerField('${p.id}','mens_ok',${p.mens_ok?'false':'true'})"></button>
-          </div>
-          <div class="toggle-row">
-            <div>
-              <div style="font-size:13px;font-weight:600">Usuário administrador</div>
-              <div style="font-size:11px;color:var(--gray3)">${adminLabel}</div>
-            </div>
-            <button class="toggle ${playerIsAdmin(p)?'on':''}" onclick="${isFallbackAdmin ? "toast('Este admin vem do fallback ADMIN_PHONES')" : `togglePlayerField('${p.id}','is_admin',${playerIsAdmin(p)?'false':'true'})`}"></button>
-          </div>
-        </div>`:''}
       </div>
       <button class="icon-btn" onclick="startEdit('${p.id}')">✏️</button>
       <button class="icon-btn del" onclick="deletePlayer('${p.id}')">✕</button>
@@ -1178,31 +1163,6 @@ function renderPlayers(){
 function startEdit(id){ editingPlayer=id; render(); }
 function cancelEdit(){ editingPlayer=null; render(); }
 
-async function togglePlayerField(id, field, value){
-  const player = appData.players.find(p=>p.id===id);
-  if(!player || !isAdmin()) return;
-
-  const payload = {[field]: value};
-  const {data,error} = await sb.from('players').update(payload).eq('id',id).select().single();
-  if(error){ toast('Erro: '+error.message,'err'); return; }
-
-  const idx = appData.players.findIndex(p=>p.id===id);
-  if(idx>=0) appData.players[idx] = data;
-
-  if(currentPlayer && currentPlayer.id===id){
-    currentPlayer = data;
-    if(currentPhone!==data.phone) currentPhone = data.phone;
-  }
-
-  toast(field==='mens_ok' ? 'Mensalidade atualizada!' : 'Permissão de admin atualizada!');
-
-  if(currentPlayer && currentPlayer.id===id && field==='is_admin' && !playerIsAdmin(data) && currentTab==='config'){
-    currentTab = 'home';
-  }
-
-  render();
-}
-
 function renderPlayerForm(){
   const c = document.getElementById('content');
   const isNew = editingPlayer==='new';
@@ -1219,8 +1179,12 @@ function renderPlayerForm(){
       <div class="form-group"><label>Posição</label>
         <select id="ep-pos">${POSITIONS.map(pos=>`<option ${p?.position===pos?'selected':''}>${pos}</option>`).join('')}</select>
       </div>
-      <div style="font-size:12px;color:var(--gray3);background:var(--gray);border-radius:10px;padding:10px 12px;line-height:1.5">
-        Mensalidade em dia e permissão de administrador são controladas diretamente na lista de jogadores para evitar regressões na edição.
+      <div class="toggle-row">
+        <div>
+          <div style="font-size:13px;font-weight:600">Mensalidade em dia</div>
+          <div style="font-size:11px;color:var(--gray3)">Jogador está adimplente</div>
+        </div>
+        <button class="toggle ${p?.mens_ok?'on':''}" id="mens-toggle" onclick="this.classList.toggle('on')"></button>
       </div>
       <button class="btn btn-primary" style="margin-top:14px" id="save-btn" onclick="savePlayer()">Salvar</button>
       <button class="btn btn-secondary" onclick="cancelEdit()">Cancelar</button>
@@ -1233,9 +1197,8 @@ async function savePlayer(){
   const phone = document.getElementById('ep-phone')?.value?.replace(/\D/g,'');
   const birth_date = document.getElementById('ep-birth')?.value;
   const position = document.getElementById('ep-pos')?.value;
-  const existing = editingPlayer==='new' ? null : appData.players.find(p=>p.id===editingPlayer);
-  const mens_ok = existing?.mens_ok ?? false;
-  const is_admin = existing?.is_admin ?? false;
+  const mens_ok = document.getElementById('mens-toggle')?.classList.contains('on');
+  const is_admin = document.getElementById('admin-toggle')?.classList.contains('on');
   if(!name||!phone){ toast('Nome e celular obrigatórios','err'); return; }
 
   const btn = document.getElementById('save-btn');
@@ -1251,7 +1214,7 @@ async function savePlayer(){
     if(error){ toast('Erro: '+error.message,'err'); if(btn) btn.disabled=false; return; }
     const idx = appData.players.findIndex(p=>p.id===editingPlayer);
     if(idx>=0) appData.players[idx]=data;
-    if(currentPlayer && currentPlayer.id===editingPlayer){ currentPlayer=data; currentPhone=data.phone; sessionStorage.setItem('pelada_phone', currentPhone); }
+    if(currentPhone===phone) currentPlayer=data;
   }
   toast('Jogador salvo!');
   editingPlayer=null;
@@ -1280,7 +1243,10 @@ function renderConfig(){
         <div class="form-group"><label>Data</label><input type="date" id="g-date" value="${g?.game_date||''}"></div>
         <div class="form-group"><label>Horário</label><input type="time" id="g-time" value="${g?.game_time||''}"></div>
       </div>
-      <div class="form-group"><label>Máx. jogadores</label><input type="number" id="g-max" value="${g?.max_players||14}" min="2" max="60"></div>
+      <div class="row-2">
+        <div class="form-group"><label>Máx. jogadores</label><input type="number" id="g-max" value="${g?.max_players||14}" min="2" max="60"></div>
+        <div class="form-group"><label>Venc. mensalidade</label><input type="date" id="g-mens" value="${g?.mens_expire_date||''}"></div>
+      </div>
       <div class="toggle-row">
         <div>
           <div style="font-size:13px;font-weight:600">Inscrições abertas</div>
@@ -1288,13 +1254,7 @@ function renderConfig(){
         </div>
         <button class="toggle ${g?.open?'on':''}" id="game-open-toggle" onclick="this.classList.toggle('on')"></button>
       </div>
-      <button class="btn btn-primary" style="margin-top:14px" id="save-cfg-btn" onclick="saveConfig()">Salvar próximo jogo</button>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Financeiro</div>
-      <div class="form-group"><label>Venc. mensalidade</label><input type="date" id="g-mens" value="${g?.mens_expire_date||''}"></div>
-      <button class="btn btn-primary" id="save-finance-btn" onclick="saveFinanceConfig()">Salvar financeiro</button>
+      <button class="btn btn-primary" style="margin-top:14px" id="save-cfg-btn" onclick="saveConfig()">Salvar configurações</button>
     </div>
 
     <div class="card">
@@ -1330,12 +1290,13 @@ async function saveConfig(){
   const date = document.getElementById('g-date')?.value;
   const time = document.getElementById('g-time')?.value;
   const max = parseInt(document.getElementById('g-max')?.value)||14;
+  const mens = document.getElementById('g-mens')?.value||null;
   const open = document.getElementById('game-open-toggle')?.classList.contains('on');
   const btn = document.getElementById('save-cfg-btn');
   if(btn) btn.disabled=true;
 
   const wasOpen = appData.game?.open;
-  const payload = {game_date:date||null,game_time:time||null,max_players:max,open};
+  const payload = {game_date:date||null,game_time:time||null,max_players:max,mens_expire_date:mens,open};
 
   let error, data;
   if(appData.game?.id){
@@ -1354,28 +1315,6 @@ async function saveConfig(){
     appData.notifications = res.data||[];
   }
   toast('Configurações salvas!');
-  if(btn) btn.disabled=false;
-  render();
-}
-
-async function saveFinanceConfig(){
-  const mens = document.getElementById('g-mens')?.value||null;
-  const btn = document.getElementById('save-finance-btn');
-  if(btn) btn.disabled=true;
-
-  const payload = {mens_expire_date:mens};
-  let error, data;
-  if(appData.game?.id){
-    const res = await sb.from('games').update(payload).eq('id',appData.game.id).select().single();
-    error=res.error; data=res.data;
-  } else {
-    const res = await sb.from('games').insert({game_date:null,game_time:null,max_players:14,open:false,...payload}).select().single();
-    error=res.error; data=res.data;
-  }
-
-  if(error){ toast('Erro: '+error.message,'err'); if(btn) btn.disabled=false; return; }
-  appData.game = data;
-  toast('Financeiro salvo!');
   if(btn) btn.disabled=false;
   render();
 }
@@ -2352,6 +2291,13 @@ function getMyWaitlistPosition(){
   return appData.game.sort_result.waitlist.indexOf(currentPlayer.id);
 }
 
+
+function saveLastGameResultManual(){
+  const sel = document.getElementById('last-game-result-select');
+  const value = sel?.value;
+  if(!value){ toast('Selecione um resultado','err'); return; }
+  declareResult(value);
+}
 
 // ---- DECLARE GAME RESULT & APPLY CHAMPIONSHIP POINTS ----
 async function declareResult(result){
