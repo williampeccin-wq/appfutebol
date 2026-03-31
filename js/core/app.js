@@ -1,5 +1,7 @@
-import { getState, replaceState, subscribe } from './state.js';
+import { getState, patchState, replaceState, subscribe } from './state.js';
 import { load, save } from '../services/storage.local.js';
+import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
+import { renderAuthScreen } from '../modules/auth/auth.view.js';
 
 const appElement = document.getElementById('app');
 
@@ -8,6 +10,7 @@ init();
 function init() {
   const data = load();
   replaceState(data);
+  restoreSession();
 
   subscribe((snapshot) => {
     persist(snapshot);
@@ -22,6 +25,14 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  const currentPlayer = getCurrentPlayer();
+
+  if (!currentPlayer) {
+    appElement.innerHTML = renderAuthScreen(snapshot.ui);
+    bindAuthEvents();
+    return;
+  }
+
   const activeTab = snapshot.ui.currentTab || 'home';
 
   appElement.innerHTML = `
@@ -29,9 +40,12 @@ function render(snapshot) {
       <div class="header-row">
         <div>
           <div class="header-title">HARMONIA</div>
-          <div class="header-subtitle">Base limpa da fase 1 · rebuild do zero</div>
+          <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
-        <div class="header-badge">Mock local ativo</div>
+        <div class="header-actions">
+          <div class="header-badge">${currentPlayer.is_admin ? 'Admin' : currentPlayer.role === 'carne' ? 'Carne' : 'Jogador'}</div>
+          <button class="header-logout" type="button" id="logout-button">Sair</button>
+        </div>
       </div>
     </div>
 
@@ -43,11 +57,98 @@ function render(snapshot) {
     </nav>
 
     <main class="content">
-      ${renderTab(snapshot, activeTab)}
+      ${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
   `;
 
-  bindNavEvents();
+  bindAppEvents();
+}
+
+function bindAuthEvents() {
+  const modeButtons = appElement.querySelectorAll('[data-auth-mode]');
+  modeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      patchState({
+        ui: {
+          authMode: button.dataset.authMode,
+          authMessage: null,
+        },
+      });
+    });
+  });
+
+  const loginForm = appElement.querySelector('#login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formData = new FormData(loginForm);
+      const result = login(formData.get('phone'), formData.get('password'));
+      if (!result.ok) {
+        patchState({
+          ui: {
+            authMode: 'login',
+            authMessage: { type: 'error', text: result.message },
+          },
+        });
+      }
+    });
+  }
+
+  const registerForm = appElement.querySelector('#register-form');
+  if (registerForm) {
+    const roleSelect = registerForm.querySelector('#register-role');
+    const positionGroup = registerForm.querySelector('#position-group');
+    const togglePosition = () => {
+      const role = roleSelect?.value === 'carne' ? 'carne' : 'jogador';
+      if (positionGroup) {
+        positionGroup.style.display = role === 'carne' ? 'none' : 'grid';
+      }
+    };
+
+    togglePosition();
+    roleSelect?.addEventListener('change', togglePosition);
+
+    registerForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formData = new FormData(registerForm);
+      const result = register({
+        name: formData.get('name'),
+        phone: formData.get('phone'),
+        birthDate: formData.get('birthDate'),
+        role: formData.get('role'),
+        position: formData.get('position'),
+        password: formData.get('password'),
+        passwordConfirm: formData.get('passwordConfirm'),
+      });
+
+      if (!result.ok) {
+        patchState({
+          ui: {
+            authMode: 'register',
+            authMessage: { type: 'error', text: result.message },
+          },
+        });
+      }
+    });
+  }
+}
+
+function bindAppEvents() {
+  const logoutButton = appElement.querySelector('#logout-button');
+  logoutButton?.addEventListener('click', () => logout());
+
+  const buttons = appElement.querySelectorAll('[data-tab]');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const snapshot = getState();
+      patchState({
+        ui: {
+          ...snapshot.ui,
+          currentTab: button.dataset.tab,
+        },
+      });
+    });
+  });
 }
 
 function renderNavButton(tab, label, activeTab) {
@@ -55,43 +156,26 @@ function renderNavButton(tab, label, activeTab) {
   return `<button class="nav-button ${activeClass}" type="button" data-tab="${tab}">${label}</button>`;
 }
 
-function bindNavEvents() {
-  const buttons = appElement.querySelectorAll('[data-tab]');
-  buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const snapshot = getState();
-      const next = {
-        ...snapshot,
-        ui: {
-          ...snapshot.ui,
-          currentTab: button.dataset.tab,
-        },
-      };
-      replaceState(next);
-    });
-  });
-}
-
-function renderTab(snapshot, activeTab) {
+function renderTab(snapshot, activeTab, currentPlayer) {
   switch (activeTab) {
     case 'players':
       return renderPlayers(snapshot);
     case 'championship':
       return renderChampionship(snapshot);
     case 'config':
-      return renderConfig(snapshot);
+      return renderConfig(snapshot, currentPlayer);
     case 'home':
     default:
-      return renderHome(snapshot);
+      return renderHome(snapshot, currentPlayer);
   }
 }
 
-function renderHome(snapshot) {
+function renderHome(snapshot, currentPlayer) {
   const game = snapshot.game;
   const confirmedCount = snapshot.confirmations.filter((item) => item.confirmed).length;
   const maxPlayers = game?.max_players || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
-  const mensalidade = buildMensalidadeMeta(game);
+  const mensalidade = buildMensalidadeMeta(game, currentPlayer);
 
   return `
     <section class="section-stack">
@@ -201,24 +285,28 @@ function renderChampionship(snapshot) {
   `;
 }
 
-function renderConfig(snapshot) {
+function renderConfig(snapshot, currentPlayer) {
+  if (!currentPlayer.is_admin) {
+    return `
+      <section class="section-stack">
+        <section class="card">
+          <div class="card-title">Configuração</div>
+          <p class="footer-note">Somente administradores terão acesso às configurações avançadas nas próximas fases.</p>
+        </section>
+      </section>
+    `;
+  }
+
   return `
     <section class="section-stack">
       <section class="card">
-        <div class="card-title">Fase 1 concluída</div>
+        <div class="card-title">Fase 2 concluída</div>
         <div class="info-block">
-          <div class="info-line">• Base nova criada do zero</div>
-          <div class="info-line">• Estado central ativo</div>
-          <div class="info-line">• Storage local funcional</div>
-          <div class="info-line">• UI mobile baseada no visual atual</div>
+          <div class="info-line">• Login com telefone e senha</div>
+          <div class="info-line">• Cadastro aberto com validação de telefone único</div>
+          <div class="info-line">• Sessão persistida em sessionStorage</div>
+          <div class="info-line">• Perfis jogador e carne separados</div>
         </div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Próxima fase</div>
-        <p class="footer-note">
-          A próxima etapa deve construir autenticação real com telefone e senha, mantendo esta base limpa e sem herdar a lógica frágil do monólito anterior.
-        </p>
       </section>
 
       <section class="card">
@@ -231,7 +319,22 @@ function renderConfig(snapshot) {
   `;
 }
 
-function buildMensalidadeMeta(game) {
+function buildHeaderSubtitle(currentPlayer) {
+  if (currentPlayer.role === 'carne') {
+    return `${currentPlayer.name} · acompanhamento da carne`;
+  }
+  return `${currentPlayer.name} · acesso autenticado`;
+}
+
+function buildMensalidadeMeta(game, currentPlayer) {
+  if (currentPlayer.role === 'carne') {
+    return {
+      className: 'is-ok',
+      title: 'Perfil carne',
+      subline: 'Esse perfil não depende de mensalidade do futebol para acessar o app.',
+    };
+  }
+
   if (!game?.mens_expire_date) {
     return {
       className: 'is-warn',
@@ -245,20 +348,19 @@ function buildMensalidadeMeta(game) {
 
   const expireDate = new Date(`${game.mens_expire_date}T12:00:00`);
 
-  if (expireDate < today) {
+  if (!currentPlayer.mens_ok && expireDate < today) {
     return {
       className: 'is-danger',
       title: 'Pendente',
-      subline: `Mensalidade vencida em ${formatDate(game.mens_expire_date)}.`,
+      subline: `Sua mensalidade venceu em ${formatDate(game.mens_expire_date)}.`,
     };
   }
 
-  const diffInDays = Math.ceil((expireDate.getTime() - today.getTime()) / 86400000);
-  if (diffInDays <= 3) {
+  if (!currentPlayer.mens_ok) {
     return {
       className: 'is-warn',
       title: 'Atenção',
-      subline: `Mensalidade vence em ${formatDate(game.mens_expire_date)}.`,
+      subline: `Seu pagamento ainda não está marcado como em dia para o ciclo com vencimento em ${formatDate(game.mens_expire_date)}.`,
     };
   }
 

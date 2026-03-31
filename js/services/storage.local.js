@@ -14,7 +14,7 @@ const defaultSeed = {
       position: 'meia',
       mens_ok: true,
       is_admin: true,
-      password_hash: '',
+      password_hash: '123456',
     },
     {
       id: 'p2',
@@ -25,7 +25,7 @@ const defaultSeed = {
       position: 'zag',
       mens_ok: true,
       is_admin: false,
-      password_hash: '',
+      password_hash: '123456',
     },
     {
       id: 'p3',
@@ -36,7 +36,7 @@ const defaultSeed = {
       position: 'atk',
       mens_ok: false,
       is_admin: false,
-      password_hash: '',
+      password_hash: '123456',
     },
     {
       id: 'p4',
@@ -47,7 +47,7 @@ const defaultSeed = {
       position: null,
       mens_ok: false,
       is_admin: false,
-      password_hash: '',
+      password_hash: '123456',
     },
   ],
   game: {
@@ -92,6 +92,8 @@ const defaultSeed = {
   ],
   ui: {
     currentTab: 'home',
+    authMode: 'login',
+    authMessage: null,
   },
 };
 
@@ -104,15 +106,16 @@ export function load() {
 
   try {
     const parsed = JSON.parse(raw);
+    const seed = structuredClone(defaultSeed);
     return {
-      ...structuredClone(defaultSeed),
+      ...seed,
       ...parsed,
       session: {
-        ...structuredClone(defaultSeed).session,
+        ...seed.session,
         ...(parsed.session || {}),
       },
       ui: {
-        ...structuredClone(defaultSeed).ui,
+        ...seed.ui,
         ...(parsed.ui || {}),
       },
     };

@@ -12,6 +12,8 @@ export const state = {
   notifications: [],
   ui: {
     currentTab: 'home',
+    authMode: 'login',
+    authMessage: null,
   },
 };
 
