@@ -2,6 +2,8 @@ import { getState, patchState, replaceState, subscribe } from './state.js';
 import { load, save } from '../services/storage.local.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
+import { renderPlayersScreen } from '../modules/players/players.view.js';
+import { canManagePresence, isConfirmed, toggleConfirmation } from '../modules/game/game.service.js';
 
 const appElement = document.getElementById('app');
 
@@ -33,7 +35,12 @@ function render(snapshot) {
     return;
   }
 
-  const activeTab = snapshot.ui.currentTab || 'home';
+  const requestedTab = snapshot.ui.currentTab || 'home';
+  const activeTab = !currentPlayer.is_admin && requestedTab === 'config' ? 'home' : requestedTab;
+  if (activeTab !== requestedTab) {
+    patchState({ ui: { currentTab: activeTab } });
+    return;
+  }
 
   appElement.innerHTML = `
     <div class="header">
@@ -53,7 +60,7 @@ function render(snapshot) {
       ${renderNavButton('home', 'Home', activeTab)}
       ${renderNavButton('players', 'Jogadores', activeTab)}
       ${renderNavButton('championship', 'Campeonato', activeTab)}
-      ${renderNavButton('config', 'Config', activeTab)}
+      ${currentPlayer.is_admin ? renderNavButton('config', 'Config', activeTab) : ''}
     </nav>
 
     <main class="content">
@@ -61,7 +68,7 @@ function render(snapshot) {
     </main>
   `;
 
-  bindAppEvents();
+  bindAppEvents(currentPlayer);
 }
 
 function bindAuthEvents() {
@@ -133,21 +140,18 @@ function bindAuthEvents() {
   }
 }
 
-function bindAppEvents() {
-  const logoutButton = appElement.querySelector('#logout-button');
-  logoutButton?.addEventListener('click', () => logout());
+function bindAppEvents(currentPlayer) {
+  appElement.querySelector('#logout-button')?.addEventListener('click', () => logout());
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
-      const snapshot = getState();
-      patchState({
-        ui: {
-          ...snapshot.ui,
-          currentTab: button.dataset.tab,
-        },
-      });
+      patchState({ ui: { currentTab: button.dataset.tab } });
     });
+  });
+
+  appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
+    toggleConfirmation(currentPlayer.id);
   });
 }
 
@@ -159,7 +163,7 @@ function renderNavButton(tab, label, activeTab) {
 function renderTab(snapshot, activeTab, currentPlayer) {
   switch (activeTab) {
     case 'players':
-      return renderPlayers(snapshot);
+      return renderPlayersScreen(snapshot, currentPlayer);
     case 'championship':
       return renderChampionship(snapshot);
     case 'config':
@@ -176,6 +180,9 @@ function renderHome(snapshot, currentPlayer) {
   const maxPlayers = game?.max_players || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const mensalidade = buildMensalidadeMeta(game, currentPlayer);
+  const carneStatus = snapshot.carne.some((entry) => entry.player_id === currentPlayer.id && entry.active);
+  const confirmed = isConfirmed(currentPlayer.id);
+  const presenceGuard = canManagePresence(currentPlayer, game);
 
   return `
     <section class="section-stack">
@@ -189,6 +196,37 @@ function renderHome(snapshot, currentPlayer) {
           </div>
           <div class="progress-text">${confirmedCount} / ${maxPlayers} confirmados</div>
         </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Usuário logado</div>
+        <div class="session-card compact">
+          <div class="session-main">
+            <div class="avatar avatar-lg">${getInitials(currentPlayer.name)}</div>
+            <div>
+              <div class="row-title">${currentPlayer.name}</div>
+              <div class="row-subtitle">${currentPlayer.is_admin ? 'Administrador' : currentPlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(currentPlayer.position)} · ${formatPhone(currentPlayer.phone)}</div>
+            </div>
+          </div>
+          <div class="chip-row">
+            <span class="tag ${currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
+            <span class="tag is-neutral">${carneStatus ? 'Grupo da carne ativo' : 'Sem grupo da carne'}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Confirmação de presença</div>
+        ${presenceGuard.ok ? `
+          <div class="info-block">
+            <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
+            <div class="actions">
+              <button class="btn btn-primary" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : 'Confirmar presença'}</button>
+            </div>
+          </div>
+        ` : `
+          <p class="footer-note">${presenceGuard.message}</p>
+        `}
       </section>
 
       <section class="card">
@@ -215,32 +253,6 @@ function renderHome(snapshot, currentPlayer) {
         <div class="info-block">
           ${snapshot.notifications.map((notification) => `
             <div class="info-line">• ${notification.message}</div>
-          `).join('')}
-        </div>
-      </section>
-    </section>
-  `;
-}
-
-function renderPlayers(snapshot) {
-  const players = [...snapshot.players].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-
-  return `
-    <section class="section-stack">
-      <section class="card">
-        <div class="card-title">Jogadores e perfis</div>
-        <div class="placeholder-list">
-          ${players.map((player) => `
-            <div class="placeholder-row">
-              <div class="placeholder-main">
-                <div class="avatar">${getInitials(player.name)}</div>
-                <div>
-                  <div class="row-title">${player.name}</div>
-                  <div class="row-subtitle">${player.role === 'carne' ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
-                </div>
-              </div>
-              <div class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Em dia' : 'Pendente'}</div>
-            </div>
           `).join('')}
         </div>
       </section>
@@ -290,8 +302,8 @@ function renderConfig(snapshot, currentPlayer) {
     return `
       <section class="section-stack">
         <section class="card">
-          <div class="card-title">Configuração</div>
-          <p class="footer-note">Somente administradores terão acesso às configurações avançadas nas próximas fases.</p>
+          <div class="card-title">Acesso restrito</div>
+          <p class="footer-note">Somente administradores podem acessar a configuração do sistema.</p>
         </section>
       </section>
     `;
@@ -300,38 +312,31 @@ function renderConfig(snapshot, currentPlayer) {
   return `
     <section class="section-stack">
       <section class="card">
-        <div class="card-title">Fase 2 concluída</div>
+        <div class="card-title">Fase 4 concluída</div>
         <div class="info-block">
-          <div class="info-line">• Login com telefone e senha</div>
-          <div class="info-line">• Cadastro aberto com validação de telefone único</div>
-          <div class="info-line">• Sessão persistida em sessionStorage</div>
-          <div class="info-line">• Perfis jogador e carne separados</div>
+          <div class="info-line">• Confirmação de presença integrada à Home</div>
+          <div class="info-line">• Toggle confirmar / cancelar persistido em storage local</div>
+          <div class="info-line">• Perfis carne continuam fora da confirmação do jogo</div>
+          <div class="info-line">• Estrutura pronta para regras de mensalidade na próxima fase</div>
         </div>
       </section>
 
       <section class="card">
-        <div class="card-title">Snapshot técnico</div>
+        <div class="card-title">Admin snapshot</div>
         <p class="footer-note">
-          Players: ${snapshot.players.length} · Confirmações: ${snapshot.confirmations.length} · Notificações: ${snapshot.notifications.length}
+          Players: ${snapshot.players.length} · Confirmações ativas: ${snapshot.confirmations.filter((item) => item.confirmed).length}
         </p>
       </section>
     </section>
   `;
 }
 
-function buildHeaderSubtitle(currentPlayer) {
-  if (currentPlayer.role === 'carne') {
-    return `${currentPlayer.name} · acompanhamento da carne`;
-  }
-  return `${currentPlayer.name} · acesso autenticado`;
-}
-
 function buildMensalidadeMeta(game, currentPlayer) {
   if (currentPlayer.role === 'carne') {
     return {
       className: 'is-ok',
-      title: 'Perfil carne',
-      subline: 'Esse perfil não depende de mensalidade do futebol para acessar o app.',
+      title: 'Não aplicável',
+      subline: 'Perfis somente carne não dependem da mensalidade do futebol para acessar o sistema.',
     };
   }
 
@@ -343,24 +348,32 @@ function buildMensalidadeMeta(game, currentPlayer) {
     };
   }
 
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-
-  const expireDate = new Date(`${game.mens_expire_date}T12:00:00`);
-
-  if (!currentPlayer.mens_ok && expireDate < today) {
+  if (!currentPlayer.mens_ok) {
     return {
       className: 'is-danger',
       title: 'Pendente',
-      subline: `Sua mensalidade venceu em ${formatDate(game.mens_expire_date)}.`,
+      subline: 'Sua mensalidade está marcada como pendente no sistema.',
     };
   }
 
-  if (!currentPlayer.mens_ok) {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const expireDate = new Date(`${game.mens_expire_date}T12:00:00`);
+
+  if (expireDate < today) {
+    return {
+      className: 'is-danger',
+      title: 'Pendente',
+      subline: `Mensalidade vencida em ${formatDate(game.mens_expire_date)}.`,
+    };
+  }
+
+  const diffInDays = Math.ceil((expireDate.getTime() - today.getTime()) / 86400000);
+  if (diffInDays <= 3) {
     return {
       className: 'is-warn',
       title: 'Atenção',
-      subline: `Seu pagamento ainda não está marcado como em dia para o ciclo com vencimento em ${formatDate(game.mens_expire_date)}.`,
+      subline: `Mensalidade vence em ${formatDate(game.mens_expire_date)}.`,
     };
   }
 
@@ -371,31 +384,25 @@ function buildMensalidadeMeta(game, currentPlayer) {
   };
 }
 
-function formatDate(value) {
-  if (!value) {
-    return '--/--/----';
-  }
+function buildHeaderSubtitle(currentPlayer) {
+  const profile = currentPlayer.is_admin ? 'Administrador' : currentPlayer.role === 'carne' ? 'Perfil carne' : getPositionLabel(currentPlayer.position);
+  return `${currentPlayer.name} · ${profile}`;
+}
 
+function formatDate(value) {
+  if (!value) return '--/--/----';
   return new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR');
 }
 
 function formatPhone(phone) {
   const digits = String(phone || '').replace(/\D/g, '');
-  if (digits.length === 11) {
-    return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-  }
-  if (digits.length === 10) {
-    return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-  }
+  if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  if (digits.length === 10) return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
   return digits;
 }
 
 function getPositionLabel(position) {
-  const labels = {
-    zag: 'Zagueiro',
-    meia: 'Meia',
-    atk: 'Atacante',
-  };
+  const labels = { zag: 'Zagueiro', meia: 'Meia', atk: 'Atacante' };
   return labels[position] || 'Sem posição';
 }
 

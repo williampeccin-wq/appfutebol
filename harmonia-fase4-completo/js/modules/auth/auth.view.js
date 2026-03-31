@@ -35,7 +35,7 @@ function renderLoginForm() {
         <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha">
       </div>
 
-      <div class="helper-text">Seed local: William / André / Lucas / Marcelo com senha <strong>123456</strong>.</div>
+      <div class="helper-text">Seed local: use o <strong>telefone</strong> cadastrado (William 48991520230, André 48999999999, Lucas 48988888888, Marcelo 48977777777) com senha <strong>123456</strong>.</div>
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Entrar</button>
