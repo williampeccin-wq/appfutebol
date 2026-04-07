@@ -5,7 +5,7 @@ export function renderAuthScreen(uiState = {}) {
   return `
     <div class="login-screen">
       <div class="login-logo">⚽</div>
-      <div class="login-title">HARMONIA</div>
+      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v2.0.5-fase6</span></div>
       <div class="login-subtitle">Entre com telefone e senha ou faça seu cadastro para participar do futebol e acompanhar a tabela da carne.</div>
 
       <section class="auth-card">
@@ -35,7 +35,7 @@ function renderLoginForm() {
         <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha">
       </div>
 
-      <div class="helper-text">Seed local: use o <strong>telefone</strong> cadastrado (William 48991520230, André 48999999999, Lucas 48988888888, Marcelo 48977777777) com senha <strong>123456</strong>.</div>
+      <div class="helper-text">Seed local: use o <strong>telefone</strong> cadastrado (William 48991520230, André 48999999999, Lucas 48988888888, Marcelo 48977777777, Carlos 48966666666) com senha <strong>123456</strong>.</div>
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Entrar</button>

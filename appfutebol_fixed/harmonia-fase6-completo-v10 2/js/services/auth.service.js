@@ -41,7 +41,7 @@ export function login(phone, password) {
     return { ok: false, message: 'Telefone não cadastrado.' };
   }
 
-  if (String(player.password_hash || '') !== normalizedPassword) {
+  if (String((player.password_hash || player.password) || '') !== normalizedPassword) {
     return { ok: false, message: 'Senha inválida.' };
   }
 

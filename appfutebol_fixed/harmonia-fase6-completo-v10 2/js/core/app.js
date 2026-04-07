@@ -4,6 +4,7 @@ import { getCurrentPlayer, login, logout, register, restoreSession } from '../se
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
 import { canManagePresence, isConfirmed, toggleConfirmation } from '../modules/game/game.service.js';
+import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 
 const appElement = document.getElementById('app');
@@ -47,7 +48,7 @@ function render(snapshot) {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="header-title">HARMONIA</div>
+          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v2.0.5-fase6</span></div>
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">
@@ -198,10 +199,12 @@ function renderHome(snapshot, currentPlayer) {
   const confirmedCount = workingSnapshot.confirmations.filter((item) => item.confirmed).length;
   const maxPlayers = game?.max_players || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
+  const vagasRestantes = maxPlayers - confirmedCount;
   const mensalidade = buildMensalidadeMeta(game, currentPlayer);
   const carneStatus = workingSnapshot.carne.some((entry) => entry.player_id === currentPlayer.id && entry.active);
   const confirmed = isConfirmed(currentPlayer.id);
   const presenceGuard = canManagePresence(currentPlayer, game);
+  const capacityOk = hasCapacity();
 
   return `
     <section class="section-stack">
@@ -236,7 +239,7 @@ function renderHome(snapshot, currentPlayer) {
 
       <section class="card">
         <div class="card-title">Confirmação de presença</div>
-        ${presenceGuard.ok ? `
+        ${(presenceGuard.ok && capacityOk) ? `
           <div class="info-block">
             <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
             <div class="actions">
@@ -245,6 +248,8 @@ function renderHome(snapshot, currentPlayer) {
           </div>
         ` : `
           <div class="info-block">
+            <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
+            <p class="footer-note">${!capacityOk ? 'O jogo já está cheio.' : presenceGuard.message}</p>
             <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
             <p class="footer-note">${presenceGuard.message}</p>
           </div>

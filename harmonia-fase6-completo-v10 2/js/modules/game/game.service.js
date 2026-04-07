@@ -1,6 +1,14 @@
 import { canConfirm } from '../finance/finance.service.js';
 import { getState, patchState } from '../../core/state.js';
 
+
+export function hasCapacity() {
+  const snapshot = getState();
+  const confirmedCount = snapshot.confirmations.filter(c => c.confirmed).length;
+  const max = snapshot.game?.max_players || 0;
+  return confirmedCount < max;
+}
+
 export function isConfirmed(playerId) {
   const snapshot = getState();
   return snapshot.confirmations.some((item) => item.player_id === playerId && item.confirmed);
@@ -10,7 +18,10 @@ export function toggleConfirmation(playerId) {
   const snapshot = getState();
   const player = snapshot.players.find(p => p.id === playerId);
   if (!canConfirm(player)) {
-    return; // bloqueia ação
+    return; // bloqueia por mensalidade/característica
+  }
+  if (!hasCapacity()) {
+    return; // bloqueia por lotação
   }
 
   const existing = snapshot.confirmations.find(

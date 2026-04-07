@@ -49,11 +49,22 @@ const defaultSeed = {
       is_admin: false,
       password_hash: '123456',
     },
+    {
+      id: 'p5',
+      name: 'Carlos',
+      phone: '48966666666',
+      birthDate: '1990-06-20',
+      role: 'jogador',
+      position: 'meia',
+      mens_ok: true,
+      is_admin: false,
+      password_hash: '123456',
+    },
   ],
   game: {
     game_date: '2026-04-01',
     game_time: '20:30',
-    max_players: 14,
+    max_players: 2,
     mens_expire_date: '2026-04-10',
     open: true,
     sort_result: null,
@@ -62,6 +73,7 @@ const defaultSeed = {
     { player_id: 'p1', confirmed: true, timestamp: '2026-03-29T18:00:00.000Z' },
     { player_id: 'p2', confirmed: true, timestamp: '2026-03-29T18:05:00.000Z' },
     { player_id: 'p3', confirmed: false, timestamp: null },
+    { player_id: 'p5', confirmed: false, timestamp: null },
   ],
   championship: {
     id: 'champ-2026-01',
@@ -72,6 +84,7 @@ const defaultSeed = {
       { player_id: 'p1', points: 14 },
       { player_id: 'p2', points: 11 },
       { player_id: 'p3', points: 8 },
+      { player_id: 'p5', points: 6 },
     ],
   },
   carne: [
@@ -97,8 +110,25 @@ const defaultSeed = {
   },
 };
 
+function ensureSeedPlayers(data) {
+  const players = Array.isArray(data.players) ? [...data.players] : [];
+  const byPhone = new Map(players.map((player) => [String(player.phone || ''), player]));
+
+  for (const seedPlayer of defaultSeed.players) {
+    if (!byPhone.has(seedPlayer.phone)) {
+      players.push(structuredClone(seedPlayer));
+    }
+  }
+
+  return {
+    ...data,
+    players,
+  };
+}
+
 export function load() {
   const raw = localStorage.getItem(STORAGE_KEY);
+
   if (!raw) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSeed));
     return structuredClone(defaultSeed);
@@ -107,7 +137,8 @@ export function load() {
   try {
     const parsed = JSON.parse(raw);
     const seed = structuredClone(defaultSeed);
-    return {
+
+    const merged = {
       ...seed,
       ...parsed,
       session: {
@@ -118,7 +149,13 @@ export function load() {
         ...seed.ui,
         ...(parsed.ui || {}),
       },
+      players: Array.isArray(parsed.players) ? parsed.players : structuredClone(seed.players),
+      confirmations: Array.isArray(parsed.confirmations) ? parsed.confirmations : structuredClone(seed.confirmations),
+      carne: Array.isArray(parsed.carne) ? parsed.carne : structuredClone(seed.carne),
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications : structuredClone(seed.notifications),
     };
+
+    return ensureSeedPlayers(merged);
   } catch (error) {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSeed));
