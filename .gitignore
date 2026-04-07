@@ -2,3 +2,5 @@
 # artefatos locais
 *.zip
 appfutebol_fixed/
+
+.DS_Store
