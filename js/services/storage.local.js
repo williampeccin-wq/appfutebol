@@ -1,3 +1,9 @@
+
+
+// WRITE SAFETY v1.24.4
+function __isValidStateForWrite(state) {
+  return state && typeof state === "object" && Array.isArray(state.players);
+}
 import { validateAndRepairState, sanitizeUi } from '../domain/state.guard.js';
 
 const STORAGE_KEY = 'harmonia_data';
@@ -296,7 +302,11 @@ export function loadLocalState() {
 
   if (!raw) {
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
+    if (__isValidStateForWrite(seed)) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+  } else {
+    console.warn("[storage.local] blocked invalid seed write");
+  }
     return seed;
   }
 
@@ -318,7 +328,11 @@ export function loadLocalState() {
   } catch (error) {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
+    if (__isValidStateForWrite(seed)) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+  } else {
+    console.warn("[storage.local] blocked invalid seed write");
+  }
     return seed;
   }
 }
@@ -331,12 +345,20 @@ export function saveLocalState(data) {
     console.warn('[state.guard] Reparos aplicados no save:', repaired.warnings);
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
+  if (__isValidStateForWrite(repaired.state)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
+  } else {
+    console.warn("[storage.local] blocked invalid repaired.state write");
+  }
 }
 
 export function resetLocalState() {
   const seed = normalizeData(structuredClone(defaultSeed));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+  if (__isValidStateForWrite(seed)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+  } else {
+    console.warn("[storage.local] blocked invalid seed write");
+  }
   return seed;
 }
 

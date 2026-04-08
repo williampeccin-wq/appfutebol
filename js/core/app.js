@@ -48,7 +48,7 @@ function render(snapshot) {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.24.2</span></div>
+          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.24.4</span></div>
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">
