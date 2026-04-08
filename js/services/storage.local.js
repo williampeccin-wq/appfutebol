@@ -1,3 +1,5 @@
+import { validateAndRepairState, sanitizeUi } from '../domain/state.guard.js';
+
 const STORAGE_KEY = 'harmonia_data';
 
 const defaultSeed = {
@@ -216,13 +218,6 @@ function mapPlayerId(id, idMap) {
   return idMap.get(id) || id;
 }
 
-function sanitizeUi(ui) {
-  return {
-    ...defaultSeed.ui,
-    ...(ui || {}),
-    authMessage: null,
-  };
-}
 
 function normalizeData(data) {
   const source = data && typeof data === 'object' ? data : {};
@@ -264,7 +259,7 @@ function normalizeData(data) {
     notifications: Array.isArray(source.notifications)
       ? source.notifications
       : structuredClone(defaultSeed.notifications),
-    ui: sanitizeUi(source.ui),
+    ui: sanitizeUi(source.ui, defaultSeed.ui),
   };
 }
 
@@ -278,7 +273,7 @@ function buildMergedData(parsed) {
       ...seed.session,
       ...(parsed.session || {}),
     },
-    ui: sanitizeUi(parsed.ui),
+    ui: sanitizeUi(parsed.ui, defaultSeed.ui),
     players: Array.isArray(parsed.players) ? parsed.players : structuredClone(seed.players),
     game: parsed.game ? { ...seed.game, ...parsed.game } : structuredClone(seed.game),
     confirmations: Array.isArray(parsed.confirmations) ? parsed.confirmations : structuredClone(seed.confirmations),
@@ -300,7 +295,7 @@ export function load() {
   const raw = localStorage.getItem(STORAGE_KEY);
 
   if (!raw) {
-    const seed = normalizeData(structuredClone(defaultSeed));
+    const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
     return seed;
   }
@@ -308,16 +303,21 @@ export function load() {
   try {
     const parsed = JSON.parse(raw);
     const normalized = normalizeData(buildMergedData(parsed));
-    const normalizedRaw = JSON.stringify(normalized);
+    const repaired = validateAndRepairState(normalized, { defaultSeed });
+    const normalizedRaw = JSON.stringify(repaired.state);
+
+    if (repaired.warnings.length) {
+      console.warn('[state.guard] Reparos aplicados no load:', repaired.warnings);
+    }
 
     if (normalizedRaw !== raw) {
       localStorage.setItem(STORAGE_KEY, normalizedRaw);
     }
 
-    return normalized;
+    return repaired.state;
   } catch (error) {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
-    const seed = normalizeData(structuredClone(defaultSeed));
+    const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
     return seed;
   }
@@ -325,7 +325,13 @@ export function load() {
 
 export function save(data) {
   const normalized = normalizeData(data);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  const repaired = validateAndRepairState(normalized, { defaultSeed });
+
+  if (repaired.warnings.length) {
+    console.warn('[state.guard] Reparos aplicados no save:', repaired.warnings);
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
 }
 
 export function reset() {
