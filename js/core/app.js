@@ -3,9 +3,9 @@ import { load, save } from '../services/storage.local.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
-import { canManagePresence, isConfirmed, toggleConfirmation } from '../modules/game/game.service.js';
+import { getPresenceGuard, isConfirmed, toggleConfirmation } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
-import { canConfirm } from '../modules/finance/finance.service.js';
+import { validateState } from '../domain/rules.engine.js';
 
 const appElement = document.getElementById('app');
 
@@ -14,6 +14,12 @@ init();
 function init() {
   const data = load();
   replaceState(data);
+
+  const validation = validateState(data);
+  if (!validation.ok) {
+    console.warn('State validation issues detected:', validation.issues);
+  }
+
   restoreSession();
 
   subscribe((snapshot) => {
@@ -48,7 +54,7 @@ function render(snapshot) {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.20.9</span></div>
+          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.22.0</span></div>
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">
@@ -177,24 +183,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
 }
 
 function renderHome(snapshot, currentPlayer) {
-  let workingSnapshot = snapshot;
-
-  if (!canConfirm(currentPlayer)) {
-    const latest = getState();
-    const hadConfirmed = latest.confirmations?.some(
-      (c) => c.player_id === currentPlayer.id && c.confirmed
-    );
-
-    if (hadConfirmed) {
-      patchState({
-        confirmations: latest.confirmations.map((c) =>
-          c.player_id === currentPlayer.id ? { ...c, confirmed: false } : c
-        ),
-      });
-      workingSnapshot = getState();
-    }
-  }
-
+  const workingSnapshot = snapshot;
   const game = workingSnapshot.game;
   const confirmedCount = workingSnapshot.confirmations.filter((item) => item.confirmed).length;
   const maxPlayers = game?.max_players || 0;
@@ -203,13 +192,13 @@ function renderHome(snapshot, currentPlayer) {
   const mensalidade = buildMensalidadeMeta(game, currentPlayer);
   const carneStatus = workingSnapshot.carne.some((entry) => entry.player_id === currentPlayer.id && entry.active);
   const confirmed = isConfirmed(currentPlayer.id);
-  const presenceGuard = canManagePresence(currentPlayer, game);
+  const presenceGuard = getPresenceGuard(currentPlayer, game);
   const capacityOk = hasCapacity();
-  const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
-  const statusNote = !confirmed && !capacityOk
-    ? 'O jogo já está cheio.'
-    : presenceGuard.ok
-      ? ''
+  const canRenderPresenceAction = presenceGuard.ok;
+  const statusNote = confirmed
+    ? ''
+    : !capacityOk && !presenceGuard.decision.canConfirm
+      ? 'O jogo já está cheio.'
       : presenceGuard.message;
 
   return `

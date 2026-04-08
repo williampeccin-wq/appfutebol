@@ -1,4 +1,5 @@
 import { getState, patchState } from '../core/state.js';
+import { canLogin, normalizePhone } from '../domain/rules.engine.js';
 
 const SESSION_KEY = 'harmonia_session_player_id';
 
@@ -36,22 +37,19 @@ export function login(phone, password) {
 
   const snapshot = getState();
   const player = snapshot.players.find((item) => normalizePhone(item.phone) === cleanPhone);
+  const decision = canLogin(player, normalizedPassword);
 
-  if (!player) {
-    return { ok: false, message: 'Telefone não cadastrado.' };
+  if (!decision.ok) {
+    return { ok: false, message: decision.message };
   }
 
-  if (String(player.password_hash || '') !== normalizedPassword) {
-    return { ok: false, message: 'Senha inválida.' };
-  }
-
-  sessionStorage.setItem(SESSION_KEY, player.id);
+  sessionStorage.setItem(SESSION_KEY, decision.player.id);
   patchState({
-    session: { playerId: player.id },
+    session: { playerId: decision.player.id },
     ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
   });
 
-  return { ok: true, player };
+  return { ok: true, player: decision.player };
 }
 
 export function register(payload) {
@@ -120,10 +118,6 @@ export function logout() {
     session: { playerId: null },
     ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
   });
-}
-
-function normalizePhone(value) {
-  return String(value || '').replace(/\D/g, '');
 }
 
 function normalizePosition(value) {

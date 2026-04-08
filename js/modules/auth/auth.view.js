@@ -5,7 +5,7 @@ export function renderAuthScreen(uiState = {}) {
   return `
     <div class="login-screen">
       <div class="login-logo">⚽</div>
-      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.20.8</span></div>
+      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.22.0</span></div>
       <div class="login-subtitle">Entre com telefone e senha ou faça seu cadastro para participar do futebol e acompanhar a tabela da carne.</div>
 
       <section class="auth-card">
