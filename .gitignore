@@ -4,3 +4,6 @@
 appfutebol_fixed/
 
 .DS_Store
+
+# builds locais
+_builds/
