@@ -1,5 +1,5 @@
 import { getState, patchState, replaceState, subscribe } from './state.js';
-import { load, save } from '../services/storage.local.js';
+import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
@@ -12,7 +12,7 @@ const appElement = document.getElementById('app');
 init();
 
 function init() {
-  const data = load();
+  const data = loadPersistedState();
   replaceState(data);
   restoreSession();
 
@@ -25,7 +25,7 @@ function init() {
 }
 
 function persist(snapshot) {
-  save(snapshot);
+  savePersistedState(snapshot);
 }
 
 function render(snapshot) {
@@ -48,7 +48,7 @@ function render(snapshot) {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.23.0</span></div>
+          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.24.1</span></div>
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">

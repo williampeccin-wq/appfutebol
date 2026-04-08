@@ -26,6 +26,11 @@ export function getPresenceGuard(player, game) {
   };
 }
 
+
+export function canManagePresence(player, game) {
+  return getPresenceGuard(player, game);
+}
+
 export function toggleConfirmation(playerId) {
   const snapshot = getState();
   const player = snapshot.players.find((item) => item.id === playerId);

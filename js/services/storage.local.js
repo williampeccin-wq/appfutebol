@@ -291,7 +291,7 @@ function buildMergedData(parsed) {
   };
 }
 
-export function load() {
+export function loadLocalState() {
   const raw = localStorage.getItem(STORAGE_KEY);
 
   if (!raw) {
@@ -323,7 +323,7 @@ export function load() {
   }
 }
 
-export function save(data) {
+export function saveLocalState(data) {
   const normalized = normalizeData(data);
   const repaired = validateAndRepairState(normalized, { defaultSeed });
 
@@ -334,8 +334,13 @@ export function save(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
 }
 
-export function reset() {
+export function resetLocalState() {
   const seed = normalizeData(structuredClone(defaultSeed));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
   return seed;
 }
+
+
+export const load = loadLocalState;
+export const save = saveLocalState;
+export const reset = resetLocalState;
