@@ -1,3 +1,4 @@
+import { APP_VERSION } from "../../core/version.js";
 export function renderAuthScreen(uiState = {}) {
   const mode = uiState.authMode === 'register' ? 'register' : 'login';
   const message = uiState.authMessage;
@@ -5,7 +6,7 @@ export function renderAuthScreen(uiState = {}) {
   return `
     <div class="login-screen">
       <div class="login-logo">⚽</div>
-      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.24.1</span></div>
+      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${APP_VERSION}</span></div>
       <div class="login-subtitle">Entre com telefone e senha ou faça seu cadastro para participar do futebol e acompanhar a tabela da carne.</div>
 
       <section class="auth-card">

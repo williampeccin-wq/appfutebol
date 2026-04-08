@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
@@ -48,7 +49,7 @@ function render(snapshot) {
     <div class="header">
       <div class="header-row">
         <div>
-          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>v1.24.4</span></div>
+          <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${APP_VERSION}</span></div>
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">
