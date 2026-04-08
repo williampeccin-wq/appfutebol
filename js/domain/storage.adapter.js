@@ -6,7 +6,19 @@ function createLocalStorageAdapter() {
   return {
     kind: BACKEND_LOCAL,
     getState() {
-      return loadLocalState();
+      try {
+        const snapshot = loadLocalState();
+
+        if (!snapshot || typeof snapshot !== "object") {
+          console.warn("[storage.adapter] invalid snapshot, resetting");
+          return resetLocalState();
+        }
+
+        return snapshot;
+      } catch (e) {
+        console.warn("[storage.adapter] failed to load, resetting", e);
+        return resetLocalState();
+      }
     },
     saveState(state) {
       saveLocalState(state);
