@@ -43,12 +43,14 @@ export function buildGameView(state, currentPlayerId) {
 }
 
 export function buildPlayersView(state) {
+  const inadimplentes = new Set(state?.finance?.inadimplentes || []);
   const gameView = buildGameView(state, null);
   const confirmedIds = new Set(gameView.confirmedPlayerIds);
 
-  return (state.players || []).map((p) => ({
+    return (state.players || []).map((p) => ({
     ...p,
     isActive: p.status !== "inactive",
     isConfirmed: confirmedIds.has(p.id),
+    isInadimplente: inadimplentes.has(p.id),
   }));
 }
