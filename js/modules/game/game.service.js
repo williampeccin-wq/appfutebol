@@ -1,3 +1,10 @@
+
+
+// PHASE5 PRESENCE STRUCTURE
+function __ensurePresenceStructure(game) {
+  if (!Array.isArray(game.confirmedPlayerIds)) game.confirmedPlayerIds = [];
+  if (!Array.isArray(game.waitlistPlayerIds)) game.waitlistPlayerIds = [];
+}
 import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull } from '../../domain/rules.engine.js';
 

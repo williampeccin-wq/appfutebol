@@ -1,3 +1,9 @@
+
+
+// PHASE5 STATUS RULES
+function __isPlayerActive(player) {
+  return player && player.status !== "inactive";
+}
 export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
