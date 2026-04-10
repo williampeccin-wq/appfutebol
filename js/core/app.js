@@ -145,6 +145,26 @@ function bindAuthEvents() {
 }
 
 
+
+function getPresenceIcon(reason, confirmed, capacityOk) {
+  if (confirmed) return "✅";
+  if (!capacityOk) return "🚫";
+
+  switch (reason) {
+    case "inadimplente":
+    case "mensalidade_pendente":
+    case "mensalidade_vencida":
+      return "💸";
+    case "carne":
+    case "carne_only":
+      return "📄";
+    case "inactive":
+      return "⛔";
+    default:
+      return "ℹ️";
+  }
+}
+
 function getPresenceReasonLabel(reason) {
   switch (reason) {
     case 'carne_only':
@@ -167,6 +187,7 @@ function getPresenceReasonLabel(reason) {
 function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPlayer, carneStatus }) {
   if (confirmed) {
     return {
+      icon: getPresenceIcon('confirmed', confirmed, capacityOk),
       toneClass: 'is-ok',
       title: 'Você está confirmado',
       text: 'Sua vaga está reservada. Se precisar, você ainda pode cancelar a presença.',
@@ -176,6 +197,7 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
   if (!capacityOk) {
     return {
+      icon: getPresenceIcon('game_full', confirmed, capacityOk),
       toneClass: 'is-warn',
       title: 'Sem vagas no momento',
       text: 'O jogo já está cheio. Se alguém cancelar, a vaga volta a ficar disponível.',
@@ -185,6 +207,7 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
   if (presenceGuard.ok) {
     return {
+      icon: getPresenceIcon('ok', confirmed, capacityOk),
       toneClass: 'is-neutral',
       title: 'Pronto para confirmar',
       text: 'Seu cadastro está apto para confirmar presença neste jogo.',
@@ -196,6 +219,7 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
   const primaryReason = reasons[0] || 'unknown';
 
   return {
+    icon: getPresenceIcon(primaryReason, confirmed, capacityOk),
     toneClass: 'is-warn',
     title: getPresenceReasonLabel(primaryReason),
     text: presenceGuard.message || (
@@ -328,7 +352,7 @@ function renderHome(snapshot, currentPlayer) {
           <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
           <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
           <div class="status-box ${presenceFeedback.toneClass}" style="margin-top:12px;">
-            <div class="status-title">${presenceFeedback.title}</div>
+            <div class="status-title">${presenceFeedback.icon} ${presenceFeedback.title}</div>
             <div class="status-subline">${presenceFeedback.text}</div>
           </div>
           ${statusNote && statusNote !== presenceFeedback.text ? `<p class="footer-note">${statusNote}</p>` : ''}
