@@ -144,6 +144,72 @@ function bindAuthEvents() {
   }
 }
 
+
+function getPresenceReasonLabel(reason) {
+  switch (reason) {
+    case 'carne_only':
+      return 'Somente carnê';
+    case 'mensalidade_pendente':
+      return 'Mensalidade pendente';
+    case 'mensalidade_sem_data':
+      return 'Mensalidade sem data';
+    case 'mensalidade_vencida':
+      return 'Mensalidade vencida';
+    case 'inscricoes_fechadas':
+      return 'Inscrições fechadas';
+    case 'game_full':
+      return 'Jogo cheio';
+    default:
+      return 'Ação indisponível';
+  }
+}
+
+function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPlayer, carneStatus }) {
+  if (confirmed) {
+    return {
+      toneClass: 'is-ok',
+      title: 'Você está confirmado',
+      text: 'Sua vaga está reservada. Se precisar, você ainda pode cancelar a presença.',
+      badge: 'Confirmado',
+    };
+  }
+
+  if (!capacityOk) {
+    return {
+      toneClass: 'is-warn',
+      title: 'Sem vagas no momento',
+      text: 'O jogo já está cheio. Se alguém cancelar, a vaga volta a ficar disponível.',
+      badge: 'Jogo cheio',
+    };
+  }
+
+  if (presenceGuard.ok) {
+    return {
+      toneClass: 'is-neutral',
+      title: 'Pronto para confirmar',
+      text: 'Seu cadastro está apto para confirmar presença neste jogo.',
+      badge: 'Liberado',
+    };
+  }
+
+  const reasons = Array.isArray(presenceGuard?.decision?.reasons) ? presenceGuard.decision.reasons : [];
+  const primaryReason = reasons[0] || 'unknown';
+
+  return {
+    toneClass: 'is-warn',
+    title: getPresenceReasonLabel(primaryReason),
+    text: presenceGuard.message || (
+      carneStatus
+        ? 'Você está vinculado ao grupo do carnê e não pode confirmar presença agora.'
+        : currentPlayer?.role === 'carne'
+          ? 'Perfis somente carnê não participam da confirmação do jogo.'
+          : 'Sua confirmação está bloqueada no momento.'
+    ),
+    badge: getPresenceReasonLabel(primaryReason),
+  };
+}
+
+
 function bindAppEvents(currentPlayer) {
   appElement.querySelector('#logout-button')?.addEventListener('click', () => logout());
 
@@ -214,6 +280,13 @@ function renderHome(snapshot, currentPlayer) {
     : presenceGuard.ok
       ? ''
       : presenceGuard.message;
+  const presenceFeedback = buildPresenceFeedback({
+    confirmed,
+    capacityOk,
+    presenceGuard,
+    currentPlayer,
+    carneStatus,
+  });
 
   return `
     <section class="section-stack">
@@ -248,22 +321,23 @@ function renderHome(snapshot, currentPlayer) {
 
       <section class="card">
         <div class="card-title">Confirmação de presença</div>
-        ${canRenderPresenceAction ? `
-          <div class="info-block">
-            <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
-            <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
-            ${statusNote ? `<p class="footer-note">${statusNote}</p>` : ''}
-            <div class="actions">
+        <div class="info-block">
+          <div class="chip-row" style="margin-bottom:12px;">
+            <span class="tag ${presenceFeedback.toneClass}">${presenceFeedback.badge}</span>
+          </div>
+          <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
+          <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
+          <div class="status-box ${presenceFeedback.toneClass}" style="margin-top:12px;">
+            <div class="status-title">${presenceFeedback.title}</div>
+            <div class="status-subline">${presenceFeedback.text}</div>
+          </div>
+          ${statusNote && statusNote !== presenceFeedback.text ? `<p class="footer-note">${statusNote}</p>` : ''}
+          ${canRenderPresenceAction ? `
+            <div class="actions" style="margin-top:12px;">
               <button class="btn btn-primary" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : 'Confirmar presença'}</button>
             </div>
-          </div>
-        ` : `
-          <div class="info-block">
-            <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
-            <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
-            <p class="footer-note">${statusNote}</p>
-          </div>
-        `}
+          ` : ''}
+        </div>
       </section>
 
       <section class="card">
