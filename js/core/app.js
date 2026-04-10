@@ -1,3 +1,4 @@
+import { buildGameView, buildPlayersView } from "../domain/projection.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
@@ -166,7 +167,7 @@ function renderNavButton(tab, label, activeTab) {
 function renderTab(snapshot, activeTab, currentPlayer) {
   switch (activeTab) {
     case 'players':
-      return renderPlayersScreen(snapshot, currentPlayer);
+      return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot));
     case 'championship':
       return renderChampionship(snapshot);
     case 'config':
@@ -196,16 +197,17 @@ function renderHome(snapshot, currentPlayer) {
     }
   }
 
-  const game = workingSnapshot.game;
-  const confirmedCount = workingSnapshot.confirmations.filter((item) => item.confirmed).length;
-  const maxPlayers = game?.max_players || 0;
+  const gameView = buildGameView(workingSnapshot, currentPlayer.id);
+  const game = gameView.game;
+  const confirmedCount = gameView.confirmedCount;
+  const maxPlayers = gameView.maxPlayers || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
-  const vagasRestantes = maxPlayers - confirmedCount;
+  const vagasRestantes = gameView.spotsLeft;
   const mensalidade = buildMensalidadeMeta(game, currentPlayer);
   const carneStatus = workingSnapshot.carne.some((entry) => entry.player_id === currentPlayer.id && entry.active);
-  const confirmed = isConfirmed(currentPlayer.id);
+  const confirmed = gameView.isConfirmed;
   const presenceGuard = canManagePresence(currentPlayer, game);
-  const capacityOk = hasCapacity();
+  const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
   const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
   const statusNote = !confirmed && !capacityOk
     ? 'O jogo já está cheio.'
@@ -359,7 +361,7 @@ function renderConfig(snapshot, currentPlayer) {
       <section class="card">
         <div class="card-title">Admin snapshot</div>
         <p class="footer-note">
-          Players: ${snapshot.players.length} · Confirmações ativas: ${snapshot.confirmations.filter((item) => item.confirmed).length}
+          Players: ${snapshot.players.length} · Confirmações ativas: ${buildGameView(snapshot, null).confirmedCount}
         </p>
       </section>
     </section>

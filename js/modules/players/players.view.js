@@ -11,10 +11,11 @@ import {
   listPlayers,
 } from './players.service.js';
 
-export function renderPlayersScreen(snapshot, currentPlayer) {
-  const allPlayers = listPlayers();
-  const jogadores = listJogadores();
-  const carneOnly = listCarneOnly();
+export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null) {
+  const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
+  const allPlayers = sourcePlayers;
+  const jogadores = sourcePlayers.filter((player) => player.role !== 'carne');
+  const carneOnly = sourcePlayers.filter((player) => player.role === 'carne');
 
   return `
     <section class="section-stack">
@@ -51,7 +52,7 @@ export function renderPlayersScreen(snapshot, currentPlayer) {
             <div class="kpi-label">Somente carne</div>
           </div>
           <div class="kpi-box">
-            <div class="kpi-value">${snapshot.confirmations.filter((item) => item.confirmed).length}</div>
+            <div class="kpi-value">${allPlayers.filter((player) => player.role !== 'carne' && player.isConfirmed).length}</div>
             <div class="kpi-label">Confirmados no jogo</div>
           </div>
         </div>
@@ -85,7 +86,7 @@ export function renderPlayersScreen(snapshot, currentPlayer) {
 
 function renderPlayerRow(player, snapshot, currentPlayer) {
   const currentFlag = isCurrentPlayer(player, currentPlayer);
-  const confirmed = player.role === 'carne' ? false : isConfirmed(player.id, snapshot.confirmations);
+  const confirmed = player.role === 'carne' ? false : !!player.isConfirmed;
 
   return `
     <div class="placeholder-row ${currentFlag ? 'is-current' : ''}">
