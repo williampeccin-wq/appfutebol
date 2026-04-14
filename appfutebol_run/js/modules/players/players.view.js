@@ -41,12 +41,27 @@ function renderPlayerManagementCard(currentPlayer) {
       <div class="player-admin-form">
         <input id="new-name" class="input" type="text" placeholder="Nome" />
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
+
+        <select id="new-role" class="input">
+          <option value="player">Jogador</option>
+          <option value="carne">Carne</option>
+        </select>
+
+        <select id="new-position" class="input">
+          <option value="meia">Meia</option>
+          <option value="zag">Zagueiro</option>
+          <option value="atk">Atacante</option>
+        </select>
+
+        <label><input id="new-admin" type="checkbox" /> Admin</label>
+        <label><input id="new-mens" type="checkbox" checked /> Mensalidade OK</label>
+
         <button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button>
       </div>
-      <p class="footer-note">Versão inicial do cadastro: adiciona jogador comum com posição padrão "Meia" e mensalidade em dia.</p>
     </section>
   `;
 }
+
 
 export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();

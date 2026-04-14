@@ -5,29 +5,37 @@ document.addEventListener("click", (e) => {
 
   const action = trigger.dataset.action;
   const id = trigger.dataset.id || "";
-  if (!action) return;
 
   const raw = localStorage.getItem("harmonia_data");
   const snapshot = raw ? JSON.parse(raw) : {};
   if (!Array.isArray(snapshot.players)) return;
 
   if (action === "add-player") {
-    const nameInput = document.getElementById("new-name");
-    const phoneInput = document.getElementById("new-phone");
+    const name = document.getElementById("new-name")?.value?.trim();
+    const phone = document.getElementById("new-phone")?.value?.trim();
+    const role = document.getElementById("new-role")?.value;
+    const position = document.getElementById("new-position")?.value;
+    const is_admin = document.getElementById("new-admin")?.checked;
+    const mens_ok = document.getElementById("new-mens")?.checked;
 
-    const name = String(nameInput?.value || "").trim();
-    const phone = String(phoneInput?.value || "").trim();
+    if (!name || !phone) {
+      alert("Nome e telefone obrigatórios");
+      return;
+    }
 
-    if (!name || !phone) return;
+    if (snapshot.players.some(p => p.phone === phone)) {
+      alert("Telefone duplicado");
+      return;
+    }
 
     snapshot.players.push({
-      id: `p_${Date.now()}`,
+      id: "p_" + Date.now(),
       name,
       phone,
-      role: "player",
-      position: "meia",
-      mens_ok: true,
-      is_admin: false,
+      role,
+      position: role === "player" ? position : null,
+      mens_ok,
+      is_admin
     });
 
     localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
@@ -35,32 +43,18 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  const player = snapshot.players.find((item) => item.id === id);
-  if (!player) return;
-
-  if (action === "mark-paid") {
-    player.mens_ok = true;
-  }
-
-  if (action === "mark-debt") {
-    player.mens_ok = false;
-  }
-
   if (action === "delete-player") {
-    snapshot.players = snapshot.players.filter((item) => item.id !== id);
+    snapshot.players = snapshot.players.filter(p => p.id !== id);
     localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
     location.reload();
     return;
   }
 
-  if (!snapshot.finance) snapshot.finance = {};
-  if (!Array.isArray(snapshot.finance.inadimplentes)) snapshot.finance.inadimplentes = [];
+  const player = snapshot.players.find(p => p.id === id);
+  if (!player) return;
 
-  if (player.mens_ok) {
-    snapshot.finance.inadimplentes = snapshot.finance.inadimplentes.filter((pid) => pid !== id);
-  } else if (!snapshot.finance.inadimplentes.includes(id)) {
-    snapshot.finance.inadimplentes.push(id);
-  }
+  if (action === "mark-paid") player.mens_ok = true;
+  if (action === "mark-debt") player.mens_ok = false;
 
   localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
   location.reload();
