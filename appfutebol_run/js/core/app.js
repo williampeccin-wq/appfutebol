@@ -29,11 +29,13 @@ document.addEventListener("click", (e) => {
     }
 
     snapshot.players.push({
+      // domain adjustment: jogador sempre participa da carne
       id: "p_" + Date.now(),
       name,
       phone,
       role,
       position: role === "player" ? position : null,
+      in_carne_group: true,
       mens_ok,
       is_admin
     });

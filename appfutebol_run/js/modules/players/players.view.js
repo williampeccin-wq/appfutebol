@@ -179,7 +179,7 @@ function renderPlayerRow(player, snapshot, currentPlayer) {
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-        <div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>
+        ${player.role === 'carne' ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
         ${renderFinanceControls(player, currentPlayer)}
         ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="delete-player" data-id="${player.id}">Excluir</button>` : ''}
       </div>
