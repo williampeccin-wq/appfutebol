@@ -1,16 +1,25 @@
 import { getState } from '../../core/state.js';
 
+function normalizeParticipation(player) {
+  const playsFootball = player?.plays_football !== undefined ? player.plays_football : player?.role !== 'carne';
+  const inCarneGroup = player?.in_carne_group !== undefined ? player.in_carne_group : true;
+  return { playsFootball, inCarneGroup };
+}
+
 export function listPlayers() {
   const snapshot = getState();
   return [...snapshot.players].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 export function listJogadores() {
-  return listPlayers().filter((player) => player.role !== 'carne');
+  return listPlayers().filter((player) => normalizeParticipation(player).playsFootball);
 }
 
 export function listCarneOnly() {
-  return listPlayers().filter((player) => player.role === 'carne');
+  return listPlayers().filter((player) => {
+    const meta = normalizeParticipation(player);
+    return meta.inCarneGroup && !meta.playsFootball;
+  });
 }
 
 export function isAdmin(player) {
@@ -27,7 +36,8 @@ export function isConfirmed(playerId, confirmations) {
 
 export function getRoleLabel(player) {
   if (isAdmin(player)) return 'Administrador';
-  return player?.role === 'carne' ? 'Carne' : 'Jogador';
+  const meta = normalizeParticipation(player);
+  return meta.playsFootball ? 'Jogador' : 'Carne';
 }
 
 export function getPositionLabel(position) {

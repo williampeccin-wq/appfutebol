@@ -1,4 +1,14 @@
 
+function normalizePlayer(player) {
+  if (player.plays_football === undefined) {
+    player.plays_football = player.role !== 'carne';
+  }
+  if (player.in_carne_group === undefined) {
+    player.in_carne_group = true;
+  }
+  return player;
+}
+
 document.addEventListener("click", (e) => {
   const trigger = e.target.closest("[data-action]");
   if (!trigger) return;
@@ -8,6 +18,9 @@ document.addEventListener("click", (e) => {
 
   const raw = localStorage.getItem("harmonia_data");
   const snapshot = raw ? JSON.parse(raw) : {};
+  if (Array.isArray(snapshot.players)) {
+    snapshot.players = snapshot.players.map(normalizePlayer);
+  }
   if (!Array.isArray(snapshot.players)) return;
 
   if (action === "add-player") {
@@ -29,13 +42,12 @@ document.addEventListener("click", (e) => {
     }
 
     snapshot.players.push({
-      // domain adjustment: jogador sempre participa da carne
       id: "p_" + Date.now(),
       name,
       phone,
-      role,
-      position: role === "player" ? position : null,
+      plays_football: role === "player",
       in_carne_group: true,
+      position: role === "player" ? position : null,
       mens_ok,
       is_admin
     });

@@ -51,6 +51,6 @@ export function buildPlayersView(state) {
     ...p,
     isActive: p.status !== 'inactive',
     isConfirmed: confirmedIds.has(p.id),
-    isInadimplente: !p.is_admin && p.role !== 'carne' && !p.mens_ok,
+    isInadimplente: !p.is_admin && (p.plays_football !== undefined ? p.plays_football : p.role !== 'carne') && !p.mens_ok,
   }));
 }

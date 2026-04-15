@@ -12,7 +12,7 @@ import {
 } from './players.service.js';
 
 function isCarneOnly(player) {
-  return player?.role === 'carne';
+  return player?.plays_football === false;
 }
 
 function isFinancePending(player) {
@@ -65,9 +65,11 @@ function renderPlayerManagementCard(currentPlayer) {
 
 export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
-  const allPlayers = sourcePlayers;
-  const jogadores = sourcePlayers.filter((player) => player.role !== 'carne');
-  const carneOnly = sourcePlayers.filter((player) => player.role === 'carne');
+  const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const allPlayers = orderedPlayers;
+  const jogadores = orderedPlayers.filter((player) => player.plays_football !== false);
+  const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
+  const carneOnly = carneGroup.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isAdmin(player));
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
@@ -86,8 +88,8 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             </div>
           </div>
           <div class="chip-row">
-            <span class="tag is-neutral">${currentPlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(currentPlayer.position)}</span>
-            <span class="tag ${isAdmin(currentPlayer) || currentPlayer.role === 'carne' || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${isAdmin(currentPlayer) || currentPlayer.role === 'carne' || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
+            <span class="tag is-neutral">${currentPlayer.plays_football === false ? 'Somente carne' : getPositionLabel(currentPlayer.position)}</span>
+            <span class="tag ${isAdmin(currentPlayer) || currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${isAdmin(currentPlayer) || currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
           </div>
         </div>
       </section>
@@ -110,7 +112,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             <div class="kpi-label">Somente carne</div>
           </div>
           <div class="kpi-box">
-            <div class="kpi-value">${allPlayers.filter((player) => player.role !== 'carne' && player.isConfirmed).length}</div>
+            <div class="kpi-value">${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</div>
             <div class="kpi-label">Confirmados no jogo</div>
           </div>
           <div class="kpi-box">
@@ -142,7 +144,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
       <section class="card">
         <div class="card-title">Grupo da carne</div>
         <div class="placeholder-list">
-          ${carneOnly.length ? carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer)).join('') : '<div class="empty-inline">Nenhum perfil exclusivo da carne cadastrado.</div>'}
+          ${carneGroup.length ? carneGroup.map((player) => renderPlayerRow(player, snapshot, currentPlayer)).join('') : '<div class="empty-inline">Nenhum integrante do grupo da carne cadastrado.</div>'}
         </div>
       </section>
 
@@ -160,7 +162,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 
 function renderPlayerRow(player, snapshot, currentPlayer) {
   const currentFlag = isCurrentPlayer(player, currentPlayer);
-  const confirmed = player.role === 'carne' ? false : !!player.isConfirmed;
+  const confirmed = player.plays_football === false ? false : !!player.isConfirmed;
   const financePending = isFinancePending(player);
 
   return `
@@ -170,16 +172,16 @@ function renderPlayerRow(player, snapshot, currentPlayer) {
         <div>
           <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
           <div class="row-subtitle">
-            ${player.role === 'carne' ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}
+            ${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}
           </div>
           <div class="chip-row chip-row-sm">
             <span class="tag is-neutral">${getRoleLabel(player)}</span>
-            ${player.role !== 'carne' ? `<span class="tag ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Confirmado' : 'Não confirmado'}</span>` : ''}
+            ${player.plays_football !== false ? `<span class="tag ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Confirmado' : 'Não confirmado'}</span>` : ''}
           </div>
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-        ${player.role === 'carne' ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
+        ${player.plays_football === false ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
         ${renderFinanceControls(player, currentPlayer)}
         ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="delete-player" data-id="${player.id}">Excluir</button>` : ''}
       </div>
