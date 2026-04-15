@@ -73,6 +73,23 @@ document.addEventListener("click", (e) => {
   localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
   location.reload();
 });
+
+
+document.addEventListener("change", (e) => {
+  const target = e.target;
+  if (!target || target.id !== "new-role") return;
+
+  const position = document.getElementById("new-position");
+  if (!position) return;
+
+  if (target.value === "carne") {
+    position.value = "meia";
+    position.disabled = true;
+  } else {
+    position.disabled = false;
+  }
+});
+
 import { buildGameView, buildPlayersView } from "../domain/projection.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';

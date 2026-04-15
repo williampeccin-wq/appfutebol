@@ -47,7 +47,7 @@ function renderPlayerManagementCard(currentPlayer) {
           <option value="carne">Carne</option>
         </select>
 
-        <select id="new-position" class="input">
+        <select id="new-position" class="input" data-role-dependent="position">
           <option value="meia">Meia</option>
           <option value="zag">Zagueiro</option>
           <option value="atk">Atacante</option>
@@ -188,3 +188,4 @@ function renderPlayerRow(player, snapshot, currentPlayer) {
     </div>
   `;
 }
+
