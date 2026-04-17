@@ -90,7 +90,7 @@ document.addEventListener("click", (e) => {
   savePersistedState(snapshot);
   editingPlayerId = null;
   setPlayerFormMode(false);
-  location.reload();
+  render(snapshot);
   return;
 }
 
@@ -189,7 +189,7 @@ if (action === "delete-player") {
     : [];
 
   savePersistedState(snapshot);
-  location.reload();
+  render(snapshot);
   return;
 }
 
@@ -201,7 +201,7 @@ if (action === "delete-player") {
   if (action === "mark-debt") player.mens_ok = false;
 
   savePersistedState(snapshot);
-  location.reload();
+  render(snapshot);
 });
 
 
