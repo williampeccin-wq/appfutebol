@@ -36,8 +36,8 @@ function renderPlayerManagementCard(currentPlayer) {
   if (!isAdmin(currentPlayer)) return '';
 
   return `
-    <section class="card">
-      <div class="card-title">Gerenciar jogadores</div>
+    <section class="card" id="player-management-card">
+      <div class="card-title" id="player-management-title">Gerenciar jogadores</div>
       <div class="player-admin-form">
         <input id="new-name" class="input" type="text" placeholder="Nome" />
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
@@ -56,7 +56,7 @@ function renderPlayerManagementCard(currentPlayer) {
         <label><input id="new-admin" type="checkbox" /> Admin</label>
         <label><input id="new-mens" type="checkbox" checked /> Mensalidade OK</label>
 
-        <button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button>
+        <div class="player-admin-actions"><button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button><button class="btn btn-secondary" type="button" data-action="cancel-edit" id="cancel-edit-button" style="display:none;">Cancelar</button></div>
       </div>
     </section>
   `;
@@ -183,6 +183,7 @@ function renderPlayerRow(player, snapshot, currentPlayer) {
       <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
         ${player.plays_football === false ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
         ${renderFinanceControls(player, currentPlayer)}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="edit-player" data-id="${player.id}">Editar</button>` : ''}
         ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="delete-player" data-id="${player.id}">Excluir</button>` : ''}
       </div>
     </div>

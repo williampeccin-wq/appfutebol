@@ -7,6 +7,12 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function normalizeDeletedPlayers(state) {
+  const ids = Array.isArray(state?.deleted_player_ids) ? state.deleted_player_ids.map((v) => String(v)) : [];
+  const phones = Array.isArray(state?.deleted_player_phones) ? state.deleted_player_phones.map((v) => normalizePhone(v)).filter(Boolean) : [];
+  return { ids: [...new Set(ids)], phones: [...new Set(phones)] };
+}
+
 export function sanitizeSession(state) {
   const nextState = clone(state);
   const playerId = nextState.session?.playerId || null;
@@ -28,7 +34,7 @@ export function sanitizeSession(state) {
   };
 }
 
-export function dedupePlayers(players, seedPlayers = []) {
+export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [], phones: [] }) {
   const warnings = [];
   const groups = new Map();
   const seedByPhone = new Map(
@@ -98,6 +104,9 @@ export function dedupePlayers(players, seedPlayers = []) {
   }
 
   for (const seedPlayer of Array.isArray(seedPlayers) ? seedPlayers : []) {
+    if (tombstones.ids.includes(String(seedPlayer?.id)) || tombstones.phones.includes(normalizePhone(seedPlayer?.phone))) {
+      continue;
+    }
     const phone = normalizePhone(seedPlayer?.phone);
     if (!phone) continue;
     const exists = deduped.some((player) => normalizePhone(player?.phone) === phone);
@@ -196,8 +205,11 @@ export function validateAndRepairState(state, options = {}) {
   nextState.carne = Array.isArray(nextState.carne) ? nextState.carne : [];
   nextState.notifications = Array.isArray(nextState.notifications) ? nextState.notifications : [];
   nextState.ui = sanitizeUi(nextState.ui, defaultUi);
+  const tombstones = normalizeDeletedPlayers(nextState);
+  nextState.deleted_player_ids = tombstones.ids;
+  nextState.deleted_player_phones = tombstones.phones;
 
-  const deduped = dedupePlayers(nextState.players, defaultSeed.players || []);
+  const deduped = dedupePlayers(nextState.players, defaultSeed.players || [], tombstones);
   nextState.players = deduped.players;
   warnings.push(...deduped.warnings);
 

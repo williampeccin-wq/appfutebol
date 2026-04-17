@@ -122,6 +122,12 @@ function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function normalizeDeletedPlayers(data) {
+  const ids = Array.isArray(data?.deleted_player_ids) ? data.deleted_player_ids.map((v) => String(v)) : [];
+  const phones = Array.isArray(data?.deleted_player_phones) ? data.deleted_player_phones.map((v) => normalizePhone(v)).filter(Boolean) : [];
+  return { ids: [...new Set(ids)], phones: [...new Set(phones)] };
+}
+
 function normalizePlayer(player) {
   if (!player || typeof player !== 'object') {
     return null;
@@ -162,7 +168,7 @@ function choosePreferredPlayer(players) {
   return [...players].sort((left, right) => scorePlayer(right) - scorePlayer(left))[0] || null;
 }
 
-function dedupePlayers(players) {
+function dedupePlayers(players, tombstones = { ids: [], phones: [] }) {
   const seedByPhone = new Map(defaultSeed.players.map((player) => [normalizePhone(player.phone), player]));
   const groups = new Map();
 
@@ -207,6 +213,9 @@ function dedupePlayers(players) {
   }
 
   for (const seedPlayer of defaultSeed.players) {
+    if (tombstones.ids.includes(String(seedPlayer.id)) || tombstones.phones.includes(normalizePhone(seedPlayer.phone))) {
+      continue;
+    }
     const phone = normalizePhone(seedPlayer.phone);
     const exists = deduped.some((player) => normalizePhone(player.phone) === phone);
     if (!exists) {
@@ -227,7 +236,8 @@ function mapPlayerId(id, idMap) {
 
 function normalizeData(data) {
   const source = data && typeof data === 'object' ? data : {};
-  const { deduped, idMap } = dedupePlayers(Array.isArray(source.players) ? source.players : []);
+  const tombstones = normalizeDeletedPlayers(source);
+  const { deduped, idMap } = dedupePlayers(Array.isArray(source.players) ? source.players : [], tombstones);
 
   return {
     ...source,

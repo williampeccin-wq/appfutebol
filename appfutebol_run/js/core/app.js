@@ -1,3 +1,24 @@
+function showToast(msg, type='success') {
+  let t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{t.classList.remove('show'); setTimeout(()=>t.remove(),200)},2000);
+}
+
+
+let editingPlayerId = null;
+
+function setPlayerFormMode(isEditing) {
+  const submitButton = document.querySelector('[data-action="add-player"]');
+  const cancelButton = document.getElementById('cancel-edit-button');
+  const title = document.getElementById('player-management-title');
+
+  if (submitButton) submitButton.textContent = isEditing ? 'Salvar alteração' : 'Adicionar';
+  if (cancelButton) cancelButton.style.display = isEditing ? 'inline-flex' : 'none';
+  if (title) title.textContent = isEditing ? 'Editando jogador' : 'Gerenciar jogadores';
+}
 
 function normalizePlayer(player) {
   if (player.plays_football === undefined) {
@@ -14,6 +35,7 @@ document.addEventListener("click", (e) => {
   if (!trigger) return;
 
   const action = trigger.dataset.action;
+  if (!action) return;
   const id = trigger.dataset.id || "";
 
   const raw = localStorage.getItem("harmonia_data");
@@ -24,23 +46,35 @@ document.addEventListener("click", (e) => {
   if (!Array.isArray(snapshot.players)) return;
 
   if (action === "add-player") {
-    const name = document.getElementById("new-name")?.value?.trim();
-    const phone = document.getElementById("new-phone")?.value?.trim();
-    const role = document.getElementById("new-role")?.value;
-    const position = document.getElementById("new-position")?.value;
-    const is_admin = document.getElementById("new-admin")?.checked;
-    const mens_ok = document.getElementById("new-mens")?.checked;
+  const name = document.getElementById("new-name")?.value?.trim();
+  const phone = document.getElementById("new-phone")?.value?.trim();
+  const role = document.getElementById("new-role")?.value;
+  const position = document.getElementById("new-position")?.value;
+  const is_admin = document.getElementById("new-admin")?.checked;
+  const mens_ok = document.getElementById("new-mens")?.checked;
 
-    if (!name || !phone) {
-      alert("Nome e telefone obrigatórios");
-      return;
-    }
+  if (!name || !phone) {
+    alert("Nome e telefone obrigatórios");
+    return;
+  }
 
-    if (snapshot.players.some(p => p.phone === phone)) {
-      alert("Telefone duplicado");
-      return;
-    }
+  if (snapshot.players.some((p) => p.phone === phone && p.id !== editingPlayerId)) {
+    alert("Telefone duplicado");
+    return;
+  }
 
+  if (editingPlayerId) {
+    const playerToEdit = snapshot.players.find((p) => p.id === editingPlayerId);
+    if (!playerToEdit) return;
+
+    playerToEdit.name = name;
+    playerToEdit.phone = phone;
+    playerToEdit.plays_football = role === "player";
+    playerToEdit.in_carne_group = true;
+    playerToEdit.position = role === "player" ? position : null;
+    playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
+    playerToEdit.is_admin = !!is_admin;
+  } else {
     snapshot.players.push({
       id: "p_" + Date.now(),
       name,
@@ -51,18 +85,114 @@ document.addEventListener("click", (e) => {
       mens_ok,
       is_admin
     });
+  }
 
-    localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
-    location.reload();
+  savePersistedState(snapshot);
+  editingPlayerId = null;
+  setPlayerFormMode(false);
+  location.reload();
+  return;
+}
+
+  if (action === "edit-player") {
+  const playerToEdit = snapshot.players.find((p) => p.id === id);
+  if (!playerToEdit) return;
+
+  const card = document.getElementById("player-management-card");
+  const nameInput = document.getElementById("new-name");
+  const phoneInput = document.getElementById("new-phone");
+  const roleInput = document.getElementById("new-role");
+  const positionInput = document.getElementById("new-position");
+  const adminInput = document.getElementById("new-admin");
+  const mensInput = document.getElementById("new-mens");
+
+  if (!nameInput || !phoneInput || !roleInput || !positionInput || !adminInput || !mensInput) return;
+
+  editingPlayerId = id;
+  nameInput.value = playerToEdit.name || "";
+  phoneInput.value = playerToEdit.phone || "";
+  roleInput.value = playerToEdit.plays_football === false ? "carne" : "player";
+  roleInput.dispatchEvent(new Event("change", { bubbles: true }));
+  positionInput.value = playerToEdit.position || "meia";
+  adminInput.checked = !!playerToEdit.is_admin;
+  mensInput.checked = !!playerToEdit.mens_ok;
+
+  setPlayerFormMode(true);
+  if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+  nameInput.focus();
+  nameInput.select();
+  return;
+}
+
+if (action === "cancel-edit") {
+  editingPlayerId = null;
+
+  const nameInput = document.getElementById("new-name");
+  const phoneInput = document.getElementById("new-phone");
+  const roleInput = document.getElementById("new-role");
+  const positionInput = document.getElementById("new-position");
+  const adminInput = document.getElementById("new-admin");
+  const mensInput = document.getElementById("new-mens");
+
+  if (nameInput) nameInput.value = "";
+  if (phoneInput) phoneInput.value = "";
+  if (roleInput) roleInput.value = "player";
+  if (positionInput) {
+    positionInput.value = "meia";
+    positionInput.disabled = false;
+  }
+  if (adminInput) adminInput.checked = false;
+  if (mensInput) mensInput.checked = true;
+
+  setPlayerFormMode(false);
+  return;
+}
+
+
+if (action === "delete-player") {
+  const player = snapshot.players.find(p => p.id === id);
+  if (!player) return;
+
+  const current = snapshot.session?.playerId;
+  if (player.id === current) {
+    showToast("Você não pode excluir seu próprio usuário", "error");
     return;
   }
 
-  if (action === "delete-player") {
-    snapshot.players = snapshot.players.filter(p => p.id !== id);
-    localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
-    location.reload();
+  const admins = snapshot.players.filter(p => p.is_admin);
+  if (player.is_admin && admins.length <= 1) {
+    showToast("Não é possível remover o último administrador", "error");
     return;
   }
+
+  if (!confirm("Tem certeza que deseja excluir este jogador?")) return;
+
+  if (!Array.isArray(snapshot.deleted_player_ids)) snapshot.deleted_player_ids = [];
+  if (!Array.isArray(snapshot.deleted_player_phones)) snapshot.deleted_player_phones = [];
+
+  snapshot.deleted_player_ids = [...new Set([...snapshot.deleted_player_ids, String(player.id)])];
+  const normalizedDeletedPhone = String(player.phone || '').replace(/\D/g, '');
+  snapshot.deleted_player_phones = [...new Set([...snapshot.deleted_player_phones, normalizedDeletedPhone].filter(Boolean))];
+
+  snapshot.players = snapshot.players.filter(p => p.id !== id);
+  snapshot.confirmations = Array.isArray(snapshot.confirmations)
+    ? snapshot.confirmations.filter(entry => entry.player_id !== id)
+    : [];
+  if (snapshot.championship?.ranking) {
+    snapshot.championship = {
+      ...snapshot.championship,
+      ranking: snapshot.championship.ranking.filter(entry => entry.player_id !== id),
+    };
+  }
+  snapshot.carne = Array.isArray(snapshot.carne)
+    ? snapshot.carne.filter(entry => entry.player_id !== id)
+    : [];
+
+  savePersistedState(snapshot);
+  location.reload();
+  return;
+}
+
 
   const player = snapshot.players.find(p => p.id === id);
   if (!player) return;
@@ -70,7 +200,7 @@ document.addEventListener("click", (e) => {
   if (action === "mark-paid") player.mens_ok = true;
   if (action === "mark-debt") player.mens_ok = false;
 
-  localStorage.setItem("harmonia_data", JSON.stringify(snapshot));
+  savePersistedState(snapshot);
   location.reload();
 });
 
