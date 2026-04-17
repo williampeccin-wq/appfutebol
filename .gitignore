@@ -8,3 +8,6 @@ appfutebol_fixed/
 # builds locais
 _builds/
 _quarentena_repo/
+
+_run_*/
+_run_*
