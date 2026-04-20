@@ -1,4 +1,5 @@
 import {
+  formatBirthDate,
   formatPhone,
   getInitials,
   getPositionLabel,
@@ -41,6 +42,7 @@ function renderPlayerManagementCard(currentPlayer) {
       <div class="player-admin-form">
         <input id="new-name" class="input" type="text" placeholder="Nome" />
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
+        <input id="new-birthdate" class="input" type="date" />
 
         <select id="new-role" class="input">
           <option value="player">Jogador</option>
@@ -84,7 +86,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             <div class="avatar avatar-lg">${getInitials(currentPlayer.name)}</div>
             <div>
               <div class="row-title">${currentPlayer.name}</div>
-              <div class="row-subtitle">${getRoleLabel(currentPlayer)} · ${formatPhone(currentPlayer.phone)}</div>
+              <div class="row-subtitle">${getRoleLabel(currentPlayer)} · ${formatPhone(currentPlayer.phone)}${currentPlayer.birthDate ? ` · Nasc. ${formatBirthDate(currentPlayer.birthDate)}` : ''}</div>
             </div>
           </div>
           <div class="chip-row">
@@ -173,7 +175,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
         <div>
           <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
           <div class="row-subtitle">
-            ${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}
+            ${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}${player.birthDate ? ` · Nasc. ${formatBirthDate(player.birthDate)}` : ''}
           </div>
           <div class="chip-row chip-row-sm">
             <span class="tag is-neutral">${getRoleLabel(player)}</span>

@@ -68,3 +68,21 @@ export function getInitials(name) {
     .map((part) => part[0]?.toUpperCase() || '')
     .join('');
 }
+
+
+export function formatBirthDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+
+  const brMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    return raw;
+  }
+
+  return raw;
+}

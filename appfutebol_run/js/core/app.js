@@ -85,6 +85,7 @@ function setPlayerFormMode(isEditing) {
 function resetPlayerForm() {
   const nameInput = document.getElementById("new-name");
   const phoneInput = document.getElementById("new-phone");
+  const birthDateInput = document.getElementById("new-birthdate");
   const roleInput = document.getElementById("new-role");
   const positionInput = document.getElementById("new-position");
   const adminInput = document.getElementById("new-admin");
@@ -92,6 +93,7 @@ function resetPlayerForm() {
 
   if (nameInput) nameInput.value = "";
   if (phoneInput) phoneInput.value = "";
+  if (birthDateInput) birthDateInput.value = "";
   if (roleInput) roleInput.value = "player";
   if (positionInput) {
     positionInput.value = "meia";
@@ -132,15 +134,16 @@ document.addEventListener("click", async (e) => {
   setActionBusy(trigger, editingPlayerId ? "Salvando..." : "Adicionando...");
   const name = document.getElementById("new-name")?.value?.trim();
   const phone = document.getElementById("new-phone")?.value?.trim();
+  const birthDate = document.getElementById("new-birthdate")?.value?.trim();
   const role = document.getElementById("new-role")?.value;
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
 
-  if (!name || !phone) {
+  if (!name || !phone || !birthDate) {
     clearActionBusy(trigger);
     uiActionInFlight = false;
-    alert("Nome e telefone obrigatórios");
+    alert("Nome, telefone e data de nascimento são obrigatórios");
     return;
   }
 
@@ -163,6 +166,7 @@ document.addEventListener("click", async (e) => {
 
     playerToEdit.name = name;
     playerToEdit.phone = phone;
+    playerToEdit.birthDate = birthDate;
     playerToEdit.plays_football = role === "player";
     playerToEdit.in_carne_group = true;
     playerToEdit.position = role === "player" ? position : null;
@@ -173,6 +177,7 @@ document.addEventListener("click", async (e) => {
       id: "p_" + Date.now(),
       name,
       phone,
+      birthDate,
       plays_football: role === "player",
       in_carne_group: true,
       position: role === "player" ? position : null,
@@ -199,16 +204,18 @@ document.addEventListener("click", async (e) => {
   const card = document.getElementById("player-management-card");
   const nameInput = document.getElementById("new-name");
   const phoneInput = document.getElementById("new-phone");
+  const birthDateInput = document.getElementById("new-birthdate");
   const roleInput = document.getElementById("new-role");
   const positionInput = document.getElementById("new-position");
   const adminInput = document.getElementById("new-admin");
   const mensInput = document.getElementById("new-mens");
 
-  if (!nameInput || !phoneInput || !roleInput || !positionInput || !adminInput || !mensInput) return;
+  if (!nameInput || !phoneInput || !birthDateInput || !roleInput || !positionInput || !adminInput || !mensInput) return;
 
   editingPlayerId = id;
   nameInput.value = playerToEdit.name || "";
   phoneInput.value = playerToEdit.phone || "";
+  birthDateInput.value = playerToEdit.birthDate || "";
   roleInput.value = playerToEdit.plays_football === false ? "carne" : "player";
   roleInput.dispatchEvent(new Event("change", { bubbles: true }));
   positionInput.value = playerToEdit.position || "meia";
