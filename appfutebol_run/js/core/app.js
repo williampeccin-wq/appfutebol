@@ -10,6 +10,68 @@ function showToast(msg, type='success') {
 
 let editingPlayerId = null;
 
+
+let uiActionInFlight = false;
+
+function setActionBusy(trigger, busyText = 'Processando...') {
+  if (!trigger) return;
+  trigger.dataset.originalText = trigger.textContent || '';
+  trigger.textContent = busyText;
+  trigger.disabled = true;
+  trigger.classList.add('is-busy');
+}
+
+function clearActionBusy(trigger) {
+  if (!trigger) return;
+  if (trigger.dataset.originalText) trigger.textContent = trigger.dataset.originalText;
+  trigger.disabled = false;
+  trigger.classList.remove('is-busy');
+  delete trigger.dataset.originalText;
+}
+
+function showConfirmModal({
+  title = 'Confirmar ação',
+  message = 'Tem certeza que deseja continuar?',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+} = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-modal-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="confirm-modal-title" id="confirm-modal-title">${title}</div>
+        <div class="confirm-modal-message">${message}</div>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" data-confirm-modal="cancel">${cancelText}</button>
+          <button type="button" class="btn btn-primary" data-confirm-modal="confirm">${confirmText}</button>
+        </div>
+      </div>
+    `;
+
+    const cleanup = (result) => {
+      document.removeEventListener('keydown', handleKeydown);
+      overlay.remove();
+      resolve(result);
+    };
+
+    const handleKeydown = (event) => {
+      if (event.key === 'Escape') cleanup(false);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) cleanup(false);
+      const button = event.target.closest('[data-confirm-modal]');
+      if (!button) return;
+      cleanup(button.dataset.confirmModal === 'confirm');
+    });
+
+    document.addEventListener('keydown', handleKeydown);
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-confirm-modal="confirm"]')?.focus();
+  });
+}
+
 function setPlayerFormMode(isEditing) {
   const submitButton = document.querySelector('[data-action="add-player"]');
   const cancelButton = document.getElementById('cancel-edit-button');
@@ -18,6 +80,25 @@ function setPlayerFormMode(isEditing) {
   if (submitButton) submitButton.textContent = isEditing ? 'Salvar alteração' : 'Adicionar';
   if (cancelButton) cancelButton.style.display = isEditing ? 'inline-flex' : 'none';
   if (title) title.textContent = isEditing ? 'Editando jogador' : 'Gerenciar jogadores';
+}
+
+function resetPlayerForm() {
+  const nameInput = document.getElementById("new-name");
+  const phoneInput = document.getElementById("new-phone");
+  const roleInput = document.getElementById("new-role");
+  const positionInput = document.getElementById("new-position");
+  const adminInput = document.getElementById("new-admin");
+  const mensInput = document.getElementById("new-mens");
+
+  if (nameInput) nameInput.value = "";
+  if (phoneInput) phoneInput.value = "";
+  if (roleInput) roleInput.value = "player";
+  if (positionInput) {
+    positionInput.value = "meia";
+    positionInput.disabled = false;
+  }
+  if (adminInput) adminInput.checked = false;
+  if (mensInput) mensInput.checked = true;
 }
 
 function normalizePlayer(player) {
@@ -30,12 +111,13 @@ function normalizePlayer(player) {
   return player;
 }
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const trigger = e.target.closest("[data-action]");
   if (!trigger) return;
 
   const action = trigger.dataset.action;
   if (!action) return;
+  if (uiActionInFlight && action !== "cancel-edit") return;
   const id = trigger.dataset.id || "";
 
   const raw = localStorage.getItem("harmonia_data");
@@ -46,6 +128,8 @@ document.addEventListener("click", (e) => {
   if (!Array.isArray(snapshot.players)) return;
 
   if (action === "add-player") {
+  uiActionInFlight = true;
+  setActionBusy(trigger, editingPlayerId ? "Salvando..." : "Adicionando...");
   const name = document.getElementById("new-name")?.value?.trim();
   const phone = document.getElementById("new-phone")?.value?.trim();
   const role = document.getElementById("new-role")?.value;
@@ -54,18 +138,28 @@ document.addEventListener("click", (e) => {
   const mens_ok = document.getElementById("new-mens")?.checked;
 
   if (!name || !phone) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
     alert("Nome e telefone obrigatórios");
     return;
   }
 
   if (snapshot.players.some((p) => p.phone === phone && p.id !== editingPlayerId)) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
     alert("Telefone duplicado");
     return;
   }
 
+  const isEditing = !!editingPlayerId;
+
   if (editingPlayerId) {
     const playerToEdit = snapshot.players.find((p) => p.id === editingPlayerId);
-    if (!playerToEdit) return;
+    if (!playerToEdit) {
+      clearActionBusy(trigger);
+      uiActionInFlight = false;
+      return;
+    }
 
     playerToEdit.name = name;
     playerToEdit.phone = phone;
@@ -90,7 +184,11 @@ document.addEventListener("click", (e) => {
   savePersistedState(snapshot);
   editingPlayerId = null;
   setPlayerFormMode(false);
+  resetPlayerForm();
   render(snapshot);
+  uiActionInFlight = false;
+  showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
+  window.scrollTo({ top: 0, behavior: "smooth" });
   return;
 }
 
@@ -126,25 +224,9 @@ document.addEventListener("click", (e) => {
 
 if (action === "cancel-edit") {
   editingPlayerId = null;
-
-  const nameInput = document.getElementById("new-name");
-  const phoneInput = document.getElementById("new-phone");
-  const roleInput = document.getElementById("new-role");
-  const positionInput = document.getElementById("new-position");
-  const adminInput = document.getElementById("new-admin");
-  const mensInput = document.getElementById("new-mens");
-
-  if (nameInput) nameInput.value = "";
-  if (phoneInput) phoneInput.value = "";
-  if (roleInput) roleInput.value = "player";
-  if (positionInput) {
-    positionInput.value = "meia";
-    positionInput.disabled = false;
-  }
-  if (adminInput) adminInput.checked = false;
-  if (mensInput) mensInput.checked = true;
-
+  resetPlayerForm();
   setPlayerFormMode(false);
+  showToast("Edição cancelada", "success");
   return;
 }
 
@@ -165,7 +247,17 @@ if (action === "delete-player") {
     return;
   }
 
-  if (!confirm("Tem certeza que deseja excluir este jogador?")) return;
+  const confirmedDelete = await showConfirmModal({
+    title: 'Excluir jogador',
+    message: `Tem certeza que deseja excluir ${player.name}? Essa ação remove o perfil da lista atual.`,
+    confirmText: 'Excluir',
+    cancelText: 'Cancelar',
+  });
+
+  if (!confirmedDelete) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Excluindo...');
 
   if (!Array.isArray(snapshot.deleted_player_ids)) snapshot.deleted_player_ids = [];
   if (!Array.isArray(snapshot.deleted_player_phones)) snapshot.deleted_player_phones = [];
@@ -190,6 +282,9 @@ if (action === "delete-player") {
 
   savePersistedState(snapshot);
   render(snapshot);
+  uiActionInFlight = false;
+  showToast("Jogador removido", "success");
+  window.scrollTo({ top: 0, behavior: "smooth" });
   return;
 }
 
@@ -197,11 +292,18 @@ if (action === "delete-player") {
   const player = snapshot.players.find(p => p.id === id);
   if (!player) return;
 
+  if (action === "mark-paid" || action === "mark-debt") {
+    uiActionInFlight = true;
+    setActionBusy(trigger, action === "mark-paid" ? "Salvando..." : "Atualizando...");
+  }
+
   if (action === "mark-paid") player.mens_ok = true;
   if (action === "mark-debt") player.mens_ok = false;
 
   savePersistedState(snapshot);
   render(snapshot);
+  uiActionInFlight = false;
+  showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
 });
 
 
@@ -479,7 +581,7 @@ function renderNavButton(tab, label, activeTab) {
 function renderTab(snapshot, activeTab, currentPlayer) {
   switch (activeTab) {
     case 'players':
-      return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot));
+      return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'championship':
       return renderChampionship(snapshot);
     case 'config':

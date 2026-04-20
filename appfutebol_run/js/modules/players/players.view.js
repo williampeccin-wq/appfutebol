@@ -63,7 +63,7 @@ function renderPlayerManagementCard(currentPlayer) {
 }
 
 
-export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null) {
+export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const allPlayers = orderedPlayers;
@@ -137,14 +137,14 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
       <section class="card">
         <div class="card-title">Jogadores do futebol</div>
         <div class="placeholder-list">
-          ${jogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer)).join('')}
+          ${jogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
         </div>
       </section>
 
       <section class="card">
         <div class="card-title">Grupo da carne</div>
         <div class="placeholder-list">
-          ${carneGroup.length ? carneGroup.map((player) => renderPlayerRow(player, snapshot, currentPlayer)).join('') : '<div class="empty-inline">Nenhum integrante do grupo da carne cadastrado.</div>'}
+          ${carneGroup.length ? carneGroup.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum integrante do grupo da carne cadastrado.</div>'}
         </div>
       </section>
 
@@ -160,13 +160,14 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   `;
 }
 
-function renderPlayerRow(player, snapshot, currentPlayer) {
+function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null) {
+  const isEditing = player.id === editingPlayerId;
   const currentFlag = isCurrentPlayer(player, currentPlayer);
   const confirmed = player.plays_football === false ? false : !!player.isConfirmed;
   const financePending = isFinancePending(player);
 
   return `
-    <div class="placeholder-row ${currentFlag ? 'is-current' : ''}">
+    <div class="placeholder-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}">
       <div class="placeholder-main">
         <div class="avatar">${getInitials(player.name)}</div>
         <div>
