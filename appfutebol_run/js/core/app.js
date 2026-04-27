@@ -596,6 +596,10 @@ function bindAppEvents(currentPlayer) {
     showToast(result.message, result.ok ? 'success' : 'error');
   });
 
+  appElement.querySelector('#copy-draw-btn')?.addEventListener('click', () => {
+    copyTeamDrawToClipboard();
+  });
+
   const gameConfigForm = appElement.querySelector('#game-config-form');
   if (gameConfigForm) {
     gameConfigForm.addEventListener('submit', (event) => {
@@ -812,6 +816,64 @@ function renderChampionship(snapshot) {
   `;
 }
 
+function buildTeamDrawShareText(snapshot) {
+  const sortResult = snapshot.game?.sort_result;
+  if (!sortResult) return '';
+
+  const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
+  const game = snapshot.game || {};
+  const formatTeam = (label, ids = []) => {
+    const lines = ids.map((id, index) => {
+      const player = playerById.get(id);
+      const name = player?.name || 'Jogador removido';
+      const position = getPositionLabel(player?.position);
+      return `${index + 1}. ${name} (${position})`;
+    });
+
+    return [`${label}:`, ...lines].join('\n');
+  };
+
+  return [
+    '⚽ Times do Harmonia',
+    `Jogo: ${formatDate(game.game_date)} às ${game.game_time || '--:--'}`,
+    '',
+    formatTeam('Time A', sortResult.team_a),
+    '',
+    formatTeam('Time B', sortResult.team_b),
+  ].join('\n');
+}
+
+async function copyTeamDrawToClipboard() {
+  const snapshot = getState();
+  const text = buildTeamDrawShareText(snapshot);
+
+  if (!text) {
+    showToast('Nenhum sorteio disponível para copiar.', 'error');
+    return;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    }
+
+    showToast('Times copiados.');
+  } catch (error) {
+    console.error(error);
+    showToast('Não foi possível copiar automaticamente.', 'error');
+  }
+}
+
 function renderPresenceList(snapshot) {
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
@@ -921,12 +983,13 @@ function renderTeamDraw(snapshot, currentPlayer) {
         ${renderTeam('Time A', sortResult.team_a)}
         ${renderTeam('Time B', sortResult.team_b)}
       </div>
-      ${currentPlayer?.is_admin ? `
-        <div class="actions" style="margin-top:12px;">
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
+        ${currentPlayer?.is_admin ? `
           <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
           <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear novamente</button>
-        </div>
-      ` : ''}
+        ` : ''}
+      </div>
     </section>
   `;
 }
