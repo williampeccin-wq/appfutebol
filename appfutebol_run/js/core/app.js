@@ -336,7 +336,7 @@ import { getState as loadPersistedState, saveState as savePersistedState, getSto
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
-import { canManagePresence, isConfirmed, toggleConfirmation } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 
@@ -586,6 +586,16 @@ function bindAppEvents(currentPlayer) {
     toggleConfirmation(currentPlayer.id);
   });
 
+  appElement.querySelector('#draw-teams-btn')?.addEventListener('click', () => {
+    const result = drawTeams();
+    showToast(result.message, result.ok ? 'success' : 'error');
+  });
+
+  appElement.querySelector('#clear-draw-btn')?.addEventListener('click', () => {
+    const result = clearTeamDraw();
+    showToast(result.message, result.ok ? 'success' : 'error');
+  });
+
   const gameConfigForm = appElement.querySelector('#game-config-form');
   if (gameConfigForm) {
     gameConfigForm.addEventListener('submit', (event) => {
@@ -749,6 +759,8 @@ function renderHome(snapshot, currentPlayer) {
         <div class="status-subline">${mensalidade.subline}</div>
       </section>
 
+      ${renderTeamDraw(workingSnapshot, currentPlayer)}
+
       <section class="card">
         <div class="card-title">Notificações recentes</div>
         <div class="info-block">
@@ -794,6 +806,71 @@ function renderChampionship(snapshot) {
           }).join('')}
         </div>
       </section>
+    </section>
+  `;
+}
+
+function renderTeamDraw(snapshot, currentPlayer) {
+  const sortResult = snapshot.game?.sort_result;
+  const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
+  const confirmedCount = buildGameView(snapshot, currentPlayer?.id || null).confirmedCount;
+
+  if (!sortResult) {
+    return `
+      <section class="card">
+        <div class="card-title">Sorteio de times</div>
+        <div class="info-block">
+          <div class="info-line">• Confirmados disponíveis: ${confirmedCount}</div>
+          <div class="info-line">• O sorteio usa apenas jogadores confirmados.</div>
+        </div>
+        ${currentPlayer?.is_admin ? `
+          <div class="actions" style="margin-top:12px;">
+            <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear times</button>
+          </div>
+        ` : '<p class="footer-note">Aguardando sorteio do administrador.</p>'}
+      </section>
+    `;
+  }
+
+  const renderTeam = (title, ids) => `
+    <div class="team-draw-box">
+      <div class="team-draw-title">${title}</div>
+      <div class="placeholder-list">
+        ${(ids || []).map((id) => {
+          const player = playerById.get(id);
+          return `
+            <div class="placeholder-row">
+              <div class="placeholder-main">
+                <div class="avatar">${getInitials(player?.name || '?')}</div>
+                <div>
+                  <div class="row-title">${player?.name || 'Jogador removido'}</div>
+                  <div class="row-subtitle">${getPositionLabel(player?.position)}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  return `
+    <section class="card">
+      <div class="card-title">Sorteio de times</div>
+      <div class="info-block">
+        <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
+        <div class="info-line">• Jogadores sorteados: ${sortResult.total_players}</div>
+      </div>
+      <div class="team-draw-grid">
+        ${renderTeam('Time A', sortResult.team_a)}
+        ${renderTeam('Time B', sortResult.team_b)}
+      </div>
+      ${currentPlayer?.is_admin ? `
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
+          <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear novamente</button>
+        </div>
+      ` : ''}
     </section>
   `;
 }
@@ -860,6 +937,8 @@ function renderConfig(snapshot, currentPlayer) {
           <div class="info-line">• Vencimento mensalidade: ${game.mens_expire_date ? formatDate(game.mens_expire_date) : 'não definido'}</div>
         </div>
       </section>
+
+      ${renderTeamDraw(snapshot, currentPlayer)}
     </section>
   `;
 }

@@ -745,3 +745,30 @@ button {
   font-weight: 700;
   color: var(--text);
 }
+
+
+.team-draw-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.team-draw-box {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.team-draw-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+@media (min-width: 720px) {
+  .team-draw-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

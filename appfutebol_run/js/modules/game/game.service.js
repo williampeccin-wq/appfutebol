@@ -67,3 +67,99 @@ export function toggleConfirmation(playerId) {
   patchState({ confirmations: updated });
   return { ok: true };
 }
+
+
+function getPositionBucket(player) {
+  const position = player?.position || 'meia';
+  if (position === 'zag') return 'zag';
+  if (position === 'atk') return 'atk';
+  return 'meia';
+}
+
+function sortByName(a, b) {
+  return String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR');
+}
+
+function balanceTeams(players) {
+  const teamA = [];
+  const teamB = [];
+
+  const buckets = {
+    zag: [],
+    meia: [],
+    atk: [],
+  };
+
+  players.forEach((player) => {
+    buckets[getPositionBucket(player)].push(player);
+  });
+
+  Object.values(buckets).forEach((bucket) => {
+    bucket.sort(sortByName);
+    bucket.forEach((player, index) => {
+      const target = teamA.length <= teamB.length
+        ? (index % 2 === 0 ? teamA : teamB)
+        : (index % 2 === 0 ? teamB : teamA);
+      target.push(player);
+    });
+  });
+
+  return {
+    teamA: teamA.sort(sortByName),
+    teamB: teamB.sort(sortByName),
+  };
+}
+
+export function drawTeams() {
+  const snapshot = getState();
+  const confirmedIds = new Set(
+    (snapshot.confirmations || [])
+      .filter((entry) => entry?.confirmed)
+      .map((entry) => entry.player_id)
+  );
+
+  const eligiblePlayers = (snapshot.players || [])
+    .filter((player) => confirmedIds.has(player.id))
+    .filter((player) => player.plays_football !== false)
+    .filter((player) => player.role !== 'carne');
+
+  if (eligiblePlayers.length < 2) {
+    return {
+      ok: false,
+      message: 'É preciso ter pelo menos 2 jogadores confirmados para sortear times.',
+    };
+  }
+
+  const { teamA, teamB } = balanceTeams(eligiblePlayers);
+  const sortResult = {
+    created_at: new Date().toISOString(),
+    total_players: eligiblePlayers.length,
+    team_a: teamA.map((player) => player.id),
+    team_b: teamB.map((player) => player.id),
+  };
+
+  patchState({
+    game: {
+      ...(snapshot.game || {}),
+      sort_result: sortResult,
+    },
+  });
+
+  return {
+    ok: true,
+    message: 'Times sorteados com sucesso.',
+    sortResult,
+  };
+}
+
+export function clearTeamDraw() {
+  const snapshot = getState();
+  patchState({
+    game: {
+      ...(snapshot.game || {}),
+      sort_result: null,
+    },
+  });
+
+  return { ok: true, message: 'Sorteio limpo.' };
+}
