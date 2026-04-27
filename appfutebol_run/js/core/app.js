@@ -759,6 +759,8 @@ function renderHome(snapshot, currentPlayer) {
         <div class="status-subline">${mensalidade.subline}</div>
       </section>
 
+      ${renderPresenceList(workingSnapshot)}
+
       ${renderTeamDraw(workingSnapshot, currentPlayer)}
 
       <section class="card">
@@ -806,6 +808,60 @@ function renderChampionship(snapshot) {
           }).join('')}
         </div>
       </section>
+    </section>
+  `;
+}
+
+function renderPresenceList(snapshot) {
+  const confirmedIds = new Set(
+    (snapshot.confirmations || [])
+      .filter((entry) => entry?.confirmed)
+      .map((entry) => entry.player_id)
+  );
+
+  const footballPlayers = (snapshot.players || [])
+    .filter((player) => player.plays_football !== false)
+    .filter((player) => player.role !== 'carne')
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
+
+  const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
+  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
+
+  const renderMiniRow = (player, statusLabel, statusClass) => `
+    <div class="presence-mini-row">
+      <div class="presence-mini-main">
+        <div class="avatar">${getInitials(player.name)}</div>
+        <div>
+          <div class="row-title">${player.name}</div>
+          <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
+        </div>
+      </div>
+      <span class="tag ${statusClass}">${statusLabel}</span>
+    </div>
+  `;
+
+  return `
+    <section class="card">
+      <div class="card-title">Lista de presença</div>
+      <div class="presence-list-grid">
+        <div class="presence-list-column">
+          <div class="presence-list-title">Confirmados (${confirmedPlayers.length})</div>
+          <div class="presence-list-stack">
+            ${confirmedPlayers.length
+              ? confirmedPlayers.map((player) => renderMiniRow(player, 'Confirmado', 'is-ok')).join('')
+              : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
+          </div>
+        </div>
+
+        <div class="presence-list-column">
+          <div class="presence-list-title">Não confirmados (${pendingPlayers.length})</div>
+          <div class="presence-list-stack">
+            ${pendingPlayers.length
+              ? pendingPlayers.map((player) => renderMiniRow(player, 'Pendente', 'is-neutral')).join('')
+              : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }

@@ -772,3 +772,52 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+.presence-list-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.presence-list-column {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.presence-list-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.presence-list-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.presence-mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.presence-mini-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .presence-list-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
