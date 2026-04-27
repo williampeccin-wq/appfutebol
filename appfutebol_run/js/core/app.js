@@ -344,8 +344,8 @@ const appElement = document.getElementById('app');
 
 init();
 
-function init() {
-  const data = loadPersistedState();
+async function init() {
+  const data = await loadPersistedState();
   replaceState(data);
   restoreSession();
 

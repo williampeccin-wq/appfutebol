@@ -1,35 +1,65 @@
 import { loadLocalState, saveLocalState, resetLocalState } from "../services/storage.local.js";
+import { loadRemoteState, saveRemoteState, getSupabaseMeta, isSupabaseConfigured } from "../services/storage.supabase.js";
 
 const BACKEND_LOCAL = "local-storage";
+const BACKEND_SUPABASE = "supabase-with-local-fallback";
 
-function createLocalStorageAdapter() {
+function validateLocalSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    console.warn("[storage.adapter] invalid snapshot, resetting");
+    return resetLocalState();
+  }
+
+  return snapshot;
+}
+
+function createHybridStorageAdapter() {
   return {
-    kind: BACKEND_LOCAL,
-    getState() {
-      try {
-        const snapshot = loadLocalState();
+    kind: isSupabaseConfigured() ? BACKEND_SUPABASE : BACKEND_LOCAL,
 
-        if (!snapshot || typeof snapshot !== "object") {
-          console.warn("[storage.adapter] invalid snapshot, resetting");
-          return resetLocalState();
-        }
+    async getState() {
+      const localSnapshot = validateLocalSnapshot(loadLocalState());
 
-        return snapshot;
-      } catch (e) {
-        console.warn("[storage.adapter] failed to load, resetting", e);
-        return resetLocalState();
+      if (!isSupabaseConfigured()) {
+        return localSnapshot;
       }
+
+      const remote = await loadRemoteState();
+
+      if (remote.ok && remote.state && typeof remote.state === "object") {
+        saveLocalState(remote.state);
+        return validateLocalSnapshot(remote.state);
+      }
+
+      await saveRemoteState(localSnapshot);
+      return localSnapshot;
     },
+
     saveState(state) {
       saveLocalState(state);
+
+      if (isSupabaseConfigured()) {
+        saveRemoteState(state).then((result) => {
+          if (!result.ok) {
+            console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
+          }
+        });
+      }
     },
-    resetState() {
-      return resetLocalState();
+
+    async resetState() {
+      const seed = resetLocalState();
+
+      if (isSupabaseConfigured()) {
+        await saveRemoteState(seed);
+      }
+
+      return seed;
     },
   };
 }
 
-const activeStorageAdapter = createLocalStorageAdapter();
+const activeStorageAdapter = createHybridStorageAdapter();
 
 export function getStorageAdapter() {
   return activeStorageAdapter;
@@ -38,17 +68,23 @@ export function getStorageAdapter() {
 export function getStorageMeta() {
   return {
     backend: activeStorageAdapter.kind,
+    supabase: getSupabaseMeta(),
   };
 }
 
-export function getState() {
-  return activeStorageAdapter.getState();
+export async function getState() {
+  try {
+    return await activeStorageAdapter.getState();
+  } catch (e) {
+    console.warn("[storage.adapter] failed to load, resetting", e);
+    return resetLocalState();
+  }
 }
 
 export function saveState(state) {
   activeStorageAdapter.saveState(state);
 }
 
-export function resetState() {
-  return activeStorageAdapter.resetState();
+export async function resetState() {
+  return await activeStorageAdapter.resetState();
 }
