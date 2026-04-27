@@ -362,6 +362,10 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  const confirmedCount = snapshot.confirmations?.filter(c => c.confirmed).length || 0;
+  const maxPlayers = snapshot.game?.max_players || 10;
+  console.log(`CONFIRMADOS: ${confirmedCount}/${maxPlayers}`);
+
   const currentPlayer = getCurrentPlayer();
 
   if (!currentPlayer) {
@@ -399,7 +403,10 @@ function render(snapshot) {
     </nav>
 
     <main class="content">
-      ${renderTab(snapshot, activeTab, currentPlayer)}
+      <div style="padding:10px;font-weight:bold;">
+${confirmedCount} / ${maxPlayers} jogadores confirmados
+</div>
+${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
   `;
 
@@ -578,6 +585,34 @@ function bindAppEvents(currentPlayer) {
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
     toggleConfirmation(currentPlayer.id);
   });
+
+  const gameConfigForm = appElement.querySelector('#game-config-form');
+  if (gameConfigForm) {
+    gameConfigForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const formData = new FormData(gameConfigForm);
+      const maxPlayers = Number(formData.get('max_players'));
+
+      if (!Number.isFinite(maxPlayers) || maxPlayers < 1) {
+        showToast('Informe um limite de jogadores válido.', 'error');
+        return;
+      }
+
+      patchState({
+        game: {
+          ...(getState().game || {}),
+          game_date: String(formData.get('game_date') || ''),
+          game_time: String(formData.get('game_time') || ''),
+          max_players: maxPlayers,
+          mens_expire_date: String(formData.get('mens_expire_date') || ''),
+          open: formData.get('open') === 'on',
+        },
+      });
+
+      showToast('Configuração do jogo salva.');
+    });
+  }
 }
 
 function renderNavButton(tab, label, activeTab) {
@@ -775,28 +810,59 @@ function renderConfig(snapshot, currentPlayer) {
     `;
   }
 
+  const game = snapshot.game || {};
+  const confirmedCount = buildGameView(snapshot, null).confirmedCount;
+  const maxPlayers = Number(game.max_players || 10);
+
   return `
     <section class="section-stack">
       <section class="card">
-        <div class="card-title">Fase 4 concluída</div>
-        <div class="info-block">
-          <div class="info-line">• Confirmação de presença integrada à Home</div>
-          <div class="info-line">• Toggle confirmar / cancelar persistido em storage local</div>
-          <div class="info-line">• Perfis carne continuam fora da confirmação do jogo</div>
-          <div class="info-line">• Estrutura pronta para regras de mensalidade na próxima fase</div>
-        </div>
+        <div class="card-title">Configuração do jogo</div>
+        <form id="game-config-form" class="player-admin-form">
+          <label class="field-label">
+            Data do jogo
+            <input class="input" type="date" name="game_date" value="${game.game_date || ''}" />
+          </label>
+
+          <label class="field-label">
+            Hora do jogo
+            <input class="input" type="time" name="game_time" value="${game.game_time || ''}" />
+          </label>
+
+          <label class="field-label">
+            Máximo de jogadores
+            <input class="input" type="number" min="1" step="1" name="max_players" value="${maxPlayers}" />
+          </label>
+
+          <label class="field-label">
+            Vencimento da mensalidade
+            <input class="input" type="date" name="mens_expire_date" value="${game.mens_expire_date || ''}" />
+          </label>
+
+          <label class="checkbox-line">
+            <input type="checkbox" name="open" ${game.open ? 'checked' : ''} />
+            Inscrições abertas
+          </label>
+
+          <div class="player-admin-actions">
+            <button class="btn btn-primary" type="submit">Salvar configuração</button>
+          </div>
+        </form>
       </section>
 
       <section class="card">
-        <div class="card-title">Admin snapshot</div>
-        <p class="footer-note">
-          Players: ${snapshot.players.length} · Confirmações ativas: ${buildGameView(snapshot, null).confirmedCount}
-        </p>
+        <div class="card-title">Resumo do jogo</div>
+        <div class="info-block">
+          <div class="info-line">• Data: ${formatDate(game.game_date)}</div>
+          <div class="info-line">• Hora: ${game.game_time || '--:--'}</div>
+          <div class="info-line">• Inscrições: ${game.open ? 'abertas' : 'fechadas'}</div>
+          <div class="info-line">• Confirmados: ${confirmedCount} / ${maxPlayers}</div>
+          <div class="info-line">• Vencimento mensalidade: ${game.mens_expire_date ? formatDate(game.mens_expire_date) : 'não definido'}</div>
+        </div>
       </section>
     </section>
   `;
 }
-
 function buildMensalidadeMeta(game, currentPlayer) {
   if (currentPlayer.is_admin || currentPlayer.role === 'carne') {
     return {
