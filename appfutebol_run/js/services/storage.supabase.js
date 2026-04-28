@@ -37,9 +37,7 @@ function buildHeaders(config, prefer = null) {
     'Content-Type': 'application/json',
   };
 
-  if (prefer) {
-    headers.Prefer = prefer;
-  }
+  if (prefer) headers.Prefer = prefer;
 
   return headers;
 }
@@ -58,11 +56,7 @@ export async function loadRemoteState() {
     });
 
     if (!response.ok) {
-      return {
-        ok: false,
-        state: null,
-        reason: `supabase_load_failed_${response.status}`,
-      };
+      return { ok: false, state: null, reason: `supabase_load_failed_${response.status}` };
     }
 
     const rows = await response.json();
@@ -100,10 +94,7 @@ export async function saveRemoteState(state) {
     });
 
     if (!response.ok) {
-      return {
-        ok: false,
-        reason: `supabase_save_failed_${response.status}`,
-      };
+      return { ok: false, reason: `supabase_save_failed_${response.status}` };
     }
 
     return { ok: true, reason: 'supabase_saved' };
