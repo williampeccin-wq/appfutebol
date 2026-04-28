@@ -364,7 +364,18 @@ async function init() {
   });
 
   render(getState());
+  bindGlobalSystemEvents();
   startRemoteSync();
+}
+
+function bindGlobalSystemEvents() {
+  window.addEventListener('harmonia:remote-conflict', () => {
+    showToast('Dados atualizados em outro dispositivo. Recarregando...', 'error');
+    setTimeout(async () => {
+      const remoteSnapshot = await loadPersistedState();
+      replaceState(mergeRemoteDomainWithLocalSession(remoteSnapshot, getState()));
+    }, 600);
+  });
 }
 
 function getDomainFingerprint(snapshot) {

@@ -1,5 +1,5 @@
 import { loadLocalState, saveLocalState, resetLocalState } from "../services/storage.local.js";
-import { loadRemoteState, saveRemoteState, getSupabaseMeta, isSupabaseConfigured } from "../services/storage.supabase.js";
+import { loadRemoteState, saveRemoteState, getSupabaseMeta, isSupabaseConfigured, getLastRemoteUpdatedAt } from "../services/storage.supabase.js";
 
 const BACKEND_LOCAL = "local-storage";
 const BACKEND_SUPABASE = "supabase-with-local-fallback";
@@ -90,7 +90,17 @@ function createHybridStorageAdapter() {
       saveLocalState(state);
 
       if (isSupabaseConfigured()) {
-        saveRemoteState(createRemoteSnapshot(state)).then((result) => {
+        const expectedUpdatedAt = getLastRemoteUpdatedAt();
+
+        saveRemoteState(createRemoteSnapshot(state), { expectedUpdatedAt }).then((result) => {
+          if (result.conflict) {
+            console.warn("[storage.adapter] remote conflict detected; local change was not pushed:", result.reason);
+            window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {
+              detail: { reason: result.reason },
+            }));
+            return;
+          }
+
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
           }
