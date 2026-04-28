@@ -4,6 +4,12 @@ import { loadRemoteState, saveRemoteState, getSupabaseMeta, isSupabaseConfigured
 const BACKEND_LOCAL = "local-storage";
 const BACKEND_SUPABASE = "supabase-with-local-fallback";
 
+const DEFAULT_UI = {
+  currentTab: "home",
+  authMode: "login",
+  authMessage: null,
+};
+
 function isValidAppState(snapshot) {
   return !!(
     snapshot &&
@@ -27,6 +33,27 @@ function getSafeLocalSnapshot() {
   return resetLocalState();
 }
 
+function preserveBrowserLocalFields(remoteSnapshot, localSnapshot) {
+  return {
+    ...remoteSnapshot,
+    session: {
+      ...(localSnapshot?.session || { playerId: null }),
+    },
+    ui: {
+      ...DEFAULT_UI,
+      ...(localSnapshot?.ui || {}),
+    },
+  };
+}
+
+function createRemoteSnapshot(state) {
+  return {
+    ...state,
+    session: { playerId: null },
+    ui: { ...DEFAULT_UI },
+  };
+}
+
 function createHybridStorageAdapter() {
   return {
     kind: isSupabaseConfigured() ? BACKEND_SUPABASE : BACKEND_LOCAL,
@@ -41,15 +68,16 @@ function createHybridStorageAdapter() {
       const remote = await loadRemoteState();
 
       if (remote.ok && isValidAppState(remote.state)) {
-        saveLocalState(remote.state);
-        return remote.state;
+        const merged = preserveBrowserLocalFields(remote.state, localSnapshot);
+        saveLocalState(merged);
+        return merged;
       }
 
       if (remote.ok && !isValidAppState(remote.state)) {
         console.warn("[storage.adapter] ignoring invalid remote state and keeping local snapshot");
       }
 
-      await saveRemoteState(localSnapshot);
+      await saveRemoteState(createRemoteSnapshot(localSnapshot));
       return localSnapshot;
     },
 
@@ -62,7 +90,7 @@ function createHybridStorageAdapter() {
       saveLocalState(state);
 
       if (isSupabaseConfigured()) {
-        saveRemoteState(state).then((result) => {
+        saveRemoteState(createRemoteSnapshot(state)).then((result) => {
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
           }
@@ -74,7 +102,7 @@ function createHybridStorageAdapter() {
       const seed = resetLocalState();
 
       if (isSupabaseConfigured()) {
-        await saveRemoteState(seed);
+        await saveRemoteState(createRemoteSnapshot(seed));
       }
 
       return seed;

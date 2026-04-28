@@ -333,6 +333,7 @@ import { buildGameView, buildPlayersView } from "../domain/projection.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
+import { loadRemoteState } from '../services/storage.supabase.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
@@ -342,19 +343,89 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 
 const appElement = document.getElementById('app');
 
+const REMOTE_SYNC_INTERVAL_MS = 4000;
+let isApplyingRemoteState = false;
+let lastDomainFingerprint = '';
+
 init();
 
 async function init() {
   const data = await loadPersistedState();
   replaceState(data);
   restoreSession();
+  lastDomainFingerprint = getDomainFingerprint(getState());
 
   subscribe((snapshot) => {
-    persist(snapshot);
+    if (!isApplyingRemoteState) {
+      persist(snapshot);
+      lastDomainFingerprint = getDomainFingerprint(snapshot);
+    }
     render(snapshot);
   });
 
   render(getState());
+  startRemoteSync();
+}
+
+function getDomainFingerprint(snapshot) {
+  return JSON.stringify({
+    players: snapshot.players || [],
+    game: snapshot.game || null,
+    confirmations: snapshot.confirmations || [],
+    championship: snapshot.championship || null,
+    carne: snapshot.carne || [],
+    notifications: snapshot.notifications || [],
+  });
+}
+
+function mergeRemoteDomainWithLocalSession(remoteSnapshot, localSnapshot) {
+  return {
+    ...remoteSnapshot,
+    session: localSnapshot.session,
+    ui: localSnapshot.ui,
+  };
+}
+
+function isValidRemoteDomainSnapshot(snapshot) {
+  return !!(
+    snapshot &&
+    typeof snapshot === 'object' &&
+    Array.isArray(snapshot.players) &&
+    snapshot.players.length > 0 &&
+    snapshot.game &&
+    typeof snapshot.game === 'object' &&
+    Array.isArray(snapshot.confirmations)
+  );
+}
+
+function startRemoteSync() {
+  window.setInterval(async () => {
+    try {
+      const localSnapshot = getState();
+      const remote = await loadRemoteState();
+
+      if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
+        return;
+      }
+
+      const currentFingerprint = getDomainFingerprint(localSnapshot);
+      const remoteFingerprint = getDomainFingerprint(remote.state);
+
+      if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
+        lastDomainFingerprint = currentFingerprint;
+        return;
+      }
+
+      isApplyingRemoteState = true;
+      replaceState(mergeRemoteDomainWithLocalSession(remote.state, localSnapshot));
+      lastDomainFingerprint = remoteFingerprint;
+      isApplyingRemoteState = false;
+      showToast('Dados atualizados.');
+    } catch (error) {
+      isApplyingRemoteState = false;
+      console.warn('[remote-sync] failed to sync remote state', error);
+    }
+  }, REMOTE_SYNC_INTERVAL_MS);
 }
 
 function persist(snapshot) {
