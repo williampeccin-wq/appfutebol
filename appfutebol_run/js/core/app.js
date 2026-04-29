@@ -1,11 +1,28 @@
+window.__HARMONIA_BUILD__ = 'v1.55.4-sync-toast-root-fix';
+
 function showToast(msg, type='success') {
+  const text = String(msg || '');
+
+  // Sync/polling remoto deve ser silencioso. Este bloqueio é defensivo
+  // e impede que qualquer caminho antigo volte a exibir o toast de sync.
+  if (/dados\s+atualizados|atualizados\s+em\s+outro\s+dispositivo|remote\s+sync|remote-conflict/i.test(text)) {
+    window.__HARMONIA_LAST_BLOCKED_TOAST__ = {
+      text,
+      type,
+      blockedAt: new Date().toISOString(),
+      build: window.__HARMONIA_BUILD__,
+    };
+    return;
+  }
+
   let t = document.createElement('div');
   t.className = 'toast ' + type;
-  t.textContent = msg;
+  t.textContent = text;
   document.body.appendChild(t);
   setTimeout(()=>t.classList.add('show'),10);
   setTimeout(()=>{t.classList.remove('show'); setTimeout(()=>t.remove(),200)},2000);
 }
+
 
 
 let editingPlayerId = null;
@@ -382,13 +399,21 @@ async function init() {
 
 function bindGlobalSystemEvents() {
   window.addEventListener('harmonia:remote-conflict', () => {
-    showToast('Dados atualizados em outro dispositivo. Recarregando...', 'error');
+    // Conflito remoto de polling/sync não deve gerar toast recorrente.
+    // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
     setTimeout(async () => {
-      const remoteSnapshot = await loadPersistedState();
-      replaceState(mergeRemoteDomainWithLocalSession(remoteSnapshot, getState()));
+      isApplyingRemoteState = true;
+      try {
+        const remoteSnapshot = await loadPersistedState();
+        replaceState(mergeRemoteDomainWithLocalSession(remoteSnapshot, getState()));
+        lastDomainFingerprint = getDomainFingerprint(getState());
+      } finally {
+        isApplyingRemoteState = false;
+      }
     }, 600);
   });
 }
+
 
 function getDomainFingerprint(snapshot) {
   return JSON.stringify({
