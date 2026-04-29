@@ -1,11 +1,9 @@
-v1.53.4 sync toast fix
+APP FUTEBOL v1.54.1 - NAVBAR FIX
 
-CHECKS:
-NO_MATCH: showToast('Dados atualizados.')
-MATCH: validateAndRepairState(remote.state) before remote fingerprint compare
-MATCH: safeRemoteState used in mergeRemoteDomainWithLocalSession
+MATCH: css/app.css .nav uses display:flex
+MATCH: css/app.css .nav uses flex-wrap:nowrap
+MATCH: css/app.css .nav uses overflow-x:auto
+MATCH: css/app.css .nav-button uses white-space:nowrap
+MATCH: js/core/version.js contains v1.54.1
 
-EXPECTED:
-- Polling/sync no longer shows repeated "Dados atualizados" toast.
-- Login screen is not interrupted every 1-2 seconds by sync toast.
-- Real remote changes still update local state silently.
+EXPECTED: Config remains on the same horizontal navbar row. If width is insufficient, the row scrolls horizontally instead of wrapping.

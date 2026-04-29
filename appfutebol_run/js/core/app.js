@@ -497,6 +497,7 @@ function render(snapshot) {
 
     <nav class="nav" aria-label="Navegação principal">
       ${renderNavButton('home', 'Home', activeTab)}
+      ${renderNavButton('weekly_game', 'Jogo da semana', activeTab)}
       ${renderNavButton('players', 'Jogadores', activeTab)}
       ${renderNavButton('championship', 'Campeonato', activeTab)}
       ${currentPlayer.is_admin ? renderNavButton('config', 'Config', activeTab) : ''}
@@ -744,6 +745,8 @@ function renderNavButton(tab, label, activeTab) {
 
 function renderTab(snapshot, activeTab, currentPlayer) {
   switch (activeTab) {
+    case 'weekly_game':
+      return renderWeeklyGame(snapshot, currentPlayer);
     case 'players':
       return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'championship':
@@ -837,28 +840,10 @@ function renderHome(snapshot, currentPlayer) {
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-title">Resumo rápido</div>
-        <div class="kpi-grid">
-          <div class="kpi-box">
-            <div class="kpi-value">${workingSnapshot.players.filter((player) => player.role === 'jogador').length}</div>
-            <div class="kpi-label">Jogadores cadastrados</div>
-          </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${workingSnapshot.carne.length}</div>
-            <div class="kpi-label">Grupo da carne</div>
-          </div>
-        </div>
-      </section>
-
       <section class="status-box ${mensalidade.className}">
         <div class="status-title">Mensalidade · ${mensalidade.title}</div>
         <div class="status-subline">${mensalidade.subline}</div>
       </section>
-
-      ${renderPresenceList(workingSnapshot)}
-
-      ${renderTeamDraw(workingSnapshot, currentPlayer)}
 
       <section class="card">
         <div class="card-title">Notificações recentes</div>
@@ -868,6 +853,22 @@ function renderHome(snapshot, currentPlayer) {
           `).join('')}
         </div>
       </section>
+    </section>
+  `;
+}
+
+function renderWeeklyGame(snapshot, currentPlayer) {
+  return `
+    <section class="section-stack">
+      <section class="hero-card">
+        <div class="hero-label">Jogo da semana</div>
+        <div class="hero-date">${formatDate(snapshot.game?.game_date)}</div>
+        <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
+      </section>
+
+      ${renderPresenceList(snapshot)}
+
+      ${renderTeamDraw(snapshot, currentPlayer)}
     </section>
   `;
 }
@@ -1099,13 +1100,13 @@ function renderTeamDraw(snapshot, currentPlayer) {
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
         ${renderTeam('Time B', sortResult.team_b, 'team_b')}
       </div>
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
-        ${currentPlayer?.is_admin ? `
+      ${currentPlayer?.is_admin ? `
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
           <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
           <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear novamente</button>
-        ` : ''}
-      </div>
+        </div>
+      ` : ''}
     </section>
   `;
 }
@@ -1172,8 +1173,6 @@ function renderConfig(snapshot, currentPlayer) {
           <div class="info-line">• Vencimento mensalidade: ${game.mens_expire_date ? formatDate(game.mens_expire_date) : 'não definido'}</div>
         </div>
       </section>
-
-      ${renderTeamDraw(snapshot, currentPlayer)}
     </section>
   `;
 }

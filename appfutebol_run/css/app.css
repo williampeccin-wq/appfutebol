@@ -304,20 +304,31 @@ button {
   position: sticky;
   top: 76px;
   z-index: 9;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   background: var(--white);
   border-bottom: 1px solid var(--gray-100);
 }
 
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
 .nav-button {
+  flex: 1 0 auto;
+  min-width: max-content;
   border: 0;
   background: transparent;
-  padding: 13px 8px;
+  padding: 13px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--gray-500);
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 
 .nav-button.is-active {
@@ -613,8 +624,9 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .nav-button {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
 
