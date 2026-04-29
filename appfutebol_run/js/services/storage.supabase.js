@@ -1,6 +1,8 @@
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 
 let lastRemoteUpdatedAt = null;
+let lastSplitSnapshot = null;
+let lastSplitFingerprint = '';
 
 const SPLIT_TABLES = {
   players: 'players',
@@ -105,6 +107,39 @@ function splitState(state) {
   };
 }
 
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function stableStringify(value) {
+  return JSON.stringify(value ?? null);
+}
+
+function snapshotFingerprint(parts) {
+  return stableStringify({
+    players: parts.players,
+    game: parts.game,
+    confirmations: parts.confirmations,
+    meta: parts.meta,
+  });
+}
+
+function indexBy(items, keyGetter) {
+  const map = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = keyGetter(item);
+    if (key) map.set(String(key), item);
+  }
+  return map;
+}
+
+function rememberSplitSnapshot(state, updatedAt = null) {
+  const parts = splitState(state);
+  lastSplitSnapshot = cloneJson(parts);
+  lastSplitFingerprint = snapshotFingerprint(parts);
+  lastRemoteUpdatedAt = updatedAt || lastRemoteUpdatedAt;
+}
+
 async function requestJson(config, url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -130,6 +165,31 @@ async function requestJson(config, url, options = {}) {
     status: response.status,
     body: '',
     data,
+  };
+}
+
+async function requestNoContent(config, url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...buildHeaders(config, options.prefer || null),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    return {
+      ok: false,
+      status: response.status,
+      body,
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    body: '',
   };
 }
 
@@ -208,6 +268,8 @@ async function loadSplitState(config) {
     };
   }
 
+  rememberSplitSnapshot(state, lastRemoteUpdatedAt);
+
   return {
     ok: true,
     state,
@@ -217,23 +279,78 @@ async function loadSplitState(config) {
   };
 }
 
-async function deleteRowsNotIn(config, table, idColumn, ids) {
-  const encodedTable = encodeURIComponent(table);
+async function upsertRow(config, table, payload) {
+  return await requestJson(config, tableUrl(config, table), {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    body: JSON.stringify(payload),
+  });
+}
 
-  if (!ids.length) {
-    const result = await fetch(`${baseUrl(config)}/rest/v1/${encodedTable}?${idColumn}=not.is.null`, {
-      method: 'DELETE',
-      headers: buildHeaders(config),
-    });
-    return result.ok;
+async function deleteRow(config, table, column, value) {
+  return await requestNoContent(config, tableUrl(config, table, `${column}=eq.${encodeURIComponent(String(value))}`), {
+    method: 'DELETE',
+  });
+}
+
+function buildGranularOperations(config, previousParts, nextParts, now) {
+  const operations = [];
+  const previousPlayers = indexBy(previousParts?.players || [], (player) => player.id);
+  const nextPlayers = indexBy(nextParts.players, (player) => player.id);
+  const previousConfirmations = indexBy(previousParts?.confirmations || [], (entry) => entry.player_id);
+  const nextConfirmations = indexBy(nextParts.confirmations, (entry) => entry.player_id);
+
+  for (const [id, player] of nextPlayers.entries()) {
+    if (stableStringify(previousPlayers.get(id)) !== stableStringify(player)) {
+      operations.push({
+        type: 'upsert_player',
+        run: () => upsertRow(config, SPLIT_TABLES.players, { id, data: player, updated_at: now }),
+      });
+    }
   }
 
-  const list = ids.map((id) => `"${String(id).replaceAll('"', '\\"')}"`).join(',');
-  const result = await fetch(`${baseUrl(config)}/rest/v1/${encodedTable}?${idColumn}=not.in.(${list})`, {
-    method: 'DELETE',
-    headers: buildHeaders(config),
-  });
-  return result.ok;
+  for (const id of previousPlayers.keys()) {
+    if (!nextPlayers.has(id)) {
+      operations.push({
+        type: 'delete_player',
+        run: () => deleteRow(config, SPLIT_TABLES.players, 'id', id),
+      });
+    }
+  }
+
+  for (const [playerId, confirmation] of nextConfirmations.entries()) {
+    if (stableStringify(previousConfirmations.get(playerId)) !== stableStringify(confirmation)) {
+      operations.push({
+        type: 'upsert_confirmation',
+        run: () => upsertRow(config, SPLIT_TABLES.confirmations, { player_id: playerId, data: confirmation, updated_at: now }),
+      });
+    }
+  }
+
+  for (const playerId of previousConfirmations.keys()) {
+    if (!nextConfirmations.has(playerId)) {
+      operations.push({
+        type: 'delete_confirmation',
+        run: () => deleteRow(config, SPLIT_TABLES.confirmations, 'player_id', playerId),
+      });
+    }
+  }
+
+  if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
+    operations.push({
+      type: 'upsert_game',
+      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: nextParts.game, updated_at: now }),
+    });
+  }
+
+  if (stableStringify(previousParts?.meta || {}) !== stableStringify(nextParts.meta || {})) {
+    operations.push({
+      type: 'upsert_meta',
+      run: () => upsertRow(config, SPLIT_TABLES.meta, { key: 'default', data: nextParts.meta, updated_at: now }),
+    });
+  }
+
+  return operations;
 }
 
 async function saveSplitState(config, state) {
@@ -243,69 +360,37 @@ async function saveSplitState(config, state) {
     return { ok: false, conflict: false, reason: 'split_save_invalid_state' };
   }
 
-  const now = new Date().toISOString();
+  const nextFingerprint = snapshotFingerprint(parts);
 
-  const playerRows = parts.players.map((player) => ({
-    id: player.id,
-    data: player,
-    updated_at: now,
-  }));
-
-  const confirmationRows = parts.confirmations.map((confirmation) => ({
-    player_id: confirmation.player_id,
-    data: confirmation,
-    updated_at: now,
-  }));
-
-  const gameRow = {
-    key: 'default',
-    data: parts.game,
-    updated_at: now,
-  };
-
-  const metaRow = {
-    key: 'default',
-    data: parts.meta,
-    updated_at: now,
-  };
-
-  const [playersResult, confirmationsResult, gameResult, metaResult] = await Promise.all([
-    requestJson(config, tableUrl(config, SPLIT_TABLES.players), {
-      method: 'POST',
-      prefer: 'resolution=merge-duplicates,return=representation',
-      body: JSON.stringify(playerRows),
-    }),
-    confirmationRows.length
-      ? requestJson(config, tableUrl(config, SPLIT_TABLES.confirmations), {
-          method: 'POST',
-          prefer: 'resolution=merge-duplicates,return=representation',
-          body: JSON.stringify(confirmationRows),
-        })
-      : Promise.resolve({ ok: true, data: [] }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.game), {
-      method: 'POST',
-      prefer: 'resolution=merge-duplicates,return=representation',
-      body: JSON.stringify(gameRow),
-    }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.meta), {
-      method: 'POST',
-      prefer: 'resolution=merge-duplicates,return=representation',
-      body: JSON.stringify(metaRow),
-    }),
-  ]);
-
-  if (!playersResult.ok || !confirmationsResult.ok || !gameResult.ok || !metaResult.ok) {
-    return { ok: false, conflict: false, reason: 'split_save_failed' };
+  if (lastSplitFingerprint && nextFingerprint === lastSplitFingerprint) {
+    return { ok: true, conflict: false, reason: 'split_no_changes', updatedAt: lastRemoteUpdatedAt };
   }
 
-  await Promise.all([
-    deleteRowsNotIn(config, SPLIT_TABLES.players, 'id', parts.players.map((player) => player.id)),
-    deleteRowsNotIn(config, SPLIT_TABLES.confirmations, 'player_id', parts.confirmations.map((entry) => entry.player_id)),
-  ]);
+  const now = new Date().toISOString();
+  const previousParts = lastSplitSnapshot || { players: [], game: null, confirmations: [], meta: {} };
+  const operations = buildGranularOperations(config, previousParts, parts, now);
 
-  lastRemoteUpdatedAt = now;
+  if (!operations.length) {
+    rememberSplitSnapshot(state, lastRemoteUpdatedAt || now);
+    return { ok: true, conflict: false, reason: 'split_no_changes', updatedAt: lastRemoteUpdatedAt };
+  }
 
-  return { ok: true, conflict: false, reason: 'split_saved', updatedAt: now };
+  const results = await Promise.all(operations.map((operation) => operation.run()));
+  const failed = results.find((result) => !result.ok);
+
+  if (failed) {
+    return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}` };
+  }
+
+  rememberSplitSnapshot(state, now);
+
+  return {
+    ok: true,
+    conflict: false,
+    reason: 'split_granular_saved',
+    updatedAt: now,
+    operations: operations.map((operation) => operation.type),
+  };
 }
 
 async function upsertLegacyState(config, state) {
@@ -384,6 +469,7 @@ export async function loadRemoteState() {
 
     if (legacy.ok) {
       await saveSplitState(config, legacy.state);
+      rememberSplitSnapshot(legacy.state, getLastRemoteUpdatedAt());
       return {
         ...legacy,
         reason: 'legacy_loaded_and_migrated_to_split',
@@ -439,5 +525,6 @@ export function getSupabaseMeta() {
     key: config.stateKey,
     lastRemoteUpdatedAt,
     splitTables: SPLIT_TABLES,
+    granularWrites: true,
   };
 }
