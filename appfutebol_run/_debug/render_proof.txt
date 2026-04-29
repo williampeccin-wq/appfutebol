@@ -1,17 +1,11 @@
-APP FUTEBOL v1.53.3 - PROTOCOLO VALIDADO
+v1.53.4 sync toast fix
 
-1) REMOÇÃO DA MENSAGEM DE SEED NA UI
-NO_MATCH: Seed local
-NO_MATCH: telefone cadastrado
-NO_MATCH: senha padrão
-NO_MATCH: senha padrao
+CHECKS:
+NO_MATCH: showToast('Dados atualizados.')
+MATCH: validateAndRepairState(remote.state) before remote fingerprint compare
+MATCH: safeRemoteState used in mergeRemoteDomainWithLocalSession
 
-2) VERSÃO
-js/core/version.js:1:export const APP_VERSION = "v1.53.3";
-index.html:7:  <link rel="stylesheet" href="./css/app.css?v=1.53.3">
-index.html:17:  <script type="module" src="./js/core/app.js?v=1.53.3"></script>
-
-3) SINTAXE JS
-OK node --check js/modules/auth/auth.view.js
-OK node --check js/core/app.js
-OK node --check js/core/version.js
+EXPECTED:
+- Polling/sync no longer shows repeated "Dados atualizados" toast.
+- Login screen is not interrupted every 1-2 seconds by sync toast.
+- Real remote changes still update local state silently.

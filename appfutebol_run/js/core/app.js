@@ -431,8 +431,15 @@ function startRemoteSync() {
         return;
       }
 
+      const repairedRemote = validateAndRepairState(remote.state);
+      const safeRemoteState = repairedRemote.state;
+
+      if (repairedRemote.warnings.length) {
+        console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
+      }
+
       const currentFingerprint = getDomainFingerprint(localSnapshot);
-      const remoteFingerprint = getDomainFingerprint(remote.state);
+      const remoteFingerprint = getDomainFingerprint(safeRemoteState);
 
       if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
         lastDomainFingerprint = currentFingerprint;
@@ -440,10 +447,9 @@ function startRemoteSync() {
       }
 
       isApplyingRemoteState = true;
-      replaceState(mergeRemoteDomainWithLocalSession(remote.state, localSnapshot));
+      replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
       lastDomainFingerprint = remoteFingerprint;
       isApplyingRemoteState = false;
-      showToast('Dados atualizados.');
     } catch (error) {
       isApplyingRemoteState = false;
       console.warn('[remote-sync] failed to sync remote state', error);
