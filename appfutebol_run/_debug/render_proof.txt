@@ -1,29 +1,17 @@
-APP FUTEBOL v1.53.2 - PROTOCOLO VALIDADO
+APP FUTEBOL v1.53.3 - PROTOCOLO VALIDADO
 
-1) SINTAXE JS
+1) REMOÇÃO DA MENSAGEM DE SEED NA UI
+NO_MATCH: Seed local
+NO_MATCH: telefone cadastrado
+NO_MATCH: senha padrão
+NO_MATCH: senha padrao
+
+2) VERSÃO
+js/core/version.js:1:export const APP_VERSION = "v1.53.3";
+index.html:7:  <link rel="stylesheet" href="./css/app.css?v=1.53.3">
+index.html:17:  <script type="module" src="./js/core/app.js?v=1.53.3"></script>
+
+3) SINTAXE JS
+OK node --check js/modules/auth/auth.view.js
 OK node --check js/core/app.js
-OK node --check js/core/state.js
-OK node --check js/domain/state.guard.js
-OK node --check js/domain/storage.adapter.js
-OK node --check js/modules/game/game.service.js
-
-2) GREP DE FEATURE
-js/core/version.js:1:export const APP_VERSION = "v1.53.2";
-js/domain/state.guard.js:193:export function enforceFinancialPresenceConsistency(state) {
-js/domain/state.guard.js:216:    warnings.push('Confirmação removida automaticamente de jogador inadimplente.');
-js/domain/state.guard.js:294:  const financialPresenceResult = enforceFinancialPresenceConsistency(nextState);
-js/core/app.js:116:function repairManualSnapshot(snapshot) {
-js/core/app.js:197:  const safeSnapshot = repairManualSnapshot(snapshot);
-js/core/app.js:299:  const safeSnapshot = repairManualSnapshot(snapshot);
-js/core/app.js:320:  const safeSnapshot = repairManualSnapshot(snapshot);
-
-3) PROVA FUNCIONAL DA REGRA DE INADIMPLÊNCIA
-{
-  "lucasConfirmationCount": 0,
-  "lucasInTeamA": false,
-  "lucasInTeamB": false,
-  "okStillConfirmed": true,
-  "teamTotalPlayers": 1
-}
-
-CRITÉRIO: jogador mens_ok=false foi removido de confirmations e sort_result, sem remover jogador adimplente.
+OK node --check js/core/version.js
