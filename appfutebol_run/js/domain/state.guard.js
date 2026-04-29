@@ -185,6 +185,65 @@ export function sanitizeCarne(state) {
   return { state: nextState, warnings };
 }
 
+
+function getPlayerIdFromDrawEntry(entry) {
+  return entry && typeof entry === 'object' ? entry.id : entry;
+}
+
+export function enforceFinancialPresenceConsistency(state) {
+  const nextState = clone(state || {});
+  const warnings = [];
+  const players = Array.isArray(nextState.players) ? nextState.players : [];
+  const blockedPlayerIds = new Set(
+    players
+      .filter((player) => {
+        if (!player || !player.id) return false;
+        const isAdmin = player.is_admin === true;
+        const isCarneOnly = player.role === 'carne';
+        const playsFootball = player.plays_football !== false && !isCarneOnly;
+        return playsFootball && !isAdmin && player.mens_ok !== true;
+      })
+      .map((player) => String(player.id))
+  );
+
+  if (!blockedPlayerIds.size) {
+    return { state: nextState, warnings };
+  }
+
+  const confirmations = Array.isArray(nextState.confirmations) ? nextState.confirmations : [];
+  const nextConfirmations = confirmations.filter((entry) => !blockedPlayerIds.has(String(entry?.player_id || '')));
+  if (nextConfirmations.length !== confirmations.length) {
+    warnings.push('Confirmação removida automaticamente de jogador inadimplente.');
+  }
+  nextState.confirmations = nextConfirmations;
+
+  const sortResult = nextState.game?.sort_result;
+  if (sortResult && typeof sortResult === 'object') {
+    const sanitizeTeam = (entries) => (Array.isArray(entries) ? entries : [])
+      .filter((entry) => !blockedPlayerIds.has(String(getPlayerIdFromDrawEntry(entry) || '')));
+
+    const originalTeamA = Array.isArray(sortResult.team_a) ? sortResult.team_a : [];
+    const originalTeamB = Array.isArray(sortResult.team_b) ? sortResult.team_b : [];
+    const nextTeamA = sanitizeTeam(originalTeamA);
+    const nextTeamB = sanitizeTeam(originalTeamB);
+
+    if (nextTeamA.length !== originalTeamA.length || nextTeamB.length !== originalTeamB.length) {
+      warnings.push('Jogador inadimplente removido automaticamente do sorteio de times.');
+      nextState.game = {
+        ...(nextState.game || {}),
+        sort_result: {
+          ...sortResult,
+          team_a: nextTeamA,
+          team_b: nextTeamB,
+          total_players: nextTeamA.length + nextTeamB.length,
+        },
+      };
+    }
+  }
+
+  return { state: nextState, warnings };
+}
+
 export function sanitizeUi(ui, defaultUi = { currentTab: 'home', authMode: 'login', authMessage: null }) {
   return {
     ...clone(defaultUi),
@@ -231,6 +290,10 @@ export function validateAndRepairState(state, options = {}) {
   const confirmationsResult = sanitizeConfirmations(nextState);
   nextState = confirmationsResult.state;
   warnings.push(...confirmationsResult.warnings);
+
+  const financialPresenceResult = enforceFinancialPresenceConsistency(nextState);
+  nextState = financialPresenceResult.state;
+  warnings.push(...financialPresenceResult.warnings);
 
   const rankingResult = sanitizeRanking(nextState);
   nextState = rankingResult.state;

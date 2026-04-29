@@ -38,9 +38,11 @@ export function getPlayerBlockReasons(player, game) {
     reasons.push('carne_only');
   }
 
-  const financeApplies = !player.is_admin && player.role !== 'carne';
+  const isAdmin = player.is_admin === true;
+  const isCarneOnly = player.role === 'carne';
+  const financeApplies = !isAdmin && !isCarneOnly;
 
-  if (financeApplies && !player.mens_ok) {
+  if (financeApplies && player.mens_ok !== true) {
     reasons.push('mensalidade_pendente');
   }
 
@@ -67,10 +69,6 @@ function getBlockMessage(reason) {
       return 'Perfis somente carne não participam da confirmação do jogo.';
     case 'mensalidade_pendente':
       return 'Você não pode confirmar presença pois sua mensalidade está pendente.';
-    case 'mensalidade_sem_data':
-      return 'A mensalidade ainda não tem data de vencimento configurada.';
-    case 'mensalidade_vencida':
-      return 'Você não pode confirmar presença pois a mensalidade está vencida.';
     case 'inscricoes_fechadas':
       return 'As inscrições estão fechadas.';
     case 'game_full':

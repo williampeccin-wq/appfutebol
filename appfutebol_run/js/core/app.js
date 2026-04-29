@@ -113,6 +113,14 @@ function normalizePlayer(player) {
   return player;
 }
 
+function repairManualSnapshot(snapshot) {
+  const repaired = validateAndRepairState(snapshot);
+  if (repaired.warnings.length) {
+    console.warn('[app] Reparos aplicados antes do save manual:', repaired.warnings);
+  }
+  return repaired.state;
+}
+
 document.addEventListener("click", async (e) => {
   const trigger = e.target.closest("[data-action]");
   if (!trigger) return;
@@ -186,11 +194,12 @@ document.addEventListener("click", async (e) => {
     });
   }
 
-  savePersistedState(snapshot);
+  const safeSnapshot = repairManualSnapshot(snapshot);
+  savePersistedState(safeSnapshot);
   editingPlayerId = null;
   setPlayerFormMode(false);
   resetPlayerForm();
-  render(snapshot);
+  render(safeSnapshot);
   uiActionInFlight = false;
   showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -287,8 +296,9 @@ if (action === "delete-player") {
     ? snapshot.carne.filter(entry => entry.player_id !== id)
     : [];
 
-  savePersistedState(snapshot);
-  render(snapshot);
+  const safeSnapshot = repairManualSnapshot(snapshot);
+  savePersistedState(safeSnapshot);
+  render(safeSnapshot);
   uiActionInFlight = false;
   showToast("Jogador removido", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -307,8 +317,9 @@ if (action === "delete-player") {
   if (action === "mark-paid") player.mens_ok = true;
   if (action === "mark-debt") player.mens_ok = false;
 
-  savePersistedState(snapshot);
-  render(snapshot);
+  const safeSnapshot = repairManualSnapshot(snapshot);
+  savePersistedState(safeSnapshot);
+  render(safeSnapshot);
   uiActionInFlight = false;
   showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
 });
@@ -330,6 +341,7 @@ document.addEventListener("change", (e) => {
 });
 
 import { buildGameView, buildPlayersView } from "../domain/projection.js";
+import { validateAndRepairState } from "../domain/state.guard.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
@@ -665,7 +677,8 @@ function bindAppEvents(currentPlayer) {
   });
 
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
-    toggleConfirmation(currentPlayer.id);
+    const result = toggleConfirmation(currentPlayer.id);
+    if (result?.message) showToast(result.message, result.ok ? 'success' : 'error');
   });
 
   appElement.querySelector('#draw-teams-btn')?.addEventListener('click', () => {
@@ -738,34 +751,19 @@ function renderTab(snapshot, activeTab, currentPlayer) {
 }
 
 function renderHome(snapshot, currentPlayer) {
-  let workingSnapshot = snapshot;
+  const workingSnapshot = snapshot;
+  const activePlayer = workingSnapshot.players.find((player) => String(player.id) === String(currentPlayer.id)) || currentPlayer;
 
-  if (!canConfirm(currentPlayer)) {
-    const latest = getState();
-    const hadConfirmed = latest.confirmations?.some(
-      (c) => c.player_id === currentPlayer.id && c.confirmed
-    );
-
-    if (hadConfirmed) {
-      patchState({
-        confirmations: latest.confirmations.map((c) =>
-          c.player_id === currentPlayer.id ? { ...c, confirmed: false } : c
-        ),
-      });
-      workingSnapshot = getState();
-    }
-  }
-
-  const gameView = buildGameView(workingSnapshot, currentPlayer.id);
+  const gameView = buildGameView(workingSnapshot, activePlayer.id);
   const game = gameView.game;
   const confirmedCount = gameView.confirmedCount;
   const maxPlayers = gameView.maxPlayers || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const vagasRestantes = gameView.spotsLeft;
-  const mensalidade = buildMensalidadeMeta(game, currentPlayer);
-  const carneStatus = workingSnapshot.carne.some((entry) => entry.player_id === currentPlayer.id && entry.active);
+  const mensalidade = buildMensalidadeMeta(game, activePlayer);
+  const carneStatus = workingSnapshot.carne.some((entry) => String(entry.player_id) === String(activePlayer.id) && entry.active);
   const confirmed = gameView.isConfirmed;
-  const presenceGuard = canManagePresence(currentPlayer, game);
+  const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
   const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
   const statusNote = !confirmed && !capacityOk
@@ -777,7 +775,7 @@ function renderHome(snapshot, currentPlayer) {
     confirmed,
     capacityOk,
     presenceGuard,
-    currentPlayer,
+    currentPlayer: activePlayer,
     carneStatus,
   });
 
@@ -799,14 +797,14 @@ function renderHome(snapshot, currentPlayer) {
         <div class="card-title">Usuário logado</div>
         <div class="session-card compact">
           <div class="session-main">
-            <div class="avatar avatar-lg">${getInitials(currentPlayer.name)}</div>
+            <div class="avatar avatar-lg">${getInitials(activePlayer.name)}</div>
             <div>
-              <div class="row-title">${currentPlayer.name}</div>
-              <div class="row-subtitle">${currentPlayer.is_admin ? 'Administrador' : currentPlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(currentPlayer.position)} · ${formatPhone(currentPlayer.phone)}</div>
+              <div class="row-title">${activePlayer.name}</div>
+              <div class="row-subtitle">${activePlayer.is_admin ? 'Administrador' : activePlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)} · ${formatPhone(activePlayer.phone)}</div>
             </div>
           </div>
           <div class="chip-row">
-            <span class="tag ${currentPlayer.is_admin || currentPlayer.role === 'carne' || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${currentPlayer.is_admin || currentPlayer.role === 'carne' || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
+            <span class="tag ${activePlayer.is_admin === true || activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'is-ok' : 'is-warn'}">${activePlayer.is_admin === true || activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
             <span class="tag is-neutral">${carneStatus ? 'Grupo da carne ativo' : 'Sem grupo da carne'}</span>
           </div>
         </div>
@@ -1174,55 +1172,28 @@ function renderConfig(snapshot, currentPlayer) {
   `;
 }
 function buildMensalidadeMeta(game, currentPlayer) {
-  if (currentPlayer.is_admin || currentPlayer.role === 'carne') {
+  if (currentPlayer.is_admin === true || currentPlayer.role === 'carne') {
     return {
       className: 'is-ok',
       title: 'Não aplicável',
-      subline: 'Perfis somente carne não dependem da mensalidade do futebol para acessar o sistema.',
+      subline: 'Este perfil não participa da mensalidade do futebol.',
     };
   }
 
-  if (!game?.mens_expire_date) {
-    return {
-      className: 'is-warn',
-      title: 'Sem data definida',
-      subline: 'A data de vencimento mensal ainda não foi configurada.',
-    };
-  }
-
-  if (!currentPlayer.mens_ok) {
+  if (currentPlayer.mens_ok !== true) {
     return {
       className: 'is-danger',
       title: 'Pendente',
-      subline: 'Sua mensalidade está marcada como pendente no sistema.',
-    };
-  }
-
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const expireDate = new Date(`${game.mens_expire_date}T12:00:00`);
-
-  if (expireDate < today) {
-    return {
-      className: 'is-danger',
-      title: 'Pendente',
-      subline: `Mensalidade vencida em ${formatDate(game.mens_expire_date)}.`,
-    };
-  }
-
-  const diffInDays = Math.ceil((expireDate.getTime() - today.getTime()) / 86400000);
-  if (diffInDays <= 3) {
-    return {
-      className: 'is-warn',
-      title: 'Atenção',
-      subline: `Mensalidade vence em ${formatDate(game.mens_expire_date)}.`,
+      subline: 'Sua mensalidade está marcada como pendente no sistema. Você pode cancelar uma presença já confirmada, mas não pode confirmar novamente até regularizar.',
     };
   }
 
   return {
     className: 'is-ok',
     title: 'Em dia',
-    subline: `Mensalidade válida até ${formatDate(game.mens_expire_date)}.`,
+    subline: game?.mens_expire_date
+      ? `Controle administrativo: ${formatDate(game.mens_expire_date)}.`
+      : 'Mensalidade marcada como ok no sistema.',
   };
 }
 

@@ -1,4 +1,5 @@
 import { loadLocalState, saveLocalState, resetLocalState } from "../services/storage.local.js";
+import { validateAndRepairState } from "./state.guard.js";
 import { loadRemoteState, saveRemoteState, getSupabaseMeta, isSupabaseConfigured, getLastRemoteUpdatedAt } from "../services/storage.supabase.js";
 
 const BACKEND_LOCAL = "local-storage";
@@ -82,17 +83,24 @@ function createHybridStorageAdapter() {
     },
 
     saveState(state) {
-      if (!isValidAppState(state)) {
-        console.warn("[storage.adapter] blocked invalid state write", state);
+      const repaired = validateAndRepairState(state);
+      const safeState = repaired.state;
+
+      if (repaired.warnings.length) {
+        console.warn("[storage.adapter] Reparos aplicados antes de persistir:", repaired.warnings);
+      }
+
+      if (!isValidAppState(safeState)) {
+        console.warn("[storage.adapter] blocked invalid state write", safeState);
         return;
       }
 
-      saveLocalState(state);
+      saveLocalState(safeState);
 
       if (isSupabaseConfigured()) {
         const expectedUpdatedAt = getLastRemoteUpdatedAt();
 
-        saveRemoteState(createRemoteSnapshot(state), { expectedUpdatedAt }).then((result) => {
+        saveRemoteState(createRemoteSnapshot(safeState), { expectedUpdatedAt }).then((result) => {
           if (result.conflict) {
             console.warn("[storage.adapter] remote conflict detected; local change was not pushed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {

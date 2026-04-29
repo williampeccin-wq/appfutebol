@@ -33,24 +33,36 @@ export function canManagePresence(player, game) {
 
 export function toggleConfirmation(playerId) {
   const snapshot = getState();
-  const player = snapshot.players.find((item) => item.id === playerId);
+  const player = snapshot.players.find((item) => String(item.id) === String(playerId));
+  const existing = snapshot.confirmations.find((entry) => String(entry.player_id) === String(playerId));
+  const currentlyConfirmed = existing?.confirmed === true;
+
+  if (currentlyConfirmed) {
+    const updated = snapshot.confirmations.map((entry) => (
+      String(entry.player_id) === String(playerId)
+        ? { ...entry, confirmed: false, timestamp: new Date().toISOString() }
+        : entry
+    ));
+    patchState({ confirmations: updated });
+    return { ok: true, message: 'Presença cancelada.' };
+  }
+
   const decision = getPresenceDecision({
     player,
     game: snapshot.game,
     confirmations: snapshot.confirmations,
   });
 
-  if (!decision.canConfirm && !decision.canCancel) {
-    return { ok: false, message: decision.message };
+  if (!decision.canConfirm) {
+    return { ok: false, message: decision.message || 'Você não pode confirmar presença agora.' };
   }
 
-  const existing = snapshot.confirmations.find((entry) => entry.player_id === playerId);
   let updated;
 
   if (existing) {
     updated = snapshot.confirmations.map((entry) => (
-      entry.player_id === playerId
-        ? { ...entry, confirmed: !entry.confirmed, timestamp: new Date().toISOString() }
+      String(entry.player_id) === String(playerId)
+        ? { ...entry, confirmed: true, timestamp: new Date().toISOString() }
         : entry
     ));
   } else {
@@ -65,7 +77,7 @@ export function toggleConfirmation(playerId) {
   }
 
   patchState({ confirmations: updated });
-  return { ok: true };
+  return { ok: true, message: 'Presença confirmada.' };
 }
 
 
