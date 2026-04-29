@@ -44,17 +44,6 @@ export function getPlayerBlockReasons(player, game) {
     reasons.push('mensalidade_pendente');
   }
 
-  if (financeApplies && !game?.mens_expire_date) {
-    reasons.push('mensalidade_sem_data');
-  } else if (financeApplies) {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    const expireDate = new Date(`${game.mens_expire_date}T12:00:00`);
-    if (expireDate < today) {
-      reasons.push('mensalidade_vencida');
-    }
-  }
-
   if (!game?.open) {
     reasons.push('inscricoes_fechadas');
   }
