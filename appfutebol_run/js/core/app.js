@@ -337,7 +337,7 @@ import { loadRemoteState } from '../services/storage.supabase.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 
@@ -680,6 +680,13 @@ function bindAppEvents(currentPlayer) {
 
   appElement.querySelector('#copy-draw-btn')?.addEventListener('click', () => {
     copyTeamDrawToClipboard();
+  });
+
+  appElement.querySelectorAll('[data-action="move-drawn-player"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const result = moveDrawnPlayer(button.dataset.playerId, button.dataset.fromTeam);
+      showToast(result.message, result.ok ? 'success' : 'error');
+    });
   });
 
   const gameConfigForm = appElement.querySelector('#game-config-form');
@@ -1032,21 +1039,44 @@ function renderTeamDraw(snapshot, currentPlayer) {
     `;
   }
 
-  const renderTeam = (title, ids) => `
+  const isAdmin = currentPlayer?.is_admin === true || currentPlayer?.is_admin === 'true' || currentPlayer?.is_admin === 1 || currentPlayer?.is_admin === '1' || currentPlayer?.role === 'admin';
+
+  const resolveDrawEntry = (entry) => {
+    const id = (entry && typeof entry === 'object') ? entry.id : entry;
+    const player = (entry && typeof entry === 'object') ? entry : playerById.get(id);
+    return { id, player };
+  };
+
+  const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
       <div class="team-draw-title">${title}</div>
       <div class="placeholder-list">
-        ${(ids || []).map((id) => {
-          const player = playerById.get(id);
+        ${(entries || []).map((entry) => {
+          const { id, player } = resolveDrawEntry(entry);
+          const targetLabel = teamKey === 'team_a' ? 'Time B' : 'Time A';
           return `
-            <div class="placeholder-row">
-              <div class="placeholder-main">
+            <div class="placeholder-row team-draw-player-row">
+              <div class="placeholder-main team-draw-player-main">
                 <div class="avatar">${getInitials(player?.name || '?')}</div>
-                <div>
+                <div class="team-draw-player-text">
                   <div class="row-title">${player?.name || 'Jogador removido'}</div>
                   <div class="row-subtitle">${getPositionLabel(player?.position)}</div>
                 </div>
               </div>
+              ${isAdmin && id && player ? `
+                <button
+                  class="team-inline-move-button"
+                  type="button"
+                  data-action="move-drawn-player"
+                  data-player-id="${id}"
+                  data-from-team="${teamKey}"
+                  aria-label="Mover ${player.name || 'jogador'} para ${targetLabel}"
+                  title="Mover para ${targetLabel}"
+                >
+                  ⇄
+                  <span>Mover</span>
+                </button>
+              ` : ''}
             </div>
           `;
         }).join('')}
@@ -1062,8 +1092,8 @@ function renderTeamDraw(snapshot, currentPlayer) {
         <div class="info-line">• Jogadores sorteados: ${sortResult.total_players}</div>
       </div>
       <div class="team-draw-grid">
-        ${renderTeam('Time A', sortResult.team_a)}
-        ${renderTeam('Time B', sortResult.team_b)}
+        ${renderTeam('Time A', sortResult.team_a, 'team_a')}
+        ${renderTeam('Time B', sortResult.team_b, 'team_b')}
       </div>
       <div class="actions" style="margin-top:12px;">
         <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>

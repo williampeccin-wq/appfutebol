@@ -152,6 +152,49 @@ export function drawTeams() {
   };
 }
 
+
+export function moveDrawnPlayer(playerId, fromTeamKey) {
+  const snapshot = getState();
+  const sortResult = snapshot.game?.sort_result;
+
+  if (!sortResult) {
+    return { ok: false, message: 'Nenhum sorteio disponível para ajustar.' };
+  }
+
+  const sourceKey = fromTeamKey === 'team_a' ? 'team_a' : fromTeamKey === 'team_b' ? 'team_b' : null;
+
+  if (!sourceKey) {
+    return { ok: false, message: 'Time de origem inválido.' };
+  }
+
+  const targetKey = sourceKey === 'team_a' ? 'team_b' : 'team_a';
+  const sourceTeam = Array.isArray(sortResult[sourceKey]) ? [...sortResult[sourceKey]] : [];
+  const targetTeam = Array.isArray(sortResult[targetKey]) ? [...sortResult[targetKey]] : [];
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const sourceIndex = sourceTeam.findIndex((entry) => String(getEntryId(entry)) === String(playerId));
+
+  if (sourceIndex === -1) {
+    return { ok: false, message: 'Jogador não encontrado no time informado.' };
+  }
+
+  const [movedPlayerEntry] = sourceTeam.splice(sourceIndex, 1);
+  targetTeam.push(movedPlayerEntry);
+
+  patchState({
+    game: {
+      ...(snapshot.game || {}),
+      sort_result: {
+        ...sortResult,
+        [sourceKey]: sourceTeam,
+        [targetKey]: targetTeam,
+        adjusted_at: new Date().toISOString(),
+      },
+    },
+  });
+
+  return { ok: true, message: 'Jogador movido.' };
+}
+
 export function clearTeamDraw() {
   const snapshot = getState();
   patchState({
