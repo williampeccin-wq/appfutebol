@@ -826,11 +826,46 @@ button {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-@media (min-width: 720px) {
+.presence-mini-main > div:last-child {
+  min-width: 0;
+}
+
+.presence-mini-row > div:last-child {
+  flex: 0 0 auto;
+  gap: 6px !important;
+}
+
+.presence-remove-button,
+.presence-add-button {
+  padding: 4px 8px;
+  min-width: auto;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.presence-remove-button {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.presence-remove-button:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.presence-add-button {
+  padding-inline: 10px;
+}
+
+@media (min-width: 980px) {
   .presence-list-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 

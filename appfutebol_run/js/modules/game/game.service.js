@@ -81,6 +81,61 @@ export function toggleConfirmation(playerId) {
 }
 
 
+/**
+ * Remove um jogador confirmado do jogo vigente por ação administrativa.
+ *
+ * Efeitos:
+ * - marca a confirmação como false;
+ * - preserva o histórico da entrada em confirmations;
+ * - remove o jogador dos times sorteados, quando houver sorteio ativo;
+ * - libera a vaga para nova confirmação futura.
+ */
+export function adminRemovePlayerFromGame(playerId) {
+  const snapshot = getState();
+
+  const targetId = String(playerId);
+  const now = new Date().toISOString();
+
+  const updatedConfirmations = (snapshot.confirmations || []).map((entry) => (
+    String(entry.player_id) === targetId
+      ? {
+          ...entry,
+          confirmed: false,
+          removed_by_admin: true,
+          timestamp: now,
+        }
+      : entry
+  ));
+
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const removeFromTeam = (team) => (Array.isArray(team) ? team.filter((entry) => String(getEntryId(entry)) !== targetId) : []);
+
+  let updatedGame = { ...(snapshot.game || {}) };
+
+  if (updatedGame?.sort_result) {
+    updatedGame = {
+      ...updatedGame,
+      sort_result: {
+        ...updatedGame.sort_result,
+        team_a: removeFromTeam(updatedGame.sort_result.team_a),
+        team_b: removeFromTeam(updatedGame.sort_result.team_b),
+        adjusted_at: now,
+      },
+    };
+  }
+
+  patchState({
+    confirmations: updatedConfirmations,
+    game: updatedGame,
+  });
+
+  return {
+    ok: true,
+    message: 'Jogador removido do jogo pelo admin.',
+  };
+}
+
+
 function getPositionBucket(player) {
   const position = player?.position || 'meia';
   if (position === 'zag') return 'zag';

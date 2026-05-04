@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.55.5-finance-admin-consistent';
+window.__HARMONIA_BUILD__ = 'v1.55.9-admin-presence-manage';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -323,6 +323,81 @@ if (action === "delete-player") {
 }
 
 
+if (action === "admin-remove-from-game") {
+  const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+  const player = snapshot.players.find((p) => p.id === id);
+
+  if (!current?.is_admin) {
+    showToast("Apenas administrador pode remover jogador do jogo", "error");
+    return;
+  }
+
+  if (!player) return;
+
+  const isPlayerConfirmed = Array.isArray(snapshot.confirmations)
+    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && entry.confirmed === true);
+
+  if (!isPlayerConfirmed) {
+    showToast("Jogador não está confirmado no jogo", "error");
+    return;
+  }
+
+  const confirmedRemoval = await showConfirmModal({
+    title: 'Remover do jogo',
+    message: `Remover ${player.name} do jogo vigente? A vaga será liberada e ele poderá confirmar novamente depois.`,
+    confirmText: 'Remover',
+    cancelText: 'Cancelar',
+  });
+
+  if (!confirmedRemoval) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Removendo...');
+
+  const result = adminRemovePlayerFromGame(id);
+  const safeSnapshot = repairManualSnapshot(getState());
+  savePersistedState(safeSnapshot);
+  render(safeSnapshot);
+
+  uiActionInFlight = false;
+  showToast(result.message, result.ok ? "success" : "error");
+  return;
+}
+
+if (action === "admin-add-to-game") {
+  const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+  const player = snapshot.players.find((p) => p.id === id);
+
+  if (!current?.is_admin) {
+    showToast("Apenas administrador pode incluir jogador no jogo", "error");
+    return;
+  }
+
+  if (!player) return;
+
+  const isPlayerConfirmed = Array.isArray(snapshot.confirmations)
+    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && entry.confirmed === true);
+
+  if (isPlayerConfirmed) {
+    showToast("Jogador já está confirmado no jogo", "error");
+    return;
+  }
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Incluindo...');
+
+  const result = toggleConfirmation(id);
+  const safeSnapshot = repairManualSnapshot(getState());
+  savePersistedState(safeSnapshot);
+  render(safeSnapshot);
+
+  uiActionInFlight = false;
+  showToast(result.message, result.ok ? "success" : "error");
+  return;
+}
+
+
+
   const player = snapshot.players.find(p => p.id === id);
   if (!player) return;
 
@@ -366,7 +441,7 @@ import { loadRemoteState } from '../services/storage.supabase.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen } from '../modules/players/players.view.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 
@@ -891,7 +966,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
         <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
       </section>
 
-      ${renderPresenceList(snapshot)}
+      ${renderPresenceList(snapshot, currentPlayer)}
 
       ${renderTeamDraw(snapshot, currentPlayer)}
     </section>
@@ -993,7 +1068,8 @@ async function copyTeamDrawToClipboard() {
   }
 }
 
-function renderPresenceList(snapshot) {
+function renderPresenceList(snapshot, currentPlayer) {
+  const adminMode = !!currentPlayer?.is_admin;
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
@@ -1008,7 +1084,7 @@ function renderPresenceList(snapshot) {
   const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
   const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
 
-  const renderMiniRow = (player, statusLabel, statusClass) => `
+  const renderMiniRow = (player, statusLabel, statusClass, confirmed = false) => `
     <div class="presence-mini-row">
       <div class="presence-mini-main">
         <div class="avatar">${getInitials(player.name)}</div>
@@ -1017,7 +1093,11 @@ function renderPresenceList(snapshot) {
           <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
         </div>
       </div>
-      <span class="tag ${statusClass}">${statusLabel}</span>
+      <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
+        <span class="tag ${statusClass}">${statusLabel}</span>
+        ${adminMode && confirmed ? `<button class="btn btn-danger presence-remove-button" type="button" data-action="admin-remove-from-game" data-id="${player.id}">Remover</button>` : ''}
+        ${adminMode && !confirmed ? `<button class="btn btn-primary presence-add-button" type="button" data-action="admin-add-to-game" data-id="${player.id}">Incluir</button>` : ''}
+      </div>
     </div>
   `;
 
@@ -1029,7 +1109,7 @@ function renderPresenceList(snapshot) {
           <div class="presence-list-title">Confirmados (${confirmedPlayers.length})</div>
           <div class="presence-list-stack">
             ${confirmedPlayers.length
-              ? confirmedPlayers.map((player) => renderMiniRow(player, 'Confirmado', 'is-ok')).join('')
+              ? confirmedPlayers.map((player) => renderMiniRow(player, 'Confirmado', 'is-ok', true)).join('')
               : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
           </div>
         </div>
@@ -1038,7 +1118,7 @@ function renderPresenceList(snapshot) {
           <div class="presence-list-title">Não confirmados (${pendingPlayers.length})</div>
           <div class="presence-list-stack">
             ${pendingPlayers.length
-              ? pendingPlayers.map((player) => renderMiniRow(player, 'Pendente', 'is-neutral')).join('')
+              ? pendingPlayers.map((player) => renderMiniRow(player, 'Pendente', 'is-neutral', false)).join('')
               : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
           </div>
         </div>

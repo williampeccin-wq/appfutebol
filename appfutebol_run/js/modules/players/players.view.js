@@ -31,6 +31,15 @@ function renderFinanceControls(player, currentPlayer) {
 }
 
 
+
+function renderAdminGameRemovalControl(player, currentPlayer, confirmed) {
+  if (!isAdmin(currentPlayer)) return '';
+  if (isCarneOnly(player)) return '';
+  if (!confirmed) return '';
+
+  return `<button class="btn btn-danger presence-remove-button" type="button" data-action="admin-remove-from-game" data-id="${player.id}">Remover</button>`;
+}
+
 function renderPlayerManagementCard(currentPlayer) {
   if (!isAdmin(currentPlayer)) return '';
 
@@ -184,6 +193,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
       <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
         ${player.plays_football === false ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
         ${renderFinanceControls(player, currentPlayer)}
+        ${renderAdminGameRemovalControl(player, currentPlayer, confirmed)}
         ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="edit-player" data-id="${player.id}">Editar</button>` : ''}
         ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="delete-player" data-id="${player.id}">Excluir</button>` : ''}
       </div>
