@@ -11,3 +11,10 @@ _quarentena_repo/
 
 _run_*/
 _run_*
+_debug/
+
+# runs locais
+appfutebol_run/
+run_*/
+TESTE_*/
+*.patch
