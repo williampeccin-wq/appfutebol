@@ -38,9 +38,8 @@ export function getPlayerBlockReasons(player, game) {
     reasons.push('carne_only');
   }
 
-  const isAdmin = player.is_admin === true;
   const isCarneOnly = player.role === 'carne';
-  const financeApplies = !isAdmin && !isCarneOnly;
+  const financeApplies = !isCarneOnly;
 
   if (financeApplies && player.mens_ok !== true) {
     reasons.push('mensalidade_pendente');

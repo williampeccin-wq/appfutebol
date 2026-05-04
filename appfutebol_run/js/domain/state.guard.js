@@ -198,10 +198,9 @@ export function enforceFinancialPresenceConsistency(state) {
     players
       .filter((player) => {
         if (!player || !player.id) return false;
-        const isAdmin = player.is_admin === true;
         const isCarneOnly = player.role === 'carne';
         const playsFootball = player.plays_football !== false && !isCarneOnly;
-        return playsFootball && !isAdmin && player.mens_ok !== true;
+        return playsFootball && player.mens_ok !== true;
       })
       .map((player) => String(player.id))
   );

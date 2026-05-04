@@ -1,0 +1,16 @@
+v1.55.5 finance admin consistent proof
+
+Base: v1.55.4 sync toast silent/root fix
+Scope: remove admin exemptions from finance/monthly-payment rules.
+
+Verified source patterns after change:
+- projection.js: isInadimplente no longer excludes p.is_admin.
+- players.view.js: pending status and finance counters no longer exclude admins; only carne-only remains exempt.
+- finance.service.js: isFinanceExempt only exempts role === 'carne'; canConfirm no longer auto-allows admin; mark debt can mark admin inadimplente.
+- state.guard.js: blocked IDs include football-playing admins with mens_ok !== true.
+- rules.engine.js: monthly-payment block applies to admins; only carne-only is exempt.
+- app.js: current player finance chips/status no longer auto-mark admin as Mensalidade ok; buildMensalidadeMeta exempts only carne.
+
+Validation:
+- node --check passed for every JS file under appfutebol_run/js.
+- grep check confirms remaining "Não aplicável" only belongs to role === 'carne' metadata block.

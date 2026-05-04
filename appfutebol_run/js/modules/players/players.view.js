@@ -17,14 +17,12 @@ function isCarneOnly(player) {
 }
 
 function isFinancePending(player) {
-  return !isAdmin(player) && !isCarneOnly(player) && !player?.mens_ok;
+  return !isCarneOnly(player) && !player?.mens_ok;
 }
 
 function renderFinanceControls(player, currentPlayer) {
   if (!isAdmin(currentPlayer)) return '';
   if (isCarneOnly(player)) return '';
-  if (isAdmin(player)) return '';
-
   if (isFinancePending(player)) {
     return `<button class="btn btn-secondary finance-action-button" type="button" data-action="mark-paid" data-id="${player.id}">Marcar pago</button>`;
   }
@@ -72,7 +70,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const jogadores = orderedPlayers.filter((player) => player.plays_football !== false);
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
   const carneOnly = carneGroup.filter((player) => player.plays_football === false);
-  const jogadoresFinanceiros = jogadores.filter((player) => !isAdmin(player));
+  const jogadoresFinanceiros = jogadores.filter((player) => !isCarneOnly(player));
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
   const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
@@ -91,7 +89,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
           </div>
           <div class="chip-row">
             <span class="tag is-neutral">${currentPlayer.plays_football === false ? 'Somente carne' : getPositionLabel(currentPlayer.position)}</span>
-            <span class="tag ${isAdmin(currentPlayer) || currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${isAdmin(currentPlayer) || currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
+            <span class="tag ${currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
           </div>
         </div>
       </section>

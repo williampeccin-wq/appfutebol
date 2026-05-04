@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.55.4-sync-toast-root-fix';
+window.__HARMONIA_BUILD__ = 'v1.55.5-finance-admin-consistent';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -838,7 +838,7 @@ function renderHome(snapshot, currentPlayer) {
             </div>
           </div>
           <div class="chip-row">
-            <span class="tag ${activePlayer.is_admin === true || activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'is-ok' : 'is-warn'}">${activePlayer.is_admin === true || activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
+            <span class="tag ${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'is-ok' : 'is-warn'}">${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
             <span class="tag is-neutral">${carneStatus ? 'Grupo da carne ativo' : 'Sem grupo da carne'}</span>
           </div>
         </div>
@@ -1202,7 +1202,7 @@ function renderConfig(snapshot, currentPlayer) {
   `;
 }
 function buildMensalidadeMeta(game, currentPlayer) {
-  if (currentPlayer.is_admin === true || currentPlayer.role === 'carne') {
+  if (currentPlayer.role === 'carne') {
     return {
       className: 'is-ok',
       title: 'Não aplicável',
