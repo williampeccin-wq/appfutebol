@@ -1,25 +1,145 @@
 import { getState, patchState } from '../core/state.js';
-import { canLogin, normalizePhone } from '../domain/rules.engine.js';
+import { SUPABASE_CONFIG } from '../config/supabase.config.js';
+import { normalizePhone } from '../domain/rules.engine.js';
 
-const SESSION_KEY = 'harmonia_session_player_id';
+const SESSION_KEY = 'harmonia_auth_session';
+const TECHNICAL_EMAIL_DOMAIN = 'harmonia.app';
 
-export function restoreSession() {
-  const sessionPlayerId = sessionStorage.getItem(SESSION_KEY);
-  if (!sessionPlayerId) {
-    patchState({ session: { playerId: null } });
+function trimTrailingSlash(value) {
+  return String(value || '').replace(/\/+$/, '');
+}
+
+function authUrl(path) {
+  return `${trimTrailingSlash(SUPABASE_CONFIG.url)}/auth/v1/${path}`;
+}
+
+function authHeaders(accessToken = null) {
+  return {
+    apikey: SUPABASE_CONFIG.anonKey,
+    Authorization: `Bearer ${accessToken || SUPABASE_CONFIG.anonKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+function saveSession(session) {
+  if (!session?.access_token || !session?.user?.id) return null;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  return session;
+}
+
+function loadStoredSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
+}
 
+function clearStoredSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+async function requestAuth(path, payload, options = {}) {
+  const response = await fetch(authUrl(path), {
+    method: options.method || 'POST',
+    headers: authHeaders(options.accessToken || null),
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      data,
+      message: data?.msg || data?.message || data?.error_description || data?.error || 'Falha de autenticação.',
+    };
+  }
+
+  return { ok: true, status: response.status, data };
+}
+
+function normalizePosition(value) {
+  return ['zag', 'meia', 'atk'].includes(value) ? value : null;
+}
+
+function normalizeLoginPhone(value) {
+  return normalizePhone(value);
+}
+
+function phoneToTechnicalEmail(phone) {
+  const normalizedPhone = normalizeLoginPhone(phone);
+  return `${normalizedPhone}@${TECHNICAL_EMAIL_DOMAIN}`;
+}
+
+function createPlayerId(players) {
+  const max = (Array.isArray(players) ? players : []).reduce((acc, player) => {
+    const current = Number(String(player.id || '').replace(/^p_?/, ''));
+    return Number.isFinite(current) ? Math.max(acc, current) : acc;
+  }, 0);
+  return `p${Math.max(max + 1, Date.now())}`;
+}
+
+function findPlayerByAuthUserId(players, authUserId) {
+  return (Array.isArray(players) ? players : []).find((item) => String(item.auth_user_id || '') === String(authUserId || '')) || null;
+}
+
+function ensureLoggedPlayer(session) {
   const snapshot = getState();
-  const player = snapshot.players.find((item) => item.id === sessionPlayerId);
+  const player = findPlayerByAuthUserId(snapshot.players, session?.user?.id);
+
   if (!player) {
-    sessionStorage.removeItem(SESSION_KEY);
-    patchState({ session: { playerId: null } });
+    patchState({
+      session: { playerId: null, authUserId: session?.user?.id || null },
+      ui: {
+        authMode: 'register',
+        authMessage: {
+          type: 'error',
+          text: 'Login autenticado, mas nenhum jogador está vinculado a esse usuário. Cadastre o perfil com o mesmo telefone.',
+        },
+      },
+    });
     return null;
   }
 
-  patchState({ session: { playerId: player.id } });
+  patchState({
+    session: { playerId: player.id, authUserId: session.user.id },
+    ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
+  });
+
   return player;
+}
+
+export async function restoreSession() {
+  const stored = loadStoredSession();
+  if (!stored?.access_token) {
+    patchState({ session: { playerId: null, authUserId: null } });
+    return null;
+  }
+
+  const response = await fetch(authUrl('user'), {
+    method: 'GET',
+    headers: authHeaders(stored.access_token),
+  });
+
+  if (!response.ok) {
+    clearStoredSession();
+    patchState({ session: { playerId: null, authUserId: null } });
+    return null;
+  }
+
+  const user = await response.json().catch(() => null);
+  if (!user?.id) {
+    clearStoredSession();
+    patchState({ session: { playerId: null, authUserId: null } });
+    return null;
+  }
+
+  const session = { ...stored, user };
+  saveSession(session);
+  return ensureLoggedPlayer(session);
 }
 
 export function getCurrentPlayer() {
@@ -27,40 +147,42 @@ export function getCurrentPlayer() {
   return snapshot.players.find((item) => item.id === snapshot.session.playerId) || null;
 }
 
-export function login(phone, password) {
-  const cleanPhone = normalizePhone(phone);
+export async function login(phone, password) {
+  const normalizedPhone = normalizeLoginPhone(phone);
   const normalizedPassword = String(password || '').trim();
 
-  if (!cleanPhone || !normalizedPassword) {
+  if (normalizedPhone.length < 10 || normalizedPhone.length > 11 || !normalizedPassword) {
     return { ok: false, message: 'Informe telefone e senha.' };
   }
 
-  const snapshot = getState();
-  const player = snapshot.players.find((item) => normalizePhone(item.phone) === cleanPhone);
-  const decision = canLogin(player, normalizedPassword);
-
-  if (!decision.ok) {
-    return { ok: false, message: decision.message };
-  }
-
-  sessionStorage.setItem(SESSION_KEY, decision.player.id);
-  patchState({
-    session: { playerId: decision.player.id },
-    ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
+  const result = await requestAuth('token?grant_type=password', {
+    email: phoneToTechnicalEmail(normalizedPhone),
+    password: normalizedPassword,
   });
 
-  return { ok: true, player: decision.player };
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  const session = saveSession(result.data);
+  const player = ensureLoggedPlayer(session);
+  if (!player) {
+    return { ok: false, message: 'Usuário autenticado, mas ainda sem jogador vinculado.' };
+  }
+
+  return { ok: true, player };
 }
 
-export function register(payload) {
+export async function register(payload) {
   const snapshot = getState();
   const name = String(payload.name || '').trim();
-  const phone = normalizePhone(payload.phone);
+  const phone = normalizeLoginPhone(payload.phone);
   const birthDate = String(payload.birthDate || '').trim();
-  const role = payload.role === 'carne' ? 'carne' : 'jogador';
-  const position = role === 'jogador' ? normalizePosition(payload.position) : null;
+  const role = payload.role === 'carne' ? 'carne' : 'player';
+  const position = role === 'player' ? normalizePosition(payload.position) : null;
   const password = String(payload.password || '').trim();
   const passwordConfirm = String(payload.passwordConfirm || '').trim();
+  const technicalEmail = phoneToTechnicalEmail(phone);
 
   if (!name) {
     return { ok: false, message: 'Informe o nome.' };
@@ -71,63 +193,95 @@ export function register(payload) {
   if (!birthDate) {
     return { ok: false, message: 'Informe a data de nascimento.' };
   }
-  if (role === 'jogador' && !position) {
+  if (role === 'player' && !position) {
     return { ok: false, message: 'Selecione a posição em campo.' };
   }
-  if (!password) {
-    return { ok: false, message: 'Informe a senha.' };
+  if (password.length < 6) {
+    return { ok: false, message: 'A senha precisa ter pelo menos 6 caracteres.' };
   }
   if (password !== passwordConfirm) {
     return { ok: false, message: 'As senhas não conferem.' };
   }
 
-  const duplicate = snapshot.players.find((item) => normalizePhone(item.phone) === phone);
-  if (duplicate) {
+  const duplicatePhone = snapshot.players.find((item) => normalizeLoginPhone(item.phone) === phone);
+  if (duplicatePhone) {
     return { ok: false, message: 'Esse telefone já está cadastrado.' };
   }
 
+  const authResult = await requestAuth('signup', {
+    email: technicalEmail,
+    password,
+    data: { name, phone, birthDate, login_type: 'phone_password' },
+  });
+
+  if (!authResult.ok) {
+    return { ok: false, message: authResult.message };
+  }
+
+  const authUser = authResult.data?.user;
+  if (!authUser?.id) {
+    return { ok: false, message: 'Cadastro criado, mas o Supabase não retornou o usuário.' };
+  }
+
+  const isFirstPlayer = !Array.isArray(snapshot.players) || snapshot.players.length === 0;
   const nextPlayer = {
     id: createPlayerId(snapshot.players),
+    auth_user_id: authUser.id,
+    email: technicalEmail,
+    login_phone: phone,
     name,
     phone,
     birthDate,
     role,
+    plays_football: role === 'player',
+    in_carne_group: true,
     position,
     mens_ok: false,
-    is_admin: false,
-    password_hash: password,
+    is_admin: isFirstPlayer,
   };
 
   patchState({
-    players: [...snapshot.players, nextPlayer],
+    players: [...(snapshot.players || []), nextPlayer],
     ui: {
       authMode: 'login',
       authMessage: {
         type: 'success',
-        text: 'Cadastro realizado com sucesso. Faça seu login.',
+        text: 'Cadastro realizado. Entrando automaticamente...',
       },
     },
   });
 
-  return { ok: true, player: nextPlayer };
+  const loginResult = await requestAuth('token?grant_type=password', {
+    email: technicalEmail,
+    password,
+  });
+
+  if (!loginResult.ok) {
+    return {
+      ok: false,
+      message: `Cadastro criado, mas o login automático falhou: ${loginResult.message}`,
+    };
+  }
+
+  const session = saveSession(loginResult.data);
+  const loggedPlayer = ensureLoggedPlayer(session);
+
+  if (!loggedPlayer) {
+    return { ok: false, message: 'Cadastro criado, mas o jogador ainda não ficou vinculado à sessão.' };
+  }
+
+  return { ok: true, player: loggedPlayer };
 }
 
-export function logout() {
-  sessionStorage.removeItem(SESSION_KEY);
+export async function logout() {
+  const stored = loadStoredSession();
+  if (stored?.access_token) {
+    await requestAuth('logout', undefined, { method: 'POST', accessToken: stored.access_token }).catch(() => null);
+  }
+
+  clearStoredSession();
   patchState({
-    session: { playerId: null },
+    session: { playerId: null, authUserId: null },
     ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
   });
-}
-
-function normalizePosition(value) {
-  return ['zag', 'meia', 'atk'].includes(value) ? value : null;
-}
-
-function createPlayerId(players) {
-  const max = players.reduce((acc, player) => {
-    const current = Number(String(player.id || '').replace(/^p/, ''));
-    return Number.isFinite(current) ? Math.max(acc, current) : acc;
-  }, 0);
-  return `p${max + 1}`;
 }

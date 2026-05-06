@@ -247,7 +247,6 @@ export function sanitizeUi(ui, defaultUi = { currentTab: 'home', authMode: 'logi
   return {
     ...clone(defaultUi),
     ...(ui || {}),
-    authMessage: null,
   };
 }
 

@@ -70,7 +70,6 @@ function isValidSplitState(state) {
     state &&
     typeof state === 'object' &&
     Array.isArray(state.players) &&
-    state.players.length > 0 &&
     state.game &&
     typeof state.game === 'object' &&
     Array.isArray(state.confirmations)
@@ -356,7 +355,7 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 async function saveSplitState(config, state) {
   const parts = splitState(state);
 
-  if (!parts.players.length || !parts.game) {
+  if (!parts.game) {
     return { ok: false, conflict: false, reason: 'split_save_invalid_state' };
   }
 

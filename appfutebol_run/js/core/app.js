@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.55.9-admin-presence-manage';
+window.__HARMONIA_BUILD__ = 'v1.56.2-phone-auth-messages';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -456,7 +456,7 @@ init();
 async function init() {
   const data = await loadPersistedState();
   replaceState(data);
-  restoreSession();
+  await restoreSession();
   lastDomainFingerprint = getDomainFingerprint(getState());
 
   subscribe((snapshot) => {
@@ -514,7 +514,6 @@ function isValidRemoteDomainSnapshot(snapshot) {
     snapshot &&
     typeof snapshot === 'object' &&
     Array.isArray(snapshot.players) &&
-    snapshot.players.length > 0 &&
     snapshot.game &&
     typeof snapshot.game === 'object' &&
     Array.isArray(snapshot.confirmations)
@@ -629,10 +628,13 @@ function bindAuthEvents() {
 
   const loginForm = appElement.querySelector('#login-form');
   if (loginForm) {
-    loginForm.addEventListener('submit', (event) => {
+    loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(loginForm);
-      const result = login(formData.get('phone'), formData.get('password'));
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Entrando...'; }
+      const result = await login(formData.get('phone'), formData.get('password'));
+      if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Entrar'; }
       if (!result.ok) {
         patchState({
           ui: {
@@ -658,10 +660,12 @@ function bindAuthEvents() {
     togglePosition();
     roleSelect?.addEventListener('change', togglePosition);
 
-    registerForm.addEventListener('submit', (event) => {
+    registerForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(registerForm);
-      const result = register({
+      const submitButton = registerForm.querySelector('button[type="submit"]');
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
+      const result = await register({
         name: formData.get('name'),
         phone: formData.get('phone'),
         birthDate: formData.get('birthDate'),
@@ -670,6 +674,8 @@ function bindAuthEvents() {
         password: formData.get('password'),
         passwordConfirm: formData.get('passwordConfirm'),
       });
+
+      if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Criar cadastro'; }
 
       if (!result.ok) {
         patchState({
@@ -774,7 +780,7 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', () => logout());
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { await logout(); });
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {

@@ -16,7 +16,6 @@ function isValidAppState(snapshot) {
     snapshot &&
     typeof snapshot === "object" &&
     Array.isArray(snapshot.players) &&
-    snapshot.players.length > 0 &&
     snapshot.game &&
     typeof snapshot.game === "object" &&
     Array.isArray(snapshot.confirmations)

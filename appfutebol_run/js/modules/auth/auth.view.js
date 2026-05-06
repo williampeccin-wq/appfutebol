@@ -1,4 +1,5 @@
 import { APP_VERSION } from "../../core/version.js";
+
 export function renderAuthScreen(uiState = {}) {
   const mode = uiState.authMode === 'register' ? 'register' : 'login';
   const message = uiState.authMessage;
@@ -7,7 +8,7 @@ export function renderAuthScreen(uiState = {}) {
     <div class="login-screen">
       <div class="login-logo">⚽</div>
       <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${APP_VERSION}</span></div>
-      <div class="login-subtitle">Entre com telefone e senha ou faça seu cadastro para participar do futebol e acompanhar a tabela da carne.</div>
+      <div class="login-subtitle">Login real com telefone e senha via Supabase Auth.</div>
 
       <section class="auth-card">
         <div class="auth-tabs">
@@ -28,7 +29,7 @@ function renderLoginForm() {
     <form id="login-form" class="form-stack" novalidate>
       <div class="form-group">
         <label class="form-label" for="login-phone">Telefone</label>
-        <input class="input" id="login-phone" name="phone" inputmode="numeric" autocomplete="tel" placeholder="(48) 99999-9999">
+        <input class="input" id="login-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="(48) 99999-9999">
       </div>
 
       <div class="form-group">
@@ -54,7 +55,7 @@ function renderRegisterForm() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="register-phone">Telefone</label>
-          <input class="input" id="register-phone" name="phone" inputmode="numeric" autocomplete="tel" placeholder="48999999999">
+          <input class="input" id="register-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="(48) 99999-9999">
         </div>
 
         <div class="form-group">
@@ -67,7 +68,7 @@ function renderRegisterForm() {
         <div class="form-group">
           <label class="form-label" for="register-role">Perfil</label>
           <select class="select" id="register-role" name="role">
-            <option value="jogador">Jogador</option>
+            <option value="player">Jogador</option>
             <option value="carne">Apenas carne</option>
           </select>
         </div>
@@ -93,6 +94,10 @@ function renderRegisterForm() {
           <label class="form-label" for="register-password-confirm">Repetir senha</label>
           <input class="input" id="register-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha">
         </div>
+      </div>
+
+      <div class="footer-note">
+        O telefone será usado como login. Internamente o app cria um identificador técnico para o Supabase Auth.
       </div>
 
       <div class="actions">
