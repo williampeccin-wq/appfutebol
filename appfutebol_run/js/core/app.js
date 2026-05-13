@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.56.11-carne-schedule-card-layout';
+window.__HARMONIA_BUILD__ = 'v1.57.1-championship-team-result-fix';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -391,6 +391,76 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+
+  if (action === "save-championship-result") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!current?.is_admin) {
+      showToast("Apenas administrador pode lançar resultado do campeonato", "error");
+      return;
+    }
+
+    const date = document.getElementById('championship-result-date')?.value?.trim();
+    if (!date) {
+      showToast("Informe a data do jogo", "error");
+      return;
+    }
+
+    const outcome = document.getElementById('championship-team-outcome')?.value;
+    const builtResult = buildTeamResultStatuses(snapshot, outcome);
+
+    if (!builtResult.ok) {
+      showToast(builtResult.message || "Resultado inválido", "error");
+      return;
+    }
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, 'Salvando...');
+
+    persistChampionshipResult(snapshot, {
+      id: globalThis.crypto?.randomUUID ? `championship_result_${globalThis.crypto.randomUUID()}` : `championship_result_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      date,
+      outcome: builtResult.outcome,
+      team_a: builtResult.team_a,
+      team_b: builtResult.team_b,
+      statuses: builtResult.statuses,
+    });
+
+    const safeSnapshot = repairManualSnapshot(snapshot);
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+    uiActionInFlight = false;
+    showToast("Resultado lançado e classificação recalculada", "success");
+    return;
+  }
+
+  if (action === "delete-championship-result") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!current?.is_admin) {
+      showToast("Apenas administrador pode excluir resultado do campeonato", "error");
+      return;
+    }
+
+    const confirmedDelete = await showConfirmModal({
+      title: 'Excluir resultado',
+      message: 'Excluir este resultado do campeonato? A classificação será recalculada automaticamente.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+    });
+
+    if (!confirmedDelete) return;
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, 'Excluindo...');
+
+    deleteChampionshipResult(snapshot, id);
+    const safeSnapshot = repairManualSnapshot(snapshot);
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+    uiActionInFlight = false;
+    showToast("Resultado removido e classificação recalculada", "success");
+    return;
+  }
+
   if (action === "add-player") {
   uiActionInFlight = true;
   setActionBusy(trigger, editingPlayerId ? "Salvando..." : "Adicionando...");
@@ -683,6 +753,8 @@ import { loadRemoteState } from '../services/storage.supabase.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
+import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
+import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
@@ -1101,7 +1173,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'carne':
       return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'championship':
-      return renderChampionship(snapshot);
+      return renderChampionshipScreen(snapshot, currentPlayer);
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
@@ -1224,41 +1296,8 @@ function renderWeeklyGame(snapshot, currentPlayer) {
   `;
 }
 
-function renderChampionship(snapshot) {
-  const ranking = snapshot.championship?.ranking || [];
-
-  return `
-    <section class="section-stack">
-      <section class="card">
-        <div class="card-title">Campeonato atual</div>
-        <div class="info-block">
-          <div class="info-line">Período iniciado em ${formatDate(snapshot.championship?.start_date)}</div>
-          <div class="info-line">Status: ${snapshot.championship?.closed ? 'Encerrado' : 'Ativo'}</div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Ranking</div>
-        <div class="placeholder-list">
-          ${ranking.map((item, index) => {
-            const player = snapshot.players.find((entry) => entry.id === item.player_id);
-            return `
-              <div class="placeholder-row">
-                <div class="placeholder-main">
-                  <div class="avatar">${index + 1}</div>
-                  <div>
-                    <div class="row-title">${player?.name || 'Jogador removido'}</div>
-                    <div class="row-subtitle">Pontuação acumulada</div>
-                  </div>
-                </div>
-                <div class="tag is-neutral">${item.points} pts</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </section>
-    </section>
-  `;
+function renderChampionship(snapshot, currentPlayer) {
+  return renderChampionshipScreen(snapshot, currentPlayer);
 }
 
 function buildTeamDrawShareText(snapshot) {

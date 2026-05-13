@@ -1255,3 +1255,251 @@ button {
     font-size: 18px;
   }
 }
+
+/* Campeonato v1.57.0 */
+.championship-screen .card { overflow: hidden; }
+.championship-hero .hero-date { font-size: 24px; }
+.championship-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.championship-rule-grid > div {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+  text-align: center;
+}
+.championship-rule-grid strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  color: #0f172a;
+}
+.championship-rule-grid span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 700;
+}
+.championship-date-grid {
+  margin-top: 14px;
+  max-width: 240px;
+}
+.championship-player-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.championship-player-result-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+.championship-player-result-card span {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.championship-player-result-card select {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.championship-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.championship-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  min-width: 520px;
+}
+.championship-table th {
+  font-size: 11px;
+  text-align: left;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 8px;
+}
+.championship-table td {
+  background: #f8fafc;
+  padding: 10px 8px;
+  font-size: 13px;
+  color: #0f172a;
+  vertical-align: middle;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+.championship-table td:first-child {
+  border-left: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 12px 0 0 12px;
+}
+.championship-table td:last-child {
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 0 12px 12px 0;
+}
+.rank-badge {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+.championship-player-name {
+  min-width: 150px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.2;
+}
+.championship-result-row {
+  align-items: center;
+}
+.history-details {
+  margin-top: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+.history-details summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: #0f172a;
+}
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.history-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 10px;
+  background: #f8fafc;
+}
+.history-title {
+  font-weight: 900;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+.history-card .championship-table {
+  min-width: 0;
+  border-spacing: 0 6px;
+}
+.history-card .championship-table th,
+.history-card .championship-table td {
+  font-size: 11px;
+  padding: 7px 6px;
+}
+.history-card .rank-badge {
+  min-width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+.empty-state {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .championship-rule-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .championship-player-result-grid {
+    grid-template-columns: 1fr;
+  }
+  .championship-player-result-card {
+    grid-template-columns: minmax(0, 1fr) 104px;
+  }
+  .championship-table {
+    min-width: 460px;
+  }
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Campeonato v1.57.1 - resultado por time */
+.championship-date-grid {
+  max-width: 560px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.championship-teams-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.championship-team-result-box {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.championship-team-label {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.championship-team-player-list {
+  display: grid;
+  gap: 8px;
+}
+
+.championship-team-player-list span {
+  display: block;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .championship-date-grid,
+  .championship-teams-result-grid {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+}
