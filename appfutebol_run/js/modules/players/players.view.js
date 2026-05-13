@@ -151,19 +151,59 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
       </section>
 
       <section class="card">
-        <div class="card-title">Grupo da carne</div>
-        <div class="placeholder-list">
-          ${carneGroup.length ? carneGroup.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum integrante do grupo da carne cadastrado.</div>'}
-        </div>
-      </section>
-
-      <section class="card">
         <div class="card-title">Permissões</div>
         <p class="footer-note">
           ${isAdmin(currentPlayer)
             ? 'Você está logado como administrador. Na próxima fase, o CRUD de jogadores e a gestão do grupo da carne entram aqui.'
             : 'Você está logado como usuário comum. A aba Config fica restrita ao admin.'}
         </p>
+      </section>
+    </section>
+  `;
+}
+
+
+export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
+  const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
+  const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
+  const carneOnly = carneGroup.filter((player) => player.plays_football === false);
+  const jogadoresNoCarne = carneGroup.filter((player) => player.plays_football !== false);
+
+  return `
+    <section class="section-stack">
+      ${renderPlayerManagementCard(currentPlayer)}
+
+      <section class="card">
+        <div class="card-title">Resumo do carne</div>
+        <div class="kpi-grid">
+          <div class="kpi-box">
+            <div class="kpi-value">${carneGroup.length}</div>
+            <div class="kpi-label">Integrantes do grupo</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-value">${carneOnly.length}</div>
+            <div class="kpi-label">Somente carne</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-value">${jogadoresNoCarne.length}</div>
+            <div class="kpi-label">Jogadores também no carne</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Somente carne</div>
+        <div class="placeholder-list">
+          ${carneOnly.length ? carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum perfil somente carne cadastrado.</div>'}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Jogadores no grupo da carne</div>
+        <div class="placeholder-list">
+          ${jogadoresNoCarne.length ? jogadoresNoCarne.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum jogador vinculado ao grupo da carne.</div>'}
+        </div>
       </section>
     </section>
   `;

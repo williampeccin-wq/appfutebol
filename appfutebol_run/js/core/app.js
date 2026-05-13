@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.56.2-phone-auth-messages';
+window.__HARMONIA_BUILD__ = 'v1.56.8-carne-tab-separation';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -440,7 +440,7 @@ import { getState as loadPersistedState, saveState as savePersistedState, getSto
 import { loadRemoteState } from '../services/storage.supabase.js';
 import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
-import { renderPlayersScreen } from '../modules/players/players.view.js';
+import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
@@ -598,6 +598,7 @@ function render(snapshot) {
       ${renderNavButton('home', 'Home', activeTab)}
       ${renderNavButton('weekly_game', 'Jogo da semana', activeTab)}
       ${renderNavButton('players', 'Jogadores', activeTab)}
+      ${renderNavButton('carne', 'Carne', activeTab)}
       ${renderNavButton('championship', 'Campeonato', activeTab)}
       ${currentPlayer.is_admin ? renderNavButton('config', 'Config', activeTab) : ''}
     </nav>
@@ -855,6 +856,8 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       return renderWeeklyGame(snapshot, currentPlayer);
     case 'players':
       return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
+    case 'carne':
+      return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'championship':
       return renderChampionship(snapshot);
     case 'config':

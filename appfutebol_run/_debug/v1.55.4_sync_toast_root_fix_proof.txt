@@ -1,0 +1,12 @@
+v1.55.4 sync toast root fix
+
+Base: appfutebol_v1.54.1_REAL(1).zip
+
+Alterações limitadas:
+- js/core/app.js: showToast bloqueia defensivamente mensagens de sync contendo "Dados atualizados".
+- js/core/app.js: handler harmonia:remote-conflict não chama mais showToast; refresh remoto é silencioso e protegido por isApplyingRemoteState.
+- js/core/version.js: APP_VERSION = v1.55.4.
+- index.html: cache busters atualizados para v1.55.4.
+
+Prova esperada no console:
+window.__HARMONIA_BUILD__ === "v1.55.4-sync-toast-root-fix"
