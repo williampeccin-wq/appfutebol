@@ -960,3 +960,298 @@ button {
     display: none;
   }
 }
+
+
+.carne-schedule-form {
+  align-items: end;
+}
+
+.carne-schedule-card {
+  padding: 16px;
+}
+
+.carne-schedule-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.carne-schedule-title {
+  margin-bottom: 4px;
+}
+
+.carne-schedule-subtitle {
+  color: var(--gray-500);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.carne-next-pill {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  min-width: 76px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--blue-050);
+  color: var(--blue-900);
+  text-align: center;
+}
+
+.carne-next-pill span {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.carne-next-pill strong {
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.carne-schedule-list {
+  display: grid;
+  gap: 8px;
+}
+
+.carne-schedule-list-head,
+.carne-schedule-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: center;
+}
+
+.carne-schedule-list.no-actions .carne-schedule-list-head,
+.carne-schedule-item.no-actions {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.carne-schedule-list-head {
+  padding: 0 10px 2px;
+  color: var(--gray-500);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.carne-schedule-list-head > div:last-child {
+  text-align: right;
+}
+
+.carne-schedule-item {
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: 14px;
+  background: var(--white);
+}
+
+.carne-schedule-item:nth-child(odd) {
+  background: #f8fafc;
+}
+
+.carne-schedule-item.is-next {
+  border-color: rgba(35, 75, 141, 0.28);
+  background: var(--blue-050);
+  box-shadow: inset 4px 0 0 var(--blue-800);
+}
+
+.carne-date-box {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-width: 74px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid rgba(35, 75, 141, 0.18);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--blue-900);
+  text-align: center;
+}
+
+.carne-date-box span {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.carne-date-box small {
+  color: var(--gray-500);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.carne-pair-boxes {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.carne-player-box {
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: 12px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+
+.carne-schedule-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.btn-sm {
+  min-height: 30px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.carne-next-note {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+@media (max-width: 620px) {
+  .carne-schedule-card {
+    padding: 12px;
+  }
+
+  .carne-schedule-header {
+    align-items: center;
+  }
+
+  .carne-schedule-subtitle {
+    font-size: 12px;
+  }
+
+  .carne-schedule-list-head {
+    display: none;
+  }
+
+  .carne-schedule-item {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    min-height: 68px;
+    padding: 8px;
+  }
+
+  .carne-schedule-item.no-actions {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .carne-date-box {
+    min-width: 54px;
+    min-height: 50px;
+    padding: 6px 5px;
+  }
+
+  .carne-date-box span {
+    font-size: 14px;
+  }
+
+  .carne-date-box small {
+    font-size: 9px;
+  }
+
+  .carne-pair-boxes {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .carne-player-box {
+    min-height: 34px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 1.12;
+  }
+
+  .carne-schedule-actions {
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+  }
+
+  .btn-sm {
+    min-height: 28px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .carne-schedule-header {
+    display: grid;
+  }
+
+  .carne-next-pill {
+    justify-self: start;
+  }
+
+  .carne-schedule-item {
+    grid-template-columns: 58px minmax(0, 1fr) 38px;
+    gap: 7px;
+  }
+
+  .carne-schedule-item.no-actions {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .carne-schedule-actions {
+    width: 38px;
+  }
+
+  .carne-schedule-actions .btn-sm {
+    width: 38px;
+    min-width: 38px;
+    height: 30px;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-indent: -999px;
+    position: relative;
+  }
+
+  .carne-schedule-actions .btn-sm::after {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-indent: 0;
+    font-size: 15px;
+  }
+
+  .carne-schedule-actions .btn-secondary::after {
+    content: "✎";
+  }
+
+  .carne-schedule-actions .btn-danger::after {
+    content: "×";
+    font-size: 18px;
+  }
+}

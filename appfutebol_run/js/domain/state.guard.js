@@ -176,12 +176,25 @@ export function sanitizeRanking(state) {
 export function sanitizeCarne(state) {
   const nextState = clone(state);
   const warnings = [];
-  const validIds = new Set((Array.isArray(nextState.players) ? nextState.players : []).map((player) => player.id));
+  const validIds = new Set((Array.isArray(nextState.players) ? nextState.players : []).map((player) => String(player.id)));
+
   nextState.carne = (Array.isArray(nextState.carne) ? nextState.carne : []).filter((entry) => {
-    const keep = entry && validIds.has(entry.player_id);
+    if (!entry || typeof entry !== 'object') {
+      warnings.push('Registro de carne inválido removido.');
+      return false;
+    }
+
+    if (entry.type === 'carne_schedule') {
+      const keep = validIds.has(String(entry.player1_id || '')) && validIds.has(String(entry.player2_id || ''));
+      if (!keep) warnings.push(`Dupla de carne órfã removida (${entry.id || 'sem-id'}).`);
+      return keep;
+    }
+
+    const keep = validIds.has(String(entry.player_id || ''));
     if (!keep) warnings.push(`Registro de carne órfão removido (${entry?.player_id || 'sem-id'}).`);
     return keep;
   });
+
   return { state: nextState, warnings };
 }
 

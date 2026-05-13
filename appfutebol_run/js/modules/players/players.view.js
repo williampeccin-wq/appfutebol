@@ -163,16 +163,219 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 }
 
 
+const DEFAULT_CARNE_SCHEDULE = [
+  ['2026-05-19', 'PANGA', 'ADRIEL'],
+  ['2026-05-13', 'SOLI', 'MALVADEZA'],
+  ['2026-05-20', 'DICÃO', 'GUILHERME'],
+  ['2026-05-27', 'ADRIANO', 'NINIU'],
+  ['2026-06-03', 'DICK', 'LUQUINHA'],
+  ['2026-06-10', 'WILLIAM', 'TELO'],
+  ['2026-06-17', 'VINÍ', 'PH'],
+  ['2026-06-24', 'CAETANO', 'PAULO'],
+  ['2026-07-01', 'BAHIA', 'TROCHINHO'],
+  ['2026-07-08', 'DAVID', 'MATEUS'],
+  ['2026-07-15', 'MARIO', 'VINICIUS'],
+  ['2026-07-22', 'JÚNIOR', 'SAMUEL'],
+  ['2026-07-29', 'BROCA', 'BROQUINHA'],
+  ['2026-08-05', 'ANDRÉ', 'CAUÊ'],
+  ['2026-08-12', 'GEDIMITO', 'VITOR'],
+];
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function normalizeName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+}
+
+function formatScheduleDate(value) {
+  if (!value) return '-';
+  const [year, month, day] = String(value).split('-');
+  if (!year || !month || !day) return escapeHtml(value);
+  return `${day}/${month}`;
+}
+
+function getPlayerName(playersById, id) {
+  return playersById.get(String(id))?.name || 'Jogador não encontrado';
+}
+
+function getCarneScheduleEntries(snapshot, orderedPlayers) {
+  const rawEntries = Array.isArray(snapshot?.carne) ? snapshot.carne : [];
+  const savedSchedule = rawEntries
+    .filter((entry) => entry?.type === 'carne_schedule')
+    .map((entry, index) => ({
+      id: String(entry.id || `carne_schedule_${index}`),
+      type: 'carne_schedule',
+      date: String(entry.date || ''),
+      player1_id: String(entry.player1_id || ''),
+      player2_id: String(entry.player2_id || ''),
+      active: entry.active !== false,
+      source: 'saved',
+    }))
+    .filter((entry) => entry.date && entry.player1_id && entry.player2_id);
+
+  if (savedSchedule.length) {
+    return savedSchedule.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  const playersByName = new Map();
+  orderedPlayers.forEach((player) => {
+    playersByName.set(normalizeName(player.name), player);
+  });
+
+  return DEFAULT_CARNE_SCHEDULE
+    .map(([date, name1, name2], index) => {
+      const player1 = playersByName.get(normalizeName(name1));
+      const player2 = playersByName.get(normalizeName(name2));
+      if (!player1 || !player2) return null;
+      return {
+        id: `seed_carne_schedule_${index}`,
+        type: 'carne_schedule',
+        date,
+        player1_id: String(player1.id),
+        player2_id: String(player2.id),
+        active: true,
+        source: 'seed',
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function getNextScheduleEntry(schedule) {
+  if (!schedule.length) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const next = schedule.find((entry) => {
+    const date = new Date(`${entry.date}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date >= today;
+  });
+
+  return next || schedule[0];
+}
+
+function renderPlayerOptions(players, selectedId = '') {
+  return players
+    .map((player) => `<option value="${escapeHtml(player.id)}" ${String(player.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(player.name)}</option>`)
+    .join('');
+}
+
+function renderCarneScheduleForm(currentPlayer, orderedPlayers) {
+  if (!isAdmin(currentPlayer)) return '';
+
+  return `
+    <section class="card" id="carne-schedule-form-card">
+      <div class="card-title" id="carne-schedule-form-title">Cadastrar dupla da carne</div>
+      <div class="player-admin-form carne-schedule-form">
+        <input id="carne-schedule-id" type="hidden" value="" />
+        <input id="carne-schedule-date" class="input" type="date" />
+        <select id="carne-schedule-player-1" class="input">
+          <option value="">Responsável 1</option>
+          ${renderPlayerOptions(orderedPlayers)}
+        </select>
+        <select id="carne-schedule-player-2" class="input">
+          <option value="">Responsável 2</option>
+          ${renderPlayerOptions(orderedPlayers)}
+        </select>
+        <div class="player-admin-actions">
+          <button class="btn btn-primary" type="button" data-action="save-carne-schedule">Salvar dupla</button>
+          <button class="btn btn-secondary" type="button" data-action="cancel-carne-schedule-edit" id="cancel-carne-schedule-edit-button" style="display:none;">Cancelar</button>
+        </div>
+      </div>
+      <p class="footer-note">Somente jogadores cadastrados podem ser selecionados. A sequência funciona como calendário recorrente: após a última dupla, o ciclo recomeça.</p>
+    </section>
+  `;
+}
+
+function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
+  const playersById = new Map(orderedPlayers.map((player) => [String(player.id), player]));
+  const nextEntry = getNextScheduleEntry(schedule);
+  const admin = isAdmin(currentPlayer);
+
+  if (!schedule.length) {
+    return `
+      <section class="card carne-schedule-card">
+        <div class="card-title">Tabela da carne Harmonia</div>
+        <div class="empty-inline">Nenhuma dupla cadastrada ainda. O admin pode criar a primeira dupla acima.</div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="card carne-schedule-card">
+      <div class="carne-schedule-header">
+        <div>
+          <div class="card-title carne-schedule-title">Tabela da carne Harmonia</div>
+          <p class="carne-schedule-subtitle">Rodízio semanal de quarta-feira em duplas.</p>
+        </div>
+        ${nextEntry ? `
+          <div class="carne-next-pill">
+            <span>Próxima</span>
+            <strong>${formatScheduleDate(nextEntry.date)}</strong>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="carne-schedule-list ${admin ? 'has-actions' : 'no-actions'}" role="table" aria-label="Tabela da carne Harmonia">
+        <div class="carne-schedule-list-head" role="row">
+          <div role="columnheader">Data</div>
+          <div role="columnheader">Dupla responsável</div>
+          ${admin ? '<div role="columnheader">Ações</div>' : ''}
+        </div>
+
+        ${schedule.map((entry) => {
+          const isNext = nextEntry && String(nextEntry.id) === String(entry.id);
+          const player1 = getPlayerName(playersById, entry.player1_id);
+          const player2 = getPlayerName(playersById, entry.player2_id);
+          return `
+            <div class="carne-schedule-item ${isNext ? 'is-next' : ''} ${admin ? 'has-actions' : 'no-actions'}" role="row">
+              <div class="carne-date-box" role="cell">
+                <span>${formatScheduleDate(entry.date)}</span>
+                <small>Quarta</small>
+              </div>
+              <div class="carne-pair-boxes" role="cell">
+                <div class="carne-player-box">${escapeHtml(player1)}</div>
+                <div class="carne-player-box">${escapeHtml(player2)}</div>
+              </div>
+              ${admin ? `
+                <div class="carne-schedule-actions" role="cell">
+                  <button class="btn btn-secondary btn-sm" type="button" data-action="edit-carne-schedule" data-id="${escapeHtml(entry.id)}">Editar</button>
+                  <button class="btn btn-danger btn-sm" type="button" data-action="delete-carne-schedule" data-id="${escapeHtml(entry.id)}">Excluir</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <p class="footer-note carne-next-note">${nextEntry ? `Próxima dupla: ${formatScheduleDate(nextEntry.date)} · ${escapeHtml(getPlayerName(playersById, nextEntry.player1_id))} e ${escapeHtml(getPlayerName(playersById, nextEntry.player2_id))}.` : ''}</p>
+    </section>
+  `;
+}
+
 export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
   const carneOnly = carneGroup.filter((player) => player.plays_football === false);
   const jogadoresNoCarne = carneGroup.filter((player) => player.plays_football !== false);
+  const schedule = getCarneScheduleEntries(snapshot, orderedPlayers);
 
   return `
     <section class="section-stack">
       ${renderPlayerManagementCard(currentPlayer)}
+      ${renderCarneScheduleForm(currentPlayer, orderedPlayers)}
 
       <section class="card">
         <div class="card-title">Resumo do carne</div>
@@ -189,8 +392,14 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
             <div class="kpi-value">${jogadoresNoCarne.length}</div>
             <div class="kpi-label">Jogadores também no carne</div>
           </div>
+          <div class="kpi-box kpi-box--highlight">
+            <div class="kpi-value">${schedule.length}</div>
+            <div class="kpi-label">Duplas cadastradas</div>
+          </div>
         </div>
       </section>
+
+      ${renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer)}
 
       <section class="card">
         <div class="card-title">Somente carne</div>

@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.56.8-carne-tab-separation';
+window.__HARMONIA_BUILD__ = 'v1.56.11-carne-schedule-card-layout';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -138,6 +138,114 @@ function repairManualSnapshot(snapshot) {
   return repaired.state;
 }
 
+
+const DEFAULT_CARNE_SCHEDULE = [
+  ['2026-05-19', 'PANGA', 'ADRIEL'],
+  ['2026-05-13', 'SOLI', 'MALVADEZA'],
+  ['2026-05-20', 'DICÃO', 'GUILHERME'],
+  ['2026-05-27', 'ADRIANO', 'NINIU'],
+  ['2026-06-03', 'DICK', 'LUQUINHA'],
+  ['2026-06-10', 'WILLIAM', 'TELO'],
+  ['2026-06-17', 'VINÍ', 'PH'],
+  ['2026-06-24', 'CAETANO', 'PAULO'],
+  ['2026-07-01', 'BAHIA', 'TROCHINHO'],
+  ['2026-07-08', 'DAVID', 'MATEUS'],
+  ['2026-07-15', 'MARIO', 'VINICIUS'],
+  ['2026-07-22', 'JÚNIOR', 'SAMUEL'],
+  ['2026-07-29', 'BROCA', 'BROQUINHA'],
+  ['2026-08-05', 'ANDRÉ', 'CAUÊ'],
+  ['2026-08-12', 'GEDIMITO', 'VITOR'],
+];
+
+function normalizeCarneScheduleName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+}
+
+function getCarneScheduleEntriesForApp(snapshot) {
+  const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+  const rawEntries = Array.isArray(snapshot?.carne) ? snapshot.carne : [];
+  const savedSchedule = rawEntries
+    .filter((entry) => entry?.type === 'carne_schedule')
+    .map((entry, index) => ({
+      id: String(entry.id || `carne_schedule_${index}`),
+      type: 'carne_schedule',
+      date: String(entry.date || ''),
+      player1_id: String(entry.player1_id || ''),
+      player2_id: String(entry.player2_id || ''),
+      active: entry.active !== false,
+    }))
+    .filter((entry) => entry.date && entry.player1_id && entry.player2_id);
+
+  if (savedSchedule.length) {
+    return savedSchedule.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  const playersByName = new Map();
+  players.forEach((player) => {
+    playersByName.set(normalizeCarneScheduleName(player.name), player);
+  });
+
+  return DEFAULT_CARNE_SCHEDULE
+    .map(([date, name1, name2], index) => {
+      const player1 = playersByName.get(normalizeCarneScheduleName(name1));
+      const player2 = playersByName.get(normalizeCarneScheduleName(name2));
+      if (!player1 || !player2) return null;
+      return {
+        id: `seed_carne_schedule_${index}`,
+        type: 'carne_schedule',
+        date,
+        player1_id: String(player1.id),
+        player2_id: String(player2.id),
+        active: true,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function persistCarneSchedule(snapshot, scheduleEntries) {
+  const nonScheduleEntries = Array.isArray(snapshot.carne)
+    ? snapshot.carne.filter((entry) => entry?.type !== 'carne_schedule')
+    : [];
+
+  snapshot.carne = [
+    ...nonScheduleEntries,
+    ...scheduleEntries
+      .filter((entry) => entry?.date && entry?.player1_id && entry?.player2_id)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .map((entry, index) => ({
+        id: String(entry.id || `carne_schedule_${Date.now()}_${index}`),
+        type: 'carne_schedule',
+        date: String(entry.date),
+        player1_id: String(entry.player1_id),
+        player2_id: String(entry.player2_id),
+        active: entry.active !== false,
+      })),
+  ];
+}
+
+function resetCarneScheduleForm() {
+  const idInput = document.getElementById('carne-schedule-id');
+  const dateInput = document.getElementById('carne-schedule-date');
+  const player1Input = document.getElementById('carne-schedule-player-1');
+  const player2Input = document.getElementById('carne-schedule-player-2');
+  const title = document.getElementById('carne-schedule-form-title');
+  const cancelButton = document.getElementById('cancel-carne-schedule-edit-button');
+  const saveButton = document.querySelector('[data-action="save-carne-schedule"]');
+
+  if (idInput) idInput.value = '';
+  if (dateInput) dateInput.value = '';
+  if (player1Input) player1Input.value = '';
+  if (player2Input) player2Input.value = '';
+  if (title) title.textContent = 'Cadastrar dupla da carne';
+  if (cancelButton) cancelButton.style.display = 'none';
+  if (saveButton) saveButton.textContent = 'Salvar dupla';
+}
+
 document.addEventListener("click", async (e) => {
   const trigger = e.target.closest("[data-action]");
   if (!trigger) return;
@@ -153,6 +261,135 @@ document.addEventListener("click", async (e) => {
     snapshot.players = snapshot.players.map(normalizePlayer);
   }
   if (!Array.isArray(snapshot.players)) return;
+
+  if (action === "save-carne-schedule") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!current?.is_admin) {
+      showToast("Apenas administrador pode alterar a tabela da carne", "error");
+      return;
+    }
+
+    const scheduleId = document.getElementById('carne-schedule-id')?.value?.trim();
+    const date = document.getElementById('carne-schedule-date')?.value?.trim();
+    const player1Id = document.getElementById('carne-schedule-player-1')?.value?.trim();
+    const player2Id = document.getElementById('carne-schedule-player-2')?.value?.trim();
+
+    if (!date || !player1Id || !player2Id) {
+      showToast("Data e dois responsáveis são obrigatórios", "error");
+      return;
+    }
+
+    if (player1Id === player2Id) {
+      showToast("A dupla precisa ter dois jogadores diferentes", "error");
+      return;
+    }
+
+    const player1Exists = snapshot.players.some((player) => String(player.id) === String(player1Id));
+    const player2Exists = snapshot.players.some((player) => String(player.id) === String(player2Id));
+
+    if (!player1Exists || !player2Exists) {
+      showToast("Só é possível selecionar jogadores cadastrados", "error");
+      return;
+    }
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, scheduleId ? 'Salvando...' : 'Cadastrando...');
+
+    const schedule = getCarneScheduleEntriesForApp(snapshot);
+    const normalizedId = scheduleId || `carne_schedule_${Date.now()}`;
+    const nextEntry = {
+      id: normalizedId,
+      type: 'carne_schedule',
+      date,
+      player1_id: player1Id,
+      player2_id: player2Id,
+      active: true,
+    };
+
+    const updatedSchedule = schedule.some((entry) => String(entry.id) === String(normalizedId))
+      ? schedule.map((entry) => String(entry.id) === String(normalizedId) ? nextEntry : entry)
+      : [...schedule, nextEntry];
+
+    persistCarneSchedule(snapshot, updatedSchedule);
+    const safeSnapshot = repairManualSnapshot(snapshot);
+    savePersistedState(safeSnapshot);
+    resetCarneScheduleForm();
+    render(safeSnapshot);
+    uiActionInFlight = false;
+    showToast(scheduleId ? "Dupla atualizada" : "Dupla cadastrada", "success");
+    return;
+  }
+
+  if (action === "edit-carne-schedule") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!current?.is_admin) {
+      showToast("Apenas administrador pode editar a tabela da carne", "error");
+      return;
+    }
+
+    const entry = getCarneScheduleEntriesForApp(snapshot).find((item) => String(item.id) === String(id));
+    if (!entry) return;
+
+    const idInput = document.getElementById('carne-schedule-id');
+    const dateInput = document.getElementById('carne-schedule-date');
+    const player1Input = document.getElementById('carne-schedule-player-1');
+    const player2Input = document.getElementById('carne-schedule-player-2');
+    const title = document.getElementById('carne-schedule-form-title');
+    const cancelButton = document.getElementById('cancel-carne-schedule-edit-button');
+    const saveButton = document.querySelector('[data-action="save-carne-schedule"]');
+    const card = document.getElementById('carne-schedule-form-card');
+
+    if (!idInput || !dateInput || !player1Input || !player2Input) return;
+
+    idInput.value = entry.id;
+    dateInput.value = entry.date;
+    player1Input.value = entry.player1_id;
+    player2Input.value = entry.player2_id;
+    if (title) title.textContent = 'Editando dupla da carne';
+    if (cancelButton) cancelButton.style.display = 'inline-flex';
+    if (saveButton) saveButton.textContent = 'Salvar alteração';
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    dateInput.focus();
+    return;
+  }
+
+  if (action === "cancel-carne-schedule-edit") {
+    resetCarneScheduleForm();
+    showToast("Edição da dupla cancelada", "success");
+    return;
+  }
+
+  if (action === "delete-carne-schedule") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!current?.is_admin) {
+      showToast("Apenas administrador pode excluir dupla da carne", "error");
+      return;
+    }
+
+    const schedule = getCarneScheduleEntriesForApp(snapshot);
+    const entry = schedule.find((item) => String(item.id) === String(id));
+    if (!entry) return;
+
+    const confirmedDelete = await showConfirmModal({
+      title: 'Excluir dupla da carne',
+      message: 'Tem certeza que deseja excluir esta dupla da tabela?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+    });
+
+    if (!confirmedDelete) return;
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, 'Excluindo...');
+
+    persistCarneSchedule(snapshot, schedule.filter((item) => String(item.id) !== String(id)));
+    const safeSnapshot = repairManualSnapshot(snapshot);
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+    uiActionInFlight = false;
+    showToast("Dupla removida", "success");
+    return;
+  }
 
   if (action === "add-player") {
   uiActionInFlight = true;
@@ -310,7 +547,12 @@ if (action === "delete-player") {
     };
   }
   snapshot.carne = Array.isArray(snapshot.carne)
-    ? snapshot.carne.filter(entry => entry.player_id !== id)
+    ? snapshot.carne.filter((entry) => {
+        if (entry?.type === 'carne_schedule') {
+          return String(entry.player1_id) !== String(id) && String(entry.player2_id) !== String(id);
+        }
+        return String(entry.player_id) !== String(id);
+      })
     : [];
 
   const safeSnapshot = repairManualSnapshot(snapshot);
