@@ -53,10 +53,23 @@ function legacyConditionalUpdateUrl(config, expectedUpdatedAt) {
   return `${baseUrl(config)}/rest/v1/${encodeURIComponent(config.stateTable)}?key=eq.${key}&updated_at=eq.${updatedAt}`;
 }
 
+function getAccessToken() {
+  try {
+    const raw = localStorage.getItem('harmonia_auth_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    return session?.access_token || null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function buildHeaders(config, prefer = null) {
+  const accessToken = getAccessToken();
+
   const headers = {
     apikey: config.anonKey,
-    Authorization: `Bearer ${config.anonKey}`,
+    Authorization: `Bearer ${accessToken || config.anonKey}`,
     'Content-Type': 'application/json',
   };
 
