@@ -255,8 +255,7 @@ document.addEventListener("click", async (e) => {
   if (uiActionInFlight && action !== "cancel-edit") return;
   const id = trigger.dataset.id || "";
 
-  const raw = localStorage.getItem("harmonia_data");
-  const snapshot = raw ? JSON.parse(raw) : {};
+  const snapshot = structuredClone(getState());
   if (Array.isArray(snapshot.players)) {
     snapshot.players = snapshot.players.map(normalizePlayer);
   }

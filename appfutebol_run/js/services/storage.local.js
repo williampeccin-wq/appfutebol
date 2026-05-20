@@ -6,7 +6,8 @@ function __isValidStateForWrite(state) {
 }
 import { validateAndRepairState, sanitizeUi } from '../domain/state.guard.js';
 
-const STORAGE_KEY = 'harmonia_data';
+const STORAGE_KEY = 'harmonia_browser_state';
+const LEGACY_STORAGE_KEY = 'harmonia_data';
 
 const defaultSeed = {
   session: {
@@ -234,7 +235,10 @@ export function loadLocalState() {
   if (!raw) {
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      session: seed.session || defaultSeed.session,
+      ui: seed.ui || defaultSeed.ui,
+    }));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -243,7 +247,10 @@ export function loadLocalState() {
 
   try {
     const parsed = JSON.parse(raw);
-    const normalized = normalizeData(buildMergedData(parsed));
+    const normalized = normalizeData(buildMergedData({
+      session: parsed?.session || {},
+      ui: parsed?.ui || {},
+    }));
     const repaired = validateAndRepairState(normalized, { defaultSeed });
     const normalizedRaw = JSON.stringify(repaired.state);
 
@@ -255,12 +262,17 @@ export function loadLocalState() {
       localStorage.setItem(STORAGE_KEY, normalizedRaw);
     }
 
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+
     return repaired.state;
   } catch (error) {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      session: seed.session || defaultSeed.session,
+      ui: seed.ui || defaultSeed.ui,
+    }));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -277,7 +289,10 @@ export function saveLocalState(data) {
   }
 
   if (__isValidStateForWrite(repaired.state)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      session: repaired.state.session || defaultSeed.session,
+      ui: repaired.state.ui || defaultSeed.ui,
+    }));
   } else {
     console.warn("[storage.local] blocked invalid repaired.state write");
   }
@@ -286,7 +301,10 @@ export function saveLocalState(data) {
 export function resetLocalState() {
   const seed = normalizeData(structuredClone(defaultSeed));
   if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      session: seed.session || defaultSeed.session,
+      ui: seed.ui || defaultSeed.ui,
+    }));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }

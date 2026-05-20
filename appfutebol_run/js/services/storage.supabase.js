@@ -69,11 +69,16 @@ function buildHeaders(config, prefer = null) {
 
   const headers = {
     apikey: config.anonKey,
-    Authorization: `Bearer ${accessToken || config.anonKey}`,
     'Content-Type': 'application/json',
   };
 
-  if (prefer) headers.Prefer = prefer;
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  if (prefer) {
+    headers.Prefer = prefer;
+  }
 
   return headers;
 }
