@@ -14,7 +14,6 @@ _run_*
 _debug/
 
 # runs locais
-appfutebol_run/
 run_*/
 TESTE_*/
 *.patch
