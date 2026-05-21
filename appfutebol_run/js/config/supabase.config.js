@@ -4,8 +4,8 @@
 
 export const SUPABASE_CONFIG = {
   enabled: true,
-  url: 'https://fjnelycvneutmyzjrozs.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbmVseWN2bmV1dG15empyb3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MDc3OTUsImV4cCI6MjA5MzQ4Mzc5NX0.cqg4EpCFVW4FWIytKrZIsmqi24_F1pKOQe7c8DJR0sc',
+  url: 'https://kpgghcrmbkrwpvtegcjh.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ2doY3JtYmtyd3B2dGVnY2poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTAyMTAsImV4cCI6MjA5Mjg4NjIxMH0.zTrATNNby4WJEFL4S1L8d7b6DuprZy5U9rx2H2-rHTs',
   stateTable: 'app_state',
   stateKey: 'default',
 };
