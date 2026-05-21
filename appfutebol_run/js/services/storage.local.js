@@ -235,10 +235,7 @@ export function loadLocalState() {
   if (!raw) {
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      session: seed.session || defaultSeed.session,
-      ui: seed.ui || defaultSeed.ui,
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -269,10 +266,7 @@ export function loadLocalState() {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      session: seed.session || defaultSeed.session,
-      ui: seed.ui || defaultSeed.ui,
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -289,10 +283,7 @@ export function saveLocalState(data) {
   }
 
   if (__isValidStateForWrite(repaired.state)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      session: repaired.state.session || defaultSeed.session,
-      ui: repaired.state.ui || defaultSeed.ui,
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
   } else {
     console.warn("[storage.local] blocked invalid repaired.state write");
   }
@@ -301,10 +292,7 @@ export function saveLocalState(data) {
 export function resetLocalState() {
   const seed = normalizeData(structuredClone(defaultSeed));
   if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      session: seed.session || defaultSeed.session,
-      ui: seed.ui || defaultSeed.ui,
-    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }

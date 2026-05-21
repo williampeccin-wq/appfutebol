@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.57.1-championship-team-result-fix';
+window.__HARMONIA_BUILD__ = 'v1.58.8-finance-state-commit-fix';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -709,22 +709,31 @@ if (action === "admin-add-to-game") {
 
 
 
-  const player = snapshot.players.find(p => p.id === id);
-  if (!player) return;
-
   if (action === "mark-paid" || action === "mark-debt") {
+    const currentSnapshot = structuredClone(getState());
+    if (Array.isArray(currentSnapshot.players)) {
+      currentSnapshot.players = currentSnapshot.players.map(normalizePlayer);
+    }
+
+    const player = currentSnapshot.players.find(p => p.id === id);
+    if (!player) return;
+
     uiActionInFlight = true;
     setActionBusy(trigger, action === "mark-paid" ? "Salvando..." : "Atualizando...");
+
+    player.mens_ok = action === "mark-paid";
+
+    const safeSnapshot = repairManualSnapshot(currentSnapshot);
+
+    // Critical: update the canonical in-memory state. Calling render() directly here
+    // would redraw the UI without changing core/state.js, so the next fast click
+    // could be based on a stale snapshot and revert the previous mensalidade change.
+    replaceState(safeSnapshot);
+
+    uiActionInFlight = false;
+    showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
+    return;
   }
-
-  if (action === "mark-paid") player.mens_ok = true;
-  if (action === "mark-debt") player.mens_ok = false;
-
-  const safeSnapshot = repairManualSnapshot(snapshot);
-  savePersistedState(safeSnapshot);
-  render(safeSnapshot);
-  uiActionInFlight = false;
-  showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
 });
 
 
@@ -749,7 +758,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { loadRemoteState } from '../services/storage.supabase.js';
-import { getCurrentPlayer, login, logout, register, restoreSession } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -767,6 +776,7 @@ let lastDomainFingerprint = '';
 init();
 
 async function init() {
+  await prepareStoredSession();
   const data = await loadPersistedState();
   replaceState(data);
   await restoreSession();

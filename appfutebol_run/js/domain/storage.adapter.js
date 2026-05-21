@@ -11,6 +11,12 @@ const DEFAULT_UI = {
   authMessage: null,
 };
 
+let remoteSaveQueue = Promise.resolve();
+
+function cloneSnapshot(snapshot) {
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
 function isValidAppState(snapshot) {
   return !!(
     snapshot &&
@@ -20,6 +26,17 @@ function isValidAppState(snapshot) {
     typeof snapshot.game === "object" &&
     Array.isArray(snapshot.confirmations)
   );
+}
+
+function hasStoredAccessToken() {
+  try {
+    const raw = localStorage.getItem("harmonia_auth_session");
+    if (!raw) return false;
+    const session = JSON.parse(raw);
+    return !!session?.access_token;
+  } catch (_error) {
+    return false;
+  }
 }
 
 function getSafeLocalSnapshot() {
@@ -61,7 +78,7 @@ function createHybridStorageAdapter() {
     async getState() {
       const localSnapshot = getSafeLocalSnapshot();
 
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured() || !hasStoredAccessToken()) {
         return localSnapshot;
       }
 
@@ -96,10 +113,17 @@ function createHybridStorageAdapter() {
 
       saveLocalState(safeState);
 
-      if (isSupabaseConfigured()) {
-        const expectedUpdatedAt = getLastRemoteUpdatedAt();
+      if (isSupabaseConfigured() && hasStoredAccessToken()) {
+        const snapshotToPersist = cloneSnapshot(safeState);
 
-        saveRemoteState(createRemoteSnapshot(safeState), { expectedUpdatedAt }).then((result) => {
+        remoteSaveQueue = remoteSaveQueue.then(async () => {
+          const expectedUpdatedAt = getLastRemoteUpdatedAt();
+
+          const result = await saveRemoteState(
+            createRemoteSnapshot(snapshotToPersist),
+            { expectedUpdatedAt }
+          );
+
           if (result.conflict) {
             console.warn("[storage.adapter] remote conflict detected; local change was not pushed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {
@@ -111,6 +135,8 @@ function createHybridStorageAdapter() {
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
           }
+        }).catch((error) => {
+          console.warn("[storage.adapter] remote save queue failed:", error);
         });
       }
     },

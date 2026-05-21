@@ -1,4 +1,5 @@
-import { getState, patchState } from '../core/state.js';
+import { getState, patchState, replaceState } from '../core/state.js';
+import { loadRemoteState } from './storage.supabase.js';
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 import { normalizePhone } from '../domain/rules.engine.js';
 
@@ -39,6 +40,40 @@ function loadStoredSession() {
 
 function clearStoredSession() {
   localStorage.removeItem(SESSION_KEY);
+}
+
+function isSessionExpired(session, skewSeconds = 60) {
+  const expiresAt = Number(session?.expires_at || 0);
+  if (!expiresAt) return false;
+  return Math.floor(Date.now() / 1000) >= (expiresAt - skewSeconds);
+}
+
+export async function prepareStoredSession() {
+  const stored = loadStoredSession();
+
+  if (!stored?.access_token) {
+    return null;
+  }
+
+  if (!isSessionExpired(stored)) {
+    return stored;
+  }
+
+  if (!stored.refresh_token) {
+    clearStoredSession();
+    return null;
+  }
+
+  const refreshed = await requestAuth('token?grant_type=refresh_token', {
+    refresh_token: stored.refresh_token,
+  });
+
+  if (!refreshed.ok || !refreshed.data?.access_token) {
+    clearStoredSession();
+    return null;
+  }
+
+  return saveSession(refreshed.data);
 }
 
 async function requestAuth(path, payload, options = {}) {
@@ -113,7 +148,7 @@ function ensureLoggedPlayer(session) {
 }
 
 export async function restoreSession() {
-  const stored = loadStoredSession();
+  const stored = await prepareStoredSession();
   if (!stored?.access_token) {
     patchState({ session: { playerId: null, authUserId: null } });
     return null;
@@ -165,6 +200,17 @@ export async function login(phone, password) {
   }
 
   const session = saveSession(result.data);
+
+  const remote = await loadRemoteState().catch(() => null);
+  if (remote?.ok && remote.state) {
+    const current = getState();
+    replaceState({
+      ...remote.state,
+      session: current.session,
+      ui: current.ui,
+    });
+  }
+
   const player = ensureLoggedPlayer(session);
   if (!player) {
     return { ok: false, message: 'Usuário autenticado, mas ainda sem jogador vinculado.' };
