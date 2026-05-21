@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.58.8-finance-state-commit-fix';
+window.__HARMONIA_BUILD__ = 'v1.58.9-rls-state-hardening';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -136,6 +136,21 @@ function repairManualSnapshot(snapshot) {
     console.warn('[app] Reparos aplicados antes do save manual:', repaired.warnings);
   }
   return repaired.state;
+}
+
+function getCurrentSnapshotPlayer(snapshot) {
+  return Array.isArray(snapshot?.players)
+    ? snapshot.players.find((player) => String(player.id) === String(snapshot.session?.playerId))
+    : null;
+}
+
+function requireAdmin(snapshot, message = 'Apenas administrador pode executar esta ação') {
+  const current = getCurrentSnapshotPlayer(snapshot);
+  if (!current?.is_admin) {
+    showToast(message, 'error');
+    return false;
+  }
+  return true;
 }
 
 
@@ -461,6 +476,7 @@ document.addEventListener("click", async (e) => {
   }
 
   if (action === "add-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode gerenciar jogadores')) return;
   uiActionInFlight = true;
   setActionBusy(trigger, editingPlayerId ? "Salvando..." : "Adicionando...");
   const name = document.getElementById("new-name")?.value?.trim();
@@ -530,6 +546,7 @@ document.addEventListener("click", async (e) => {
 }
 
   if (action === "edit-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode editar jogadores')) return;
   const playerToEdit = snapshot.players.find((p) => p.id === id);
   if (!playerToEdit) return;
 
@@ -571,6 +588,7 @@ if (action === "cancel-edit") {
 
 
 if (action === "delete-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode excluir jogadores')) return;
   const player = snapshot.players.find(p => p.id === id);
   if (!player) return;
 
@@ -710,6 +728,7 @@ if (action === "admin-add-to-game") {
 
 
   if (action === "mark-paid" || action === "mark-debt") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode alterar mensalidade')) return;
     const currentSnapshot = structuredClone(getState());
     if (Array.isArray(currentSnapshot.players)) {
       currentSnapshot.players = currentSnapshot.players.map(normalizePlayer);

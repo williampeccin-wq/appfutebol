@@ -236,7 +236,7 @@ async function loadLegacyState(config) {
 
 async function loadSplitState(config) {
   const [playersResult, gameResult, confirmationsResult, metaResult] = await Promise.all([
-    requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,auth_user_id,is_admin,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.confirmations, 'select=player_id,data,updated_at'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
@@ -252,7 +252,14 @@ async function loadSplitState(config) {
   }
 
   const players = Array.isArray(playersResult.data)
-    ? playersResult.data.map((row) => row.data).filter(Boolean)
+    ? playersResult.data
+        .map((row) => ({
+          ...(row.data || {}),
+          id: row.id || row.data?.id,
+          auth_user_id: row.auth_user_id || row.data?.auth_user_id || null,
+          is_admin: row.is_admin === true,
+        }))
+        .filter((player) => player.id)
     : [];
   const gameRow = Array.isArray(gameResult.data) ? gameResult.data[0] : null;
   const confirmations = Array.isArray(confirmationsResult.data)
@@ -319,9 +326,22 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   for (const [id, player] of nextPlayers.entries()) {
     if (stableStringify(previousPlayers.get(id)) !== stableStringify(player)) {
+      const authUserId = player.auth_user_id || null;
+      const isAdmin = player.is_admin === true;
       operations.push({
         type: 'upsert_player',
-        run: () => upsertRow(config, SPLIT_TABLES.players, { id, data: player, updated_at: now }),
+        run: () => upsertRow(config, SPLIT_TABLES.players, {
+          id,
+          auth_user_id: authUserId,
+          is_admin: isAdmin,
+          data: {
+            ...player,
+            id,
+            auth_user_id: authUserId,
+            is_admin: isAdmin,
+          },
+          updated_at: now,
+        }),
       });
     }
   }

@@ -269,9 +269,57 @@ export async function register(payload) {
     return { ok: false, message: 'Cadastro criado, mas o Supabase não retornou o usuário.' };
   }
 
-  const isFirstPlayer = !Array.isArray(snapshot.players) || snapshot.players.length === 0;
+  const loginResult = await requestAuth('token?grant_type=password', {
+    email: technicalEmail,
+    password,
+  });
+
+  if (!loginResult.ok) {
+    return {
+      ok: false,
+      message: `Cadastro criado, mas o login automático falhou: ${loginResult.message}`,
+    };
+  }
+
+  const session = saveSession(loginResult.data);
+
+  const remote = await loadRemoteState().catch(() => null);
+  const baseSnapshot = remote?.ok && remote.state ? remote.state : snapshot;
+  const basePlayers = Array.isArray(baseSnapshot.players) ? baseSnapshot.players : [];
+
+  const remoteDuplicatePhone = basePlayers.find((item) => normalizeLoginPhone(item.phone) === phone);
+  if (remoteDuplicatePhone) {
+    replaceState({
+      ...baseSnapshot,
+      session: { playerId: null, authUserId: session.user.id },
+      ui: {
+        ...(baseSnapshot.ui || {}),
+        authMode: 'login',
+        authMessage: {
+          type: 'error',
+          text: 'Esse telefone já existe na base remota. Faça login ou peça ao administrador para conferir o cadastro.',
+        },
+      },
+    });
+    return { ok: false, message: 'Esse telefone já existe na base remota.' };
+  }
+
+  replaceState({
+    ...baseSnapshot,
+    session: { playerId: null, authUserId: session.user.id },
+    ui: {
+      ...(baseSnapshot.ui || {}),
+      authMode: 'login',
+      authMessage: {
+        type: 'success',
+        text: 'Cadastro realizado. Entrando automaticamente...',
+      },
+    },
+  });
+
+  const isFirstPlayer = basePlayers.length === 0;
   const nextPlayer = {
-    id: createPlayerId(snapshot.players),
+    id: createPlayerId(basePlayers),
     auth_user_id: authUser.id,
     email: technicalEmail,
     login_phone: phone,
@@ -287,7 +335,7 @@ export async function register(payload) {
   };
 
   patchState({
-    players: [...(snapshot.players || []), nextPlayer],
+    players: [...basePlayers, nextPlayer],
     ui: {
       authMode: 'login',
       authMessage: {
@@ -297,19 +345,6 @@ export async function register(payload) {
     },
   });
 
-  const loginResult = await requestAuth('token?grant_type=password', {
-    email: technicalEmail,
-    password,
-  });
-
-  if (!loginResult.ok) {
-    return {
-      ok: false,
-      message: `Cadastro criado, mas o login automático falhou: ${loginResult.message}`,
-    };
-  }
-
-  const session = saveSession(loginResult.data);
   const loggedPlayer = ensureLoggedPlayer(session);
 
   if (!loggedPlayer) {
