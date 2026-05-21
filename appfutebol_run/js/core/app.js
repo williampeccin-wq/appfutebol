@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.58.9-rls-state-hardening';
+window.__HARMONIA_BUILD__ = 'v1.58.13-self-profile-form-layout';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -26,6 +26,7 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
+let selfProfileEditOpen = false;
 
 
 let uiActionInFlight = false;
@@ -153,6 +154,69 @@ function requireAdmin(snapshot, message = 'Apenas administrador pode executar es
   return true;
 }
 
+function normalizeSelfPhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeSelfPosition(value) {
+  return ['zag', 'meia', 'atk'].includes(value) ? value : null;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function renderSelfProfileEditCardForHome(activePlayer) {
+  if (activePlayer?.is_admin || !selfProfileEditOpen) return '';
+
+  return `
+      <section class="card self-profile-card" id="self-profile-card">
+        <div class="card-title">Editar meu cadastro</div>
+        <div class="self-profile-form">
+          <label class="form-group">
+            <span class="form-label">Nome</span>
+            <input id="self-name" class="input" type="text" placeholder="Nome completo" value="${escapeHtml(activePlayer.name || '')}" autocomplete="name" />
+          </label>
+
+          <label class="form-group">
+            <span class="form-label">Telefone</span>
+            <input id="self-phone" class="input" type="tel" placeholder="(48) 99999-9999" value="${escapeHtml(formatPhone(activePlayer.phone || ''))}" autocomplete="tel" />
+          </label>
+
+          <label class="form-group">
+            <span class="form-label">Nascimento</span>
+            <input id="self-birthdate" class="input" type="date" value="${escapeHtml(activePlayer.birthDate || '')}" />
+          </label>
+
+          ${activePlayer.plays_football === false ? '' : `
+            <label class="form-group">
+              <span class="form-label">Posição</span>
+              <select id="self-position" class="input">
+                <option value="meia" ${activePlayer.position === 'meia' ? 'selected' : ''}>Meia</option>
+                <option value="zag" ${activePlayer.position === 'zag' ? 'selected' : ''}>Zagueiro</option>
+                <option value="atk" ${activePlayer.position === 'atk' ? 'selected' : ''}>Atacante</option>
+              </select>
+            </label>
+          `}
+
+          <div class="self-profile-note">
+            Você pode alterar nome, telefone, nascimento e posição. Mensalidade, perfil, grupo da carne e permissão de admin continuam restritos ao administrador.
+          </div>
+
+          <div class="self-profile-actions">
+            <button class="btn btn-primary" type="button" data-action="update-self-profile">Salvar</button>
+            <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit">Cancelar</button>
+          </div>
+        </div>
+      </section>
+`;
+}
+
 
 const DEFAULT_CARNE_SCHEDULE = [
   ['2026-05-19', 'PANGA', 'ADRIEL'],
@@ -275,6 +339,27 @@ document.addEventListener("click", async (e) => {
     snapshot.players = snapshot.players.map(normalizePlayer);
   }
   if (!Array.isArray(snapshot.players)) return;
+
+
+  if (action === "toggle-self-profile-edit") {
+    const currentPlayer = getCurrentSnapshotPlayer(snapshot);
+    if (!currentPlayer) {
+      showToast("Sessão inválida. Faça login novamente.", "error");
+      return;
+    }
+    if (currentPlayer.is_admin) return;
+
+    selfProfileEditOpen = !selfProfileEditOpen;
+    render(snapshot);
+
+    if (selfProfileEditOpen) {
+      setTimeout(() => {
+        document.getElementById("self-profile-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("self-name")?.focus();
+      }, 0);
+    }
+    return;
+  }
 
   if (action === "save-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
@@ -586,6 +671,71 @@ if (action === "cancel-edit") {
   return;
 }
 
+
+if (action === "update-self-profile") {
+  const currentPlayer = getCurrentSnapshotPlayer(snapshot);
+  if (!currentPlayer) {
+    showToast("Sessão inválida. Faça login novamente.", "error");
+    return;
+  }
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, "Salvando...");
+
+  const name = document.getElementById("self-name")?.value?.trim();
+  const phone = normalizeSelfPhone(document.getElementById("self-phone")?.value);
+  const birthDate = document.getElementById("self-birthdate")?.value?.trim();
+  const positionInput = document.getElementById("self-position");
+  const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
+
+  if (!name || !phone || !birthDate) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert("Nome, telefone e data de nascimento são obrigatórios");
+    return;
+  }
+
+  if (phone.length < 10 || phone.length > 11) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert("Informe um telefone válido");
+    return;
+  }
+
+  if (currentPlayer.plays_football !== false && !position) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert("Selecione a posição em campo");
+    return;
+  }
+
+  const duplicatePhone = snapshot.players.some((player) => normalizeSelfPhone(player.phone) === phone && player.id !== currentPlayer.id);
+  if (duplicatePhone) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert("Telefone duplicado");
+    return;
+  }
+
+  snapshot.players = snapshot.players.map((player) => {
+    if (player.id !== currentPlayer.id) return player;
+    return {
+      ...player,
+      name,
+      phone,
+      birthDate,
+      position: player.plays_football === false ? player.position : position,
+    };
+  });
+
+  const safeSnapshot = repairManualSnapshot(snapshot);
+  savePersistedState(safeSnapshot);
+  selfProfileEditOpen = false;
+  render(safeSnapshot);
+  uiActionInFlight = false;
+  showToast("Cadastro atualizado com sucesso", "success");
+  return;
+}
 
 if (action === "delete-player") {
   if (!requireAdmin(snapshot, 'Apenas administrador pode excluir jogadores')) return;
@@ -1262,6 +1412,9 @@ function renderHome(snapshot, currentPlayer) {
               <div class="row-title">${activePlayer.name}</div>
               <div class="row-subtitle">${activePlayer.is_admin ? 'Administrador' : activePlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)} · ${formatPhone(activePlayer.phone)}</div>
             </div>
+            ${activePlayer.is_admin ? '' : `
+              <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit" style="margin-left:auto;">${selfProfileEditOpen ? 'Fechar edição' : 'Editar'}</button>
+            `}
           </div>
           <div class="chip-row">
             <span class="tag ${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'is-ok' : 'is-warn'}">${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
@@ -1269,6 +1422,8 @@ function renderHome(snapshot, currentPlayer) {
           </div>
         </div>
       </section>
+
+      ${renderSelfProfileEditCardForHome(activePlayer)}
 
       <section class="card">
         <div class="card-title">Confirmação de presença</div>

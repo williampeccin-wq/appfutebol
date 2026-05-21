@@ -1,4 +1,4 @@
--- Harmonia FC — Supabase schema v1.58.9 RLS STATE HARDENING
+-- Harmonia FC — Supabase schema v1.58.11 SELF PROFILE HOME
 -- Use no projeto DEV correto: https://fjnelycvneutmyzjrozs.supabase.co
 
 create table if not exists public.app_state (
@@ -164,9 +164,6 @@ begin
     raise exception 'in_carne_group_is_admin_only';
   end if;
 
-  if coalesce(NEW.data->>'position', '') is distinct from coalesce(OLD.data->>'position', '') then
-    raise exception 'position_is_admin_only';
-  end if;
 
   NEW.data = jsonb_set(
     jsonb_set(

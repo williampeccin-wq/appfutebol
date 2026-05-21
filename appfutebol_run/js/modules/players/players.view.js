@@ -71,6 +71,13 @@ function renderPlayerManagementCard(currentPlayer) {
   `;
 }
 
+function renderSelfProfileCard(currentPlayer) {
+  // Edição do próprio cadastro fica concentrada na Home, recolhida atrás do botão Editar.
+  return '';
+}
+
+
+
 
 export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
@@ -104,6 +111,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
       </section>
 
       ${renderPlayerManagementCard(currentPlayer)}
+      ${renderSelfProfileCard(currentPlayer)}
 
       <section class="card">
         <div class="card-title">Resumo do elenco</div>

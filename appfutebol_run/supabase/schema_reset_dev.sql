@@ -1,4 +1,4 @@
--- Harmonia FC — RESET DEV ONLY — v1.58.9 RLS STATE HARDENING
+-- Harmonia FC — RESET DEV ONLY — v1.58.11 SELF PROFILE HOME
 -- Rode isto somente no projeto DEV correto: https://fjnelycvneutmyzjrozs.supabase.co
 -- NÃO rode na base oficial/prod.
 
@@ -157,9 +157,6 @@ begin
     raise exception 'in_carne_group_is_admin_only';
   end if;
 
-  if coalesce(NEW.data->>'position', '') is distinct from coalesce(OLD.data->>'position', '') then
-    raise exception 'position_is_admin_only';
-  end if;
 
   NEW.data = jsonb_set(
     jsonb_set(
