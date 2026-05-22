@@ -3,12 +3,11 @@ import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 let lastRemoteUpdatedAt = null;
 let lastSplitSnapshot = null;
 let lastSplitFingerprint = '';
-let presenceTableAvailable = false;
+const presenceTableAvailable = true;
 
 const SPLIT_TABLES = {
   players: 'players',
   game: 'game_state',
-  confirmations: 'confirmations',
   presence: 'presence_confirmations',
   meta: 'app_meta',
 };
@@ -318,22 +317,19 @@ async function loadLegacyState(config) {
 }
 
 async function loadSplitState(config) {
-  const [playersResult, gameResult, confirmationsResult, presenceResult, metaResult] = await Promise.all([
+  const [playersResult, gameResult, presenceResult, metaResult] = await Promise.all([
     requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,auth_user_id,is_admin,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.confirmations, 'select=player_id,data,updated_at'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.presence, 'game_key=eq.default&select=game_key,player_id,status,confirmed_at,cancelled_at,removed_by_admin,data,updated_at'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
   ]);
 
-  const presenceAvailable = presenceResult.ok;
-
-  if (!playersResult.ok || !gameResult.ok || !metaResult.ok || (!presenceAvailable && !confirmationsResult.ok)) {
+  if (!playersResult.ok || !gameResult.ok || !presenceResult.ok || !metaResult.ok) {
     return {
       ok: false,
       state: null,
       updatedAt: null,
-      reason: 'split_tables_unavailable',
+      reason: 'single_source_tables_unavailable',
     };
   }
 
@@ -348,17 +344,10 @@ async function loadSplitState(config) {
         .filter((player) => player.id)
     : [];
   const gameRow = Array.isArray(gameResult.data) ? gameResult.data[0] : null;
-  presenceTableAvailable = presenceAvailable;
 
-  const legacyConfirmations = Array.isArray(confirmationsResult.data)
-    ? confirmationsResult.data.map((row) => row.data).filter(Boolean)
-    : [];
-  const normalizedPresenceConfirmations = presenceResult.ok && Array.isArray(presenceResult.data)
+  const confirmations = Array.isArray(presenceResult.data)
     ? presenceResult.data.map(confirmationFromPresenceRow).filter((entry) => entry?.player_id)
     : [];
-  const confirmations = presenceTableAvailable
-    ? normalizedPresenceConfirmations
-    : legacyConfirmations;
   const metaRow = Array.isArray(metaResult.data) ? metaResult.data[0] : null;
 
   const state = composeState({
@@ -370,8 +359,7 @@ async function loadSplitState(config) {
 
   const updatedValues = [
     ...(Array.isArray(playersResult.data) ? playersResult.data.map((row) => row.updated_at) : []),
-    ...(Array.isArray(confirmationsResult.data) ? confirmationsResult.data.map((row) => row.updated_at) : []),
-    ...(presenceResult.ok && Array.isArray(presenceResult.data) ? presenceResult.data.map((row) => row.updated_at) : []),
+    ...(Array.isArray(presenceResult.data) ? presenceResult.data.map((row) => row.updated_at) : []),
     gameRow?.updated_at,
     metaRow?.updated_at,
   ].filter(Boolean).sort();
@@ -383,7 +371,7 @@ async function loadSplitState(config) {
       ok: false,
       state,
       updatedAt: lastRemoteUpdatedAt,
-      reason: 'split_state_empty_or_invalid',
+      reason: 'single_source_state_empty_or_invalid',
     };
   }
 
@@ -393,8 +381,8 @@ async function loadSplitState(config) {
     ok: true,
     state,
     updatedAt: lastRemoteUpdatedAt,
-    reason: 'split_loaded',
-    mode: 'split',
+    reason: 'presence_single_source_loaded',
+    mode: 'presence-single-source',
   };
 }
 
@@ -464,33 +452,19 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   for (const [playerId, confirmation] of nextConfirmations.entries()) {
     if (stableStringify(previousConfirmations.get(playerId)) !== stableStringify(confirmation)) {
-      if (presenceTableAvailable) {
-        operations.push({
-          type: 'upsert_presence_confirmation',
-          run: () => upsertPresenceConfirmation(config, confirmation, now),
-        });
-      } else {
-        operations.push({
-          type: 'upsert_confirmation_legacy',
-          run: () => upsertRow(config, SPLIT_TABLES.confirmations, { player_id: playerId, data: confirmation, updated_at: now }),
-        });
-      }
+      operations.push({
+        type: 'upsert_presence_confirmation',
+        run: () => upsertPresenceConfirmation(config, confirmation, now),
+      });
     }
   }
 
   for (const playerId of previousConfirmations.keys()) {
     if (!nextConfirmations.has(playerId)) {
-      if (presenceTableAvailable) {
-        operations.push({
-          type: 'delete_presence_confirmation',
-          run: () => requestNoContent(config, tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.default&player_id=eq.${encodeURIComponent(String(playerId))}`), { method: 'DELETE' }),
-        });
-      } else {
-        operations.push({
-          type: 'delete_confirmation_legacy',
-          run: () => deleteRow(config, SPLIT_TABLES.confirmations, 'player_id', playerId),
-        });
-      }
+      operations.push({
+        type: 'delete_presence_confirmation',
+        run: () => requestNoContent(config, tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.default&player_id=eq.${encodeURIComponent(String(playerId))}`), { method: 'DELETE' }),
+      });
     }
   }
 
@@ -617,32 +591,14 @@ export async function loadRemoteState() {
   }
 
   try {
-    const split = await loadSplitState(config);
-
-    if (split.ok) {
-      return split;
-    }
-
-    const legacy = await loadLegacyState(config);
-
-    if (legacy.ok) {
-      await saveSplitState(config, legacy.state);
-      rememberSplitSnapshot(legacy.state, getLastRemoteUpdatedAt());
-      return {
-        ...legacy,
-        reason: 'legacy_loaded_and_migrated_to_split',
-        mode: 'legacy-migrated',
-      };
-    }
-
-    return split;
+    return await loadSplitState(config);
   } catch (error) {
-    console.warn('[storage.supabase] load failed, falling back to local storage', error);
-    return { ok: false, state: null, updatedAt: null, reason: 'supabase_load_exception' };
+    console.warn('[storage.supabase] load failed; presence_confirmations single source is unavailable', error);
+    return { ok: false, state: null, updatedAt: null, reason: 'single_source_load_exception' };
   }
 }
 
-export async function saveRemoteState(state, options = {}) {
+export async function saveRemoteState(state, _options = {}) {
   const config = getConfig();
 
   if (!isSupabaseConfigured()) {
@@ -650,26 +606,10 @@ export async function saveRemoteState(state, options = {}) {
   }
 
   try {
-    const splitResult = await saveSplitState(config, state);
-
-    if (splitResult.ok) {
-      return splitResult;
-    }
-
-    const expectedUpdatedAt = options.expectedUpdatedAt || lastRemoteUpdatedAt;
-
-    if (expectedUpdatedAt) {
-      const legacyResult = await updateLegacyStateIfUnchanged(config, state, expectedUpdatedAt);
-
-      if (legacyResult.ok || legacyResult.conflict) {
-        return legacyResult;
-      }
-    }
-
-    return await upsertLegacyState(config, state);
+    return await saveSplitState(config, state);
   } catch (error) {
-    console.warn('[storage.supabase] save failed, local storage remains available', error);
-    return { ok: false, conflict: false, reason: 'supabase_save_exception' };
+    console.warn('[storage.supabase] save failed; local storage remains available', error);
+    return { ok: false, conflict: false, reason: 'single_source_save_exception' };
   }
 }
 
@@ -686,7 +626,8 @@ export function getSupabaseMeta() {
     granularWrites: true,
     presenceNormalization: true,
     presenceReadCutover: true,
-    presenceWriteCutover: presenceTableAvailable,
-    presenceTableAvailable,
+    presenceSingleSource: true,
+    presenceWriteCutover: true,
+    presenceTableAvailable: true,
   };
 }
