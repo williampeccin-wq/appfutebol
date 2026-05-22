@@ -107,7 +107,7 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
   return {
     session: { playerId: null },
     players,
-    game,
+    game: normalizeGameForPresenceCutover(game),
     confirmations,
     championship: meta.championship || null,
     carne: Array.isArray(meta.carne) ? meta.carne : [],
@@ -123,7 +123,7 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
 function splitState(state) {
   return {
     players: Array.isArray(state.players) ? state.players : [],
-    game: state.game || null,
+    game: normalizeGameForPresenceCutover(state.game || null),
     confirmations: Array.isArray(state.confirmations) ? state.confirmations : [],
     meta: {
       championship: state.championship || null,
@@ -157,6 +157,27 @@ function indexBy(items, keyGetter) {
     if (key) map.set(String(key), item);
   }
   return map;
+}
+
+function normalizeGameForPresenceCutover(game) {
+  if (!game || typeof game !== 'object') return game || null;
+
+  const nextGame = cloneJson(game) || {};
+
+  // Cutover v1.60.3: presence_confirmations is the authoritative source
+  // for presence. Keep game_state focused on game configuration/sort result
+  // and never let old embedded presence arrays drive the UI again.
+  delete nextGame.confirmedPlayers;
+  delete nextGame.confirmed_players;
+  delete nextGame.confirmations;
+
+  if (nextGame.data && typeof nextGame.data === 'object') {
+    delete nextGame.data.confirmedPlayers;
+    delete nextGame.data.confirmed_players;
+    delete nextGame.data.confirmations;
+  }
+
+  return nextGame;
 }
 
 function confirmationFromPresenceRow(row) {
@@ -305,7 +326,9 @@ async function loadSplitState(config) {
     requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
   ]);
 
-  if (!playersResult.ok || !gameResult.ok || !confirmationsResult.ok || !metaResult.ok) {
+  const presenceAvailable = presenceResult.ok;
+
+  if (!playersResult.ok || !gameResult.ok || !metaResult.ok || (!presenceAvailable && !confirmationsResult.ok)) {
     return {
       ok: false,
       state: null,
@@ -325,7 +348,7 @@ async function loadSplitState(config) {
         .filter((player) => player.id)
     : [];
   const gameRow = Array.isArray(gameResult.data) ? gameResult.data[0] : null;
-  presenceTableAvailable = presenceResult.ok;
+  presenceTableAvailable = presenceAvailable;
 
   const legacyConfirmations = Array.isArray(confirmationsResult.data)
     ? confirmationsResult.data.map((row) => row.data).filter(Boolean)
@@ -333,7 +356,7 @@ async function loadSplitState(config) {
   const normalizedPresenceConfirmations = presenceResult.ok && Array.isArray(presenceResult.data)
     ? presenceResult.data.map(confirmationFromPresenceRow).filter((entry) => entry?.player_id)
     : [];
-  const confirmations = normalizedPresenceConfirmations.length
+  const confirmations = presenceTableAvailable
     ? normalizedPresenceConfirmations
     : legacyConfirmations;
   const metaRow = Array.isArray(metaResult.data) ? metaResult.data[0] : null;
@@ -441,14 +464,15 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   for (const [playerId, confirmation] of nextConfirmations.entries()) {
     if (stableStringify(previousConfirmations.get(playerId)) !== stableStringify(confirmation)) {
-      operations.push({
-        type: 'upsert_confirmation',
-        run: () => upsertRow(config, SPLIT_TABLES.confirmations, { player_id: playerId, data: confirmation, updated_at: now }),
-      });
       if (presenceTableAvailable) {
         operations.push({
           type: 'upsert_presence_confirmation',
           run: () => upsertPresenceConfirmation(config, confirmation, now),
+        });
+      } else {
+        operations.push({
+          type: 'upsert_confirmation_legacy',
+          run: () => upsertRow(config, SPLIT_TABLES.confirmations, { player_id: playerId, data: confirmation, updated_at: now }),
         });
       }
     }
@@ -456,14 +480,15 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   for (const playerId of previousConfirmations.keys()) {
     if (!nextConfirmations.has(playerId)) {
-      operations.push({
-        type: 'delete_confirmation',
-        run: () => deleteRow(config, SPLIT_TABLES.confirmations, 'player_id', playerId),
-      });
       if (presenceTableAvailable) {
         operations.push({
           type: 'delete_presence_confirmation',
           run: () => requestNoContent(config, tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.default&player_id=eq.${encodeURIComponent(String(playerId))}`), { method: 'DELETE' }),
+        });
+      } else {
+        operations.push({
+          type: 'delete_confirmation_legacy',
+          run: () => deleteRow(config, SPLIT_TABLES.confirmations, 'player_id', playerId),
         });
       }
     }
@@ -660,6 +685,8 @@ export function getSupabaseMeta() {
     splitTables: SPLIT_TABLES,
     granularWrites: true,
     presenceNormalization: true,
+    presenceReadCutover: true,
+    presenceWriteCutover: presenceTableAvailable,
     presenceTableAvailable,
   };
 }
