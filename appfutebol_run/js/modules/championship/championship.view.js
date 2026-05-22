@@ -12,6 +12,7 @@ import {
   getActiveDrawTeams,
   getTeamOutcomeLabel,
 } from './championship.service.js';
+import { canManageChampionship } from '../../domain/authz.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -69,7 +70,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
 }
 
 function renderResultForm(snapshot, currentPlayer) {
-  if (!currentPlayer?.is_admin) return '';
+  if (!canManageChampionship(currentPlayer)) return '';
 
   const players = getFootballPlayers(snapshot);
   if (!players.length) {
@@ -153,7 +154,7 @@ function renderResultsHistory(snapshot, currentPlayer) {
                     <div class="row-subtitle">${getTeamOutcomeLabel(result.outcome)} · ${summary.win} vitória · ${summary.draw} empate · ${summary.loss} derrota · ${summary.no_play} não jogou</div>
                   </div>
                 </div>
-                ${currentPlayer?.is_admin ? `<button class="btn btn-danger btn-sm" type="button" data-action="delete-championship-result" data-id="${escapeHtml(result.id)}">Excluir</button>` : ''}
+                ${canManageChampionship(currentPlayer) ? `<button class="btn btn-danger btn-sm" type="button" data-action="delete-championship-result" data-id="${escapeHtml(result.id)}">Excluir</button>` : ''}
               </div>
             `;
           }).join('')}

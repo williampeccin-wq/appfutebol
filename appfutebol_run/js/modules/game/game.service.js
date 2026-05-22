@@ -1,3 +1,4 @@
+import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull } from '../../domain/rules.engine.js';
 
@@ -40,7 +41,15 @@ export function toggleConfirmation(playerId) {
   if (currentlyConfirmed) {
     const updated = snapshot.confirmations.map((entry) => (
       String(entry.player_id) === String(playerId)
-        ? { ...entry, confirmed: false, timestamp: new Date().toISOString() }
+        ? {
+            ...entry,
+            confirmed: false,
+            status: 'cancelled',
+            removed_by_admin: false,
+            confirmed_at: null,
+            cancelled_at: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+          }
         : entry
     ));
     patchState({ confirmations: updated });
@@ -62,7 +71,15 @@ export function toggleConfirmation(playerId) {
   if (existing) {
     updated = snapshot.confirmations.map((entry) => (
       String(entry.player_id) === String(playerId)
-        ? { ...entry, confirmed: true, timestamp: new Date().toISOString() }
+        ? {
+            ...entry,
+            confirmed: true,
+            status: 'confirmed',
+            removed_by_admin: false,
+            confirmed_at: new Date().toISOString(),
+            cancelled_at: null,
+            timestamp: new Date().toISOString(),
+          }
         : entry
     ));
   } else {
@@ -71,6 +88,10 @@ export function toggleConfirmation(playerId) {
       {
         player_id: playerId,
         confirmed: true,
+        status: 'confirmed',
+        removed_by_admin: false,
+        confirmed_at: new Date().toISOString(),
+        cancelled_at: null,
         timestamp: new Date().toISOString(),
       },
     ];
@@ -101,7 +122,10 @@ export function adminRemovePlayerFromGame(playerId) {
       ? {
           ...entry,
           confirmed: false,
+          status: 'removed',
           removed_by_admin: true,
+          confirmed_at: null,
+          cancelled_at: null,
           timestamp: now,
         }
       : entry
@@ -188,7 +212,7 @@ export function drawTeams() {
   const eligiblePlayers = (snapshot.players || [])
     .filter((player) => confirmedIds.has(player.id))
     .filter((player) => player.plays_football !== false)
-    .filter((player) => player.role !== 'carne');
+    .filter((player) => !isCarneOnly(player));
 
   if (eligiblePlayers.length < 2) {
     return {

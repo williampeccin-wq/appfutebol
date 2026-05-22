@@ -1,8 +1,9 @@
+import { isCarneOnly } from '../../domain/authz.js';
 
 // PHASE 8 — FINANCE BASIC
 
 function isFinanceExempt(player) {
-  return player?.role === 'carne';
+  return isCarneOnly(player);
 }
 
 export function isMensalidadeOk(player) {
@@ -13,7 +14,7 @@ export function isMensalidadeOk(player) {
 
 export function canConfirm(player) {
   if (!player) return false;
-  if (player.role === 'carne') return false;
+  if (isCarneOnly(player)) return false;
   if (player.status === 'inactive') return false;
   return player.mens_ok === true;
 }
@@ -26,6 +27,6 @@ export function marcarComoPago(snapshot, playerId) {
 
 export function marcarComoInadimplente(snapshot, playerId) {
   const player = snapshot?.players?.find((item) => item.id === playerId);
-  if (player && player.role !== 'carne') player.mens_ok = false;
+  if (player && !isCarneOnly(player)) player.mens_ok = false;
   return snapshot;
 }

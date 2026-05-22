@@ -1,3 +1,4 @@
+import { isCarneOnly as authzIsCarneOnly } from './authz.js';
 export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -34,12 +35,13 @@ export function getPlayerBlockReasons(player, game) {
     return reasons;
   }
 
-  if (player.role === 'carne') {
+  const carneOnly = authzIsCarneOnly(player);
+
+  if (carneOnly) {
     reasons.push('carne_only');
   }
 
-  const isCarneOnly = player.role === 'carne';
-  const financeApplies = !isCarneOnly;
+  const financeApplies = !carneOnly;
 
   if (financeApplies && player.mens_ok !== true) {
     reasons.push('mensalidade_pendente');

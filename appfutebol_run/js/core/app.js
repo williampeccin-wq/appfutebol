@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.58.13-self-profile-form-layout';
+window.__HARMONIA_BUILD__ = 'v1.60.0-presence-normalization-foundation';
 
 function showToast(msg, type='success') {
   const text = String(msg || '');
@@ -30,6 +30,9 @@ let selfProfileEditOpen = false;
 
 
 let uiActionInFlight = false;
+
+// Dev/test hook: exposes centralized authorization decisions without leaking DB keys.
+exposeAuthz(() => getCurrentPlayer());
 
 function setActionBusy(trigger, busyText = 'Processando...') {
   if (!trigger) return;
@@ -147,7 +150,7 @@ function getCurrentSnapshotPlayer(snapshot) {
 
 function requireAdmin(snapshot, message = 'Apenas administrador pode executar esta ação') {
   const current = getCurrentSnapshotPlayer(snapshot);
-  if (!current?.is_admin) {
+  if (!authzIsAdmin(current)) {
     showToast(message, 'error');
     return false;
   }
@@ -172,7 +175,7 @@ function escapeHtml(value) {
 }
 
 function renderSelfProfileEditCardForHome(activePlayer) {
-  if (activePlayer?.is_admin || !selfProfileEditOpen) return '';
+  if (authzIsAdmin(activePlayer) || !selfProfileEditOpen) return '';
 
   return `
       <section class="card self-profile-card" id="self-profile-card">
@@ -347,7 +350,7 @@ document.addEventListener("click", async (e) => {
       showToast("Sessão inválida. Faça login novamente.", "error");
       return;
     }
-    if (currentPlayer.is_admin) return;
+    if (authzIsAdmin(currentPlayer)) return;
 
     selfProfileEditOpen = !selfProfileEditOpen;
     render(snapshot);
@@ -363,7 +366,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "save-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
-    if (!current?.is_admin) {
+    if (!authzIsAdmin(current)) {
       showToast("Apenas administrador pode alterar a tabela da carne", "error");
       return;
     }
@@ -421,7 +424,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "edit-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
-    if (!current?.is_admin) {
+    if (!authzIsAdmin(current)) {
       showToast("Apenas administrador pode editar a tabela da carne", "error");
       return;
     }
@@ -460,7 +463,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "delete-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
-    if (!current?.is_admin) {
+    if (!authzIsAdmin(current)) {
       showToast("Apenas administrador pode excluir dupla da carne", "error");
       return;
     }
@@ -493,7 +496,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "save-championship-result") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
-    if (!current?.is_admin) {
+    if (!authzIsAdmin(current)) {
       showToast("Apenas administrador pode lançar resultado do campeonato", "error");
       return;
     }
@@ -534,7 +537,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "delete-championship-result") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
-    if (!current?.is_admin) {
+    if (!authzIsAdmin(current)) {
       showToast("Apenas administrador pode excluir resultado do campeonato", "error");
       return;
     }
@@ -806,7 +809,7 @@ if (action === "admin-remove-from-game") {
   const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
   const player = snapshot.players.find((p) => p.id === id);
 
-  if (!current?.is_admin) {
+  if (!authzIsAdmin(current)) {
     showToast("Apenas administrador pode remover jogador do jogo", "error");
     return;
   }
@@ -847,7 +850,7 @@ if (action === "admin-add-to-game") {
   const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
   const player = snapshot.players.find((p) => p.id === id);
 
-  if (!current?.is_admin) {
+  if (!authzIsAdmin(current)) {
     showToast("Apenas administrador pode incluir jogador no jogo", "error");
     return;
   }
@@ -935,6 +938,7 @@ import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipR
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
+import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 
 const appElement = document.getElementById('app');
 
@@ -1066,7 +1070,7 @@ function render(snapshot) {
   }
 
   const requestedTab = snapshot.ui.currentTab || 'home';
-  const activeTab = !currentPlayer.is_admin && requestedTab === 'config' ? 'home' : requestedTab;
+  const activeTab = !canAccessConfig(currentPlayer) && requestedTab === 'config' ? 'home' : requestedTab;
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
@@ -1080,7 +1084,7 @@ function render(snapshot) {
           <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
         </div>
         <div class="header-actions">
-          <div class="header-badge">${currentPlayer.is_admin ? 'Admin' : currentPlayer.role === 'carne' ? 'Carne' : 'Jogador'}</div>
+          <div class="header-badge">${authzIsAdmin(currentPlayer) ? 'Admin' : getPlayerRole(currentPlayer) === 'carne' ? 'Carne' : 'Jogador'}</div>
           <button class="header-logout" type="button" id="logout-button">Sair</button>
         </div>
       </div>
@@ -1092,7 +1096,7 @@ function render(snapshot) {
       ${renderNavButton('players', 'Jogadores', activeTab)}
       ${renderNavButton('carne', 'Carne', activeTab)}
       ${renderNavButton('championship', 'Campeonato', activeTab)}
-      ${currentPlayer.is_admin ? renderNavButton('config', 'Config', activeTab) : ''}
+      ${canAccessConfig(currentPlayer) ? renderNavButton('config', 'Config', activeTab) : ''}
     </nav>
 
     <main class="content">
@@ -1410,9 +1414,9 @@ function renderHome(snapshot, currentPlayer) {
             <div class="avatar avatar-lg">${getInitials(activePlayer.name)}</div>
             <div>
               <div class="row-title">${activePlayer.name}</div>
-              <div class="row-subtitle">${activePlayer.is_admin ? 'Administrador' : activePlayer.role === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)} · ${formatPhone(activePlayer.phone)}</div>
+              <div class="row-subtitle">${authzIsAdmin(activePlayer) ? 'Administrador' : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)} · ${formatPhone(activePlayer.phone)}</div>
             </div>
-            ${activePlayer.is_admin ? '' : `
+            ${authzIsAdmin(activePlayer) ? '' : `
               <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit" style="margin-left:auto;">${selfProfileEditOpen ? 'Fechar edição' : 'Editar'}</button>
             `}
           </div>
@@ -1542,7 +1546,7 @@ async function copyTeamDrawToClipboard() {
 }
 
 function renderPresenceList(snapshot, currentPlayer) {
-  const adminMode = !!currentPlayer?.is_admin;
+  const adminMode = canManagePresenceAuthz(currentPlayer);
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
@@ -1613,7 +1617,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
           <div class="info-line">• Confirmados disponíveis: ${confirmedCount}</div>
           <div class="info-line">• O sorteio usa apenas jogadores confirmados.</div>
         </div>
-        ${currentPlayer?.is_admin ? `
+        ${canManagePresenceAuthz(currentPlayer) ? `
           <div class="actions" style="margin-top:12px;">
             <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear times</button>
           </div>
@@ -1622,7 +1626,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
     `;
   }
 
-  const isAdmin = currentPlayer?.is_admin === true || currentPlayer?.is_admin === 'true' || currentPlayer?.is_admin === 1 || currentPlayer?.is_admin === '1' || currentPlayer?.role === 'admin';
+  const isAdmin = authzIsAdmin(currentPlayer);
 
   const resolveDrawEntry = (entry) => {
     const id = (entry && typeof entry === 'object') ? entry.id : entry;
@@ -1678,7 +1682,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
         ${renderTeam('Time B', sortResult.team_b, 'team_b')}
       </div>
-      ${currentPlayer?.is_admin ? `
+      ${canManagePresenceAuthz(currentPlayer) ? `
         <div class="actions" style="margin-top:12px;">
           <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
           <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
@@ -1690,7 +1694,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 }
 
 function renderConfig(snapshot, currentPlayer) {
-  if (!currentPlayer.is_admin) {
+  if (!authzIsAdmin(currentPlayer)) {
     return `
       <section class="section-stack">
         <section class="card">
@@ -1755,7 +1759,7 @@ function renderConfig(snapshot, currentPlayer) {
   `;
 }
 function buildMensalidadeMeta(game, currentPlayer) {
-  if (currentPlayer.role === 'carne') {
+  if (authzIsCarneOnly(currentPlayer)) {
     return {
       className: 'is-ok',
       title: 'Não aplicável',
@@ -1781,7 +1785,7 @@ function buildMensalidadeMeta(game, currentPlayer) {
 }
 
 function buildHeaderSubtitle(currentPlayer) {
-  const profile = currentPlayer.is_admin ? 'Administrador' : currentPlayer.role === 'carne' ? 'Perfil carne' : getPositionLabel(currentPlayer.position);
+  const profile = authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Perfil carne' : getPositionLabel(currentPlayer.position);
   return `${currentPlayer.name} · ${profile}`;
 }
 

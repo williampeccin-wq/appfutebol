@@ -1,7 +1,8 @@
 import { getState } from '../../core/state.js';
+import { isAdmin as authzIsAdmin, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 
 function normalizeParticipation(player) {
-  const playsFootball = player?.plays_football !== undefined ? player.plays_football : player?.role !== 'carne';
+  const playsFootball = authzPlaysFootball(player);
   const inCarneGroup = player?.in_carne_group !== undefined ? player.in_carne_group : true;
   return { playsFootball, inCarneGroup };
 }
@@ -23,7 +24,7 @@ export function listCarneOnly() {
 }
 
 export function isAdmin(player) {
-  return !!player?.is_admin;
+  return authzIsAdmin(player);
 }
 
 export function isCurrentPlayer(player, currentPlayer) {

@@ -1,3 +1,4 @@
+import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { CHAMPIONSHIP_HISTORY } from './championship.history.js';
 
 export const ACTIVE_CHAMPIONSHIP = {
@@ -28,7 +29,7 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 }, {});
 
 export function isFootballPlayer(player) {
-  return !!player && player.plays_football !== false && player.role !== 'carne';
+  return !!player && authzPlaysFootball(player);
 }
 
 export function normalizeName(value) {
