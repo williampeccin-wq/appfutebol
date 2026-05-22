@@ -43,6 +43,7 @@ export function getRoleLabel(player) {
 
 export function getPositionLabel(position) {
   const labels = {
+    gol: 'Goleiro',
     zag: 'Zagueiro',
     meia: 'Meia',
     atk: 'Atacante',

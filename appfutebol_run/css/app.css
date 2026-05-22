@@ -1555,3 +1555,297 @@ button {
     width: 100%;
   }
 }
+
+.home-stack {
+  gap: 12px;
+}
+
+.home-user-card {
+  padding: 12px;
+}
+
+.home-user-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-user-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.home-user-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-user-meta {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.home-user-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.home-user-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gray-500);
+  margin-top: 8px;
+}
+
+.btn-compact {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.next-game-card {
+  display: grid;
+  gap: 12px;
+}
+
+.next-game-card .hero-progress {
+  margin-top: 0;
+}
+
+.hero-presence-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.hero-presence-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+}
+
+.hero-presence-status {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+.hero-presence-note {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.82;
+  margin-top: 4px;
+}
+
+.notifications-card {
+  padding: 12px 14px;
+  box-shadow: none;
+}
+
+.compact-title {
+  margin-bottom: 8px;
+}
+
+.notification-list {
+  display: grid;
+  gap: 6px;
+}
+
+.notification-item {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--gray-700);
+}
+
+.notification-item.is-empty {
+  color: var(--gray-500);
+}
+
+
+.notification-item-carne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.14), rgba(34, 197, 94, 0.04));
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  color: #166534;
+}
+
+.notification-icon-carne {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+
+.notification-content-carne {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.notification-content-carne strong {
+  font-weight: 900;
+  color: #166534;
+}
+
+
+/* v1.60.13 - weekly game UI polish */
+.weekly-game-stack {
+  gap: 16px;
+}
+
+.weekly-hero-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #0f2a52 0%, #214983 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 34px rgba(15, 42, 82, 0.20);
+  overflow: hidden;
+  position: relative;
+}
+
+.weekly-hero-card::after {
+  content: "";
+  position: absolute;
+  right: -70px;
+  top: -90px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.16), rgba(255,255,255,0));
+  pointer-events: none;
+}
+
+.weekly-hero-main,
+.weekly-presence-card {
+  position: relative;
+  z-index: 1;
+}
+
+.weekly-eyebrow {
+  font-size: 12px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 900;
+  opacity: 0.78;
+  margin-bottom: 10px;
+}
+
+.weekly-date {
+  font-size: clamp(30px, 8vw, 48px);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.weekly-meta {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 750;
+  opacity: 0.95;
+}
+
+.weekly-progress-track {
+  margin-top: 16px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.weekly-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: #f8b400;
+}
+
+.weekly-count {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.weekly-presence-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.weekly-presence-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 900;
+  opacity: 0.78;
+}
+
+.weekly-presence-status {
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.weekly-presence-status.is-confirmed {
+  color: #bbf7d0;
+}
+
+.weekly-presence-status.is-pending {
+  color: #e2e8f0;
+}
+
+.weekly-presence-subtitle,
+.weekly-presence-warning {
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0.84;
+}
+
+@media (min-width: 860px) {
+  .weekly-hero-card {
+    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+    align-items: center;
+    padding: 22px;
+  }
+}
+
+.notification-icon-carne {
+  color: #f97316;
+  background: #fff7ed;
+}
+
+
+.notification-icon-carne svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}

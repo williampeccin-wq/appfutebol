@@ -162,6 +162,7 @@ export function adminRemovePlayerFromGame(playerId) {
 
 function getPositionBucket(player) {
   const position = player?.position || 'meia';
+  if (position === 'gol') return 'gol';
   if (position === 'zag') return 'zag';
   if (position === 'atk') return 'atk';
   return 'meia';
@@ -176,6 +177,7 @@ function balanceTeams(players) {
   const teamB = [];
 
   const buckets = {
+    gol: [],
     zag: [],
     meia: [],
     atk: [],

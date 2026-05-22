@@ -57,8 +57,9 @@ function renderPlayerManagementCard(currentPlayer) {
         </select>
 
         <select id="new-position" class="input" data-role-dependent="position">
-          <option value="meia">Meia</option>
+          <option value="gol">Goleiro</option>
           <option value="zag">Zagueiro</option>
+          <option value="meia">Meia</option>
           <option value="atk">Atacante</option>
         </select>
 

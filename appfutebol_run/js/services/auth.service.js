@@ -97,7 +97,7 @@ async function requestAuth(path, payload, options = {}) {
 }
 
 function normalizePosition(value) {
-  return ['zag', 'meia', 'atk'].includes(value) ? value : null;
+  return ['gol', 'zag', 'meia', 'atk'].includes(value) ? value : null;
 }
 
 function normalizeLoginPhone(value) {

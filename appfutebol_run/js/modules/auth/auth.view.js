@@ -106,6 +106,7 @@ function renderRegisterForm() {
           <label class="form-label" for="register-position">Posição</label>
           <select class="select" id="register-position" name="position" autocomplete="off">
             <option value="">Selecione</option>
+            <option value="gol">Goleiro</option>
             <option value="zag">Zagueiro</option>
             <option value="meia">Meia</option>
             <option value="atk">Atacante</option>

@@ -162,7 +162,7 @@ function normalizeSelfPhone(value) {
 }
 
 function normalizeSelfPosition(value) {
-  return ['zag', 'meia', 'atk'].includes(value) ? value : null;
+  return ['gol', 'zag', 'meia', 'atk'].includes(value) ? value : null;
 }
 
 function escapeHtml(value) {
@@ -175,7 +175,7 @@ function escapeHtml(value) {
 }
 
 function renderSelfProfileEditCardForHome(activePlayer) {
-  if (authzIsAdmin(activePlayer) || !selfProfileEditOpen) return '';
+  if (!selfProfileEditOpen) return '';
 
   return `
       <section class="card self-profile-card" id="self-profile-card">
@@ -200,8 +200,9 @@ function renderSelfProfileEditCardForHome(activePlayer) {
             <label class="form-group">
               <span class="form-label">Posição</span>
               <select id="self-position" class="input">
-                <option value="meia" ${activePlayer.position === 'meia' ? 'selected' : ''}>Meia</option>
+                <option value="gol" ${activePlayer.position === 'gol' ? 'selected' : ''}>Goleiro</option>
                 <option value="zag" ${activePlayer.position === 'zag' ? 'selected' : ''}>Zagueiro</option>
+                <option value="meia" ${activePlayer.position === 'meia' ? 'selected' : ''}>Meia</option>
                 <option value="atk" ${activePlayer.position === 'atk' ? 'selected' : ''}>Atacante</option>
               </select>
             </label>
@@ -1373,9 +1374,17 @@ function renderHome(snapshot, currentPlayer) {
   const confirmedCount = gameView.confirmedCount;
   const maxPlayers = gameView.maxPlayers || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
-  const vagasRestantes = gameView.spotsLeft;
   const mensalidade = buildMensalidadeMeta(game, activePlayer);
-  const carneStatus = workingSnapshot.carne.some((entry) => String(entry.player_id) === String(activePlayer.id) && entry.active);
+  const carneScheduleEntries = getCarneScheduleEntriesForApp(workingSnapshot);
+  const carneStatus =
+    workingSnapshot.carne.some((entry) => String(entry?.player_id || '') === String(activePlayer.id) && entry?.active !== false) ||
+    carneScheduleEntries.some((entry) =>
+      entry?.active !== false &&
+      (
+        String(entry?.player1_id || '') === String(activePlayer.id) ||
+        String(entry?.player2_id || '') === String(activePlayer.id)
+      )
+    );
   const confirmed = gameView.isConfirmed;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
@@ -1392,10 +1401,45 @@ function renderHome(snapshot, currentPlayer) {
     currentPlayer: activePlayer,
     carneStatus,
   });
+  const storedNotifications = Array.isArray(workingSnapshot.notifications) ? workingSnapshot.notifications : [];
+  const playersByIdForCarneNotification = new Map(workingSnapshot.players.map((player) => [String(player.id), player]));
+  const nextCarneEntry = carneScheduleEntries
+    .filter((entry) => entry?.active !== false && entry?.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const carneNotification = nextCarneEntry
+    ? {
+        type: 'carne',
+        date: formatDate(nextCarneEntry.date),
+        player1: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-',
+        player2: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-',
+        message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
+      }
+    : null;
+  const notifications = carneNotification
+    ? [carneNotification, ...storedNotifications]
+    : storedNotifications;
 
   return `
-    <section class="section-stack">
-      <section class="hero-card">
+    <section class="section-stack home-stack">
+      <section class="card home-user-card">
+        <div class="home-user-main">
+          <div class="avatar">${getInitials(activePlayer.name)}</div>
+          <div class="home-user-text">
+            <div class="home-user-name">${activePlayer.name}</div>
+            <div class="home-user-meta">${authzIsAdmin(activePlayer) ? `Administrador · ${getPositionLabel(activePlayer.position)}` : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</div>
+          </div>
+          <button class="btn btn-secondary btn-compact" type="button" data-action="toggle-self-profile-edit">${selfProfileEditOpen ? 'Fechar' : 'Editar'}</button>
+        </div>
+        <div class="home-user-status">
+          <span class="tag ${mensalidade.className}">Mensalidade: ${mensalidade.title}</span>
+          <span class="tag is-neutral">${carneStatus ? 'Carne ativo' : 'Sem carne'}</span>
+        </div>
+        <div class="home-user-note">${mensalidade.subline}</div>
+      </section>
+
+      ${renderSelfProfileEditCardForHome(activePlayer)}
+
+      <section class="hero-card next-game-card">
         <div class="hero-label">Próximo jogo</div>
         <div class="hero-date">${formatDate(game?.game_date)}</div>
         <div class="hero-meta">${game?.game_time || '--:--'} · ${game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
@@ -1403,70 +1447,47 @@ function renderHome(snapshot, currentPlayer) {
           <div class="progress-track">
             <div class="progress-bar" style="width:${fillPercent}%"></div>
           </div>
-          <div class="progress-text">${confirmedCount} / ${maxPlayers} confirmados</div>
+          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}</div>
         </div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Usuário logado</div>
-        <div class="session-card compact">
-          <div class="session-main">
-            <div class="avatar avatar-lg">${getInitials(activePlayer.name)}</div>
-            <div>
-              <div class="row-title">${activePlayer.name}</div>
-              <div class="row-subtitle">${authzIsAdmin(activePlayer) ? 'Administrador' : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)} · ${formatPhone(activePlayer.phone)}</div>
-            </div>
-            ${authzIsAdmin(activePlayer) ? '' : `
-              <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit" style="margin-left:auto;">${selfProfileEditOpen ? 'Fechar edição' : 'Editar'}</button>
-            `}
+        <div class="hero-presence-panel">
+          <div>
+            <div class="hero-presence-label">Sua presença</div>
+            <div class="hero-presence-status">${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}</div>
+            ${statusNote && statusNote !== presenceFeedback.text ? `<div class="hero-presence-note">${statusNote}</div>` : ''}
           </div>
-          <div class="chip-row">
-            <span class="tag ${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'is-ok' : 'is-warn'}">${activePlayer.role === 'carne' || activePlayer.mens_ok === true ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
-            <span class="tag is-neutral">${carneStatus ? 'Grupo da carne ativo' : 'Sem grupo da carne'}</span>
-          </div>
-        </div>
-      </section>
-
-      ${renderSelfProfileEditCardForHome(activePlayer)}
-
-      <section class="card">
-        <div class="card-title">Confirmação de presença</div>
-        <div class="info-block">
-          <div class="chip-row" style="margin-bottom:12px;">
-            <span class="tag ${presenceFeedback.toneClass}">${presenceFeedback.badge}</span>
-          </div>
-          <div class="info-line">Vagas restantes: <strong>${vagasRestantes}</strong></div>
-          <div class="info-line">Seu status atual: <strong>${confirmed ? 'Confirmado' : 'Não confirmado'}</strong></div>
-          <div class="status-box ${presenceFeedback.toneClass}" style="margin-top:12px;">
-            <div class="status-title">${presenceFeedback.icon} ${presenceFeedback.title}</div>
-            <div class="status-subline">${presenceFeedback.text}</div>
-          </div>
-          ${statusNote && statusNote !== presenceFeedback.text ? `<p class="footer-note">${statusNote}</p>` : ''}
           ${canRenderPresenceAction ? `
-            <div class="actions" style="margin-top:12px;">
-              <button class="btn btn-primary" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : 'Confirmar presença'}</button>
-            </div>
+            <button class="btn ${confirmed ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar' : 'Confirmar'}</button>
           ` : ''}
         </div>
       </section>
 
-      <section class="status-box ${mensalidade.className}">
-        <div class="status-title">Mensalidade · ${mensalidade.title}</div>
-        <div class="status-subline">${mensalidade.subline}</div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Notificações recentes</div>
-        <div class="info-block">
-          ${workingSnapshot.notifications.map((notification) => `
-            <div class="info-line">• ${notification.message}</div>
-          `).join('')}
+      <section class="card notifications-card">
+        <div class="card-title compact-title">Notificações</div>
+        <div class="notification-list">
+          ${notifications.length ? notifications.slice(0, 5).map((notification) => notification.type === 'carne' ? `
+            <div class="notification-item notification-item-carne">
+              <span class="notification-icon-carne" aria-hidden="true">
+                <svg viewBox="0 0 64 64" focusable="false">
+                  <line x1="10" y1="54" x2="54" y2="10" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                  <ellipse cx="25" cy="39" rx="9" ry="13" transform="rotate(45 25 39)" fill="#f97316"/>
+                  <ellipse cx="39" cy="25" rx="9" ry="13" transform="rotate(45 39 25)" fill="#fb923c"/>
+                  <path d="M20 36c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+                  <path d="M34 22c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+                </svg>
+              </span>
+              <span class="notification-content-carne">
+                <strong>Dupla da carne (${notification.date}):</strong>
+                <span>${notification.player1}, ${notification.player2}</span>
+              </span>
+            </div>
+          ` : `
+            <div class="notification-item">• ${notification.message}</div>
+          `).join('') : '<div class="notification-item is-empty">Nenhuma notificação recente.</div>'}
         </div>
       </section>
     </section>
   `;
 }
-
 function renderWeeklyGame(snapshot, currentPlayer) {
   return `
     <section class="section-stack">
@@ -1771,7 +1792,9 @@ function buildMensalidadeMeta(game, currentPlayer) {
     return {
       className: 'is-danger',
       title: 'Pendente',
-      subline: 'Sua mensalidade está marcada como pendente no sistema. Você pode cancelar uma presença já confirmada, mas não pode confirmar novamente até regularizar.',
+      subline: game?.mens_expire_date
+        ? `Vencimento ${formatDate(game.mens_expire_date)}. Pagamento pendente, você não poderá confirmar presença.`
+        : 'Pagamento pendente, você não poderá confirmar presença.',
     };
   }
 
@@ -1779,13 +1802,13 @@ function buildMensalidadeMeta(game, currentPlayer) {
     className: 'is-ok',
     title: 'Em dia',
     subline: game?.mens_expire_date
-      ? `Controle administrativo: ${formatDate(game.mens_expire_date)}.`
+      ? `Data de vencimento da mensalidade: ${formatDate(game.mens_expire_date)}.`
       : 'Mensalidade marcada como ok no sistema.',
   };
 }
 
 function buildHeaderSubtitle(currentPlayer) {
-  const profile = authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Perfil carne' : getPositionLabel(currentPlayer.position);
+  const profile = authzIsAdmin(currentPlayer) ? `Administrador · ${getPositionLabel(currentPlayer.position)}` : getPlayerRole(currentPlayer) === 'carne' ? 'Perfil carne' : getPositionLabel(currentPlayer.position);
   return `${currentPlayer.name} · ${profile}`;
 }
 
@@ -1802,7 +1825,7 @@ function formatPhone(phone) {
 }
 
 function getPositionLabel(position) {
-  const labels = { zag: 'Zagueiro', meia: 'Meia', atk: 'Atacante' };
+  const labels = { gol: 'Goleiro', zag: 'Zagueiro', meia: 'Meia', atk: 'Atacante' };
   return labels[position] || 'Sem posição';
 }
 
