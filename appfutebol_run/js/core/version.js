@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.14-weekly-game-rollback-self-edit';
+export const APP_VERSION = 'v1.60.23-players-layout-cleanup';

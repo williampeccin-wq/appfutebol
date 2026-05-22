@@ -62,10 +62,6 @@ function renderLoginForm() {
         >
       </div>
 
-      <div class="footer-note">
-        No iPhone/Mac, salve a senha do Harmonia FC no iCloud Keychain para preencher com Face ID ou Touch ID nas próximas entradas.
-      </div>
-
       <div class="actions">
         <button class="btn btn-primary" type="submit">Entrar</button>
       </div>
@@ -124,10 +120,6 @@ function renderRegisterForm() {
           <label class="form-label" for="register-password-confirm">Repetir senha</label>
           <input class="input" id="register-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" required placeholder="Repita a senha">
         </div>
-      </div>
-
-      <div class="footer-note">
-        O telefone será usado como login. Ao criar a senha, aceite salvar no iCloud Keychain/gerenciador do navegador para liberar preenchimento por Face ID ou Touch ID.
       </div>
 
       <div class="actions">

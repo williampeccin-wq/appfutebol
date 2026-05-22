@@ -22,22 +22,49 @@ function isFinancePending(player) {
 
 function renderFinanceControls(player, currentPlayer) {
   if (!isAdmin(currentPlayer)) return '';
-  if (isCarneOnly(player)) return '';
-  if (isFinancePending(player)) {
-    return `<button class="btn btn-secondary finance-action-button" type="button" data-action="mark-paid" data-id="${player.id}">Marcar pago</button>`;
-  }
+  if (isCarneOnly(player)) return '<span class="switch-placeholder">—</span>';
 
-  return `<button class="btn btn-primary finance-action-button" type="button" data-action="mark-debt" data-id="${player.id}">Marcar inadimplente</button>`;
+  const isPaid = !isFinancePending(player);
+  const action = isPaid ? 'mark-debt' : 'mark-paid';
+  const label = isPaid ? 'Pago' : 'Pendente';
+
+  return `
+    <button
+      class="switch-control ${isPaid ? 'is-on' : 'is-off'}"
+      type="button"
+      data-action="${action}"
+      data-id="${player.id}"
+      aria-pressed="${isPaid ? 'true' : 'false'}"
+      title="${isPaid ? 'Marcar como pendente' : 'Marcar como pago'}"
+    >
+      <span class="switch-track"><span class="switch-thumb"></span></span>
+      <span class="switch-label ${isPaid ? 'is-ok' : 'is-warn'}">${label}</span>
+    </button>
+  `;
 }
 
 
 
 function renderAdminGameRemovalControl(player, currentPlayer, confirmed) {
   if (!isAdmin(currentPlayer)) return '';
-  if (isCarneOnly(player)) return '';
-  if (!confirmed) return '';
+  if (isCarneOnly(player)) return '<span class="switch-placeholder">—</span>';
 
-  return `<button class="btn btn-danger presence-remove-button" type="button" data-action="admin-remove-from-game" data-id="${player.id}">Remover</button>`;
+  const action = confirmed ? 'admin-remove-from-game' : 'admin-add-to-game';
+  const label = confirmed ? 'Dentro' : 'Fora';
+
+  return `
+    <button
+      class="switch-control ${confirmed ? 'is-on' : 'is-off'}"
+      type="button"
+      data-action="${action}"
+      data-id="${player.id}"
+      aria-pressed="${confirmed ? 'true' : 'false'}"
+      title="${confirmed ? 'Remover do jogo' : 'Incluir no jogo'}"
+    >
+      <span class="switch-track"><span class="switch-thumb"></span></span>
+      <span class="switch-label ${confirmed ? 'is-ok' : 'is-neutral'}">${label}</span>
+    </button>
+  `;
 }
 
 function renderPlayerManagementCard(currentPlayer) {
@@ -113,59 +140,35 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 
       ${renderPlayerManagementCard(currentPlayer)}
       ${renderSelfProfileCard(currentPlayer)}
-
-      <section class="card">
-        <div class="card-title">Resumo do elenco</div>
-        <div class="kpi-grid">
-          <div class="kpi-box">
-            <div class="kpi-value">${allPlayers.length}</div>
-            <div class="kpi-label">Perfis cadastrados</div>
+      <section class="players-admin-panel">
+        <div class="players-admin-header">
+          <div>
+            <h2>Jogadores</h2>
+            
           </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${jogadores.length}</div>
-            <div class="kpi-label">Jogadores do futebol</div>
-          </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${carneOnly.length}</div>
-            <div class="kpi-label">Somente carne</div>
-          </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</div>
-            <div class="kpi-label">Confirmados no jogo</div>
-          </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${emDia}</div>
-            <div class="kpi-label">Financeiro em dia</div>
-          </div>
-          <div class="kpi-box">
-            <div class="kpi-value">${pendentes}</div>
-            <div class="kpi-label">Financeiro pendente</div>
-          </div>
-          <div class="kpi-box kpi-box--highlight">
-            <div class="kpi-value">${adimplencia}%</div>
-            <div class="kpi-label">Adimplência</div>
-          </div>
-          <div class="kpi-box kpi-box--muted">
-            <div class="kpi-value">${jogadoresFinanceiros.length}</div>
-            <div class="kpi-label">Base financeira</div>
+          <div class="players-filter-row">
+            <span class="filter-pill is-active">Todos <strong>${jogadores.length}</strong></span>
+            <span class="filter-pill is-ok">Pagos <strong>${emDia}</strong></span>
+            <span class="filter-pill is-warn">Pendentes <strong>${pendentes}</strong></span>
+            <span class="filter-pill is-ok">Dentro do jogo <strong>${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</strong></span>
           </div>
         </div>
-      </section>
 
-      <section class="card">
-        <div class="card-title">Jogadores do futebol</div>
-        <div class="placeholder-list">
+        <div class="players-switch-table" role="table" aria-label="Jogadores">
+          <div class="players-switch-head" role="row">
+            <div role="columnheader">Jogador</div>
+            <div role="columnheader">Posição</div>
+            <div role="columnheader">Pago</div>
+            <div role="columnheader">No jogo</div>
+            <div role="columnheader">Ações</div>
+          </div>
           ${jogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
         </div>
-      </section>
 
-      <section class="card">
-        <div class="card-title">Permissões</div>
-        <p class="footer-note">
-          ${isAdmin(currentPlayer)
-            ? 'Você está logado como administrador. Na próxima fase, o CRUD de jogadores e a gestão do grupo da carne entram aqui.'
-            : 'Você está logado como usuário comum. A aba Config fica restrita ao admin.'}
-        </p>
+        <div class="switch-legend">
+          <span><span class="legend-switch is-on"></span> Pago / dentro do jogo</span>
+          <span><span class="legend-switch is-off"></span> Pendente / fora do jogo</span>
+        </div>
       </section>
     </section>
   `;
@@ -373,6 +376,28 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
   `;
 }
 
+
+function renderCarneMemberRow(player) {
+  return `
+    <div class="carne-member-row">
+      <div class="carne-member-main">
+        <div class="avatar">${getInitials(player.name)}</div>
+        <div>
+          <div class="row-title">${escapeHtml(player.name)}</div>
+          <div class="row-subtitle">
+            ${player.plays_football === false ? 'Somente carne' : getRoleLabel(player)}
+            ${player.birthDate ? ` · Nasc. ${formatBirthDate(player.birthDate)}` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="carne-member-tags">
+        <span class="position-pill">${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)}</span>
+        ${player.plays_football !== false ? `<span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -383,7 +408,6 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
 
   return `
     <section class="section-stack">
-      ${renderPlayerManagementCard(currentPlayer)}
       ${renderCarneScheduleForm(currentPlayer, orderedPlayers)}
 
       <section class="card">
@@ -413,14 +437,14 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
       <section class="card">
         <div class="card-title">Somente carne</div>
         <div class="placeholder-list">
-          ${carneOnly.length ? carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum perfil somente carne cadastrado.</div>'}
+          ${carneOnly.length ? carneOnly.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum perfil somente carne cadastrado.</div>'}
         </div>
       </section>
 
       <section class="card">
         <div class="card-title">Jogadores no grupo da carne</div>
         <div class="placeholder-list">
-          ${jogadoresNoCarne.length ? jogadoresNoCarne.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('') : '<div class="empty-inline">Nenhum jogador vinculado ao grupo da carne.</div>'}
+          ${jogadoresNoCarne.length ? jogadoresNoCarne.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum jogador vinculado ao grupo da carne.</div>'}
         </div>
       </section>
     </section>
@@ -434,28 +458,32 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   const financePending = isFinancePending(player);
 
   return `
-    <div class="placeholder-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}">
-      <div class="placeholder-main">
+    <div class="players-switch-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
+      <div class="players-switch-player" role="cell">
         <div class="avatar">${getInitials(player.name)}</div>
-        <div>
+        <div class="players-switch-player-text">
           <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
-          <div class="row-subtitle">
-            ${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)} · ${formatPhone(player.phone)}${player.birthDate ? ` · Nasc. ${formatBirthDate(player.birthDate)}` : ''}
-          </div>
-          <div class="chip-row chip-row-sm">
-            <span class="tag is-neutral">${getRoleLabel(player)}</span>
-            ${player.plays_football !== false ? `<span class="tag ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Confirmado' : 'Não confirmado'}</span>` : ''}
-          </div>
+
         </div>
+
       </div>
-      <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-        ${player.plays_football === false ? '' : `<div class="tag ${financePending ? 'is-warn' : 'is-ok'}">${financePending ? 'Pendente' : 'Em dia'}</div>`}
+
+      <div role="cell">
+        <span class="position-pill">${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)}</span>
+      </div>
+
+      <div class="players-paid-action-cell" role="cell">
         ${renderFinanceControls(player, currentPlayer)}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador">✎</button>` : ''}
+      </div>
+
+      <div role="cell">
         ${renderAdminGameRemovalControl(player, currentPlayer, confirmed)}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="edit-player" data-id="${player.id}">Editar</button>` : ''}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="btn btn-secondary finance-action-button" type="button" data-action="delete-player" data-id="${player.id}">Excluir</button>` : ''}
+      </div>
+
+      <div class="players-switch-actions" role="cell">
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir">🗑</button>` : ''}
       </div>
     </div>
   `;
 }
-

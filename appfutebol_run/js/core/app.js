@@ -1489,12 +1489,40 @@ function renderHome(snapshot, currentPlayer) {
   `;
 }
 function renderWeeklyGame(snapshot, currentPlayer) {
+  const view = buildGameView(snapshot, currentPlayer?.id || null);
+  const confirmed = isConfirmed(currentPlayer?.id);
+  const capacity = snapshot.game?.max_players || 8;
+  const remaining = Math.max(capacity - view.confirmedCount, 0);
+  const canAct = currentPlayer && currentPlayer.plays_football !== false;
+
   return `
-    <section class="section-stack">
-      <section class="hero-card">
-        <div class="hero-label">Jogo da semana</div>
-        <div class="hero-date">${formatDate(snapshot.game?.game_date)}</div>
-        <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
+    <section class="section-stack weekly-game-screen">
+      <section class="weekly-summary-grid">
+        <div class="weekly-game-card">
+          <div class="hero-label">Próximo jogo</div>
+          <div class="hero-date">${formatDate(snapshot.game?.game_date)}</div>
+          <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
+          <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
+          <div class="weekly-game-stats">
+            <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
+            <span>${remaining} vagas restantes</span>
+          </div>
+        </div>
+
+        <div class="weekly-self-card">
+          <div class="card-title">Minha presença</div>
+          <button
+            class="switch-control weekly-self-switch ${confirmed ? 'is-on' : 'is-off'}"
+            type="button"
+            id="confirm-btn"
+            ${canAct ? '' : 'disabled'}
+            aria-pressed="${confirmed ? 'true' : 'false'}"
+          >
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Dentro do jogo' : 'Fora do jogo'}</span>
+          </button>
+          <p class="footer-note">${confirmed ? 'Você está confirmado para o próximo jogo.' : 'Ative o switch para confirmar sua presença.'}</p>
+        </div>
       </section>
 
       ${renderPresenceList(snapshot, currentPlayer)}
@@ -1582,43 +1610,53 @@ function renderPresenceList(snapshot, currentPlayer) {
   const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
   const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
 
-  const renderMiniRow = (player, statusLabel, statusClass, confirmed = false) => `
-    <div class="presence-mini-row">
-      <div class="presence-mini-main">
+  const renderWeeklyRow = (player, confirmed = false) => `
+    <div class="weekly-player-row">
+      <div class="players-switch-player">
         <div class="avatar">${getInitials(player.name)}</div>
         <div>
           <div class="row-title">${player.name}</div>
           <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
         </div>
       </div>
-      <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
-        <span class="tag ${statusClass}">${statusLabel}</span>
-        ${adminMode && confirmed ? `<button class="btn btn-danger presence-remove-button" type="button" data-action="admin-remove-from-game" data-id="${player.id}">Remover</button>` : ''}
-        ${adminMode && !confirmed ? `<button class="btn btn-primary presence-add-button" type="button" data-action="admin-add-to-game" data-id="${player.id}">Incluir</button>` : ''}
+      <div class="weekly-player-meta">
+        <span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>
+        ${adminMode ? `
+          <button
+            class="switch-control switch-control-inline ${confirmed ? 'is-on' : 'is-off'}"
+            type="button"
+            data-action="${confirmed ? 'admin-remove-from-game' : 'admin-add-to-game'}"
+            data-id="${player.id}"
+            aria-pressed="${confirmed ? 'true' : 'false'}"
+            title="${confirmed ? 'Remover do jogo' : 'Incluir no jogo'}"
+          >
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Dentro' : 'Fora'}</span>
+          </button>
+        ` : `<span class="tag ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Confirmado' : 'Pendente'}</span>`}
       </div>
     </div>
   `;
 
   return `
-    <section class="card">
-      <div class="card-title">Lista de presença</div>
-      <div class="presence-list-grid">
-        <div class="presence-list-column">
-          <div class="presence-list-title">Confirmados (${confirmedPlayers.length})</div>
-          <div class="presence-list-stack">
-            ${confirmedPlayers.length
-              ? confirmedPlayers.map((player) => renderMiniRow(player, 'Confirmado', 'is-ok', true)).join('')
-              : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
-          </div>
-        </div>
+    <section class="weekly-presence-card">
+      <div class="card-title weekly-presence-main-title">Lista de presença</div>
 
-        <div class="presence-list-column">
-          <div class="presence-list-title">Não confirmados (${pendingPlayers.length})</div>
-          <div class="presence-list-stack">
-            ${pendingPlayers.length
-              ? pendingPlayers.map((player) => renderMiniRow(player, 'Pendente', 'is-neutral', false)).join('')
-              : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
-          </div>
+      <div class="weekly-presence-section">
+        <div class="weekly-presence-title">Confirmados (${confirmedPlayers.length})</div>
+        <div class="weekly-presence-stack">
+          ${confirmedPlayers.length
+            ? confirmedPlayers.map((player) => renderWeeklyRow(player, true)).join('')
+            : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
+        </div>
+      </div>
+
+      <div class="weekly-presence-section">
+        <div class="weekly-presence-title">Não confirmados (${pendingPlayers.length})</div>
+        <div class="weekly-presence-stack">
+          ${pendingPlayers.length
+            ? pendingPlayers.map((player) => renderWeeklyRow(player, false)).join('')
+            : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
         </div>
       </div>
     </section>
