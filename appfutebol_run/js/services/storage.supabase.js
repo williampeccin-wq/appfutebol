@@ -3,7 +3,6 @@ import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 let lastRemoteUpdatedAt = null;
 let lastSplitSnapshot = null;
 let lastSplitFingerprint = '';
-const presenceTableAvailable = true;
 
 const SPLIT_TABLES = {
   players: 'players',
@@ -36,22 +35,6 @@ function baseUrl(config) {
 function tableUrl(config, table, query = '') {
   const suffix = query ? `?${query}` : '';
   return `${baseUrl(config)}/rest/v1/${encodeURIComponent(table)}${suffix}`;
-}
-
-function legacyStateUrl(config) {
-  const table = encodeURIComponent(config.stateTable);
-  const key = encodeURIComponent(config.stateKey);
-  return `${baseUrl(config)}/rest/v1/${table}?key=eq.${key}&select=key,state,updated_at&limit=1`;
-}
-
-function legacyUpsertUrl(config) {
-  return `${baseUrl(config)}/rest/v1/${encodeURIComponent(config.stateTable)}`;
-}
-
-function legacyConditionalUpdateUrl(config, expectedUpdatedAt) {
-  const key = encodeURIComponent(config.stateKey);
-  const updatedAt = encodeURIComponent(expectedUpdatedAt);
-  return `${baseUrl(config)}/rest/v1/${encodeURIComponent(config.stateTable)}?key=eq.${key}&updated_at=eq.${updatedAt}`;
 }
 
 function getAuthSession() {
@@ -163,9 +146,9 @@ function normalizeGameForPresenceCutover(game) {
 
   const nextGame = cloneJson(game) || {};
 
-  // Cutover v1.60.3: presence_confirmations is the authoritative source
+  // Cleanup v1.60.5: presence_confirmations is the only operational source
   // for presence. Keep game_state focused on game configuration/sort result
-  // and never let old embedded presence arrays drive the UI again.
+  // and strip any embedded presence residues before reading or saving.
   delete nextGame.confirmedPlayers;
   delete nextGame.confirmed_players;
   delete nextGame.confirmations;
@@ -289,30 +272,6 @@ async function requestNoContent(config, url, options = {}) {
     ok: true,
     status: response.status,
     body: '',
-  };
-}
-
-async function loadLegacyState(config) {
-  const result = await requestJson(config, legacyStateUrl(config), { method: 'GET' });
-
-  if (!result.ok) {
-    return { ok: false, state: null, updatedAt: null, reason: `legacy_load_failed_${result.status}` };
-  }
-
-  const first = Array.isArray(result.data) ? result.data[0] : null;
-
-  if (!first || !first.state || typeof first.state !== 'object') {
-    return { ok: false, state: null, updatedAt: first?.updated_at || null, reason: 'legacy_state_empty' };
-  }
-
-  lastRemoteUpdatedAt = first.updated_at || null;
-
-  return {
-    ok: true,
-    state: first.state,
-    updatedAt: first.updated_at || null,
-    reason: 'legacy_loaded',
-    mode: 'legacy',
   };
 }
 
@@ -525,56 +484,6 @@ async function saveSplitState(config, state) {
   };
 }
 
-async function upsertLegacyState(config, state) {
-  const payload = {
-    key: config.stateKey,
-    state,
-    updated_at: new Date().toISOString(),
-  };
-
-  const result = await requestJson(config, legacyUpsertUrl(config), {
-    method: 'POST',
-    prefer: 'resolution=merge-duplicates,return=representation',
-    body: JSON.stringify(payload),
-  });
-
-  if (!result.ok) {
-    return { ok: false, conflict: false, reason: `legacy_save_failed_${result.status}` };
-  }
-
-  const rows = Array.isArray(result.data) ? result.data : [];
-  lastRemoteUpdatedAt = rows[0]?.updated_at || payload.updated_at;
-
-  return { ok: true, conflict: false, reason: 'legacy_saved', updatedAt: lastRemoteUpdatedAt };
-}
-
-async function updateLegacyStateIfUnchanged(config, state, expectedUpdatedAt) {
-  const payload = {
-    state,
-    updated_at: new Date().toISOString(),
-  };
-
-  const result = await requestJson(config, legacyConditionalUpdateUrl(config, expectedUpdatedAt), {
-    method: 'PATCH',
-    prefer: 'return=representation',
-    body: JSON.stringify(payload),
-  });
-
-  if (!result.ok) {
-    return { ok: false, conflict: false, reason: `legacy_save_failed_${result.status}` };
-  }
-
-  const rows = Array.isArray(result.data) ? result.data : [];
-
-  if (!rows.length) {
-    return { ok: false, conflict: true, reason: 'legacy_conflict_remote_changed' };
-  }
-
-  lastRemoteUpdatedAt = rows[0]?.updated_at || payload.updated_at;
-
-  return { ok: true, conflict: false, reason: 'legacy_saved', updatedAt: lastRemoteUpdatedAt };
-}
-
 export function getLastRemoteUpdatedAt() {
   return lastRemoteUpdatedAt;
 }
@@ -628,6 +537,6 @@ export function getSupabaseMeta() {
     presenceReadCutover: true,
     presenceSingleSource: true,
     presenceWriteCutover: true,
-    presenceTableAvailable: true,
+    presenceCleanup: true,
   };
 }
