@@ -88,3 +88,20 @@ export function formatBirthDate(value) {
 
   return raw;
 }
+
+
+export function getPlayerPhoto(player) {
+  return player?.photoDataUrl || '';
+}
+
+export function getAvatarHtml(player, extraClass = '') {
+  const photo = getPlayerPhoto(player);
+  const initials = getInitials(player?.name);
+  const safeName = String(player?.name || 'jogador').replaceAll('"', '&quot;');
+
+  if (photo) {
+    return `<div class="avatar avatar-photo ${extraClass}"><img src="${photo}" alt="Foto de ${safeName}" loading="lazy" /></div>`;
+  }
+
+  return `<div class="avatar ${extraClass}">${initials}</div>`;
+}

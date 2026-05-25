@@ -2,6 +2,7 @@ import {
   formatBirthDate,
   formatPhone,
   getInitials,
+  getAvatarHtml,
   getPositionLabel,
   getRoleLabel,
   isAdmin,
@@ -78,6 +79,15 @@ function renderPlayerManagementCard(currentPlayer) {
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
         <input id="new-birthdate" class="input" type="date" />
 
+        <label class="player-photo-upload">
+          <span class="player-photo-preview" id="new-photo-preview">Foto</span>
+          <span class="player-photo-upload-copy">
+            <strong>Foto do jogador</strong>
+            <small>Selecionar ou trocar foto</small>
+          </span>
+          <input id="new-photo" type="file" accept="image/*" />
+        </label>
+
         <select id="new-role" class="input">
           <option value="player">Jogador</option>
           <option value="carne">Carne</option>
@@ -125,7 +135,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
         <div class="card-title">Sessão atual</div>
         <div class="session-card">
           <div class="session-main">
-            <div class="avatar avatar-lg">${getInitials(currentPlayer.name)}</div>
+            ${getAvatarHtml(currentPlayer, "avatar-lg")}
             <div>
               <div class="row-title">${currentPlayer.name}</div>
               <div class="row-subtitle">${getRoleLabel(currentPlayer)} · ${formatPhone(currentPlayer.phone)}${currentPlayer.birthDate ? ` · Nasc. ${formatBirthDate(currentPlayer.birthDate)}` : ''}</div>
@@ -381,7 +391,7 @@ function renderCarneMemberRow(player) {
   return `
     <div class="carne-member-row">
       <div class="carne-member-main">
-        <div class="avatar">${getInitials(player.name)}</div>
+        ${getAvatarHtml(player)}
         <div>
           <div class="row-title">${escapeHtml(player.name)}</div>
           <div class="row-subtitle">
@@ -460,7 +470,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   return `
     <div class="players-switch-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
       <div class="players-switch-player" role="cell">
-        <div class="avatar">${getInitials(player.name)}</div>
+        ${getAvatarHtml(player)}
         <div class="players-switch-player-text">
           <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
 
@@ -474,7 +484,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
 
       <div class="players-paid-action-cell" role="cell">
         ${renderFinanceControls(player, currentPlayer)}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador">✎</button>` : ''}
+        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador">✎</button>` : ''}
       </div>
 
       <div role="cell">

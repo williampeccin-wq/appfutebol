@@ -111,6 +111,7 @@ function resetPlayerForm() {
   const positionInput = document.getElementById("new-position");
   const adminInput = document.getElementById("new-admin");
   const mensInput = document.getElementById("new-mens");
+  const photoInput = document.getElementById("new-photo");
 
   if (nameInput) nameInput.value = "";
   if (phoneInput) phoneInput.value = "";
@@ -122,6 +123,11 @@ function resetPlayerForm() {
   }
   if (adminInput) adminInput.checked = false;
   if (mensInput) mensInput.checked = true;
+  if (photoInput) {
+    photoInput.value = "";
+    photoInput.dataset.photoDataUrl = "";
+  }
+  setPlayerPhotoPreview("", "");
 }
 
 function normalizePlayer(player) {
@@ -165,6 +171,224 @@ function normalizeSelfPosition(value) {
   return ['gol', 'zag', 'meia', 'atk'].includes(value) ? value : null;
 }
 
+
+function getPlayerPhoto(player) {
+  return player?.photoDataUrl || '';
+}
+
+function renderAvatarForApp(player, extraClass = '') {
+  const photo = getPlayerPhoto(player);
+  const initials = getInitials(player?.name);
+
+  if (photo) {
+    return `<div class="avatar avatar-photo ${extraClass}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
+  }
+
+  return `<div class="avatar ${extraClass}">${initials}</div>`;
+}
+
+function readAndResizePlayerPhoto(file, maxSize = 360, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    if (!String(file.type || '').startsWith('image/')) {
+      reject(new Error('Selecione um arquivo de imagem.'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+    reader.onload = () => {
+      const image = new Image();
+
+      image.onerror = () => reject(new Error('Imagem inválida.'));
+      image.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(image.width || 1, image.height || 1));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+
+      image.src = String(reader.result || '');
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function setPlayerPhotoPreview(photoDataUrl = '', name = '') {
+  const preview = document.getElementById('new-photo-preview');
+  if (!preview) return;
+
+  if (photoDataUrl) {
+    preview.innerHTML = `<img src="${photoDataUrl}" alt="Foto de ${escapeHtml(name || 'jogador')}" />`;
+    preview.classList.add('has-photo');
+  } else {
+    preview.innerHTML = 'Foto';
+    preview.classList.remove('has-photo');
+  }
+}
+
+
+function setSelfPhotoPreview(photoDataUrl = '', name = '') {
+  const preview = document.getElementById('self-photo-preview');
+  if (!preview) return;
+
+  if (photoDataUrl) {
+    preview.innerHTML = `<img src="${photoDataUrl}" alt="Foto de ${escapeHtml(name || 'jogador')}" />`;
+    preview.classList.add('has-photo');
+  } else {
+    preview.innerHTML = 'Foto';
+    preview.classList.remove('has-photo');
+  }
+}
+
+
+function hydratePlayerEditForm(playerToEdit) {
+  if (!playerToEdit) return;
+
+  const nameInput = document.getElementById("new-name");
+  const phoneInput = document.getElementById("new-phone");
+  const birthDateInput = document.getElementById("new-birthdate");
+  const roleInput = document.getElementById("new-role");
+  const positionInput = document.getElementById("new-position");
+  const adminInput = document.getElementById("new-admin");
+  const mensInput = document.getElementById("new-mens");
+  const photoInput = document.getElementById("new-photo");
+
+  if (!nameInput || !phoneInput || !birthDateInput || !roleInput || !positionInput || !adminInput || !mensInput) return;
+
+  nameInput.value = playerToEdit.name || "";
+  phoneInput.value = playerToEdit.phone || "";
+  birthDateInput.value = playerToEdit.birthDate || "";
+  roleInput.value = playerToEdit.plays_football === false ? "carne" : "player";
+  roleInput.dispatchEvent(new Event("change", { bubbles: true }));
+  positionInput.value = playerToEdit.position || "meia";
+  adminInput.checked = !!playerToEdit.is_admin;
+  mensInput.checked = !!playerToEdit.mens_ok;
+
+  const currentPhotoDataUrl = getPlayerPhoto(playerToEdit);
+  if (photoInput) {
+    photoInput.value = "";
+    photoInput.dataset.photoDataUrl = currentPhotoDataUrl || "";
+  }
+  setPlayerPhotoPreview(currentPhotoDataUrl || "", playerToEdit.name || "");
+  setPlayerFormMode(true);
+}
+
+function bindPlayerPhotoInput() {
+  const input = document.getElementById('new-photo');
+
+  if (!input || input.dataset.boundPlayerPhoto === '1') {
+    return;
+  }
+
+  input.dataset.boundPlayerPhoto = '1';
+
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const dataUrl = await readAndResizePlayerPhoto(file);
+      input.dataset.photoDataUrl = dataUrl;
+      setPlayerPhotoPreview(dataUrl, document.getElementById('new-name')?.value || '');
+
+      if (editingPlayerId) {
+        const currentSnapshot = structuredClone(getState());
+        currentSnapshot.players = (currentSnapshot.players || []).map((player) => {
+          if (String(player.id) !== String(editingPlayerId)) return player;
+          return {
+            ...player,
+            photoDataUrl: dataUrl,
+          };
+        });
+
+        const safeSnapshot = repairManualSnapshot(currentSnapshot);
+        replaceState(safeSnapshot);
+        savePersistedState(safeSnapshot);
+
+        setTimeout(() => {
+          const updatedSnapshot = getState();
+          const updatedPlayer = (updatedSnapshot.players || []).find((player) => String(player.id) === String(editingPlayerId));
+          hydratePlayerEditForm(updatedPlayer);
+        }, 0);
+
+        showToast('Foto do jogador salva.');
+      }
+    } catch (error) {
+      input.value = '';
+      input.dataset.photoDataUrl = '';
+      showToast(error.message || 'Não foi possível carregar a foto.', 'error');
+    }
+  });
+}
+
+
+function bindSelfPhotoInput() {
+  const input = document.getElementById('self-photo');
+
+  if (!input || input.dataset.boundSelfPhoto === '1') {
+    return;
+  }
+
+  input.dataset.boundSelfPhoto = '1';
+
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const dataUrl = await readAndResizePlayerPhoto(file);
+      input.dataset.photoDataUrl = dataUrl;
+
+      const snapshot = structuredClone(getState());
+      const currentPlayerId = snapshot.session?.playerId;
+
+      if (!currentPlayerId) {
+        showToast('Sessão inválida. Faça login novamente.', 'error');
+        return;
+      }
+
+      snapshot.players = (snapshot.players || []).map((player) => {
+        if (String(player.id) !== String(currentPlayerId)) return player;
+        return {
+          ...player,
+          photoDataUrl: dataUrl,
+        };
+      });
+
+      const safeSnapshot = repairManualSnapshot(snapshot);
+      replaceState(safeSnapshot);
+      savePersistedState(safeSnapshot);
+      setSelfPhotoPreview(dataUrl, document.getElementById('self-name')?.value || '');
+      showToast('Sua foto foi salva.');
+    } catch (error) {
+      input.value = '';
+      input.dataset.photoDataUrl = '';
+      showToast(error.message || 'Não foi possível carregar a foto.', 'error');
+    }
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -194,6 +418,17 @@ function renderSelfProfileEditCardForHome(activePlayer) {
           <label class="form-group">
             <span class="form-label">Nascimento</span>
             <input id="self-birthdate" class="input" type="date" value="${escapeHtml(activePlayer.birthDate || '')}" />
+          </label>
+
+          <label class="player-photo-upload self-photo-upload">
+            <span class="player-photo-preview ${getPlayerPhoto(activePlayer) ? 'has-photo' : ''}" id="self-photo-preview">
+              ${getPlayerPhoto(activePlayer) ? `<img src="${getPlayerPhoto(activePlayer)}" alt="Foto de ${escapeHtml(activePlayer.name || 'jogador')}" />` : 'Foto'}
+            </span>
+            <span class="player-photo-upload-copy">
+              <strong>Foto do meu perfil</strong>
+              <small>Selecionar ou trocar minha foto</small>
+            </span>
+            <input id="self-photo" type="file" accept="image/*" />
           </label>
 
           ${activePlayer.plays_football === false ? '' : `
@@ -351,7 +586,6 @@ document.addEventListener("click", async (e) => {
       showToast("Sessão inválida. Faça login novamente.", "error");
       return;
     }
-    if (authzIsAdmin(currentPlayer)) return;
 
     selfProfileEditOpen = !selfProfileEditOpen;
     render(snapshot);
@@ -575,6 +809,7 @@ document.addEventListener("click", async (e) => {
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
+  const photoDataUrl = document.getElementById("new-photo")?.dataset?.photoDataUrl || "";
 
   if (!name || !phone || !birthDate) {
     clearActionBusy(trigger);
@@ -608,6 +843,9 @@ document.addEventListener("click", async (e) => {
     playerToEdit.position = role === "player" ? position : null;
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
     playerToEdit.is_admin = !!is_admin;
+    if (photoDataUrl) {
+      playerToEdit.photoDataUrl = photoDataUrl;
+    }
   } else {
     snapshot.players.push({
       id: "p_" + Date.now(),
@@ -618,16 +856,17 @@ document.addEventListener("click", async (e) => {
       in_carne_group: true,
       position: role === "player" ? position : null,
       mens_ok,
-      is_admin
+      is_admin,
+      photoDataUrl
     });
   }
 
   const safeSnapshot = repairManualSnapshot(snapshot);
+  replaceState(safeSnapshot);
   savePersistedState(safeSnapshot);
   editingPlayerId = null;
   setPlayerFormMode(false);
   resetPlayerForm();
-  render(safeSnapshot);
   uiActionInFlight = false;
   showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -651,16 +890,7 @@ document.addEventListener("click", async (e) => {
   if (!nameInput || !phoneInput || !birthDateInput || !roleInput || !positionInput || !adminInput || !mensInput) return;
 
   editingPlayerId = id;
-  nameInput.value = playerToEdit.name || "";
-  phoneInput.value = playerToEdit.phone || "";
-  birthDateInput.value = playerToEdit.birthDate || "";
-  roleInput.value = playerToEdit.plays_football === false ? "carne" : "player";
-  roleInput.dispatchEvent(new Event("change", { bubbles: true }));
-  positionInput.value = playerToEdit.position || "meia";
-  adminInput.checked = !!playerToEdit.is_admin;
-  mensInput.checked = !!playerToEdit.mens_ok;
-
-  setPlayerFormMode(true);
+  hydratePlayerEditForm(playerToEdit);
   if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
   nameInput.focus();
   nameInput.select();
@@ -690,6 +920,7 @@ if (action === "update-self-profile") {
   const phone = normalizeSelfPhone(document.getElementById("self-phone")?.value);
   const birthDate = document.getElementById("self-birthdate")?.value?.trim();
   const positionInput = document.getElementById("self-position");
+  const selfPhotoDataUrl = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
   const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
 
   if (!name || !phone || !birthDate) {
@@ -729,13 +960,14 @@ if (action === "update-self-profile") {
       phone,
       birthDate,
       position: player.plays_football === false ? player.position : position,
+      photoDataUrl: selfPhotoDataUrl || player.photoDataUrl || '',
     };
   });
 
   const safeSnapshot = repairManualSnapshot(snapshot);
+  replaceState(safeSnapshot);
   savePersistedState(safeSnapshot);
   selfProfileEditOpen = false;
-  render(safeSnapshot);
   uiActionInFlight = false;
   showToast("Cadastro atualizado com sucesso", "success");
   return;
@@ -1109,6 +1341,8 @@ ${renderTab(snapshot, activeTab, currentPlayer)}
   `;
 
   bindAppEvents(currentPlayer);
+  bindPlayerPhotoInput();
+  bindSelfPhotoInput();
 }
 
 function bindAuthEvents() {
@@ -1423,7 +1657,7 @@ function renderHome(snapshot, currentPlayer) {
     <section class="section-stack home-stack">
       <section class="card home-user-card">
         <div class="home-user-main">
-          <div class="avatar">${getInitials(activePlayer.name)}</div>
+          ${renderAvatarForApp(activePlayer)}
           <div class="home-user-text">
             <div class="home-user-name">${activePlayer.name}</div>
             <div class="home-user-meta">${authzIsAdmin(activePlayer) ? `Administrador · ${getPositionLabel(activePlayer.position)}` : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</div>
@@ -1613,7 +1847,7 @@ function renderPresenceList(snapshot, currentPlayer) {
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
       <div class="players-switch-player">
-        <div class="avatar">${getInitials(player.name)}</div>
+        ${renderAvatarForApp(player)}
         <div>
           <div class="row-title">${player.name}</div>
           <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
