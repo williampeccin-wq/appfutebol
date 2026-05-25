@@ -1183,9 +1183,18 @@ init();
 
 async function init() {
   await prepareStoredSession();
-  const data = await loadPersistedState();
-  replaceState(data);
+
+  // Auth gate:
+  // 1. Validate Supabase Auth first.
+  // 2. If the stored auth session is invalid, restoreSession() clears it.
+  // 3. Only after that do we load persisted state, avoiding unauthenticated REST calls on the login screen.
   await restoreSession();
+
+  if (!getCurrentPlayer()) {
+    const data = await loadPersistedState();
+    replaceState(data);
+  }
+
   lastDomainFingerprint = getDomainFingerprint(getState());
 
   subscribe((snapshot) => {
@@ -1252,6 +1261,12 @@ function isValidRemoteDomainSnapshot(snapshot) {
 function startRemoteSync() {
   window.setInterval(async () => {
     try {
+      // Never poll Supabase REST while the user is not operationally authenticated.
+      // With RLS closed, polling on the login screen correctly produces 401.
+      if (!getCurrentPlayer()) {
+        return;
+      }
+
       const localSnapshot = getState();
       const remote = await loadRemoteState();
 
