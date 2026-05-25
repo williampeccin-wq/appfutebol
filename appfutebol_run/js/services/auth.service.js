@@ -174,11 +174,35 @@ export async function restoreSession() {
 
   const session = { ...stored, user };
   saveSession(session);
+
+  const remote = await loadRemoteState().catch(() => null);
+  if (remote?.ok && remote.state) {
+    const current = getState();
+    replaceState({
+      ...remote.state,
+      session: { playerId: null, authUserId: session.user.id },
+      ui: current.ui,
+    });
+  }
+
   return ensureLoggedPlayer(session);
 }
 
 export function getCurrentPlayer() {
   const snapshot = getState();
+  const stored = loadStoredSession();
+  const authUserId = stored?.user?.id || snapshot.session?.authUserId || null;
+
+  if (authUserId) {
+    const byAuth = findPlayerByAuthUserId(snapshot.players, authUserId);
+    if (byAuth) {
+      if (snapshot.session?.playerId !== byAuth.id || snapshot.session?.authUserId !== authUserId) {
+        patchState({ session: { playerId: byAuth.id, authUserId } });
+      }
+      return byAuth;
+    }
+  }
+
   return snapshot.players.find((item) => item.id === snapshot.session.playerId) || null;
 }
 
@@ -206,7 +230,7 @@ export async function login(phone, password) {
     const current = getState();
     replaceState({
       ...remote.state,
-      session: current.session,
+      session: { playerId: null, authUserId: session.user.id },
       ui: current.ui,
     });
   }

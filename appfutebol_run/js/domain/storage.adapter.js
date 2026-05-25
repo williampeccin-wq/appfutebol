@@ -50,12 +50,33 @@ function getSafeLocalSnapshot() {
   return resetLocalState();
 }
 
+function getStoredAuthUserId() {
+  try {
+    const raw = localStorage.getItem("harmonia_auth_session");
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    return session?.user?.id || null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveSessionFromAuth(remoteSnapshot, localSnapshot) {
+  const authUserId = getStoredAuthUserId() || localSnapshot?.session?.authUserId || null;
+  const player = authUserId && Array.isArray(remoteSnapshot?.players)
+    ? remoteSnapshot.players.find((item) => String(item?.auth_user_id || "") === String(authUserId))
+    : null;
+
+  return {
+    playerId: player?.id || null,
+    authUserId,
+  };
+}
+
 function preserveBrowserLocalFields(remoteSnapshot, localSnapshot) {
   return {
     ...remoteSnapshot,
-    session: {
-      ...(localSnapshot?.session || { playerId: null }),
-    },
+    session: resolveSessionFromAuth(remoteSnapshot, localSnapshot),
     ui: {
       ...DEFAULT_UI,
       ...(localSnapshot?.ui || {}),
