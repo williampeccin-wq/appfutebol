@@ -451,12 +451,6 @@ function renderSelfProfileEditCardForHome(activePlayer) {
             Você pode alterar nome, telefone, nascimento e posição. Mensalidade, perfil, grupo da carne e permissão de admin continuam restritos ao administrador.
           </div>
 
-          <div class="passkey-card">
-            <div class="passkey-card-title">Acesso por Face ID/biometria</div>
-            <p class="footer-note">Ative neste aparelho para entrar nas próximas vezes usando a autenticação do dispositivo.</p>
-            <button class="btn btn-secondary" type="button" data-action="register-passkey">Ativar neste aparelho</button>
-          </div>
-
           <div class="self-profile-actions">
             <button class="btn btn-primary" type="button" data-action="update-self-profile">Salvar</button>
             <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit">Cancelar</button>
@@ -606,30 +600,6 @@ document.addEventListener("click", async (e) => {
         document.getElementById("self-name")?.focus();
       }, 0);
     }
-    return;
-  }
-
-
-  if (action === "register-passkey") {
-    if (!isPasskeySupported()) {
-      showToast("Este aparelho/navegador não suporta Face ID/biometria neste contexto.", "error");
-      return;
-    }
-
-    uiActionInFlight = true;
-    setActionBusy(trigger, "Ativando...");
-
-    const result = await registerCurrentUserPasskey();
-
-    clearActionBusy(trigger);
-    uiActionInFlight = false;
-
-    if (!result.ok) {
-      showToast(result.message || "Não foi possível ativar a biometria.", "error");
-      return;
-    }
-
-    showToast("Acesso por biometria ativado neste aparelho.", "success");
     return;
   }
 
@@ -1197,7 +1167,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { loadRemoteState } from '../services/storage.supabase.js';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, isPasskeySupported, registerCurrentUserPasskey, signInWithPasskey } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -1410,34 +1380,6 @@ function bindAuthEvents() {
     });
   });
 
-
-  appElement.querySelector('#passkey-login-button')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-
-    if (!isPasskeySupported()) {
-      patchState({
-        ui: {
-          authMode: 'login',
-          authMessage: { type: 'error', text: 'Este aparelho/navegador não suporta Face ID/biometria neste contexto.' },
-        },
-      });
-      return;
-    }
-
-    setActionBusy(button, 'Abrindo...');
-    const result = await signInWithPasskey();
-    clearActionBusy(button);
-
-    if (!result.ok) {
-      patchState({
-        ui: {
-          authMode: 'login',
-          authMessage: { type: 'error', text: result.message || 'Não foi possível entrar com biometria.' },
-        },
-      });
-    }
-  });
-
   const loginForm = appElement.querySelector('#login-form');
   if (loginForm) {
     loginForm.addEventListener('submit', async (event) => {
@@ -1500,7 +1442,6 @@ function bindAuthEvents() {
     });
   }
 }
-
 
 
 function getPresenceIcon(reason, confirmed, capacityOk) {

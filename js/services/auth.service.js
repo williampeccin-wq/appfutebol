@@ -1,4 +1,3 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getState, patchState, replaceState } from '../core/state.js';
 import { loadRemoteState } from './storage.supabase.js';
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
@@ -6,35 +5,6 @@ import { normalizePhone } from '../domain/rules.engine.js';
 
 const SESSION_KEY = 'harmonia_auth_session';
 const TECHNICAL_EMAIL_DOMAIN = 'harmonia.app';
-
-let supabasePasskeyClient = null;
-
-function getSupabasePasskeyClient() {
-  if (supabasePasskeyClient) return supabasePasskeyClient;
-
-  supabasePasskeyClient = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      experimental: { passkey: true },
-    },
-  });
-
-  return supabasePasskeyClient;
-}
-
-function isPasskeyRuntimeSupported() {
-  return !!(
-    window.PublicKeyCredential &&
-    navigator.credentials &&
-    window.isSecureContext
-  );
-}
-
-function normalizeSupabaseJsSession(data) {
-  return data?.session || data || null;
-}
 
 
 function trimTrailingSlash(value) {
@@ -79,10 +49,6 @@ function isSessionExpired(session, skewSeconds = 60) {
   return Math.floor(Date.now() / 1000) >= (expiresAt - skewSeconds);
 }
 
-
-export function isPasskeySupported() {
-  return isPasskeyRuntimeSupported();
-}
 
 export async function prepareStoredSession() {
   const stored = loadStoredSession();
@@ -414,82 +380,6 @@ export async function register(payload) {
   return { ok: true, player: loggedPlayer };
 }
 
-
-export async function registerCurrentUserPasskey() {
-  const stored = await prepareStoredSession();
-
-  if (!stored?.access_token || !stored?.refresh_token || !stored?.user?.id) {
-    return { ok: false, message: 'Faça login com telefone e senha antes de ativar o acesso por biometria.' };
-  }
-
-  if (!isPasskeyRuntimeSupported()) {
-    return { ok: false, message: 'Este aparelho/navegador não suporta passkeys/WebAuthn neste contexto.' };
-  }
-
-  const client = getSupabasePasskeyClient();
-
-  const setSessionResult = await client.auth.setSession({
-    access_token: stored.access_token,
-    refresh_token: stored.refresh_token,
-  });
-
-  if (setSessionResult.error) {
-    return { ok: false, message: setSessionResult.error.message || 'Não foi possível preparar a sessão para passkey.' };
-  }
-
-  const currentPlayer = getCurrentPlayer();
-  const friendlyName = `Harmonia FC - ${currentPlayer?.name || 'Jogador'}`;
-
-  const result = await client.auth.registerPasskey({
-    friendlyName,
-  });
-
-  if (result.error) {
-    return { ok: false, message: result.error.message || 'Não foi possível ativar a biometria neste aparelho.' };
-  }
-
-  localStorage.setItem('harmonia_passkey_enabled', '1');
-  return { ok: true };
-}
-
-export async function signInWithPasskey() {
-  if (!isPasskeyRuntimeSupported()) {
-    return { ok: false, message: 'Este aparelho/navegador não suporta passkeys/WebAuthn neste contexto.' };
-  }
-
-  const client = getSupabasePasskeyClient();
-  const result = await client.auth.signInWithPasskey();
-
-  if (result.error) {
-    return { ok: false, message: result.error.message || 'Não foi possível entrar com biometria.' };
-  }
-
-  const session = normalizeSupabaseJsSession(result.data);
-
-  if (!session?.access_token || !session?.user?.id) {
-    return { ok: false, message: 'A autenticação por biometria não retornou sessão válida.' };
-  }
-
-  saveSession(session);
-
-  const remote = await loadRemoteState().catch(() => null);
-  if (remote?.ok && remote.state) {
-    const current = getState();
-    replaceState({
-      ...remote.state,
-      session: { playerId: null, authUserId: session.user.id },
-      ui: current.ui,
-    });
-  }
-
-  const player = ensureLoggedPlayer(session);
-  if (!player) {
-    return { ok: false, message: 'Biometria autenticada, mas nenhum jogador está vinculado a esse usuário.' };
-  }
-
-  localStorage.setItem('harmonia_passkey_enabled', '1');
-  return { ok: true, player };
-}
 
 export async function logout() {
   const stored = loadStoredSession();
