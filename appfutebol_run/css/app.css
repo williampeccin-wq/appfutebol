@@ -2867,26 +2867,6 @@ button {
 }
 
 
-/* v1.60.33 - passkey access */
-.passkey-login-button {
-  width: 100%;
-}
-
-.passkey-card {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
-  background: #eff6ff;
-}
-
-.passkey-card-title {
-  font-weight: 900;
-  color: #1e3a8a;
-}
-
 
 /* v1.60.34 - Harmonia crest branding */
 :root {

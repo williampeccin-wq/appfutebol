@@ -8,7 +8,7 @@ export function renderAuthScreen(uiState = {}) {
     <div class="login-screen">
       <img class="login-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
       <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${String(APP_VERSION || '').replace(/^v/, '').split('-')[0]}</span></div>
-      <div class="login-subtitle">Login com telefone e senha ou passkey/biometria.</div>
+      <div class="login-subtitle">Login com telefone e senha.</div>
 
       <section class="auth-card">
         <div class="auth-tabs">
@@ -64,10 +64,7 @@ function renderLoginForm() {
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Entrar</button>
-        <button class="btn btn-secondary passkey-login-button" type="button" id="passkey-login-button">Entrar com Face ID/biometria</button>
       </div>
-
-      <p class="footer-note">Depois do primeiro cadastro com telefone e senha, ative o acesso por biometria no seu perfil.</p>
     </form>
   `;
 }
@@ -124,6 +121,8 @@ function renderRegisterForm() {
           <input class="input" id="register-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" required placeholder="Repita a senha">
         </div>
       </div>
+
+      <p class="footer-note">Essa senha ficará vinculada ao seu usuário e será usada nos próximos acessos.</p>
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Criar cadastro</button>
