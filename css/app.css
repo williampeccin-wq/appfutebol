@@ -2865,3 +2865,85 @@ button {
   background: #ffe4e6;
   border-color: #fb7185;
 }
+
+
+/* v1.60.33 - passkey access */
+.passkey-login-button {
+  width: 100%;
+}
+
+.passkey-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #eff6ff;
+}
+
+.passkey-card-title {
+  font-weight: 900;
+  color: #1e3a8a;
+}
+
+
+/* v1.60.34 - Harmonia crest branding */
+:root {
+  --harmonia-navy: #0d2236;
+  --harmonia-navy-2: #102b46;
+  --harmonia-silver: #d7dce2;
+}
+
+.header,
+.app-header,
+.topbar {
+  background: linear-gradient(135deg, #0b1d30 0%, #102b46 100%) !important;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-crest {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255,255,255,.35);
+  box-shadow: 0 6px 16px rgba(0,0,0,.28);
+}
+
+.login-crest {
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto 14px;
+  border: 2px solid rgba(255,255,255,.35);
+  box-shadow: 0 10px 24px rgba(0,0,0,.32);
+}
+
+.btn-primary,
+.header-logout,
+.header-badge {
+  background-color: var(--harmonia-navy-2) !important;
+}
+
+.next-game-card,
+.game-card,
+.weekly-game-hero {
+  background: linear-gradient(135deg, #0b1d30 0%, #173b61 100%) !important;
+}
+
+@media (max-width: 760px) {
+  .brand-crest {
+    width: 44px;
+    height: 44px;
+  }
+}

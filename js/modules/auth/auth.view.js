@@ -6,9 +6,9 @@ export function renderAuthScreen(uiState = {}) {
 
   return `
     <div class="login-screen">
-      <div class="login-logo">⚽</div>
-      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${APP_VERSION}</span></div>
-      <div class="login-subtitle">Login real com telefone e senha via Supabase Auth.</div>
+      <img class="login-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
+      <div class="login-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${String(APP_VERSION || '').replace(/^v/, '').split('-')[0]}</span></div>
+      <div class="login-subtitle">Login com telefone e senha ou passkey/biometria.</div>
 
       <section class="auth-card">
         <div class="auth-tabs">
@@ -64,7 +64,10 @@ function renderLoginForm() {
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Entrar</button>
+        <button class="btn btn-secondary passkey-login-button" type="button" id="passkey-login-button">Entrar com Face ID/biometria</button>
       </div>
+
+      <p class="footer-note">Depois do primeiro cadastro com telefone e senha, ative o acesso por biometria no seu perfil.</p>
     </form>
   `;
 }
