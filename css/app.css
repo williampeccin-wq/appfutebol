@@ -2845,3 +2845,23 @@ button {
 .self-photo-upload {
   grid-column: 1 / -1;
 }
+
+
+/* v1.60.32 - delete player button */
+.players-row-actions-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.icon-action-button.player-delete-near-paid {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.icon-action-button.player-delete-near-paid:hover {
+  background: #ffe4e6;
+  border-color: #fb7185;
+}

@@ -484,16 +484,17 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
 
       <div class="players-paid-action-cell" role="cell">
         ${renderFinanceControls(player, currentPlayer)}
-        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador">✎</button>` : ''}
+        <div class="players-row-actions-inline">
+          ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador">✎</button>` : ''}
+          ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador">🗑</button>` : ''}
+        </div>
       </div>
 
       <div role="cell">
         ${renderAdminGameRemovalControl(player, currentPlayer, confirmed)}
       </div>
 
-      <div class="players-switch-actions" role="cell">
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir">🗑</button>` : ''}
-      </div>
+      <div class="players-switch-actions" role="cell"></div>
     </div>
   `;
 }
