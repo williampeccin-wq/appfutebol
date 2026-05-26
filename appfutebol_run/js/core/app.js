@@ -992,7 +992,7 @@ if (action === "delete-player") {
 
   const confirmedDelete = await showConfirmModal({
     title: 'Excluir jogador',
-    message: `Tem certeza que deseja excluir ${player.name}? Essa ação remove o perfil da lista atual.`,
+    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador, suas confirmações, vínculos de carne e registros relacionados da lista atual.`,
     confirmText: 'Excluir',
     cancelText: 'Cancelar',
   });
@@ -1029,8 +1029,8 @@ if (action === "delete-player") {
     : [];
 
   const safeSnapshot = repairManualSnapshot(snapshot);
+  replaceState(safeSnapshot);
   savePersistedState(safeSnapshot);
-  render(safeSnapshot);
   uiActionInFlight = false;
   showToast("Jogador removido", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
