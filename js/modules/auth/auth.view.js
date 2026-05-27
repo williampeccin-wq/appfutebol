@@ -34,15 +34,16 @@ function renderLoginForm() {
           id="login-phone"
           name="phone"
           type="tel"
-          inputmode="tel"
+          inputmode="numeric"
           autocomplete="username"
           autocapitalize="none"
           autocorrect="off"
           spellcheck="false"
           enterkeyhint="next"
           required
-          placeholder="(48) 99999-9999"
+          placeholder="48999999999"
         >
+        <small class="field-hint">Digite apenas números, com DDD.</small>
       </div>
 
       <div class="form-group">
@@ -80,7 +81,8 @@ function renderRegisterForm() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="register-phone">Telefone</label>
-          <input class="input" id="register-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required placeholder="(48) 99999-9999">
+          <input class="input" id="register-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required placeholder="48999999999">
+          <small class="field-hint">Digite apenas números, com DDD.</small>
         </div>
 
         <div class="form-group">

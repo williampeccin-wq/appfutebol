@@ -2927,3 +2927,85 @@ button {
     height: 44px;
   }
 }
+
+
+/* v1.60.37 - own password change */
+.password-change-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, .08);
+  background: rgba(255,255,255,.72);
+}
+
+.password-change-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+
+/* v1.60.39 - admin reset password visible */
+.icon-action-button.player-reset-password-near-paid {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
+}
+
+.icon-action-button.player-reset-password-near-paid:hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+
+
+/* v1.60.40 - admin access onboarding */
+.access-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.access-status.has-access {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.access-status.no-access {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.access-action-button {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 11px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.access-action-button:hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+
+
+/* v1.60.41 - phone validation */
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
