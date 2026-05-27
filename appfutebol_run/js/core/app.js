@@ -171,6 +171,65 @@ function normalizeSelfPhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function normalizeAdminPhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function formatPhoneForInput(value) {
+  const digits = normalizeAdminPhone(value).slice(0, 11);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function validatePhoneWithDDD(value) {
+  const digits = normalizeAdminPhone(value);
+
+  if (digits.length < 10 || digits.length > 11) {
+    return {
+      ok: false,
+      digits,
+      message: 'Informe um telefone válido com DDD. Use apenas números.',
+    };
+  }
+
+  const ddd = digits.slice(0, 2);
+  if (ddd === '00' || ddd[0] === '0') {
+    return {
+      ok: false,
+      digits,
+      message: 'Informe um DDD válido, sem zero inicial.',
+    };
+  }
+
+  return { ok: true, digits, message: '' };
+}
+
+function bindPhoneOnlyInputs() {
+  document.querySelectorAll('input[type="tel"]').forEach((input) => {
+    if (input.dataset.phoneOnlyBound === '1') return;
+    input.dataset.phoneOnlyBound = '1';
+    input.inputMode = 'numeric';
+    input.autocomplete = input.autocomplete || 'tel';
+
+    input.addEventListener('input', () => {
+      const formatted = formatPhoneForInput(input.value);
+      input.value = formatted;
+      const validation = validatePhoneWithDDD(formatted);
+      input.setCustomValidity(validation.ok || !validation.digits ? '' : validation.message);
+    });
+
+    input.addEventListener('blur', () => {
+      const validation = validatePhoneWithDDD(input.value);
+      if (validation.digits && !validation.ok) {
+        input.reportValidity?.();
+      }
+    });
+  });
+}
+
+
 function normalizeSelfPosition(value) {
   return ['gol', 'zag', 'meia', 'atk'].includes(value) ? value : null;
 }
@@ -449,6 +508,29 @@ function renderSelfProfileEditCardForHome(activePlayer) {
 
           <div class="self-profile-note">
             Você pode alterar nome, telefone, nascimento e posição. Mensalidade, perfil, grupo da carne e permissão de admin continuam restritos ao administrador.
+          </div>
+
+          <div class="password-change-card">
+            <div class="password-change-title">Alterar senha</div>
+
+            <label class="form-group">
+              <span class="form-label">Senha atual</span>
+              <input id="change-password-current" class="input" type="password" autocomplete="current-password" />
+            </label>
+
+            <label class="form-group">
+              <span class="form-label">Nova senha</span>
+              <input id="change-password-new" class="input" type="password" autocomplete="new-password" />
+            </label>
+
+            <label class="form-group">
+              <span class="form-label">Confirmar nova senha</span>
+              <input id="change-password-confirm" class="input" type="password" autocomplete="new-password" />
+            </label>
+
+            <button class="btn btn-secondary" type="button" id="change-own-password-button">
+              Salvar nova senha
+            </button>
           </div>
 
           <div class="self-profile-actions">
@@ -807,7 +889,8 @@ document.addEventListener("click", async (e) => {
   uiActionInFlight = true;
   setActionBusy(trigger, editingPlayerId ? "Salvando..." : "Adicionando...");
   const name = document.getElementById("new-name")?.value?.trim();
-  const phone = document.getElementById("new-phone")?.value?.trim();
+  const phoneRaw = document.getElementById("new-phone")?.value?.trim();
+  const phone = normalizeAdminPhone(phoneRaw);
   const birthDate = document.getElementById("new-birthdate")?.value?.trim();
   const role = document.getElementById("new-role")?.value;
   const position = document.getElementById("new-position")?.value;
@@ -822,7 +905,14 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
-  if (snapshot.players.some((p) => p.phone === phone && p.id !== editingPlayerId)) {
+  if (phone.length < 10 || phone.length > 11) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert("Informe um telefone válido com DDD. Use apenas números.");
+    return;
+  }
+
+  if (snapshot.players.some((p) => normalizeAdminPhone(p.phone) === phone && String(p.id) !== String(editingPlayerId))) {
     clearActionBusy(trigger);
     uiActionInFlight = false;
     alert("Telefone duplicado");
@@ -921,7 +1011,8 @@ if (action === "update-self-profile") {
   setActionBusy(trigger, "Salvando...");
 
   const name = document.getElementById("self-name")?.value?.trim();
-  const phone = normalizeSelfPhone(document.getElementById("self-phone")?.value);
+  const phoneValidation = validatePhoneWithDDD(document.getElementById("self-phone")?.value);
+  const phone = phoneValidation.digits;
   const birthDate = document.getElementById("self-birthdate")?.value?.trim();
   const positionInput = document.getElementById("self-position");
   const selfPhotoDataUrl = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
@@ -976,6 +1067,162 @@ if (action === "update-self-profile") {
   showToast("Cadastro atualizado com sucesso", "success");
   return;
 }
+
+
+
+if (action === "create-player-access") {
+  if (!requireAdmin(snapshot, "Apenas administrador pode criar acesso")) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) {
+    showToast("Jogador não encontrado.", "error");
+    return;
+  }
+
+  if (player.auth_user_id) {
+    showToast("Este jogador já tem acesso criado.", "error");
+    return;
+  }
+
+  const phone = normalizeAdminPhone(player.phone);
+  if (phone.length < 10 || phone.length > 11) {
+    showToast("Este jogador precisa ter telefone válido antes de criar acesso.", "error");
+    return;
+  }
+
+  const newPassword = window.prompt(`Senha inicial para ${player.name}:`);
+  if (!newPassword) return;
+
+  if (String(newPassword).length < 6) {
+    showToast("Senha deve ter pelo menos 6 caracteres.", "error");
+    return;
+  }
+
+  const adminSecret = window.prompt("Informe o segredo admin para criar acesso:");
+  if (!adminSecret) return;
+
+  setActionBusy(trigger, "Criando...");
+
+  try {
+    const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
+
+    const response = await fetch(
+      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token || ""}`,
+        },
+        body: JSON.stringify({
+          mode: "create_access",
+          admin_secret: adminSecret,
+          player_id: player.id,
+          name: player.name,
+          phone,
+          birth_date: player.birthDate || "",
+          new_password: newPassword,
+        }),
+      },
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    clearActionBusy(trigger);
+
+    if (!response.ok || !data?.user_id) {
+      showToast(data.error || "Falha ao criar acesso.", "error");
+      return;
+    }
+
+    const target = snapshot.players.find((p) => String(p.id) === String(player.id));
+    if (target) {
+      target.auth_user_id = data.user_id;
+      target.email = data.email || `${phone}@harmonia.app`;
+      target.login_phone = phone;
+      target.phone = phone;
+    }
+
+    const safeSnapshot = repairManualSnapshot(snapshot);
+    replaceState(safeSnapshot);
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+
+    showToast("Acesso criado com sucesso.", "success");
+  } catch (error) {
+    clearActionBusy(trigger);
+    showToast(error?.message || "Erro inesperado.", "error");
+  }
+
+  return;
+}
+
+
+if (action === "reset-player-password") {
+  if (!requireAdmin(snapshot, "Apenas administrador pode resetar senha")) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) {
+    showToast("Jogador não encontrado.", "error");
+    return;
+  }
+
+  if (!player.auth_user_id) {
+    showToast("Este jogador ainda não tem acesso criado.", "error");
+    return;
+  }
+
+  const newPassword = window.prompt(`Nova senha para ${player.name}:`);
+  if (!newPassword) return;
+
+  if (String(newPassword).length < 6) {
+    showToast("Senha deve ter pelo menos 6 caracteres.", "error");
+    return;
+  }
+
+  const adminSecret = window.prompt("Informe o segredo admin da recuperação de senha:");
+  if (!adminSecret) return;
+
+  setActionBusy(trigger, "Resetando...");
+
+  try {
+    const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
+
+    const response = await fetch(
+      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token || ""}`,
+        },
+        body: JSON.stringify({
+          mode: "reset_password",
+          admin_secret: adminSecret,
+          user_id: player.auth_user_id,
+          new_password: newPassword,
+        }),
+      },
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    clearActionBusy(trigger);
+
+    if (!response.ok) {
+      showToast(data.error || "Falha ao resetar senha.", "error");
+      return;
+    }
+
+    showToast("Senha resetada com sucesso.", "success");
+  } catch (error) {
+    clearActionBusy(trigger);
+    showToast(error?.message || "Erro inesperado.", "error");
+  }
+
+  return;
+}
+
 
 if (action === "delete-player") {
   if (!requireAdmin(snapshot, 'Apenas administrador pode excluir jogadores')) return;
@@ -1167,7 +1414,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { loadRemoteState } from '../services/storage.supabase.js';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -1318,6 +1565,7 @@ function render(snapshot) {
   if (!currentPlayer) {
     appElement.innerHTML = renderAuthScreen(snapshot.ui);
     bindAuthEvents();
+    bindPhoneOnlyInputs();
     return;
   }
 
@@ -1363,6 +1611,7 @@ ${renderTab(snapshot, activeTab, currentPlayer)}
   `;
 
   bindAppEvents(currentPlayer);
+  bindPhoneOnlyInputs();
   bindPlayerPhotoInput();
   bindSelfPhotoInput();
 }
@@ -1534,6 +1783,31 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
 function bindAppEvents(currentPlayer) {
   appElement.querySelector('#logout-button')?.addEventListener('click', async () => { await logout(); });
+
+  appElement.querySelector('#change-own-password-button')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const currentPassword = document.getElementById("change-password-current")?.value || "";
+    const newPassword = document.getElementById("change-password-new")?.value || "";
+    const confirmPassword = document.getElementById("change-password-confirm")?.value || "";
+
+    setActionBusy(button, "Salvando...");
+
+    const result = await updateOwnPassword(currentPassword, newPassword, confirmPassword);
+
+    clearActionBusy(button);
+
+    if (!result.ok) {
+      showToast(result.message || "Não foi possível alterar a senha.", "error");
+      return;
+    }
+
+    document.getElementById("change-password-current").value = "";
+    document.getElementById("change-password-new").value = "";
+    document.getElementById("change-password-confirm").value = "";
+
+    showToast("Senha alterada com sucesso.", "success");
+  });
+
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {

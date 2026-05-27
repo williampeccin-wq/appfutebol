@@ -381,6 +381,61 @@ export async function register(payload) {
 }
 
 
+
+export async function updateOwnPassword(currentPassword, newPassword, confirmPassword) {
+  const stored = await prepareStoredSession();
+
+  if (!stored?.access_token || !stored?.user?.id) {
+    return { ok: false, message: 'Sessão inválida. Faça login novamente.' };
+  }
+
+  const current = String(currentPassword || '').trim();
+  const next = String(newPassword || '').trim();
+  const confirm = String(confirmPassword || '').trim();
+
+  if (!current) return { ok: false, message: 'Informe sua senha atual.' };
+  if (next.length < 6) return { ok: false, message: 'A nova senha deve ter pelo menos 6 caracteres.' };
+  if (next !== confirm) return { ok: false, message: 'A confirmação da senha não confere.' };
+  if (current === next) return { ok: false, message: 'A nova senha precisa ser diferente da atual.' };
+
+  const currentPlayer = getCurrentPlayer();
+  const phone = currentPlayer?.phone || currentPlayer?.login_phone || '';
+  const normalizedPhone = normalizeLoginPhone(phone);
+
+  if (!normalizedPhone) {
+    return { ok: false, message: 'Telefone do usuário não encontrado.' };
+  }
+
+  const authCheck = await requestAuth('token?grant_type=password', {
+    email: phoneToTechnicalEmail(normalizedPhone),
+    password: current,
+  });
+
+  if (!authCheck.ok) return { ok: false, message: 'Senha atual incorreta.' };
+
+  const response = await fetch(authUrl('user'), {
+    method: 'PUT',
+    headers: authHeaders(authCheck.data.access_token),
+    body: JSON.stringify({ password: next }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: data?.msg || data?.message || data?.error || 'Não foi possível alterar a senha.',
+    };
+  }
+
+  saveSession({
+    ...authCheck.data,
+    user: authCheck.data.user || stored.user,
+  });
+
+  return { ok: true };
+}
+
 export async function logout() {
   const stored = loadStoredSession();
   if (stored?.access_token) {
