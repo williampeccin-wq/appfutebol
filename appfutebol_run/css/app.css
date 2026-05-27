@@ -3009,3 +3009,345 @@ button {
   font-weight: 700;
   color: #64748b;
 }
+
+
+/* v1.60.44 mobile admin layout fix */
+.player-status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.player-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .player-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .player-admin-actions {
+    width: 100%;
+  }
+
+  .player-admin-actions .access-action-button {
+    flex: 1;
+    min-width: 140px;
+  }
+}
+
+
+/* v1.60.45 - mobile player cards hard layout fix */
+@media (max-width: 768px) {
+  .players-table,
+  .players-table-body,
+  .players-list,
+  .players-grid {
+    width: 100%;
+  }
+
+  .players-table-header,
+  .players-header-row,
+  .players-row-header {
+    display: none !important;
+  }
+
+  .player-row,
+  .players-row,
+  [role="row"].player-row {
+    display: grid !important;
+    grid-template-columns: 44px 1fr !important;
+    grid-template-areas:
+      "avatar identity"
+      "avatar meta" !important;
+    gap: 8px 12px !important;
+    align-items: start !important;
+    padding: 14px 16px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    min-width: 0 !important;
+  }
+
+  .player-row > *,
+  .players-row > * {
+    min-width: 0 !important;
+  }
+
+  .player-avatar,
+  .player-initials,
+  .avatar {
+    grid-area: avatar !important;
+  }
+
+  .player-main,
+  .player-identity,
+  .player-info,
+  .player-name-cell,
+  [role="cell"]:first-child {
+    grid-area: identity !important;
+    min-width: 0 !important;
+  }
+
+  .player-meta,
+  .player-status-line,
+  .players-switch-actions,
+  [role="cell"]:nth-child(2),
+  [role="cell"]:nth-child(3) {
+    grid-area: meta !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .player-meta {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .player-status-line {
+    flex-direction: row !important;
+  }
+
+  .player-admin-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+
+  .player-admin-actions .access-action-button {
+    flex: 1 1 130px !important;
+    max-width: 180px !important;
+    height: 34px !important;
+    font-size: 12px !important;
+  }
+
+  .player-admin-actions .icon-action-button,
+  .icon-action-button {
+    width: 38px !important;
+    height: 38px !important;
+    flex: 0 0 38px !important;
+  }
+
+  .switch-control {
+    flex: 0 0 auto !important;
+    transform: scale(.88) !important;
+    transform-origin: left center !important;
+  }
+
+  .switch-label {
+    font-size: 12px !important;
+  }
+
+  .position-badge {
+    max-width: 120px !important;
+  }
+}
+
+
+/* v1.60.46 - definitive player row layout fix */
+.players-switch-head,
+.players-switch-row.player-row-card {
+  grid-template-columns: minmax(170px, 1.35fr) minmax(150px, 0.9fr) minmax(190px, 1fr) !important;
+}
+
+.player-row-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.player-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.player-row-actions .access-action-button {
+  min-width: 126px;
+}
+
+@media (max-width: 760px) {
+  .players-switch-head {
+    display: none !important;
+  }
+
+  .players-switch-row.player-row-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 14px 18px !important;
+    grid-template-columns: none !important;
+  }
+
+  .player-row-identity,
+  .player-row-status,
+  .player-row-actions {
+    width: 100% !important;
+  }
+
+  .player-row-status {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding-left: 56px !important;
+  }
+
+  .player-row-actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding-left: 56px !important;
+  }
+
+  .player-row-actions .access-action-button {
+    flex: 1 1 150px !important;
+    max-width: 210px !important;
+    min-width: 140px !important;
+  }
+
+  .player-row-actions .icon-action-button {
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .player-row-status .switch-control {
+    transform: none !important;
+  }
+
+  .player-row-status .position-pill {
+    max-width: 160px !important;
+  }
+}
+
+
+/* v1.60.47 - player actions never overflow */
+.players-switch-row.player-row-card {
+  grid-template-columns: minmax(170px, 1fr) minmax(120px, auto) !important;
+  grid-template-areas:
+    "identity status"
+    "identity actions" !important;
+}
+
+.players-switch-row.player-row-card .player-row-identity {
+  grid-area: identity !important;
+}
+
+.players-switch-row.player-row-card .player-row-status {
+  grid-area: status !important;
+  justify-content: flex-start !important;
+}
+
+.players-switch-row.player-row-card .player-row-actions {
+  grid-area: actions !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+.players-switch-row.player-row-card .access-action-button {
+  max-width: 150px !important;
+  min-width: 118px !important;
+  height: 34px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+}
+
+.players-switch-row.player-row-card .icon-action-button {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+}
+
+@media (max-width: 1100px) {
+  .players-switch-head {
+    display: none !important;
+  }
+
+  .players-switch-row.player-row-card {
+    display: grid !important;
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+    grid-template-areas:
+      "avatar identity"
+      "avatar status"
+      "avatar actions" !important;
+    column-gap: 12px !important;
+    row-gap: 8px !important;
+    align-items: start !important;
+    padding: 14px 16px !important;
+  }
+
+  .players-switch-row.player-row-card .players-switch-player {
+    display: contents !important;
+  }
+
+  .players-switch-row.player-row-card .player-avatar,
+  .players-switch-row.player-row-card .avatar,
+  .players-switch-row.player-row-card .player-photo,
+  .players-switch-row.player-row-card .player-initials,
+  .players-switch-row.player-row-card .avatar-circle,
+  .players-switch-row.player-row-card .players-switch-player > :first-child {
+    grid-area: avatar !important;
+  }
+
+  .players-switch-row.player-row-card .players-switch-player-text {
+    grid-area: identity !important;
+    min-width: 0 !important;
+  }
+
+  .players-switch-row.player-row-card .player-row-status {
+    grid-area: status !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding-left: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .players-switch-row.player-row-card .player-row-actions {
+    grid-area: actions !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .players-switch-row.player-row-card .access-action-button {
+    flex: 0 1 auto !important;
+    max-width: 150px !important;
+    min-width: 118px !important;
+  }
+
+  .players-switch-row.player-row-card .switch-control {
+    transform: none !important;
+  }
+
+  .players-switch-row.player-row-card .position-pill {
+    max-width: 150px !important;
+  }
+}
