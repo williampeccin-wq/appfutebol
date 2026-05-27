@@ -3351,3 +3351,44 @@ button {
     max-width: 150px !important;
   }
 }
+
+/* v1.60.51 - responsive team draw layout */
+.team-draw-grid,
+.teams-draw-grid,
+.draw-teams-grid {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.team-draw-card,
+.draw-team-card,
+.team-column {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .team-draw-grid,
+  .teams-draw-grid,
+  .draw-teams-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
+
+  .team-draw-card,
+  .draw-team-card,
+  .team-column {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .team-draw-grid,
+  .teams-draw-grid,
+  .draw-teams-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 24px !important;
+  }
+}
