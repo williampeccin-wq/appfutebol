@@ -22,12 +22,19 @@ function isFinancePending(player) {
 }
 
 function renderFinanceControls(player, currentPlayer) {
-  if (!isAdmin(currentPlayer)) return '';
   if (isCarneOnly(player)) return '<span class="switch-placeholder">—</span>';
 
   const isPaid = !isFinancePending(player);
   const action = isPaid ? 'mark-debt' : 'mark-paid';
   const label = isPaid ? 'Pago' : 'Pendente';
+
+  if (!isAdmin(currentPlayer)) {
+    return `
+      <span class="switch-label static-finance-label ${isPaid ? 'is-ok' : 'is-warn'}">
+        ${label}
+      </span>
+    `;
+  }
 
   return `
     <button
@@ -464,40 +471,30 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
 function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null) {
   const isEditing = player.id === editingPlayerId;
   const currentFlag = isCurrentPlayer(player, currentPlayer);
-  const confirmed = player.plays_football === false ? false : !!player.isConfirmed;
-  const financePending = isFinancePending(player);
 
   return `
-    <div class="players-switch-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
-      <div class="players-switch-player" role="cell">
+    <div class="players-switch-row player-row-card ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
+      <div class="players-switch-player player-row-identity" role="cell">
         ${getAvatarHtml(player)}
         <div class="players-switch-player-text">
           <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
           ${isAdmin(currentPlayer) ? `<div class="access-status ${player.auth_user_id ? 'has-access' : 'no-access'}">${player.auth_user_id ? 'Acesso criado' : 'Sem acesso'}</div>` : ''}
-
         </div>
-
       </div>
 
-      <div role="cell">
+      <div class="player-row-status" role="cell">
         <span class="position-pill">${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)}</span>
-      </div>
-
-      <div class="players-paid-action-cell" role="cell">
         ${renderFinanceControls(player, currentPlayer)}
-        <div class="players-row-actions-inline">
-          ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador">✎</button>` : ''}
-          ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha">🔑</button>` : ''}
-          ${isAdmin(currentPlayer) && !player.auth_user_id ? `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}" title="Criar acesso" aria-label="Criar acesso">Criar acesso</button>` : ''}
-          ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador">🗑</button>` : ''}
-        </div>
       </div>
 
-      <div role="cell">
-        ${renderAdminGameRemovalControl(player, currentPlayer, confirmed)}
+      <div class="player-row-actions" role="cell">
+        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador">✎</button>` : ''}
+        ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha">🔑</button>` : ''}
+        ${isAdmin(currentPlayer) && !player.auth_user_id ? `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}" title="Criar acesso" aria-label="Criar acesso">Criar acesso</button>` : ''}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) && !player.auth_user_id ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador">🗑</button>` : ''}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-delete-protected" type="button" data-action="delete-player-protected" data-id="${player.id}" title="Jogador com acesso ativo. Remova o acesso antes de excluir." aria-label="Exclusão bloqueada">🔒</button>` : ''}
       </div>
-
-      <div class="players-switch-actions" role="cell"></div>
     </div>
   `;
 }
+
