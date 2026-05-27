@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.47-player-actions-second-line';
+export const APP_VERSION = 'v1.60.50-draw-before-presence';

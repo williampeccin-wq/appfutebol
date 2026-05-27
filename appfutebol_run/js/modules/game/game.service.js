@@ -161,16 +161,55 @@ export function adminRemovePlayerFromGame(playerId) {
 
 
 function getPositionBucket(player) {
-  const position = player?.position || 'meia';
-  if (position === 'gol') return 'gol';
-  if (position === 'zag') return 'zag';
-  if (position === 'atk') return 'atk';
+  const raw = String(player?.position || 'meia')
+    .trim()
+    .toLowerCase();
+
+  if (
+    raw === 'gol' ||
+    raw === 'goleiro'
+  ) {
+    return 'gol';
+  }
+
+  if (
+    raw === 'zag' ||
+    raw === 'zagueiro'
+  ) {
+    return 'zag';
+  }
+
+  if (
+    raw === 'atk' ||
+    raw === 'atacante'
+  ) {
+    return 'atk';
+  }
+
   return 'meia';
 }
 
 function sortByName(a, b) {
   return String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR');
 }
+
+function getDisplayOrderValue(player) {
+  const position = getPositionBucket(player);
+  if (position === 'gol') return 0;
+  if (position === 'zag') return 1;
+  if (position === 'meia') return 2;
+  if (position === 'atk') return 3;
+  return 99;
+}
+
+function sortPlayersForDisplay(players = []) {
+  return [...players].sort((a, b) => {
+    const positionDiff = getDisplayOrderValue(a) - getDisplayOrderValue(b);
+    if (positionDiff !== 0) return positionDiff;
+    return sortByName(a, b);
+  });
+}
+
 
 function balanceTeams(players) {
   const teamA = [];
@@ -188,20 +227,27 @@ function balanceTeams(players) {
   });
 
   Object.values(buckets).forEach((bucket) => {
-    bucket.sort(sortByName);
-    bucket.forEach((player, index) => {
-      const target = teamA.length <= teamB.length
-        ? (index % 2 === 0 ? teamA : teamB)
-        : (index % 2 === 0 ? teamB : teamA);
-      target.push(player);
+    const shuffled = [...bucket].sort(() => Math.random() - 0.5);
+
+    shuffled.forEach((player) => {
+      const currentPosition = getPositionBucket(player);
+      const countA = teamA.filter((p) => getPositionBucket(p) === currentPosition).length;
+      const countB = teamB.filter((p) => getPositionBucket(p) === currentPosition).length;
+
+      if (countA < countB) return teamA.push(player);
+      if (countB < countA) return teamB.push(player);
+
+      if (teamA.length <= teamB.length) teamA.push(player);
+      else teamB.push(player);
     });
   });
 
   return {
-    teamA: teamA.sort(sortByName),
-    teamB: teamB.sort(sortByName),
+    teamA: sortPlayersForDisplay(teamA),
+    teamB: sortPlayersForDisplay(teamB),
   };
 }
+
 
 export function drawTeams() {
   const snapshot = getState();

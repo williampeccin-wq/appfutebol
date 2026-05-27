@@ -2054,9 +2054,8 @@ function renderWeeklyGame(snapshot, currentPlayer) {
         </div>
       </section>
 
-      ${renderPresenceList(snapshot, currentPlayer)}
-
       ${renderTeamDraw(snapshot, currentPlayer)}
+      ${renderPresenceList(snapshot, currentPlayer)}
     </section>
   `;
 }
@@ -2192,6 +2191,32 @@ function renderPresenceList(snapshot, currentPlayer) {
   `;
 }
 
+function getPositionDrawOrder(player) {
+  const raw = String(player?.position || '').trim().toLowerCase();
+
+  if (raw === 'gol' || raw === 'goleiro') return 0;
+  if (raw === 'zag' || raw === 'zagueiro') return 1;
+  if (raw === 'meia') return 2;
+  if (raw === 'atk' || raw === 'atacante') return 3;
+
+  return 99;
+}
+
+function sortDrawEntriesForDisplay(entries = [], playerById = new Map()) {
+  return [...entries].sort((a, b) => {
+    const idA = (a && typeof a === 'object') ? a.id : a;
+    const idB = (b && typeof b === 'object') ? b.id : b;
+
+    const playerA = playerById.get(idA) || ((a && typeof a === 'object') ? a : null);
+    const playerB = playerById.get(idB) || ((b && typeof b === 'object') ? b : null);
+
+    const positionDiff = getPositionDrawOrder(playerA) - getPositionDrawOrder(playerB);
+    if (positionDiff !== 0) return positionDiff;
+
+    return String(playerA?.name || '').localeCompare(String(playerB?.name || ''), 'pt-BR');
+  });
+}
+
 function renderTeamDraw(snapshot, currentPlayer) {
   const sortResult = snapshot.game?.sort_result;
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
@@ -2226,7 +2251,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
     <div class="team-draw-box">
       <div class="team-draw-title">${title}</div>
       <div class="placeholder-list">
-        ${(entries || []).map((entry) => {
+        ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
           const targetLabel = teamKey === 'team_a' ? 'Time B' : 'Time A';
           return `
