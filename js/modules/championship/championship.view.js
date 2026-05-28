@@ -9,6 +9,8 @@ import {
   getHistoricalAnnual,
   getHistoricalTournaments,
   getResultSummary,
+  getEffectiveChampionshipResults,
+  getResultAuditRows,
   getActiveDrawTeams,
   getTeamOutcomeLabel,
 } from './championship.service.js';
@@ -29,6 +31,21 @@ function formatDate(value) {
   if (!year || !month || !day) return escapeHtml(value);
   return `${day}/${month}/${year}`;
 }
+
+function getStatusLabel(status) {
+  if (status === 'win') return 'Vitória';
+  if (status === 'draw') return 'Empate';
+  if (status === 'loss') return 'Derrota';
+  return 'WO / Não jogou';
+}
+
+function getStatusClass(status) {
+  if (status === 'win') return 'is-win';
+  if (status === 'draw') return 'is-draw';
+  if (status === 'loss') return 'is-loss';
+  return 'is-no-play';
+}
+
 
 function renderRankingTable(rows, { annual = false } = {}) {
   if (!rows.length) {
@@ -135,27 +152,59 @@ function renderResultForm(snapshot, currentPlayer) {
 }
 
 function renderResultsHistory(snapshot, currentPlayer) {
-  const championship = getChampionshipState(snapshot);
+  const results = getEffectiveChampionshipResults(snapshot);
   const players = getFootballPlayers(snapshot);
 
   return `
     <section class="card">
-      <div class="card-title">Jogos lançados</div>
-      ${championship.active.results.length ? `
-        <div class="placeholder-list compact-list">
-          ${championship.active.results.slice().reverse().map((result) => {
+      <div class="card-title">Auditoria dos jogos lançados</div>
+      <p class="footer-note">Cada rodada abaixo é usada para calcular a classificação. A importação inicial veio da planilha Rei da Quadra.</p>
+      ${results.length ? `
+        <div class="championship-audit-list">
+          ${results.slice().reverse().map((result) => {
             const summary = getResultSummary(result, players);
+            const rows = getResultAuditRows(result, players);
+            const unmatched = rows.filter((row) => !row.matched).length;
+
             return `
-              <div class="placeholder-row championship-result-row">
-                <div class="placeholder-main">
-                  <div class="avatar">⚽</div>
+              <details class="championship-audit-item">
+                <summary>
                   <div>
-                    <div class="row-title">${formatDate(result.date)}</div>
-                    <div class="row-subtitle">${getTeamOutcomeLabel(result.outcome)} · ${summary.win} vitória · ${summary.draw} empate · ${summary.loss} derrota · ${summary.no_play} não jogou</div>
+                    <strong>${formatDate(result.date)}</strong>
+                    <span>${result.imported ? 'Importado da planilha' : getTeamOutcomeLabel(result.outcome)}</span>
                   </div>
+                  <small>${summary.win} V · ${summary.draw} E · ${summary.loss} D · ${summary.no_play} WO${unmatched ? ` · ${unmatched} sem vínculo` : ''}</small>
+                </summary>
+
+                <div class="championship-audit-table-wrap">
+                  <table class="championship-audit-table">
+                    <thead>
+                      <tr>
+                        <th>Jogador</th>
+                        <th>Origem</th>
+                        <th>Resultado</th>
+                        <th>Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rows.map((row) => `
+                        <tr class="${row.matched ? '' : 'is-unmatched'}">
+                          <td>${escapeHtml(row.name)}</td>
+                          <td>${escapeHtml(row.sheet_name || row.name)}</td>
+                          <td><span class="status-chip ${getStatusClass(row.status)}">${getStatusLabel(row.status)}</span></td>
+                          <td><strong>${row.points}</strong></td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
                 </div>
-                ${canManageChampionship(currentPlayer) ? `<button class="btn btn-danger btn-sm" type="button" data-action="delete-championship-result" data-id="${escapeHtml(result.id)}">Excluir</button>` : ''}
-              </div>
+
+                ${canManageChampionship(currentPlayer) && !result.imported ? `
+                  <div class="actions">
+                    <button class="btn btn-danger btn-sm" type="button" data-action="delete-championship-result" data-id="${escapeHtml(result.id)}">Excluir lançamento</button>
+                  </div>
+                ` : ''}
+              </details>
             `;
           }).join('')}
         </div>
@@ -163,7 +212,6 @@ function renderResultsHistory(snapshot, currentPlayer) {
     </section>
   `;
 }
-
 
 function renderSimpleAnnualHistoryTable(rows) {
   if (!rows.length) return '<div class="empty-state">Sem dados.</div>';
@@ -223,7 +271,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const currentRanking = calculateCurrentRanking(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
-  const resultCount = getChampionshipState(snapshot).active.results.length;
+  const resultCount = getEffectiveChampionshipResults(snapshot).length;
 
   return `
     <section class="section-stack championship-screen">

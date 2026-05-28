@@ -28,6 +28,223 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
   return acc;
 }, {});
 
+const IMPORTED_SHEET_NAME_ALIASES = {
+  'ANDRE DAMS': 'ANDRÉ',
+  'PAPAL PH': 'PH',
+  'WILLIAM': 'WILLIAM PECCIN',
+  'DAVID': 'DVD',
+  'NATAN': 'NATHAN',
+  'GEDE': 'GEDIEL',
+};
+
+const IMPORTED_SHEET_STATUS_BY_POINTS = {
+  0: 'no_play',
+  1: 'loss',
+  2: 'draw',
+  3: 'win',
+};
+
+const IMPORTED_SHEET_ROUNDS = [
+  {
+    id: 'import_rei_da_quadra_2026_05_06',
+    date: '2026-05-06',
+    label: '06/05',
+    source: 'Planilha Rei da Quadra',
+    values: {
+      'Júnior': 2,
+      'Adriano': 2,
+      'André Dams': 2,
+      'Broquinha': 2,
+      'Broca': 2,
+      'Cauê': 2,
+      'David': 2,
+      'Dick': 2,
+      'William': 2,
+      'Niniu': 2,
+      'Papal PH': 2,
+      'Vinícius': 2,
+      'Lucas Silva': 0,
+      'Gui': 2,
+      'Caetano': 2,
+      'Natan': 0,
+      'Digão': 2,
+      'Mário': 2,
+      'Panga': 2,
+      'Samuel': 0,
+      'Gede': 0,
+      'Vítor': 0,
+      'Telo': 0,
+      'Trocinho': 0,
+    },
+  },
+  {
+    id: 'import_rei_da_quadra_2026_05_13',
+    date: '2026-05-13',
+    label: '13/05',
+    source: 'Planilha Rei da Quadra',
+    values: {
+      'Júnior': 3,
+      'Adriano': 3,
+      'André Dams': 3,
+      'Broquinha': 3,
+      'Broca': 3,
+      'Cauê': 3,
+      'David': 3,
+      'Dick': 3,
+      'William': 1,
+      'Niniu': 1,
+      'Papal PH': 1,
+      'Vinícius': 1,
+      'Lucas Silva': 1,
+      'Gui': 1,
+      'Caetano': 1,
+      'Natan': 3,
+      'Digão': 0,
+      'Mário': 0,
+      'Panga': 0,
+      'Samuel': 1,
+      'Gede': 0,
+      'Vítor': 0,
+      'Telo': 0,
+      'Trocinho': 0,
+    },
+  },
+  {
+    id: 'import_rei_da_quadra_2026_05_20',
+    date: '2026-05-20',
+    label: '20/05',
+    source: 'Planilha Rei da Quadra',
+    values: {
+      'Júnior': 3,
+      'Adriano': 3,
+      'André Dams': 1,
+      'Broquinha': 1,
+      'Broca': 1,
+      'Cauê': 1,
+      'David': 1,
+      'Dick': 1,
+      'William': 3,
+      'Niniu': 3,
+      'Papal PH': 3,
+      'Vinícius': 3,
+      'Lucas Silva': 3,
+      'Gui': 1,
+      'Caetano': 1,
+      'Natan': 0,
+      'Digão': 0,
+      'Mário': 0,
+      'Panga': 0,
+      'Samuel': 0,
+      'Gede': 0,
+      'Vítor': 0,
+      'Telo': 0,
+      'Trocinho': 0,
+    },
+  },
+];
+
+function normalizeImportedSheetName(value) {
+  const normalized = normalizeName(value);
+  return IMPORTED_SHEET_NAME_ALIASES[normalized] || normalized;
+}
+
+function getStatusFromImportedPoints(points) {
+  return IMPORTED_SHEET_STATUS_BY_POINTS[Number(points)] || 'no_play';
+}
+
+function buildPlayerNameIndex(players) {
+  const index = new Map();
+
+  players.forEach((player) => {
+    const normalized = normalizeName(player.name);
+    if (normalized) index.set(normalized, player);
+  });
+
+  return index;
+}
+
+export function getImportedChampionshipResults(snapshot) {
+  const players = getFootballPlayers(snapshot);
+  const playerByName = buildPlayerNameIndex(players);
+
+  return IMPORTED_SHEET_ROUNDS.map((round) => {
+    const statuses = {};
+    const audit_entries = [];
+
+    Object.entries(round.values || {}).forEach(([sheetName, points]) => {
+      const normalizedSheetName = normalizeImportedSheetName(sheetName);
+      const player = playerByName.get(normalizedSheetName) || null;
+      const status = getStatusFromImportedPoints(points);
+
+      if (player?.id) {
+        statuses[String(player.id)] = status;
+      }
+
+      audit_entries.push({
+        sheet_name: sheetName,
+        normalized_name: normalizedSheetName,
+        app_name: player?.name || null,
+        player_id: player?.id ? String(player.id) : null,
+        status,
+        points: Number(points || 0),
+      });
+    });
+
+    return {
+      id: round.id,
+      date: round.date,
+      created_at: round.date,
+      outcome: 'imported_sheet',
+      source: round.source,
+      imported: true,
+      team_a: [],
+      team_b: [],
+      statuses,
+      audit_entries,
+    };
+  });
+}
+
+export function getEffectiveChampionshipResults(snapshot) {
+  const imported = getImportedChampionshipResults(snapshot);
+  const championship = getChampionshipState(snapshot);
+  const importedIds = new Set(imported.map((result) => String(result.id)));
+
+  return [
+    ...imported,
+    ...championship.active.results.filter((result) => !importedIds.has(String(result.id))),
+  ].sort((left, right) => String(left.date).localeCompare(String(right.date)));
+}
+
+export function getResultAuditRows(result, players) {
+  const playerById = new Map((players || []).map((player) => [String(player.id), player]));
+
+  if (Array.isArray(result.audit_entries)) {
+    return result.audit_entries.map((entry) => ({
+      player_id: entry.player_id || null,
+      name: entry.app_name || entry.sheet_name || 'Jogador não vinculado',
+      sheet_name: entry.sheet_name || '',
+      status: entry.status || 'no_play',
+      points: Number(entry.points || 0),
+      matched: !!entry.player_id,
+    }));
+  }
+
+  return (players || []).map((player) => {
+    const status = result.statuses?.[String(player.id)] || 'no_play';
+    return {
+      player_id: String(player.id),
+      name: player.name || 'Sem nome',
+      sheet_name: '',
+      status,
+      points: POINTS_BY_STATUS[status] || 0,
+      matched: true,
+    };
+  });
+}
+
+
+
 export function isFootballPlayer(player) {
   return !!player && authzPlaysFootball(player);
 }
@@ -234,9 +451,9 @@ export function getTeamOutcomeLabel(outcome) {
 export function calculateCurrentRanking(snapshot) {
   const players = getFootballPlayers(snapshot);
   const rowsById = new Map(players.map((player) => [String(player.id), buildEmptyRow(player)]));
-  const championship = getChampionshipState(snapshot);
+  const results = getEffectiveChampionshipResults(snapshot);
 
-  championship.active.results.forEach((result) => {
+  results.forEach((result) => {
     rowsById.forEach((row, playerId) => {
       const rawStatus = result.statuses?.[playerId] || 'no_play';
       const status = Object.prototype.hasOwnProperty.call(POINTS_BY_STATUS, rawStatus) ? rawStatus : 'no_play';

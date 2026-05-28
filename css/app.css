@@ -1207,6 +1207,7 @@ button {
 @media (max-width: 420px) {
   .carne-schedule-header {
     display: grid;
+    gap: 10px;
   }
 
   .carne-next-pill {
@@ -1214,45 +1215,37 @@ button {
   }
 
   .carne-schedule-item {
-    grid-template-columns: 58px minmax(0, 1fr) 38px;
-    gap: 7px;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: stretch;
   }
 
-  .carne-schedule-item.no-actions {
-    grid-template-columns: 58px minmax(0, 1fr);
+  .carne-date-box {
+    width: 100%;
+  }
+
+  .carne-pair-boxes {
+    grid-template-columns: 1fr;
   }
 
   .carne-schedule-actions {
-    width: 38px;
+    flex-direction: row;
+    justify-content: stretch;
+    width: 100%;
   }
 
   .carne-schedule-actions .btn-sm {
-    width: 38px;
-    min-width: 38px;
-    height: 30px;
-    padding: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-indent: -999px;
-    position: relative;
+    flex: 1;
+    min-width: 0;
+    text-indent: 0;
+    overflow: visible;
+    white-space: normal;
+    position: static;
+    height: auto;
   }
 
   .carne-schedule-actions .btn-sm::after {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    text-indent: 0;
-    font-size: 15px;
-  }
-
-  .carne-schedule-actions .btn-secondary::after {
-    content: "✎";
-  }
-
-  .carne-schedule-actions .btn-danger::after {
-    content: "×";
-    font-size: 18px;
+    content: none;
   }
 }
 
@@ -3391,4 +3384,102 @@ button {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     gap: 24px !important;
   }
+}
+
+
+/* v1.60.52 - championship audit history */
+.championship-audit-list {
+  display: grid;
+  gap: 10px;
+}
+
+.championship-audit-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.championship-audit-item summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  list-style: none;
+}
+
+.championship-audit-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.championship-audit-item summary strong {
+  display: block;
+  color: #0f172a;
+}
+
+.championship-audit-item summary span,
+.championship-audit-item summary small {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.championship-audit-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid #e5e7eb;
+}
+
+.championship-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.championship-audit-table th,
+.championship-audit-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+}
+
+.championship-audit-table th {
+  color: #64748b;
+  font-size: 0.72rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: #f8fafc;
+}
+
+.championship-audit-table tr.is-unmatched td {
+  background: #fff7ed;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-weight: 900;
+  font-size: 0.75rem;
+}
+
+.status-chip.is-win {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-chip.is-draw {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.status-chip.is-loss {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.status-chip.is-no-play {
+  color: #991b1b;
+  background: #fee2e2;
 }
