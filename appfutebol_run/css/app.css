@@ -3587,3 +3587,47 @@ button {
     content: none !important;
   }
 }
+
+
+/* v1.60.60 - championship real adjustments */
+.weekly-summary-grid {
+  grid-template-columns: 1fr !important;
+}
+
+.championship-teams-result-details {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.championship-teams-result-details > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 900;
+  color: #1d3557;
+  list-style: none;
+}
+
+.championship-teams-result-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.championship-teams-result-details > summary::before {
+  content: "▶ ";
+}
+
+.championship-teams-result-details[open] > summary::before {
+  content: "▼ ";
+}
+
+.championship-teams-result-details .championship-teams-result-grid {
+  padding: 0 12px 12px;
+}
+
+@media (max-width: 760px) {
+  .championship-teams-result-details .championship-teams-result-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -141,14 +141,32 @@ function indexBy(items, keyGetter) {
   return map;
 }
 
+function buildGameKeyFromGame(game) {
+  const date = String(game?.game_date || '').trim();
+  const time = String(game?.game_time || '').trim();
+
+  if (!date) return 'default';
+
+  const safeDate = date.replace(/[^0-9-]/g, '');
+  const safeTime = time.replace(/[^0-9]/g, '') || '0000';
+
+  return `game_${safeDate}_${safeTime}`;
+}
+
+function getActiveGameKey(game) {
+  const explicit = String(game?.game_key || '').trim();
+  return explicit || buildGameKeyFromGame(game);
+}
+
+function normalizeConfirmationGameKey(confirmation, fallbackGameKey) {
+  return String(confirmation?.game_key || fallbackGameKey || 'default');
+}
+
 function normalizeGameForPresenceCutover(game) {
   if (!game || typeof game !== 'object') return game || null;
 
   const nextGame = cloneJson(game) || {};
 
-  // Cleanup v1.60.5: presence_confirmations is the only operational source
-  // for presence. Keep game_state focused on game configuration/sort result
-  // and strip any embedded presence residues before reading or saving.
   delete nextGame.confirmedPlayers;
   delete nextGame.confirmed_players;
   delete nextGame.confirmations;
@@ -158,6 +176,8 @@ function normalizeGameForPresenceCutover(game) {
     delete nextGame.data.confirmed_players;
     delete nextGame.data.confirmations;
   }
+
+  nextGame.game_key = getActiveGameKey(nextGame);
 
   return nextGame;
 }
@@ -172,6 +192,7 @@ function confirmationFromPresenceRow(row) {
 
   return {
     ...data,
+    game_key: row.game_key || data.game_key || 'default',
     player_id: row.player_id || data.player_id,
     confirmed,
     status: status || (confirmed ? 'confirmed' : 'cancelled'),
@@ -183,15 +204,17 @@ function confirmationFromPresenceRow(row) {
   };
 }
 
-function presencePayloadFromConfirmation(confirmation, now) {
+function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default') {
   const confirmed = confirmation?.confirmed === true;
   const removedByAdmin = confirmation?.removed_by_admin === true;
   const status = confirmed ? 'confirmed' : (removedByAdmin ? 'removed' : 'cancelled');
   const timestamp = confirmation?.timestamp || now;
   const actorAuthUserId = getCurrentAuthUserId();
+  const normalizedGameKey = normalizeConfirmationGameKey(confirmation, gameKey);
 
   const normalizedPayload = {
     player_id: String(confirmation.player_id),
+    game_key: normalizedGameKey,
     confirmed,
     status,
     timestamp,
@@ -203,7 +226,7 @@ function presencePayloadFromConfirmation(confirmation, now) {
   };
 
   return {
-    game_key: 'default',
+    game_key: normalizedGameKey,
     player_id: String(confirmation.player_id),
     status,
     confirmed_at: normalizedPayload.confirmed_at,
@@ -276,14 +299,13 @@ async function requestNoContent(config, url, options = {}) {
 }
 
 async function loadSplitState(config) {
-  const [playersResult, gameResult, presenceResult, metaResult] = await Promise.all([
+  const [playersResult, gameResult, metaResult] = await Promise.all([
     requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,auth_user_id,is_admin,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.presence, 'game_key=eq.default&select=game_key,player_id,status,confirmed_at,cancelled_at,removed_by_admin,data,updated_at'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
   ]);
 
-  if (!playersResult.ok || !gameResult.ok || !presenceResult.ok || !metaResult.ok) {
+  if (!playersResult.ok || !gameResult.ok || !metaResult.ok) {
     return {
       ok: false,
       state: null,
@@ -302,16 +324,35 @@ async function loadSplitState(config) {
         }))
         .filter((player) => player.id)
     : [];
+
   const gameRow = Array.isArray(gameResult.data) ? gameResult.data[0] : null;
+  const normalizedGame = normalizeGameForPresenceCutover(gameRow?.data || null);
+  const activeGameKey = getActiveGameKey(normalizedGame);
+
+  const presenceResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(activeGameKey)}&select=game_key,player_id,status,confirmed_at,cancelled_at,removed_by_admin,data,updated_at`),
+    { method: 'GET' }
+  );
+
+  if (!presenceResult.ok) {
+    return {
+      ok: false,
+      state: null,
+      updatedAt: null,
+      reason: 'single_source_presence_unavailable',
+    };
+  }
 
   const confirmations = Array.isArray(presenceResult.data)
     ? presenceResult.data.map(confirmationFromPresenceRow).filter((entry) => entry?.player_id)
     : [];
+
   const metaRow = Array.isArray(metaResult.data) ? metaResult.data[0] : null;
 
   const state = composeState({
     players,
-    game: gameRow?.data || null,
+    game: normalizedGame,
     confirmations,
     meta: metaRow?.data || {},
   });
@@ -340,8 +381,8 @@ async function loadSplitState(config) {
     ok: true,
     state,
     updatedAt: lastRemoteUpdatedAt,
-    reason: 'presence_single_source_loaded',
-    mode: 'presence-single-source',
+    reason: 'presence_single_source_loaded_by_game_key',
+    mode: 'presence-single-source-game-key',
   };
 }
 
@@ -354,8 +395,8 @@ async function upsertRow(config, table, payload, onConflict = null) {
   });
 }
 
-async function upsertPresenceConfirmation(config, confirmation, now) {
-  const payload = presencePayloadFromConfirmation(confirmation, now);
+async function upsertPresenceConfirmation(config, confirmation, now, gameKey) {
+  const payload = presencePayloadFromConfirmation(confirmation, now, gameKey);
   const result = await upsertRow(config, SPLIT_TABLES.presence, payload, 'game_key,player_id');
 
   if (!result.ok) {
@@ -375,6 +416,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   const operations = [];
   const previousPlayers = indexBy(previousParts?.players || [], (player) => player.id);
   const nextPlayers = indexBy(nextParts.players, (player) => player.id);
+
+  const previousGameKey = getActiveGameKey(previousParts?.game || null);
+  const nextGameKey = getActiveGameKey(nextParts.game || null);
+
   const previousConfirmations = indexBy(previousParts?.confirmations || [], (entry) => entry.player_id);
   const nextConfirmations = indexBy(nextParts.confirmations, (entry) => entry.player_id);
 
@@ -409,11 +454,30 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     }
   }
 
+  if (previousGameKey !== nextGameKey) {
+    operations.push({
+      type: 'delete_previous_game_presence_confirmations',
+      run: () => requestNoContent(
+        config,
+        tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}`),
+        { method: 'DELETE' }
+      ),
+    });
+  }
+
   for (const [playerId, confirmation] of nextConfirmations.entries()) {
-    if (stableStringify(previousConfirmations.get(playerId)) !== stableStringify(confirmation)) {
+    const normalizedConfirmation = {
+      ...confirmation,
+      game_key: nextGameKey,
+    };
+
+    if (
+      previousGameKey !== nextGameKey ||
+      stableStringify(previousConfirmations.get(playerId)) !== stableStringify(normalizedConfirmation)
+    ) {
       operations.push({
         type: 'upsert_presence_confirmation',
-        run: () => upsertPresenceConfirmation(config, confirmation, now),
+        run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, nextGameKey),
       });
     }
   }
@@ -422,7 +486,11 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     if (!nextConfirmations.has(playerId)) {
       operations.push({
         type: 'delete_presence_confirmation',
-        run: () => requestNoContent(config, tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.default&player_id=eq.${encodeURIComponent(String(playerId))}`), { method: 'DELETE' }),
+        run: () => requestNoContent(
+          config,
+          tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}&player_id=eq.${encodeURIComponent(String(playerId))}`),
+          { method: 'DELETE' }
+        ),
       });
     }
   }
@@ -538,5 +606,7 @@ export function getSupabaseMeta() {
     presenceSingleSource: true,
     presenceWriteCutover: true,
     presenceCleanup: true,
+    presenceGameKeyScoped: true,
+    gameCycleResetFix: true,
   };
 }

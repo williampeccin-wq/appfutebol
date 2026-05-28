@@ -121,7 +121,7 @@ function renderResultForm(snapshot, currentPlayer) {
   return `
     <section class="card championship-result-card">
       <div class="card-title">Lançar resultado do jogo</div>
-      <p class="footer-note">Informe o resultado do time sorteado. O sistema distribui automaticamente os pontos para todos os jogadores do jogo.</p>
+      <p class="footer-note">Informe o resultado do sorteio atual. Depois de criar o próximo jogo e sortear novamente, este mesmo formulário ficará disponível para o novo lançamento.</p>
       <div class="form-grid compact-grid championship-date-grid">
         <label>
           Data do jogo
@@ -134,16 +134,19 @@ function renderResultForm(snapshot, currentPlayer) {
           </select>
         </label>
       </div>
-      <div class="championship-teams-result-grid">
-        <div class="championship-team-result-box">
-          <div class="championship-team-label">Time A</div>
-          <div class="championship-team-player-list">${renderTeamPlayers(draw.team_a)}</div>
+      <details class="championship-teams-result-details">
+        <summary>Ver escalações do sorteio</summary>
+        <div class="championship-teams-result-grid">
+          <div class="championship-team-result-box">
+            <div class="championship-team-label">Time A</div>
+            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_a)}</div>
+          </div>
+          <div class="championship-team-result-box">
+            <div class="championship-team-label">Time B</div>
+            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_b)}</div>
+          </div>
         </div>
-        <div class="championship-team-result-box">
-          <div class="championship-team-label">Time B</div>
-          <div class="championship-team-player-list">${renderTeamPlayers(draw.team_b)}</div>
-        </div>
-      </div>
+      </details>
       <div class="actions">
         <button class="btn btn-primary" type="button" data-action="save-championship-result">Salvar resultado</button>
       </div>
