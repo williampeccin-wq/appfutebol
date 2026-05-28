@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.51-draw-layout-responsive';
+export const APP_VERSION = 'v1.60.53-carne-mobile-safari-fix';
