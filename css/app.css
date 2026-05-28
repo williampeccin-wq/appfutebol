@@ -3521,3 +3521,69 @@ button {
     min-width: 0;
   }
 }
+
+
+/* v1.60.55 - final Carne mobile specificity override */
+@media (max-width: 760px) {
+  .carne-schedule-card .carne-schedule-item.has-actions,
+  .carne-schedule-card .carne-schedule-item.no-actions,
+  .carne-schedule-card .carne-schedule-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    grid-template-columns: none !important;
+    min-height: auto !important;
+    padding: 12px !important;
+  }
+
+  .carne-schedule-card .carne-date-box {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .carne-schedule-card .carne-pair-boxes {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+  }
+
+  .carne-schedule-card .carne-player-box {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .carne-schedule-card .carne-schedule-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-top: 0 !important;
+    gap: 8px !important;
+    grid-column: auto !important;
+  }
+
+  .carne-schedule-card .carne-schedule-actions .btn-sm {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    white-space: normal !important;
+    text-indent: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  .carne-schedule-card .carne-schedule-actions .btn-sm::after {
+    content: none !important;
+  }
+}
