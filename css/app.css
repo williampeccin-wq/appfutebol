@@ -3483,3 +3483,41 @@ button {
   color: #991b1b;
   background: #fee2e2;
 }
+
+
+/* v1.60.54 safari carne mobile stabilization */
+@media (max-width: 620px) {
+  .carne-schedule-item,
+  .carne-schedule-item.no-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    grid-template-columns: none !important;
+  }
+
+  .carne-date-box {
+    width: 100%;
+    max-width: none;
+  }
+
+  .carne-pair-boxes {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+
+  .carne-schedule-actions {
+    display: flex;
+    flex-direction: row !important;
+    width: 100%;
+    justify-content: stretch !important;
+    gap: 8px !important;
+  }
+
+  .carne-schedule-actions .btn-sm {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+  }
+}
