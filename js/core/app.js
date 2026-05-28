@@ -1855,18 +1855,41 @@ function bindAppEvents(currentPlayer) {
         return;
       }
 
+      const currentState = getState();
+      const previousGameDate = String(currentState?.game?.game_date || '');
+      const nextGameDate = String(formData.get('game_date') || '');
+
+      const shouldResetConfirmations = previousGameDate !== nextGameDate;
+
+      const nextGameKey = nextGameDate
+        ? `game_${nextGameDate}_${String(formData.get('game_time') || '')}`
+        : `game_${Date.now()}`;
+
       patchState({
         game: {
-          ...(getState().game || {}),
-          game_date: String(formData.get('game_date') || ''),
+          ...(currentState.game || {}),
+          game_date: nextGameDate,
           game_time: String(formData.get('game_time') || ''),
           max_players: maxPlayers,
           mens_expire_date: String(formData.get('mens_expire_date') || ''),
           open: formData.get('open') === 'on',
+          game_key: nextGameKey,
+          ...(shouldResetConfirmations ? { sort_result: null } : {}),
         },
+        ...(shouldResetConfirmations ? { confirmations: [] } : {}),
       });
 
-      showToast('Configuração do jogo salva.');
+      if (shouldResetConfirmations) {
+        localStorage.removeItem('harmonia_team_draw');
+        localStorage.removeItem('harmonia_confirmations');
+        localStorage.removeItem('harmonia_game_state');
+      }
+
+      showToast(
+        shouldResetConfirmations
+          ? 'Novo jogo criado. Presenças e sorteio foram reiniciados.'
+          : 'Configuração do jogo salva.'
+      );
     });
   }
 }
@@ -1933,7 +1956,15 @@ function renderHome(snapshot, currentPlayer) {
   const storedNotifications = Array.isArray(workingSnapshot.notifications) ? workingSnapshot.notifications : [];
   const playersByIdForCarneNotification = new Map(workingSnapshot.players.map((player) => [String(player.id), player]));
   const nextCarneEntry = carneScheduleEntries
-    .filter((entry) => entry?.active !== false && entry?.date)
+    .filter((entry) => {
+      if (entry?.active === false || !entry?.date) return false;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const entryDate = new Date(`${entry.date}T00:00:00`);
+      return entryDate >= today;
+    })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
   const carneNotification = nextCarneEntry
     ? {
@@ -2036,21 +2067,6 @@ function renderWeeklyGame(snapshot, currentPlayer) {
             <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
             <span>${remaining} vagas restantes</span>
           </div>
-        </div>
-
-        <div class="weekly-self-card">
-          <div class="card-title">Minha presença</div>
-          <button
-            class="switch-control weekly-self-switch ${confirmed ? 'is-on' : 'is-off'}"
-            type="button"
-            id="confirm-btn"
-            ${canAct ? '' : 'disabled'}
-            aria-pressed="${confirmed ? 'true' : 'false'}"
-          >
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label ${confirmed ? 'is-ok' : 'is-neutral'}">${confirmed ? 'Dentro do jogo' : 'Fora do jogo'}</span>
-          </button>
-          <p class="footer-note">${confirmed ? 'Você está confirmado para o próximo jogo.' : 'Ative o switch para confirmar sua presença.'}</p>
         </div>
       </section>
 

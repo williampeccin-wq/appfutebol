@@ -29,11 +29,13 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 }, {});
 
 const IMPORTED_SHEET_NAME_ALIASES = {
+  'ADRIANO': 'DANO',
   'ANDRE DAMS': 'ANDRÉ',
   'PAPAL PH': 'PH',
-  'WILLIAM': 'WILLIAM PECCIN',
+  'WILLIAM': 'WILLIAM',
   'DAVID': 'DVD',
-  'NATAN': 'NATHAN',
+  'LUCAS SILVA': 'LUCAS',
+  'NATAN': 'NATAN',
   'GEDE': 'GEDIEL',
 };
 
