@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.53-carne-mobile-safari-fix';
+export const APP_VERSION = 'v1.60.54-carne-mobile-final-fix';
