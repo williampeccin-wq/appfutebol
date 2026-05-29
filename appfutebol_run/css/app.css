@@ -3717,3 +3717,137 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v1.60.66 - championship launch UX, responsive config, home waitlist */
+.championship-result-status-row,
+.championship-result-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.championship-result-actions-row .footer-note {
+  flex: 1 1 240px;
+}
+
+.championship-team-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.championship-team-player-pill {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 6px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.championship-team-player-pill small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.championship-launch-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.championship-launch-summary-grid > div {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.championship-launch-summary-grid strong {
+  display: block;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.championship-launch-summary-grid span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.home-waitlist-card {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.home-waitlist-highlight {
+  font-weight: 900;
+  color: #9a3412;
+  margin-bottom: 10px;
+}
+
+.home-waitlist-list {
+  display: grid;
+  gap: 8px;
+}
+
+.home-waitlist-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #fed7aa;
+}
+
+.home-waitlist-row span {
+  font-weight: 900;
+  color: #c2410c;
+}
+
+#game-config-form.game-config-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: end !important;
+}
+
+#game-config-form.game-config-form label,
+#game-config-form.game-config-form .field-label {
+  min-width: 0;
+}
+
+#game-config-form.game-config-form .config-notifications-field,
+#game-config-form.game-config-form .config-notifications-help,
+#game-config-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1 !important;
+}
+
+#game-config-form.game-config-form .notification-textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .championship-launch-summary-grid,
+  #game-config-form.game-config-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .championship-audit-item summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .championship-result-actions-row .btn {
+    width: 100%;
+  }
+}

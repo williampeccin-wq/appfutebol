@@ -849,7 +849,7 @@ document.addEventListener("click", async (e) => {
     });
 
     const safeSnapshot = repairManualSnapshot(snapshot);
-    savePersistedState(safeSnapshot);
+    await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
     uiActionInFlight = false;
     showToast("Resultado lançado e classificação recalculada", "success");
@@ -877,7 +877,7 @@ document.addEventListener("click", async (e) => {
 
     deleteChampionshipResult(snapshot, id);
     const safeSnapshot = repairManualSnapshot(snapshot);
-    savePersistedState(safeSnapshot);
+    await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
     uiActionInFlight = false;
     showToast("Resultado removido e classificação recalculada", "success");
@@ -1941,6 +1941,8 @@ function renderHome(snapshot, currentPlayer) {
   const game = gameView.game;
   const confirmedCount = gameView.confirmedCount;
   const maxPlayers = gameView.maxPlayers || 0;
+  const waitlistView = getWaitlistView(workingSnapshot);
+  const waitlistCount = waitlistView.length;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const mensalidade = buildMensalidadeMeta(game, activePlayer);
   const carneScheduleEntries = getCarneScheduleEntriesForApp(workingSnapshot);
@@ -2027,7 +2029,7 @@ function renderHome(snapshot, currentPlayer) {
           <div class="progress-track">
             <div class="progress-bar" style="width:${fillPercent}%"></div>
           </div>
-          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}</div>
+          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}${waitlistCount ? ` · Fila: ${waitlistCount}` : ''}</div>
         </div>
         <div class="hero-presence-panel">
           <div>
@@ -2040,6 +2042,21 @@ function renderHome(snapshot, currentPlayer) {
           ` : ''}
         </div>
       </section>
+
+      ${waitlistCount ? `
+        <section class="card home-waitlist-card">
+          <div class="card-title compact-title">Fila de espera</div>
+          ${waitlisted ? `<div class="home-waitlist-highlight">Você está em ${waitlistPosition || '?'}º na fila.</div>` : ''}
+          <div class="home-waitlist-list">
+            ${waitlistView.slice(0, 5).map((entry) => `
+              <div class="home-waitlist-row">
+                <span>#${entry.position}</span>
+                <strong>${entry.player?.name || 'Jogador'}</strong>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+      ` : ''}
 
       <section class="card notifications-card">
         <div class="card-title compact-title">Notificações</div>

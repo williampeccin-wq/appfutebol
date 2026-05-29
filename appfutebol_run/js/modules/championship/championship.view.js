@@ -13,6 +13,7 @@ import {
   getResultAuditRows,
   getActiveDrawTeams,
   getTeamOutcomeLabel,
+  getManualChampionshipResults,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 
@@ -44,6 +45,14 @@ function getStatusClass(status) {
   if (status === 'draw') return 'is-draw';
   if (status === 'loss') return 'is-loss';
   return 'is-no-play';
+}
+
+function getPositionShortLabel(position) {
+  const value = String(position || '').toLowerCase();
+  if (value === 'gol') return 'Gol';
+  if (value === 'zag') return 'Zag';
+  if (value === 'atk') return 'Ata';
+  return 'Meia';
 }
 
 
@@ -113,15 +122,28 @@ function renderResultForm(snapshot, currentPlayer) {
   const playerById = new Map(players.map((player) => [String(player.id), player]));
   const renderTeamPlayers = (ids) => ids.map((playerId) => {
     const player = playerById.get(String(playerId));
-    return `<span>${escapeHtml(player?.name || 'Jogador removido')}</span>`;
+    return `
+      <span class="championship-team-player-pill">
+        <strong>${escapeHtml(player?.name || 'Jogador removido')}</strong>
+        <small>${escapeHtml(getPositionShortLabel(player?.position))}</small>
+      </span>
+    `;
   }).join('');
 
   const today = draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const manualResults = getManualChampionshipResults(snapshot);
+  const existingSameDate = manualResults.find((result) => String(result.date) === String(today));
 
   return `
     <section class="card championship-result-card">
       <div class="card-title">Lançar resultado do jogo</div>
-      <p class="footer-note">Informe o resultado do sorteio atual. Depois de criar o próximo jogo e sortear novamente, este mesmo formulário ficará disponível para o novo lançamento.</p>
+      <p class="footer-note">Use este bloco para lançar o resultado do sorteio atual. Ao salvar uma data já lançada, o resultado anterior dessa data é substituído para evitar duplicidade.</p>
+
+      <div class="championship-result-status-row">
+        <span class="tag is-neutral">Sorteio atual: ${draw.team_a.length + draw.team_b.length} jogadores</span>
+        <span class="tag ${existingSameDate ? 'is-warn' : 'is-ok'}">${existingSameDate ? 'Esta data já tem lançamento' : 'Data livre para lançamento'}</span>
+      </div>
+
       <div class="form-grid compact-grid championship-date-grid">
         <label>
           Data do jogo
@@ -134,8 +156,9 @@ function renderResultForm(snapshot, currentPlayer) {
           </select>
         </label>
       </div>
+
       <details class="championship-teams-result-details">
-        <summary>Ver escalações do sorteio</summary>
+        <summary>Ver escalações do sorteio · Time A ${draw.team_a.length} x ${draw.team_b.length} Time B</summary>
         <div class="championship-teams-result-grid">
           <div class="championship-team-result-box">
             <div class="championship-team-label">Time A</div>
@@ -147,13 +170,14 @@ function renderResultForm(snapshot, currentPlayer) {
           </div>
         </div>
       </details>
-      <div class="actions">
+
+      <div class="championship-result-actions-row">
         <button class="btn btn-primary" type="button" data-action="save-championship-result">Salvar resultado</button>
+        <span class="footer-note">Depois de criar novo jogo e novo sorteio, este mesmo formulário fica pronto para o próximo lançamento.</span>
       </div>
     </section>
   `;
 }
-
 function renderResultsHistory(snapshot, currentPlayer) {
   const results = getEffectiveChampionshipResults(snapshot);
   const players = getFootballPlayers(snapshot);
@@ -275,6 +299,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
   const currentRanking = calculateCurrentRanking(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
+  const manualResults = getManualChampionshipResults(snapshot);
 
   return `
     <section class="section-stack championship-screen">
@@ -282,6 +307,16 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
         <div class="hero-label">Campeonato atual</div>
         <div class="hero-date">${ACTIVE_CHAMPIONSHIP.label}</div>
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
+      </section>
+
+      <section class="card championship-launch-summary-card">
+        <div class="card-title">Próximos lançamentos</div>
+        <p class="footer-note">Os resultados ficam acumulados no histórico auditável. Para cada novo jogo, faça o sorteio na aba Jogo da semana e volte aqui para lançar o vencedor.</p>
+        <div class="championship-launch-summary-grid">
+          <div><strong>${manualResults.length}</strong><span>lançamentos manuais</span></div>
+          <div><strong>${Math.max(resultCount - manualResults.length, 0)}</strong><span>rodadas importadas</span></div>
+          <div><strong>${currentRanking.length}</strong><span>jogadores elegíveis</span></div>
+        </div>
       </section>
 
       <section class="card championship-rule-card">

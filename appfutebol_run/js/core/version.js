@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.65-access-waitlist-ux-fix';
+export const APP_VERSION = 'v1.60.66-championship-config-waitlist-ux';

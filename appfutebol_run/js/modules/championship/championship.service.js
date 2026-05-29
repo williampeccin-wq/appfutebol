@@ -29,14 +29,16 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 }, {});
 
 const IMPORTED_SHEET_NAME_ALIASES = {
+  // De/para validado com a planilha Inverno 26.
   'ADRIANO': 'DANO',
   'ANDRE DAMS': 'ANDRÉ',
+  'ANDRÉ DAMS': 'ANDRÉ',
+  'LUCAS SILVA': 'LUCAS',
+  'DAVID': 'DVD',
+  'GEDE': 'GEDIEL',
+  'NATAN': 'NATAN',
   'PAPAL PH': 'PH',
   'WILLIAM': 'WILLIAM',
-  'DAVID': 'DVD',
-  'LUCAS SILVA': 'LUCAS',
-  'NATAN': 'NATAN',
-  'GEDE': 'GEDIEL',
 };
 
 const IMPORTED_SHEET_STATUS_BY_POINTS = {
@@ -319,7 +321,10 @@ export function persistChampionshipResult(snapshot, result) {
     statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
   };
 
-  const results = championship.active.results.filter((entry) => String(entry.id) !== String(normalizedResult.id));
+  const results = championship.active.results.filter((entry) => (
+    String(entry.id) !== String(normalizedResult.id) &&
+    String(entry.date) !== String(normalizedResult.date)
+  ));
   results.push(normalizedResult);
 
   snapshot.championship = {
@@ -448,6 +453,12 @@ export function buildTeamResultStatuses(snapshot, outcome) {
 
 export function getTeamOutcomeLabel(outcome) {
   return TEAM_RESULT_OPTIONS.find((option) => option.value === outcome)?.label || 'Resultado lançado';
+}
+
+export function getManualChampionshipResults(snapshot) {
+  return getChampionshipState(snapshot).active.results
+    .filter((result) => !result.imported)
+    .sort((left, right) => String(left.date).localeCompare(String(right.date)));
 }
 
 export function calculateCurrentRanking(snapshot) {
