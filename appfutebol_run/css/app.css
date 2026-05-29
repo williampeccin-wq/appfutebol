@@ -3631,3 +3631,89 @@ button {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* v1.60.61 - admin notifications and waitlist */
+.notification-textarea {
+  min-height: 104px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.notification-item-admin {
+  display: grid;
+  gap: 6px;
+  align-items: start;
+}
+
+.notification-item-admin span {
+  white-space: normal;
+}
+
+.waitlist-section {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 12px;
+}
+
+.waitlist-player-row {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.hero-presence-note {
+  max-width: 36rem;
+}
+
+
+/* v1.60.62 - config layout and waitlist stability */
+#game-config-form.game-config-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+#game-config-form.game-config-form .checkbox-line {
+  align-self: center;
+  min-height: 44px;
+}
+
+#game-config-form.game-config-form .config-notifications-field {
+  grid-column: 1 / -1;
+}
+
+#game-config-form.game-config-form .config-notifications-help {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+}
+
+#game-config-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+#game-config-form.game-config-form .notification-textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 12px 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+@media (min-width: 860px) {
+  #game-config-form.game-config-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #game-config-form.game-config-form .config-notifications-field,
+  #game-config-form.game-config-form .config-notifications-help,
+  #game-config-form.game-config-form .game-config-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  #game-config-form.game-config-form {
+    grid-template-columns: 1fr;
+  }
+}

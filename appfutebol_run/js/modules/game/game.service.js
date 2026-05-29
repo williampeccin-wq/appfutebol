@@ -32,13 +32,140 @@ export function canManagePresence(player, game) {
   return getPresenceGuard(player, game);
 }
 
+
+function isWaitlistEntry(entry) {
+  return !!entry && entry.confirmed !== true && (entry.status === 'waitlist' || entry.status === 'waitlisted');
+}
+
+function getWaitlistEntries(confirmations = []) {
+  return (Array.isArray(confirmations) ? confirmations : [])
+    .filter(isWaitlistEntry)
+    .sort((a, b) => String(a.waitlisted_at || a.timestamp || '').localeCompare(String(b.waitlisted_at || b.timestamp || '')));
+}
+
+function promoteFirstWaitlisted(confirmations = [], now = new Date().toISOString(), excludedPlayerId = null) {
+  const waitlist = getWaitlistEntries(confirmations)
+    .filter((entry) => String(entry.player_id) !== String(excludedPlayerId || ''));
+
+  if (!waitlist.length) {
+    return {
+      confirmations,
+      promoted: null,
+    };
+  }
+
+  const promotedId = String(waitlist[0].player_id);
+
+  return {
+    promoted: promotedId,
+    confirmations: confirmations.map((entry) => (
+      String(entry.player_id) === promotedId
+        ? {
+            ...entry,
+            confirmed: true,
+            status: 'confirmed',
+            waitlisted_at: null,
+            waitlist_position: null,
+            removed_by_admin: false,
+            confirmed_at: now,
+            cancelled_at: null,
+            timestamp: now,
+          }
+        : entry
+    )),
+  };
+}
+
+function upsertWaitlistEntry(snapshot, playerId, now = new Date().toISOString()) {
+  const currentWaitlist = getWaitlistEntries(snapshot.confirmations);
+  const existing = (snapshot.confirmations || []).find((entry) => String(entry.player_id) === String(playerId));
+
+  const waitlistEntry = {
+    ...(existing || {}),
+    player_id: playerId,
+    confirmed: false,
+    status: 'waitlist',
+    removed_by_admin: false,
+    confirmed_at: null,
+    cancelled_at: null,
+    waitlisted_at: existing?.waitlisted_at || now,
+    waitlist_position: currentWaitlist.some((entry) => String(entry.player_id) === String(playerId))
+      ? currentWaitlist.findIndex((entry) => String(entry.player_id) === String(playerId)) + 1
+      : currentWaitlist.length + 1,
+    timestamp: now,
+  };
+
+  if (existing) {
+    return (snapshot.confirmations || []).map((entry) => (
+      String(entry.player_id) === String(playerId) ? waitlistEntry : entry
+    ));
+  }
+
+  return [
+    ...(snapshot.confirmations || []),
+    waitlistEntry,
+  ];
+}
+
+function normalizeWaitlistPositions(confirmations = []) {
+  const waitlistIds = getWaitlistEntries(confirmations).map((entry) => String(entry.player_id));
+  return confirmations.map((entry) => {
+    if (!isWaitlistEntry(entry)) return entry;
+    const position = waitlistIds.indexOf(String(entry.player_id)) + 1;
+    return {
+      ...entry,
+      waitlist_position: position > 0 ? position : null,
+    };
+  });
+}
+
+export function getWaitlistView(snapshot = getState()) {
+  const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
+  return getWaitlistEntries(snapshot.confirmations || [])
+    .map((entry, index) => ({
+      ...entry,
+      position: index + 1,
+      player: playersById.get(String(entry.player_id)) || null,
+    }))
+    .filter((entry) => entry.player);
+}
+
+
 export function toggleConfirmation(playerId) {
   const snapshot = getState();
   const player = snapshot.players.find((item) => String(item.id) === String(playerId));
   const existing = snapshot.confirmations.find((entry) => String(entry.player_id) === String(playerId));
   const currentlyConfirmed = existing?.confirmed === true;
+  const currentlyWaitlisted = isWaitlistEntry(existing);
+  const now = new Date().toISOString();
 
   if (currentlyConfirmed) {
+    const cancelled = snapshot.confirmations.map((entry) => (
+      String(entry.player_id) === String(playerId)
+        ? {
+            ...entry,
+            confirmed: false,
+            status: 'cancelled',
+            removed_by_admin: false,
+            confirmed_at: null,
+            cancelled_at: now,
+            timestamp: now,
+          }
+        : entry
+    ));
+
+    const promoted = promoteFirstWaitlisted(cancelled, now, playerId);
+    patchState({ confirmations: normalizeWaitlistPositions(promoted.confirmations) });
+
+    return {
+      ok: true,
+      message: promoted.promoted
+        ? 'Presença cancelada. Primeiro da fila entrou automaticamente.'
+        : 'Presença cancelada.',
+    };
+  }
+
+  if (currentlyWaitlisted) {
     const updated = snapshot.confirmations.map((entry) => (
       String(entry.player_id) === String(playerId)
         ? {
@@ -47,13 +174,16 @@ export function toggleConfirmation(playerId) {
             status: 'cancelled',
             removed_by_admin: false,
             confirmed_at: null,
-            cancelled_at: new Date().toISOString(),
-            timestamp: new Date().toISOString(),
+            cancelled_at: now,
+            waitlisted_at: null,
+            waitlist_position: null,
+            timestamp: now,
           }
         : entry
     ));
-    patchState({ confirmations: updated });
-    return { ok: true, message: 'Presença cancelada.' };
+
+    patchState({ confirmations: normalizeWaitlistPositions(updated) });
+    return { ok: true, message: 'Você saiu da fila de espera.' };
   }
 
   const decision = getPresenceDecision({
@@ -63,6 +193,16 @@ export function toggleConfirmation(playerId) {
   });
 
   if (!decision.canConfirm) {
+    if (decision.reasonBlocked === 'game_full') {
+      const updated = normalizeWaitlistPositions(upsertWaitlistEntry(snapshot, playerId, now));
+      const position = getWaitlistEntries(updated).findIndex((entry) => String(entry.player_id) === String(playerId)) + 1;
+      patchState({ confirmations: updated });
+      return {
+        ok: true,
+        message: `Jogo cheio. Você entrou na fila de espera${position ? ` na posição ${position}` : ''}.`,
+      };
+    }
+
     return { ok: false, message: decision.message || 'Você não pode confirmar presença agora.' };
   }
 
@@ -75,10 +215,12 @@ export function toggleConfirmation(playerId) {
             ...entry,
             confirmed: true,
             status: 'confirmed',
+            waitlisted_at: null,
+            waitlist_position: null,
             removed_by_admin: false,
-            confirmed_at: new Date().toISOString(),
+            confirmed_at: now,
             cancelled_at: null,
-            timestamp: new Date().toISOString(),
+            timestamp: now,
           }
         : entry
     ));
@@ -90,17 +232,18 @@ export function toggleConfirmation(playerId) {
         confirmed: true,
         status: 'confirmed',
         removed_by_admin: false,
-        confirmed_at: new Date().toISOString(),
+        confirmed_at: now,
         cancelled_at: null,
-        timestamp: new Date().toISOString(),
+        waitlisted_at: null,
+        waitlist_position: null,
+        timestamp: now,
       },
     ];
   }
 
-  patchState({ confirmations: updated });
+  patchState({ confirmations: normalizeWaitlistPositions(updated) });
   return { ok: true, message: 'Presença confirmada.' };
 }
-
 
 /**
  * Remove um jogador confirmado do jogo vigente por ação administrativa.
@@ -126,10 +269,14 @@ export function adminRemovePlayerFromGame(playerId) {
           removed_by_admin: true,
           confirmed_at: null,
           cancelled_at: null,
+          waitlisted_at: null,
+          waitlist_position: null,
           timestamp: now,
         }
       : entry
   ));
+
+  const promoted = promoteFirstWaitlisted(updatedConfirmations, now, targetId);
 
   const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
   const removeFromTeam = (team) => (Array.isArray(team) ? team.filter((entry) => String(getEntryId(entry)) !== targetId) : []);
@@ -149,16 +296,17 @@ export function adminRemovePlayerFromGame(playerId) {
   }
 
   patchState({
-    confirmations: updatedConfirmations,
+    confirmations: normalizeWaitlistPositions(promoted.confirmations),
     game: updatedGame,
   });
 
   return {
     ok: true,
-    message: 'Jogador removido do jogo pelo admin.',
+    message: promoted.promoted
+      ? 'Jogador removido. Primeiro da fila entrou automaticamente.'
+      : 'Jogador removido do jogo pelo admin.',
   };
 }
-
 
 function getPositionBucket(player) {
   const raw = String(player?.position || 'meia')

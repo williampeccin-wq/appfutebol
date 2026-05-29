@@ -186,9 +186,11 @@ function confirmationFromPresenceRow(row) {
   if (!row || typeof row !== 'object') return null;
 
   const data = row.data && typeof row.data === 'object' ? row.data : {};
-  const status = String(row.status || data.status || '').toLowerCase();
+  const rowStatus = String(row.status || '').toLowerCase();
+  const dataStatus = String(data.status || '').toLowerCase();
+  const status = (dataStatus === 'waitlist' || dataStatus === 'waitlisted') ? dataStatus : (rowStatus || dataStatus);
   const confirmed = status ? status === 'confirmed' : data.confirmed === true;
-  const timestamp = row.confirmed_at || row.cancelled_at || row.updated_at || data.timestamp || null;
+  const timestamp = data.waitlisted_at || data.timestamp || row.confirmed_at || row.cancelled_at || row.updated_at || null;
 
   return {
     ...data,
@@ -199,6 +201,8 @@ function confirmationFromPresenceRow(row) {
     timestamp,
     confirmed_at: row.confirmed_at || data.confirmed_at || null,
     cancelled_at: row.cancelled_at || data.cancelled_at || null,
+    waitlisted_at: data.waitlisted_at || null,
+    waitlist_position: data.waitlist_position || null,
     removed_by_admin: row.removed_by_admin === true || data.removed_by_admin === true,
     source: 'presence_confirmations',
   };
@@ -207,8 +211,10 @@ function confirmationFromPresenceRow(row) {
 function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default') {
   const confirmed = confirmation?.confirmed === true;
   const removedByAdmin = confirmation?.removed_by_admin === true;
-  const status = confirmed ? 'confirmed' : (removedByAdmin ? 'removed' : 'cancelled');
-  const timestamp = confirmation?.timestamp || now;
+  const requestedStatus = String(confirmation?.status || '').toLowerCase();
+  const isWaitlist = !confirmed && (requestedStatus === 'waitlist' || requestedStatus === 'waitlisted');
+  const status = confirmed ? 'confirmed' : (removedByAdmin ? 'removed' : (isWaitlist ? 'waitlist' : 'cancelled'));
+  const timestamp = confirmation?.timestamp || confirmation?.waitlisted_at || now;
   const actorAuthUserId = getCurrentAuthUserId();
   const normalizedGameKey = normalizeConfirmationGameKey(confirmation, gameKey);
 
@@ -219,7 +225,9 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
     status,
     timestamp,
     confirmed_at: confirmed ? timestamp : null,
-    cancelled_at: (!confirmed && !removedByAdmin) ? timestamp : null,
+    cancelled_at: (!confirmed && !removedByAdmin && !isWaitlist) ? timestamp : null,
+    waitlisted_at: isWaitlist ? (confirmation?.waitlisted_at || timestamp) : null,
+    waitlist_position: isWaitlist ? (confirmation?.waitlist_position || null) : null,
     removed_by_admin: removedByAdmin,
     source: 'presence_confirmations_app_write',
     actor_auth_user_id: actorAuthUserId,
@@ -228,7 +236,7 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
   return {
     game_key: normalizedGameKey,
     player_id: String(confirmation.player_id),
-    status,
+    status: status === 'waitlist' ? 'cancelled' : status,
     confirmed_at: normalizedPayload.confirmed_at,
     cancelled_at: normalizedPayload.cancelled_at,
     removed_by_admin: removedByAdmin,

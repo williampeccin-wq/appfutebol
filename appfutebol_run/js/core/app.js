@@ -1107,7 +1107,7 @@ if (action === "create-player-access") {
     const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
 
     const response = await fetch(
-      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
+      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
       {
         method: "POST",
         headers: {
@@ -1145,10 +1145,10 @@ if (action === "create-player-access") {
 
     const safeSnapshot = repairManualSnapshot(snapshot);
     replaceState(safeSnapshot);
-    savePersistedState(safeSnapshot);
+    await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
 
-    showToast("Acesso criado com sucesso.", "success");
+    showToast(data.reused_existing_user ? "Acesso existente atualizado e vinculado." : "Acesso criado com sucesso.", "success");
   } catch (error) {
     clearActionBusy(trigger);
     showToast(error?.message || "Erro inesperado.", "error");
@@ -1189,7 +1189,7 @@ if (action === "reset-player-password") {
     const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
 
     const response = await fetch(
-      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
+      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
       {
         method: "POST",
         headers: {
@@ -1419,10 +1419,11 @@ import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
+import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 
 const appElement = document.getElementById('app');
 
@@ -1865,6 +1866,11 @@ function bindAppEvents(currentPlayer) {
         ? `game_${nextGameDate}_${String(formData.get('game_time') || '')}`
         : `game_${Date.now()}`;
 
+      const adminNotification = String(formData.get('admin_notification') || '').trim();
+      const otherNotifications = Array.isArray(currentState.notifications)
+        ? currentState.notifications.filter((item) => item?.type !== 'admin')
+        : [];
+
       patchState({
         game: {
           ...(currentState.game || {}),
@@ -1876,6 +1882,16 @@ function bindAppEvents(currentPlayer) {
           game_key: nextGameKey,
           ...(shouldResetConfirmations ? { sort_result: null } : {}),
         },
+        notifications: adminNotification
+          ? [
+              {
+                type: 'admin',
+                message: adminNotification,
+                created_at: new Date().toISOString(),
+              },
+              ...otherNotifications,
+            ]
+          : otherNotifications,
         ...(shouldResetConfirmations ? { confirmations: [] } : {}),
       });
 
@@ -1938,14 +1954,18 @@ function renderHome(snapshot, currentPlayer) {
       )
     );
   const confirmed = gameView.isConfirmed;
+  const waitlisted = gameView.isWaitlisted;
+  const waitlistPosition = gameView.waitlistPosition;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
-  const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
-  const statusNote = !confirmed && !capacityOk
-    ? 'O jogo já está cheio.'
-    : presenceGuard.ok
-      ? ''
-      : presenceGuard.message;
+  const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
+  const statusNote = waitlisted
+    ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
+    : !confirmed && !capacityOk
+      ? 'O jogo já está cheio. Você pode entrar na fila de espera.'
+      : presenceGuard.ok
+        ? ''
+        : presenceGuard.message;
   const presenceFeedback = buildPresenceFeedback({
     confirmed,
     capacityOk,
@@ -2012,11 +2032,11 @@ function renderHome(snapshot, currentPlayer) {
         <div class="hero-presence-panel">
           <div>
             <div class="hero-presence-label">Sua presença</div>
-            <div class="hero-presence-status">${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}</div>
+            <div class="hero-presence-status">${waitlisted ? '⏳ Na fila de espera' : `${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}`}</div>
             ${statusNote && statusNote !== presenceFeedback.text ? `<div class="hero-presence-note">${statusNote}</div>` : ''}
           </div>
           ${canRenderPresenceAction ? `
-            <button class="btn ${confirmed ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar' : 'Confirmar'}</button>
+            <button class="btn ${confirmed || waitlisted ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar')}</button>
           ` : ''}
         </div>
       </section>
@@ -2041,7 +2061,10 @@ function renderHome(snapshot, currentPlayer) {
               </span>
             </div>
           ` : `
-            <div class="notification-item">• ${notification.message}</div>
+            <div class="notification-item notification-item-admin">
+              <strong>📢 Aviso:</strong>
+              <span>${String(notification.message || '').replace(/\n/g, '<br>')}</span>
+            </div>
           `).join('') : '<div class="notification-item is-empty">Nenhuma notificação recente.</div>'}
         </div>
       </section>
@@ -2145,6 +2168,8 @@ function renderPresenceList(snapshot, currentPlayer) {
       .filter((entry) => entry?.confirmed)
       .map((entry) => entry.player_id)
   );
+  const waitlistEntries = getWaitlistView(snapshot);
+  const waitlistedIds = new Set(waitlistEntries.map((entry) => String(entry.player_id)));
 
   const footballPlayers = (snapshot.players || [])
     .filter((player) => player.plays_football !== false)
@@ -2152,7 +2177,8 @@ function renderPresenceList(snapshot, currentPlayer) {
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
   const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
-  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
+  const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
+  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id) && !waitlistedIds.has(String(player.id)));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
@@ -2192,6 +2218,28 @@ function renderPresenceList(snapshot, currentPlayer) {
           ${confirmedPlayers.length
             ? confirmedPlayers.map((player) => renderWeeklyRow(player, true)).join('')
             : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
+        </div>
+      </div>
+
+      <div class="weekly-presence-section waitlist-section">
+        <div class="weekly-presence-title">Fila de espera (${waitlistPlayers.length})</div>
+        <div class="weekly-presence-stack">
+          ${waitlistPlayers.length
+            ? waitlistPlayers.map((player, index) => `
+              <div class="weekly-player-row waitlist-player-row">
+                <div class="players-switch-player">
+                  ${renderAvatarForApp(player)}
+                  <div>
+                    <div class="row-title">#${index + 1} · ${player.name}</div>
+                    <div class="row-subtitle">${getPositionLabel(player.position)} · aguardando vaga</div>
+                  </div>
+                </div>
+                <div class="weekly-player-meta">
+                  <span class="tag is-warn">Fila</span>
+                </div>
+              </div>
+            `).join('')
+            : '<div class="empty-inline">Nenhum jogador na fila de espera.</div>'}
         </div>
       </div>
 
@@ -2342,7 +2390,7 @@ function renderConfig(snapshot, currentPlayer) {
     <section class="section-stack">
       <section class="card">
         <div class="card-title">Configuração do jogo</div>
-        <form id="game-config-form" class="player-admin-form">
+        <form id="game-config-form" class="player-admin-form game-config-form">
           <label class="field-label">
             Data do jogo
             <input class="input" type="date" name="game_date" value="${game.game_date || ''}" />
@@ -2368,7 +2416,13 @@ function renderConfig(snapshot, currentPlayer) {
             Inscrições abertas
           </label>
 
-          <div class="player-admin-actions">
+          <label class="field-label config-notifications-field">
+            Notificações
+            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Digite aqui recados para todos os jogadores.">${(Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || ''}</textarea>
+          </label>
+          <p class="footer-note config-notifications-help">Esse recado aparece na Home para todos, abaixo da dupla da carne. Deixe vazio para ocultar.</p>
+
+          <div class="player-admin-actions game-config-actions">
             <button class="btn btn-primary" type="submit">Salvar configuração</button>
           </div>
         </form>
