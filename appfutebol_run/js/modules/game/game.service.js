@@ -418,17 +418,31 @@ export function drawTeams() {
   }
 
   const { teamA, teamB } = balanceTeams(eligiblePlayers);
+  const game = snapshot.game || {};
+  const createdAt = new Date().toISOString();
+  const gameKey = String(game.game_key || (game.game_date ? `game_${game.game_date}_${game.game_time || ''}` : 'default'));
+  const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
   const sortResult = {
-    created_at: new Date().toISOString(),
+    id: drawId,
+    game_key: gameKey,
+    game_date: game.game_date || '',
+    game_time: game.game_time || '',
+    created_at: createdAt,
     total_players: eligiblePlayers.length,
     team_a: teamA.map((player) => player.id),
     team_b: teamB.map((player) => player.id),
   };
 
+  const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
+
   patchState({
     game: {
-      ...(snapshot.game || {}),
+      ...game,
       sort_result: sortResult,
+      draw_history: [
+        ...drawHistory.filter((entry) => String(entry?.id || '') !== drawId),
+        sortResult,
+      ].slice(-30),
     },
   });
 
@@ -467,15 +481,22 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
   const [movedPlayerEntry] = sourceTeam.splice(sourceIndex, 1);
   targetTeam.push(movedPlayerEntry);
 
+  const adjustedDraw = {
+    ...sortResult,
+    [sourceKey]: sourceTeam,
+    [targetKey]: targetTeam,
+    adjusted_at: new Date().toISOString(),
+  };
+  const game = snapshot.game || {};
+  const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
+
   patchState({
     game: {
-      ...(snapshot.game || {}),
-      sort_result: {
-        ...sortResult,
-        [sourceKey]: sourceTeam,
-        [targetKey]: targetTeam,
-        adjusted_at: new Date().toISOString(),
-      },
+      ...game,
+      sort_result: adjustedDraw,
+      draw_history: drawHistory.map((entry) => (
+        String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
+      )),
     },
   });
 

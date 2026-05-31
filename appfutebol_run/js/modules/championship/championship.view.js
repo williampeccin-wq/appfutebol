@@ -12,6 +12,7 @@ import {
   getEffectiveChampionshipResults,
   getResultAuditRows,
   getActiveDrawTeams,
+  getChampionshipDrawOptions,
   getTeamOutcomeLabel,
   getManualChampionshipResults,
 } from './championship.service.js';
@@ -100,83 +101,85 @@ function renderResultForm(snapshot, currentPlayer) {
 
   const players = getFootballPlayers(snapshot);
   if (!players.length) {
-    return `
-      <section class="card">
-        <div class="card-title">Lançar resultado</div>
-        <div class="empty-state">Cadastre jogadores com perfil jogador antes de lançar resultados.</div>
-      </section>
-    `;
+    return `<section class="card"><div class="card-title">Lançar resultado</div><div class="empty-state">Cadastre jogadores com perfil jogador antes de lançar resultados.</div></section>`;
   }
 
-  const draw = getActiveDrawTeams(snapshot);
-  if (!draw.ok) {
+  const draws = getChampionshipDrawOptions(snapshot);
+  if (!draws.length) {
     return `
-      <section class="card championship-result-card">
+      <section class="card championship-result-card championship-result-card-v2">
         <div class="card-title">Lançar resultado do jogo</div>
-        <div class="empty-state">${escapeHtml(draw.message)}</div>
-        <p class="footer-note">O resultado do campeonato usa o último sorteio da aba Jogo da semana. Depois do sorteio, informe qual time venceu ou se houve empate.</p>
-      </section>
-    `;
+        <div class="empty-state">Faça o sorteio dos times antes de lançar o resultado do campeonato.</div>
+        <p class="footer-note">O lançamento fica vinculado ao sorteio para manter auditoria visual do campeonato.</p>
+      </section>`;
   }
 
+  const selectedDraw = draws[0];
   const playerById = new Map(players.map((player) => [String(player.id), player]));
+  const selectedDate = selectedDraw.date || (selectedDraw.created_at ? new Date(selectedDraw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const manualResults = getManualChampionshipResults(snapshot);
+  const existingResult = manualResults.find((result) => String(result.draw_id || '') === String(selectedDraw.id || '') || String(result.date || '') === String(selectedDate));
+
   const renderTeamPlayers = (ids) => ids.map((playerId) => {
     const player = playerById.get(String(playerId));
-    return `
-      <span class="championship-team-player-pill">
-        <strong>${escapeHtml(player?.name || 'Jogador removido')}</strong>
-        <small>${escapeHtml(getPositionShortLabel(player?.position))}</small>
-      </span>
-    `;
+    return `<span class="championship-team-player-pill"><strong>${escapeHtml(player?.name || 'Jogador removido')}</strong><small>${escapeHtml(getPositionShortLabel(player?.position))}</small></span>`;
   }).join('');
 
-  const today = draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const manualResults = getManualChampionshipResults(snapshot);
-  const existingSameDate = manualResults.find((result) => String(result.date) === String(today));
-
   return `
-    <section class="card championship-result-card">
-      <div class="card-title">Lançar resultado do jogo</div>
-      <p class="footer-note">Use este bloco para lançar o resultado do sorteio atual. Ao salvar uma data já lançada, o resultado anterior dessa data é substituído para evitar duplicidade.</p>
-
-      <div class="championship-result-status-row">
-        <span class="tag is-neutral">Sorteio atual: ${draw.team_a.length + draw.team_b.length} jogadores</span>
-        <span class="tag ${existingSameDate ? 'is-warn' : 'is-ok'}">${existingSameDate ? 'Esta data já tem lançamento' : 'Data livre para lançamento'}</span>
+    <section class="card championship-result-card championship-result-card-v2">
+      <div class="championship-result-header-v2">
+        <div class="championship-result-icon-v2">🏆</div>
+        <div>
+          <div class="card-title">Lançar resultado do jogo</div>
+          <p class="championship-result-subtitle-v2">Selecione o sorteio correto. O lançamento fica auditável e vinculado ao sorteio, não apenas ao último jogo aberto.</p>
+        </div>
       </div>
 
-      <div class="form-grid compact-grid championship-date-grid">
-        <label>
-          Data do jogo
-          <input type="date" id="championship-result-date" value="${today}">
+      <div class="championship-result-badges-v2">
+        <span class="championship-pill-v2 is-blue">Sorteios disponíveis: ${draws.length}</span>
+        <span class="championship-pill-v2 ${existingResult ? 'is-gold' : 'is-green'}">${existingResult ? 'Sorteio já lançado' : 'Sorteio sem resultado'}</span>
+      </div>
+
+      <div class="championship-result-divider-v2"></div>
+
+      <div class="championship-result-form-v2">
+        <label class="championship-field-v2 championship-draw-field-v2">
+          <span>Sorteio</span>
+          <select id="championship-draw-id" class="championship-control-v2">
+            ${draws.map((draw) => {
+              const date = draw.date || (draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : '');
+              const result = manualResults.find((entry) => String(entry.draw_id || '') === String(draw.id || '') || String(entry.date || '') === String(date));
+              const total = (draw.team_a?.length || 0) + (draw.team_b?.length || 0);
+              return `<option value="${escapeHtml(draw.id)}">${formatDate(date)} · ${draw.game_time || '--:--'} · ${total} jogadores${result ? ' · lançado' : ''}</option>`;
+            }).join('')}
+          </select>
         </label>
-        <label>
-          Resultado
-          <select id="championship-team-outcome">
+
+        <label class="championship-field-v2">
+          <span>Data do jogo</span>
+          <input id="championship-result-date" class="championship-control-v2" type="date" value="${selectedDate}">
+        </label>
+
+        <label class="championship-field-v2">
+          <span>Resultado</span>
+          <select id="championship-team-outcome" class="championship-control-v2">
             ${TEAM_RESULT_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('')}
           </select>
         </label>
       </div>
 
-      <details class="championship-teams-result-details">
-        <summary>Ver escalações do sorteio · Time A ${draw.team_a.length} x ${draw.team_b.length} Time B</summary>
+      <details class="championship-teams-result-details championship-teams-result-details-v2">
+        <summary><span>Ver escalações do sorteio selecionado</span><small>Time A ${selectedDraw.team_a.length} x ${selectedDraw.team_b.length} Time B</small></summary>
         <div class="championship-teams-result-grid">
-          <div class="championship-team-result-box">
-            <div class="championship-team-label">Time A</div>
-            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_a)}</div>
-          </div>
-          <div class="championship-team-result-box">
-            <div class="championship-team-label">Time B</div>
-            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_b)}</div>
-          </div>
+          <div class="championship-team-result-box"><div class="championship-team-label">Time A</div><div class="championship-team-player-list">${renderTeamPlayers(selectedDraw.team_a)}</div></div>
+          <div class="championship-team-result-box"><div class="championship-team-label">Time B</div><div class="championship-team-player-list">${renderTeamPlayers(selectedDraw.team_b)}</div></div>
         </div>
       </details>
 
-      <div class="championship-result-actions-row">
-        <button class="btn btn-primary" type="button" data-action="save-championship-result">Salvar resultado</button>
-        <span class="footer-note">Depois de criar novo jogo e novo sorteio, este mesmo formulário fica pronto para o próximo lançamento.</span>
-      </div>
-    </section>
-  `;
+      <button class="btn btn-primary championship-save-result-btn-v2" type="button" data-action="save-championship-result">Salvar resultado</button>
+
+      <div class="championship-result-info-v2"><strong>i</strong><span>Se este sorteio já tiver resultado, salvar novamente substitui o lançamento anterior.</span></div>
+    </section>`;
 }
 function renderResultsHistory(snapshot, currentPlayer) {
   const results = getEffectiveChampionshipResults(snapshot);
@@ -303,38 +306,28 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
 
   return `
     <section class="section-stack championship-screen">
-      <section class="hero-card championship-hero">
+      <section class="hero-card championship-hero championship-hero-current">
         <div class="hero-label">Campeonato atual</div>
         <div class="hero-date">${ACTIVE_CHAMPIONSHIP.label}</div>
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
+      <section class="card championship-current-ranking-card">
+        <div class="card-title">Classificação atual · Inverno 26</div>
+        <p class="footer-note">Este é o bloco principal da aba. Ele usa a planilha inicial importada e todos os resultados lançados no app.</p>
+        ${renderRankingTable(currentRanking)}
+      </section>
+
+      ${renderResultForm(snapshot, currentPlayer)}
+
       <section class="card championship-launch-summary-card">
-        <div class="card-title">Próximos lançamentos</div>
-        <p class="footer-note">Os resultados ficam acumulados no histórico auditável. Para cada novo jogo, faça o sorteio na aba Jogo da semana e volte aqui para lançar o vencedor.</p>
+        <div class="card-title">Controle de lançamentos</div>
+        <p class="footer-note">Cada resultado fica vinculado ao sorteio escolhido, permitindo auditar jogo por jogo.</p>
         <div class="championship-launch-summary-grid">
           <div><strong>${manualResults.length}</strong><span>lançamentos manuais</span></div>
           <div><strong>${Math.max(resultCount - manualResults.length, 0)}</strong><span>rodadas importadas</span></div>
           <div><strong>${currentRanking.length}</strong><span>jogadores elegíveis</span></div>
         </div>
-      </section>
-
-      <section class="card championship-rule-card">
-        <div class="card-title">Regra de pontuação</div>
-        <div class="championship-rule-grid">
-          <div><strong>3</strong><span>Vitória</span></div>
-          <div><strong>2</strong><span>Empate</span></div>
-          <div><strong>1</strong><span>Derrota</span></div>
-          <div><strong>0</strong><span>Não jogou</span></div>
-        </div>
-        <p class="footer-note">Desempate: pontos, vitórias, empates e derrotas. Se persistir empate, os jogadores mantêm a mesma posição.</p>
-      </section>
-
-      ${renderResultForm(snapshot, currentPlayer)}
-
-      <section class="card">
-        <div class="card-title">Classificação · Inverno 26</div>
-        ${renderRankingTable(currentRanking)}
       </section>
 
       <section class="card">

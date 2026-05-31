@@ -829,7 +829,8 @@ document.addEventListener("click", async (e) => {
     }
 
     const outcome = document.getElementById('championship-team-outcome')?.value;
-    const builtResult = buildTeamResultStatuses(snapshot, outcome);
+    const drawId = document.getElementById('championship-draw-id')?.value || null;
+    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId);
 
     if (!builtResult.ok) {
       showToast(builtResult.message || "Resultado inválido", "error");
@@ -843,6 +844,8 @@ document.addEventListener("click", async (e) => {
       id: globalThis.crypto?.randomUUID ? `championship_result_${globalThis.crypto.randomUUID()}` : `championship_result_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       date,
       outcome: builtResult.outcome,
+      draw_id: builtResult.draw_id,
+      game_key: builtResult.game_key,
       team_a: builtResult.team_a,
       team_b: builtResult.team_b,
       statuses: builtResult.statuses,

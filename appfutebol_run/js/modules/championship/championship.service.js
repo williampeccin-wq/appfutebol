@@ -299,6 +299,8 @@ export function getChampionshipState(snapshot) {
           date: String(result.date || ''),
           created_at: result.created_at || null,
           outcome: result.outcome || null,
+          draw_id: result.draw_id || null,
+          game_key: result.game_key || null,
           team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
           team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
           statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
@@ -316,6 +318,8 @@ export function persistChampionshipResult(snapshot, result) {
     date: String(result.date || ''),
     created_at: result.created_at || new Date().toISOString(),
     outcome: result.outcome || null,
+    draw_id: result.draw_id || null,
+    game_key: result.game_key || null,
     team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
     team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
     statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
@@ -392,29 +396,63 @@ function applyRanks(sortedRows) {
 }
 
 
-export function getActiveDrawTeams(snapshot) {
-  const sortResult = snapshot?.game?.sort_result;
-  if (!sortResult || typeof sortResult !== 'object') {
-    return { ok: false, message: 'Faça o sorteio dos times antes de lançar o resultado do campeonato.' };
-  }
+function normalizeDrawEntry(draw, fallbackId = '') {
+  if (!draw || typeof draw !== 'object') return null;
 
-  const teamA = Array.isArray(sortResult.team_a) ? sortResult.team_a.map(String).filter(Boolean) : [];
-  const teamB = Array.isArray(sortResult.team_b) ? sortResult.team_b.map(String).filter(Boolean) : [];
+  const teamA = Array.isArray(draw.team_a) ? draw.team_a.map(String).filter(Boolean) : [];
+  const teamB = Array.isArray(draw.team_b) ? draw.team_b.map(String).filter(Boolean) : [];
+  if (!teamA.length || !teamB.length) return null;
 
-  if (!teamA.length || !teamB.length) {
-    return { ok: false, message: 'O sorteio atual precisa ter jogadores nos dois times.' };
-  }
+  const gameDate = draw.game_date || draw.date || '';
+  const gameTime = draw.game_time || '';
+  const createdAt = draw.created_at || null;
+  const id = String(draw.id || fallbackId || `${gameDate}_${createdAt || Date.now()}`);
 
   return {
     ok: true,
-    created_at: sortResult.created_at || null,
+    id,
+    draw_id: id,
+    game_key: draw.game_key || null,
+    game_date: gameDate,
+    game_time: gameTime,
+    created_at: createdAt,
+    total_players: Number(draw.total_players || teamA.length + teamB.length),
     team_a: teamA,
     team_b: teamB,
   };
 }
 
-export function buildTeamResultStatuses(snapshot, outcome) {
-  const draw = getActiveDrawTeams(snapshot);
+export function getChampionshipDrawOptions(snapshot) {
+  const game = snapshot?.game || {};
+  const options = [];
+  const pushDraw = (draw, fallbackId) => {
+    const normalized = normalizeDrawEntry(draw, fallbackId);
+    if (!normalized) return;
+    if (options.some((entry) => String(entry.id) === String(normalized.id))) return;
+    options.push(normalized);
+  };
+
+  pushDraw(game.sort_result, 'current_draw');
+  (Array.isArray(game.draw_history) ? game.draw_history : []).forEach((draw, index) => pushDraw(draw, `draw_history_${index}`));
+
+  return options.sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')));
+}
+
+export function getActiveDrawTeams(snapshot, drawId = null) {
+  const options = getChampionshipDrawOptions(snapshot);
+  const selected = drawId
+    ? options.find((draw) => String(draw.id) === String(drawId))
+    : options[0];
+
+  if (!selected) {
+    return { ok: false, message: 'Faça o sorteio dos times antes de lançar o resultado do campeonato.' };
+  }
+
+  return selected;
+}
+
+export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
+  const draw = getActiveDrawTeams(snapshot, drawId);
   if (!draw.ok) return { ok: false, message: draw.message };
 
   const validOutcome = TEAM_RESULT_OPTIONS.some((option) => option.value === outcome) ? outcome : null;
@@ -445,6 +483,10 @@ export function buildTeamResultStatuses(snapshot, outcome) {
   return {
     ok: true,
     outcome: validOutcome,
+    draw_id: draw.id,
+    game_key: draw.game_key || null,
+    game_date: draw.game_date || null,
+    game_time: draw.game_time || null,
     team_a: draw.team_a,
     team_b: draw.team_b,
     statuses,
