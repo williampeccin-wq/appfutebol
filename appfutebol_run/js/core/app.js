@@ -1243,7 +1243,7 @@ if (action === "delete-player") {
 
   const confirmedDelete = await showConfirmModal({
     title: 'Excluir jogador',
-    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador, suas confirmações, vínculos de carne e registros relacionados da lista atual.`,
+    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador do app, suas confirmações, vínculos de carne e registros relacionados da lista atual.${player.auth_user_id ? ' O acesso Auth no Supabase pode continuar existindo, mas ficará sem jogador vinculado.' : ''}`,
     confirmText: 'Excluir',
     cancelText: 'Cancelar',
   });
@@ -1426,9 +1426,13 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 
 const appElement = document.getElementById('app');
 
-const REMOTE_SYNC_INTERVAL_MS = 4000;
+const REMOTE_SYNC_INTERVAL_MS = 2000;
 let isApplyingRemoteState = false;
 let lastDomainFingerprint = '';
+let pullRefreshStartY = null;
+let pullRefreshArmed = false;
+let pullRefreshRunning = false;
+const PULL_REFRESH_THRESHOLD_PX = 72;
 
 init();
 
@@ -1462,6 +1466,18 @@ async function init() {
 }
 
 function bindGlobalSystemEvents() {
+  setupPullToRefresh();
+
+  window.addEventListener('focus', () => {
+    applyRemoteSyncNow({ showFeedback: false });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      applyRemoteSyncNow({ showFeedback: false });
+    }
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -1476,6 +1492,83 @@ function bindGlobalSystemEvents() {
       }
     }, 600);
   });
+}
+
+
+
+function setPullRefreshHintState(state = 'idle') {
+  const hint = document.getElementById('pull-refresh-hint');
+  if (!hint) return;
+
+  if (state === 'ready') {
+    hint.innerHTML = '<span class="pull-refresh-arrow">↓</span><span>Solte para atualizar</span>';
+    hint.classList.add('is-ready');
+    hint.classList.remove('is-loading');
+    return;
+  }
+
+  if (state === 'loading') {
+    hint.innerHTML = '<span class="pull-refresh-arrow">↻</span><span>Atualizando...</span>';
+    hint.classList.add('is-loading');
+    hint.classList.remove('is-ready');
+    return;
+  }
+
+  hint.innerHTML = '<span class="pull-refresh-arrow">↓</span><span>Arraste para baixo para atualizar</span>';
+  hint.classList.remove('is-ready', 'is-loading');
+}
+
+function setupPullToRefresh() {
+  document.addEventListener('touchstart', (event) => {
+    if (!getCurrentPlayer()) return;
+    if (window.scrollY > 4) return;
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    pullRefreshStartY = touch.clientY;
+    pullRefreshArmed = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (event) => {
+    if (pullRefreshStartY === null || pullRefreshRunning) return;
+    if (window.scrollY > 4) {
+      pullRefreshStartY = null;
+      pullRefreshArmed = false;
+      setPullRefreshHintState('idle');
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const deltaY = touch.clientY - pullRefreshStartY;
+    if (deltaY >= PULL_REFRESH_THRESHOLD_PX) {
+      pullRefreshArmed = true;
+      setPullRefreshHintState('ready');
+    } else if (deltaY > 16) {
+      setPullRefreshHintState('idle');
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', async () => {
+    if (pullRefreshStartY === null) return;
+
+    const shouldRefresh = pullRefreshArmed && !pullRefreshRunning;
+    pullRefreshStartY = null;
+    pullRefreshArmed = false;
+
+    if (!shouldRefresh) {
+      setPullRefreshHintState('idle');
+      return;
+    }
+
+    pullRefreshRunning = true;
+    setPullRefreshHintState('loading');
+    await applyRemoteSyncNow({ showFeedback: true });
+    pullRefreshRunning = false;
+    setPullRefreshHintState('idle');
+  }, { passive: true });
 }
 
 
@@ -1509,45 +1602,55 @@ function isValidRemoteDomainSnapshot(snapshot) {
   );
 }
 
-function startRemoteSync() {
-  window.setInterval(async () => {
-    try {
-      // Never poll Supabase REST while the user is not operationally authenticated.
-      // With RLS closed, polling on the login screen correctly produces 401.
-      if (!getCurrentPlayer()) {
-        return;
-      }
-
-      const localSnapshot = getState();
-      const remote = await loadRemoteState();
-
-      if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
-        return;
-      }
-
-      const repairedRemote = validateAndRepairState(remote.state);
-      const safeRemoteState = repairedRemote.state;
-
-      if (repairedRemote.warnings.length) {
-        console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
-      }
-
-      const currentFingerprint = getDomainFingerprint(localSnapshot);
-      const remoteFingerprint = getDomainFingerprint(safeRemoteState);
-
-      if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
-        lastDomainFingerprint = currentFingerprint;
-        return;
-      }
-
-      isApplyingRemoteState = true;
-      replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
-      lastDomainFingerprint = remoteFingerprint;
-      isApplyingRemoteState = false;
-    } catch (error) {
-      isApplyingRemoteState = false;
-      console.warn('[remote-sync] failed to sync remote state', error);
+async function applyRemoteSyncNow({ showFeedback = false } = {}) {
+  try {
+    // Never poll Supabase REST while the user is not operationally authenticated.
+    // With RLS closed, polling on the login screen correctly produces 401.
+    if (!getCurrentPlayer()) {
+      return false;
     }
+
+    const localSnapshot = getState();
+    const remote = await loadRemoteState();
+
+    if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
+      if (showFeedback) showToast('Não foi possível atualizar agora.', 'error');
+      return false;
+    }
+
+    const repairedRemote = validateAndRepairState(remote.state);
+    const safeRemoteState = repairedRemote.state;
+
+    if (repairedRemote.warnings.length) {
+      console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
+    }
+
+    const currentFingerprint = getDomainFingerprint(localSnapshot);
+    const remoteFingerprint = getDomainFingerprint(safeRemoteState);
+
+    if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
+      lastDomainFingerprint = currentFingerprint;
+      if (showFeedback) showToast('App já está atualizado.', 'success');
+      return false;
+    }
+
+    isApplyingRemoteState = true;
+    replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
+    lastDomainFingerprint = remoteFingerprint;
+    isApplyingRemoteState = false;
+    if (showFeedback) showToast('App atualizado.', 'success');
+    return true;
+  } catch (error) {
+    isApplyingRemoteState = false;
+    console.warn('[remote-sync] failed to sync remote state', error);
+    if (showFeedback) showToast('Erro ao atualizar.', 'error');
+    return false;
+  }
+}
+
+function startRemoteSync() {
+  window.setInterval(() => {
+    applyRemoteSyncNow({ showFeedback: false });
   }, REMOTE_SYNC_INTERVAL_MS);
 }
 
@@ -1603,6 +1706,7 @@ function render(snapshot) {
     </nav>
 
     <main class="content">
+      <div id="pull-refresh-hint" class="pull-refresh-hint"><span class="pull-refresh-arrow">↓</span><span>Arraste para baixo para atualizar</span></div>
       <div style="padding:10px;font-weight:bold;">
 ${confirmedCount} / ${maxPlayers} jogadores confirmados
 </div>
@@ -1884,6 +1988,8 @@ function bindAppEvents(currentPlayer) {
         localStorage.removeItem('harmonia_confirmations');
         localStorage.removeItem('harmonia_game_state');
       }
+
+      window.dispatchEvent(new CustomEvent('harmonia:game-config-saved'));
 
       showToast(
         shouldResetConfirmations
