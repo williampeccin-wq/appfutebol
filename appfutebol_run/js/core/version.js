@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.63-prod-hotfix-pull-refresh-hint-small';
+export const APP_VERSION = 'v1.60.64-waitlist-presence';

@@ -26,6 +26,74 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+async function findAuthUserByEmail(supabase: ReturnType<typeof createClient>, email: string) {
+  let page = 1;
+  const perPage = 1000;
+
+  while (page <= 10) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw new Error(`list_users_failed:${error.message}`);
+    }
+
+    const users = data?.users || [];
+    const found = users.find((user) => String(user.email || "").toLowerCase() === email.toLowerCase());
+
+    if (found) return found;
+    if (users.length < perPage) return null;
+
+    page += 1;
+  }
+
+  return null;
+}
+
+async function linkPlayerAccess(
+  supabase: ReturnType<typeof createClient>,
+  playerId: string,
+  authUserId: string,
+  email: string,
+  phone: string,
+) {
+  const { error: rpcError } = await supabase.rpc("harmonia_service_link_player_access", {
+    p_player_id: playerId,
+    p_auth_user_id: authUserId,
+    p_email: email,
+    p_phone: phone,
+  });
+
+  if (!rpcError) {
+    return { ok: true, mode: "rpc" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("players")
+    .update({
+      auth_user_id: authUserId,
+      data: {
+        auth_user_id: authUserId,
+        email,
+        login_phone: phone,
+        phone,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", playerId);
+
+  if (updateError) {
+    return {
+      ok: false,
+      error: `player_link_failed:${rpcError.message};fallback_failed:${updateError.message}`,
+    };
+  }
+
+  return { ok: true, mode: "fallback_update" };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -66,36 +134,90 @@ serve(async (req) => {
 
     if (mode === "create_access") {
       const normalizedPhone = normalizePhone(phone);
+      const normalizedPlayerId = String(player_id || "").trim();
+
+      if (!normalizedPlayerId) {
+        return jsonResponse({ error: "missing_player_id" }, 400);
+      }
 
       if (normalizedPhone.length < 10 || normalizedPhone.length > 11) {
         return jsonResponse({ error: "invalid_phone" }, 400);
       }
 
       const email = technicalEmailFromPhone(normalizedPhone);
+      const existingUser = await findAuthUserByEmail(supabase, email);
 
-      const { data, error } = await supabase.auth.admin.createUser({
+      let authUser = existingUser;
+
+      if (authUser?.id) {
+        const { data: updatedUser, error: updateUserError } = await supabase.auth.admin.updateUserById(
+          authUser.id,
+          {
+            password: String(new_password),
+            email_confirm: true,
+            user_metadata: {
+              ...(authUser.user_metadata || {}),
+              name: String(name || ""),
+              phone: normalizedPhone,
+              birthDate: String(birth_date || ""),
+              player_id: normalizedPlayerId,
+              login_type: "phone_password",
+              updated_by: "harmonia_admin_edge_function",
+            },
+          },
+        );
+
+        if (updateUserError) {
+          return jsonResponse({ error: updateUserError.message }, 400);
+        }
+
+        authUser = updatedUser.user || authUser;
+      } else {
+        const { data, error } = await supabase.auth.admin.createUser({
+          email,
+          password: String(new_password),
+          email_confirm: true,
+          user_metadata: {
+            name: String(name || ""),
+            phone: normalizedPhone,
+            birthDate: String(birth_date || ""),
+            player_id: normalizedPlayerId,
+            login_type: "phone_password",
+            created_by: "harmonia_admin_edge_function",
+          },
+        });
+
+        if (error) {
+          return jsonResponse({ error: error.message }, 400);
+        }
+
+        authUser = data.user;
+      }
+
+      if (!authUser?.id) {
+        return jsonResponse({ error: "auth_user_missing_after_create_or_update" }, 500);
+      }
+
+      const linkResult = await linkPlayerAccess(
+        supabase,
+        normalizedPlayerId,
+        authUser.id,
         email,
-        password: String(new_password),
-        email_confirm: true,
-        user_metadata: {
-          name: String(name || ""),
-          phone: normalizedPhone,
-          birthDate: String(birth_date || ""),
-          player_id: String(player_id || ""),
-          login_type: "phone_password",
-          created_by: "harmonia_admin_edge_function",
-        },
-      });
+        normalizedPhone,
+      );
 
-      if (error) {
-        return jsonResponse({ error: error.message }, 400);
+      if (!linkResult.ok) {
+        return jsonResponse({ error: linkResult.error || "player_link_failed" }, 500);
       }
 
       return jsonResponse({
         ok: true,
         mode: "create_access",
-        user_id: data.user?.id || null,
+        user_id: authUser.id,
         email,
+        player_id: normalizedPlayerId,
+        link_mode: linkResult.mode,
+        reused_existing_user: !!existingUser,
       });
     }
 
