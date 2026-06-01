@@ -1,23 +1,38 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull } from '../../domain/rules.engine.js';
+import { getActiveGame, getGameKey } from '../../domain/projection.js';
+
+
+function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
+function activeGameKey(snapshot = getState()) { return getGameKey(activeGame(snapshot)); }
+function scopedConfirmations(snapshot = getState()) {
+  const key = activeGameKey(snapshot);
+  return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key);
+}
+function mergeScopedConfirmations(snapshot, scoped) {
+  const key = activeGameKey(snapshot);
+  const others = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) !== key);
+  return [...others, ...scoped.map((entry) => ({ ...entry, game_key: key }))];
+}
+function patchScopedConfirmations(snapshot, scoped) { patchState({ confirmations: mergeScopedConfirmations(snapshot, scoped) }); }
 
 export function hasCapacity() {
   const snapshot = getState();
-  return !isGameFull(snapshot.game, snapshot.confirmations);
+  return !isGameFull(activeGame(snapshot), scopedConfirmations(snapshot));
 }
 
 export function isConfirmed(playerId) {
   const snapshot = getState();
-  return snapshot.confirmations.some((item) => item.player_id === playerId && item.confirmed);
+  return scopedConfirmations(snapshot).some((item) => item.player_id === playerId && item.confirmed);
 }
 
 export function getPresenceGuard(player, game) {
   const snapshot = getState();
   const decision = getPresenceDecision({
     player,
-    game,
-    confirmations: snapshot.confirmations,
+    game: activeGame(snapshot),
+    confirmations: scopedConfirmations(snapshot),
   });
 
   return {
@@ -133,115 +148,46 @@ export function getWaitlistView(snapshot = getState()) {
 
 export function toggleConfirmation(playerId) {
   const snapshot = getState();
+  const game = activeGame(snapshot);
+  const gameKey = activeGameKey(snapshot);
+  const confirmations = scopedConfirmations(snapshot);
   const player = snapshot.players.find((item) => String(item.id) === String(playerId));
-  const existing = snapshot.confirmations.find((entry) => String(entry.player_id) === String(playerId));
+  const existing = confirmations.find((entry) => String(entry.player_id) === String(playerId));
   const currentlyConfirmed = existing?.confirmed === true;
   const currentlyWaitlisted = isWaitlistEntry(existing);
   const now = new Date().toISOString();
 
   if (currentlyConfirmed) {
-    const cancelled = snapshot.confirmations.map((entry) => (
-      String(entry.player_id) === String(playerId)
-        ? {
-            ...entry,
-            confirmed: false,
-            status: 'cancelled',
-            removed_by_admin: false,
-            confirmed_at: null,
-            cancelled_at: now,
-            timestamp: now,
-          }
-        : entry
-    ));
-
+    const cancelled = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: false, status: 'cancelled', removed_by_admin: false, confirmed_at: null, cancelled_at: now, timestamp: now } : entry);
     const promoted = promoteFirstWaitlisted(cancelled, now, playerId);
-    patchState({ confirmations: normalizeWaitlistPositions(promoted.confirmations) });
-
-    return {
-      ok: true,
-      message: promoted.promoted
-        ? 'Presença cancelada. Primeiro da fila entrou automaticamente.'
-        : 'Presença cancelada.',
-    };
+    patchScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations));
+    return { ok: true, message: promoted.promoted ? 'Presença cancelada. Primeiro da fila entrou automaticamente.' : 'Presença cancelada.' };
   }
 
   if (currentlyWaitlisted) {
-    const updated = snapshot.confirmations.map((entry) => (
-      String(entry.player_id) === String(playerId)
-        ? {
-            ...entry,
-            confirmed: false,
-            status: 'cancelled',
-            removed_by_admin: false,
-            confirmed_at: null,
-            cancelled_at: now,
-            waitlisted_at: null,
-            waitlist_position: null,
-            timestamp: now,
-          }
-        : entry
-    ));
-
-    patchState({ confirmations: normalizeWaitlistPositions(updated) });
+    const updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: false, status: 'cancelled', removed_by_admin: false, confirmed_at: null, cancelled_at: now, waitlisted_at: null, waitlist_position: null, timestamp: now } : entry);
+    patchScopedConfirmations(snapshot, normalizeWaitlistPositions(updated));
     return { ok: true, message: 'Você saiu da fila de espera.' };
   }
 
-  const decision = getPresenceDecision({
-    player,
-    game: snapshot.game,
-    confirmations: snapshot.confirmations,
-  });
-
+  const decision = getPresenceDecision({ player, game, confirmations });
   if (!decision.canConfirm) {
     if (decision.reasonBlocked === 'game_full') {
-      const updated = normalizeWaitlistPositions(upsertWaitlistEntry(snapshot, playerId, now));
+      const updated = normalizeWaitlistPositions(upsertWaitlistEntry({ ...snapshot, confirmations }, playerId, now));
       const position = getWaitlistEntries(updated).findIndex((entry) => String(entry.player_id) === String(playerId)) + 1;
-      patchState({ confirmations: updated });
-      return {
-        ok: true,
-        message: `Jogo cheio. Você entrou na fila de espera${position ? ` na posição ${position}` : ''}.`,
-      };
+      patchScopedConfirmations(snapshot, updated);
+      return { ok: true, message: `Jogo cheio. Você entrou na fila de espera${position ? ` na posição ${position}` : ''}.` };
     }
-
     return { ok: false, message: decision.message || 'Você não pode confirmar presença agora.' };
   }
 
   let updated;
-
   if (existing) {
-    updated = snapshot.confirmations.map((entry) => (
-      String(entry.player_id) === String(playerId)
-        ? {
-            ...entry,
-            confirmed: true,
-            status: 'confirmed',
-            waitlisted_at: null,
-            waitlist_position: null,
-            removed_by_admin: false,
-            confirmed_at: now,
-            cancelled_at: null,
-            timestamp: now,
-          }
-        : entry
-    ));
+    updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: true, status: 'confirmed', waitlisted_at: null, waitlist_position: null, removed_by_admin: false, confirmed_at: now, cancelled_at: null, timestamp: now, game_key: gameKey } : entry);
   } else {
-    updated = [
-      ...snapshot.confirmations,
-      {
-        player_id: playerId,
-        confirmed: true,
-        status: 'confirmed',
-        removed_by_admin: false,
-        confirmed_at: now,
-        cancelled_at: null,
-        waitlisted_at: null,
-        waitlist_position: null,
-        timestamp: now,
-      },
-    ];
+    updated = [...confirmations, { player_id: playerId, game_key: gameKey, confirmed: true, status: 'confirmed', removed_by_admin: false, confirmed_at: now, cancelled_at: null, waitlisted_at: null, waitlist_position: null, timestamp: now }];
   }
-
-  patchState({ confirmations: normalizeWaitlistPositions(updated) });
+  patchScopedConfirmations(snapshot, normalizeWaitlistPositions(updated));
   return { ok: true, message: 'Presença confirmada.' };
 }
 
@@ -399,8 +345,10 @@ function balanceTeams(players) {
 
 export function drawTeams() {
   const snapshot = getState();
+  const game = activeGame(snapshot);
+  const gameKey = activeGameKey(snapshot);
   const confirmedIds = new Set(
-    (snapshot.confirmations || [])
+    scopedConfirmations(snapshot)
       .filter((entry) => entry?.confirmed)
       .map((entry) => entry.player_id)
   );
@@ -418,9 +366,8 @@ export function drawTeams() {
   }
 
   const { teamA, teamB } = balanceTeams(eligiblePlayers);
-  const game = snapshot.game || {};
   const createdAt = new Date().toISOString();
-  const gameKey = String(game.game_key || (game.game_date ? `game_${game.game_date}_${game.game_time || ''}` : 'default'));
+  
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
   const sortResult = {
     id: drawId,
@@ -435,16 +382,8 @@ export function drawTeams() {
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
 
-  patchState({
-    game: {
-      ...game,
-      sort_result: sortResult,
-      draw_history: [
-        ...drawHistory.filter((entry) => String(entry?.id || '') !== drawId),
-        sortResult,
-      ].slice(-30),
-    },
-  });
+  const updatedGame = { ...game, sort_result: sortResult, draw_history: [...drawHistory.filter((entry) => String(entry?.id || '') !== drawId), sortResult].slice(-30) };
+  patchState({ game: updatedGame, games: (snapshot.games || []).map((item) => String(item.game_key || item.id) === gameKey ? updatedGame : item) });
 
   return {
     ok: true,

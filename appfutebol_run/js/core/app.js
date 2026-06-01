@@ -152,6 +152,24 @@ function repairManualSnapshot(snapshot) {
   return repaired.state;
 }
 
+
+function makeGameKeyFromForm(date, time) {
+  const safeDate = String(date || '').replace(/[^0-9-]/g, '') || new Date().toISOString().slice(0, 10);
+  const safeTime = String(time || '').replace(/[^0-9]/g, '') || '0000';
+  return `game_${safeDate}_${safeTime}`;
+}
+function normalizeGameForList(game) { const key = getGameKey(game); return { ...(game || {}), id: game?.id || key, game_key: key }; }
+function getCurrentGames(snapshot) { return getGames(snapshot).map(normalizeGameForList); }
+function getActiveGameFromSnapshot(snapshot) { return normalizeGameForList(getActiveGame(snapshot)); }
+function replaceGameInSnapshot(snapshot, updatedGame) {
+  const normalized = normalizeGameForList(updatedGame);
+  const games = getCurrentGames(snapshot);
+  const exists = games.some((game) => String(game.game_key || game.id) === String(normalized.game_key));
+  const nextGames = exists ? games.map((game) => String(game.game_key || game.id) === String(normalized.game_key) ? normalized : game) : [...games, normalized];
+  return nextGames.sort((a,b)=>String(a.game_date||'').localeCompare(String(b.game_date||'')) || String(a.game_time||'').localeCompare(String(b.game_time||'')));
+}
+function scopedConfirmationsForApp(snapshot, game) { const key = getGameKey(game || getActiveGameFromSnapshot(snapshot)); return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key); }
+
 function getCurrentSnapshotPlayer(snapshot) {
   return Array.isArray(snapshot?.players)
     ? snapshot.players.find((player) => String(player.id) === String(snapshot.session?.playerId))
@@ -665,6 +683,14 @@ document.addEventListener("click", async (e) => {
   }
   if (!Array.isArray(snapshot.players)) return;
 
+
+  if (action === "select-active-game") {
+    const selected = getCurrentGames(snapshot).find((game) => String(getGameKey(game)) === String(id));
+    if (!selected) { showToast("Jogo não encontrado.", "error"); return; }
+    patchState({ game: selected, active_game_id: getGameKey(selected) });
+    showToast("Jogo ativo alterado.");
+    return;
+  }
 
   if (action === "toggle-self-profile-edit") {
     const currentPlayer = getCurrentSnapshotPlayer(snapshot);
@@ -1411,7 +1437,7 @@ document.addEventListener("change", (e) => {
   }
 });
 
-import { buildGameView, buildPlayersView } from "../domain/projection.js";
+import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
@@ -1860,55 +1886,35 @@ function bindAppEvents(currentPlayer) {
       }
 
       const currentState = getState();
-      const previousGameDate = String(currentState?.game?.game_date || '');
+      const activeGame = getActiveGameFromSnapshot(currentState);
+      const previousGameKey = getGameKey(activeGame);
       const nextGameDate = String(formData.get('game_date') || '');
-
-      const shouldResetConfirmations = previousGameDate !== nextGameDate;
-
-      const nextGameKey = nextGameDate
-        ? `game_${nextGameDate}_${String(formData.get('game_time') || '')}`
-        : `game_${Date.now()}`;
+      const nextGameTime = String(formData.get('game_time') || '');
+      const nextGameKey = makeGameKeyFromForm(nextGameDate, nextGameTime);
+      const shouldCreateOrSwitchGame = previousGameKey !== nextGameKey;
 
       const adminNotification = String(formData.get('admin_notification') || '').trim();
       const otherNotifications = Array.isArray(currentState.notifications)
         ? currentState.notifications.filter((item) => item?.type !== 'admin')
         : [];
 
+      const updatedGame = {
+        ...(activeGame || {}), id: nextGameKey, game_key: nextGameKey,
+        game_date: nextGameDate, game_time: nextGameTime,
+        max_players: maxPlayers,
+        mens_expire_date: String(formData.get('mens_expire_date') || ''),
+        open: formData.get('open') === 'on',
+        ...(shouldCreateOrSwitchGame ? { sort_result: null } : {}),
+      };
+
       patchState({
-        game: {
-          ...(currentState.game || {}),
-          game_date: nextGameDate,
-          game_time: String(formData.get('game_time') || ''),
-          max_players: maxPlayers,
-          mens_expire_date: String(formData.get('mens_expire_date') || ''),
-          open: formData.get('open') === 'on',
-          game_key: nextGameKey,
-          ...(shouldResetConfirmations ? { sort_result: null } : {}),
-        },
-        notifications: adminNotification
-          ? [
-              {
-                type: 'admin',
-                message: adminNotification,
-                created_at: new Date().toISOString(),
-              },
-              ...otherNotifications,
-            ]
-          : otherNotifications,
-        ...(shouldResetConfirmations ? { confirmations: [] } : {}),
+        game: updatedGame,
+        games: replaceGameInSnapshot(currentState, updatedGame),
+        active_game_id: nextGameKey,
+        notifications: adminNotification ? [{ type: 'admin', message: adminNotification, created_at: new Date().toISOString() }, ...otherNotifications] : otherNotifications,
       });
 
-      if (shouldResetConfirmations) {
-        localStorage.removeItem('harmonia_team_draw');
-        localStorage.removeItem('harmonia_confirmations');
-        localStorage.removeItem('harmonia_game_state');
-      }
-
-      showToast(
-        shouldResetConfirmations
-          ? 'Novo jogo criado. Presenças e sorteio foram reiniciados.'
-          : 'Configuração do jogo salva.'
-      );
+      showToast(shouldCreateOrSwitchGame ? 'Jogo futuro criado/selecionado. Presenças anteriores foram preservadas.' : 'Configuração do jogo salva.');
     });
   }
 }
@@ -2094,7 +2100,8 @@ function renderHome(snapshot, currentPlayer) {
 function renderWeeklyGame(snapshot, currentPlayer) {
   const view = buildGameView(snapshot, currentPlayer?.id || null);
   const confirmed = isConfirmed(currentPlayer?.id);
-  const capacity = snapshot.game?.max_players || 8;
+  const activeGame = view.game || getActiveGameFromSnapshot(snapshot);
+  const capacity = activeGame?.max_players || 8;
   const remaining = Math.max(capacity - view.confirmedCount, 0);
   const canAct = currentPlayer && currentPlayer.plays_football !== false;
 
@@ -2103,8 +2110,8 @@ function renderWeeklyGame(snapshot, currentPlayer) {
       <section class="weekly-summary-grid">
         <div class="weekly-game-card">
           <div class="hero-label">Próximo jogo</div>
-          <div class="hero-date">${formatDate(snapshot.game?.game_date)}</div>
-          <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
+          <div class="hero-date">${formatDate(activeGame?.game_date)}</div>
+          <div class="hero-meta">${activeGame?.game_time || '--:--'} · ${activeGame?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
           <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
           <div class="weekly-game-stats">
             <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
@@ -2128,7 +2135,7 @@ function buildTeamDrawShareText(snapshot) {
   if (!sortResult) return '';
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
-  const game = snapshot.game || {};
+  const game = getActiveGameFromSnapshot(snapshot);
   const formatTeam = (label, ids = []) => {
     const lines = ids.map((id, index) => {
       const player = playerById.get(id);
@@ -2449,7 +2456,20 @@ function renderConfig(snapshot, currentPlayer) {
       </section>
 
       <section class="card">
-        <div class="card-title">Resumo do jogo</div>
+        <div class="card-title">Jogos futuros</div>
+        <p class="footer-note">Escolha qual jogo fica ativo para Home, presença, fila, sorteio e campeonato.</p>
+        <div class="games-list-config">
+          ${getCurrentGames(snapshot).map((item) => {
+            const key = getGameKey(item);
+            const active = key === getGameKey(game);
+            const count = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed).length;
+            return `<div class="game-config-row ${active ? 'is-active' : ''}"><div><strong>${formatDate(item.game_date)} · ${item.game_time || '--:--'}</strong><span>${count}/${item.max_players || item.maxPlayers || 0} confirmados · ${item.open ? 'aberto' : 'fechado'}</span></div><button class="btn btn-secondary btn-sm" type="button" data-action="select-active-game" data-id="${key}">${active ? 'Ativo' : 'Ativar'}</button></div>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Resumo do jogo ativo</div>
         <div class="info-block">
           <div class="info-line">• Data: ${formatDate(game.game_date)}</div>
           <div class="info-line">• Hora: ${game.game_time || '--:--'}</div>
