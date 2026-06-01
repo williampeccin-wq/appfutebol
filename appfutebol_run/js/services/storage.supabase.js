@@ -92,8 +92,6 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     game: normalizeGameForPresenceCutover(game),
     confirmations,
     championship: meta.championship || null,
-    games: Array.isArray(meta.games) ? meta.games : (game ? [normalizeGameForPresenceCutover(game)] : []),
-    active_game_id: meta.active_game_id || game?.game_key || null,
     carne: Array.isArray(meta.carne) ? meta.carne : [],
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
     ui: {
@@ -111,8 +109,6 @@ function splitState(state) {
     confirmations: Array.isArray(state.confirmations) ? state.confirmations : [],
     meta: {
       championship: state.championship || null,
-      games: Array.isArray(state.games) ? state.games : [],
-      active_game_id: state.active_game_id || state.game?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
     },
@@ -190,11 +186,9 @@ function confirmationFromPresenceRow(row) {
   if (!row || typeof row !== 'object') return null;
 
   const data = row.data && typeof row.data === 'object' ? row.data : {};
-  const rowStatus = String(row.status || '').toLowerCase();
-  const dataStatus = String(data.status || '').toLowerCase();
-  const status = (dataStatus === 'waitlist' || dataStatus === 'waitlisted') ? dataStatus : (rowStatus || dataStatus);
+  const status = String(row.status || data.status || '').toLowerCase();
   const confirmed = status ? status === 'confirmed' : data.confirmed === true;
-  const timestamp = data.waitlisted_at || data.timestamp || row.confirmed_at || row.cancelled_at || row.updated_at || null;
+  const timestamp = row.confirmed_at || row.cancelled_at || row.updated_at || data.timestamp || null;
 
   return {
     ...data,
@@ -205,8 +199,6 @@ function confirmationFromPresenceRow(row) {
     timestamp,
     confirmed_at: row.confirmed_at || data.confirmed_at || null,
     cancelled_at: row.cancelled_at || data.cancelled_at || null,
-    waitlisted_at: data.waitlisted_at || null,
-    waitlist_position: data.waitlist_position || null,
     removed_by_admin: row.removed_by_admin === true || data.removed_by_admin === true,
     source: 'presence_confirmations',
   };
@@ -215,10 +207,8 @@ function confirmationFromPresenceRow(row) {
 function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default') {
   const confirmed = confirmation?.confirmed === true;
   const removedByAdmin = confirmation?.removed_by_admin === true;
-  const requestedStatus = String(confirmation?.status || '').toLowerCase();
-  const isWaitlist = !confirmed && (requestedStatus === 'waitlist' || requestedStatus === 'waitlisted');
-  const status = confirmed ? 'confirmed' : (removedByAdmin ? 'removed' : (isWaitlist ? 'waitlist' : 'cancelled'));
-  const timestamp = confirmation?.timestamp || confirmation?.waitlisted_at || now;
+  const status = confirmed ? 'confirmed' : (removedByAdmin ? 'removed' : 'cancelled');
+  const timestamp = confirmation?.timestamp || now;
   const actorAuthUserId = getCurrentAuthUserId();
   const normalizedGameKey = normalizeConfirmationGameKey(confirmation, gameKey);
 
@@ -229,9 +219,7 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
     status,
     timestamp,
     confirmed_at: confirmed ? timestamp : null,
-    cancelled_at: (!confirmed && !removedByAdmin && !isWaitlist) ? timestamp : null,
-    waitlisted_at: isWaitlist ? (confirmation?.waitlisted_at || timestamp) : null,
-    waitlist_position: isWaitlist ? (confirmation?.waitlist_position || null) : null,
+    cancelled_at: (!confirmed && !removedByAdmin) ? timestamp : null,
     removed_by_admin: removedByAdmin,
     source: 'presence_confirmations_app_write',
     actor_auth_user_id: actorAuthUserId,
@@ -240,7 +228,7 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
   return {
     game_key: normalizedGameKey,
     player_id: String(confirmation.player_id),
-    status: status === 'waitlist' ? 'cancelled' : status,
+    status,
     confirmed_at: normalizedPayload.confirmed_at,
     cancelled_at: normalizedPayload.cancelled_at,
     removed_by_admin: removedByAdmin,
@@ -466,7 +454,16 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     }
   }
 
-  // v1.60.70: multiple future games preserve previous game confirmations.
+  if (previousGameKey !== nextGameKey) {
+    operations.push({
+      type: 'delete_previous_game_presence_confirmations',
+      run: () => requestNoContent(
+        config,
+        tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}`),
+        { method: 'DELETE' }
+      ),
+    });
+  }
 
   for (const [playerId, confirmation] of nextConfirmations.entries()) {
     const normalizedConfirmation = {

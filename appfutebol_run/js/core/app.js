@@ -152,24 +152,6 @@ function repairManualSnapshot(snapshot) {
   return repaired.state;
 }
 
-
-function makeGameKeyFromForm(date, time) {
-  const safeDate = String(date || '').replace(/[^0-9-]/g, '') || new Date().toISOString().slice(0, 10);
-  const safeTime = String(time || '').replace(/[^0-9]/g, '') || '0000';
-  return `game_${safeDate}_${safeTime}`;
-}
-function normalizeGameForList(game) { const key = getGameKey(game); return { ...(game || {}), id: game?.id || key, game_key: key }; }
-function getCurrentGames(snapshot) { return getGames(snapshot).map(normalizeGameForList); }
-function getActiveGameFromSnapshot(snapshot) { return normalizeGameForList(getActiveGame(snapshot)); }
-function replaceGameInSnapshot(snapshot, updatedGame) {
-  const normalized = normalizeGameForList(updatedGame);
-  const games = getCurrentGames(snapshot);
-  const exists = games.some((game) => String(game.game_key || game.id) === String(normalized.game_key));
-  const nextGames = exists ? games.map((game) => String(game.game_key || game.id) === String(normalized.game_key) ? normalized : game) : [...games, normalized];
-  return nextGames.sort((a,b)=>String(a.game_date||'').localeCompare(String(b.game_date||'')) || String(a.game_time||'').localeCompare(String(b.game_time||'')));
-}
-function scopedConfirmationsForApp(snapshot, game) { const key = getGameKey(game || getActiveGameFromSnapshot(snapshot)); return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key); }
-
 function getCurrentSnapshotPlayer(snapshot) {
   return Array.isArray(snapshot?.players)
     ? snapshot.players.find((player) => String(player.id) === String(snapshot.session?.playerId))
@@ -684,14 +666,6 @@ document.addEventListener("click", async (e) => {
   if (!Array.isArray(snapshot.players)) return;
 
 
-  if (action === "select-active-game") {
-    const selected = getCurrentGames(snapshot).find((game) => String(getGameKey(game)) === String(id));
-    if (!selected) { showToast("Jogo não encontrado.", "error"); return; }
-    patchState({ game: selected, active_game_id: getGameKey(selected) });
-    showToast("Jogo ativo alterado.");
-    return;
-  }
-
   if (action === "toggle-self-profile-edit") {
     const currentPlayer = getCurrentSnapshotPlayer(snapshot);
     if (!currentPlayer) {
@@ -855,8 +829,7 @@ document.addEventListener("click", async (e) => {
     }
 
     const outcome = document.getElementById('championship-team-outcome')?.value;
-    const drawId = document.getElementById('championship-draw-id')?.value || null;
-    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId);
+    const builtResult = buildTeamResultStatuses(snapshot, outcome);
 
     if (!builtResult.ok) {
       showToast(builtResult.message || "Resultado inválido", "error");
@@ -870,15 +843,13 @@ document.addEventListener("click", async (e) => {
       id: globalThis.crypto?.randomUUID ? `championship_result_${globalThis.crypto.randomUUID()}` : `championship_result_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       date,
       outcome: builtResult.outcome,
-      draw_id: builtResult.draw_id,
-      game_key: builtResult.game_key,
       team_a: builtResult.team_a,
       team_b: builtResult.team_b,
       statuses: builtResult.statuses,
     });
 
     const safeSnapshot = repairManualSnapshot(snapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
+    savePersistedState(safeSnapshot);
     render(safeSnapshot);
     uiActionInFlight = false;
     showToast("Resultado lançado e classificação recalculada", "success");
@@ -906,7 +877,7 @@ document.addEventListener("click", async (e) => {
 
     deleteChampionshipResult(snapshot, id);
     const safeSnapshot = repairManualSnapshot(snapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
+    savePersistedState(safeSnapshot);
     render(safeSnapshot);
     uiActionInFlight = false;
     showToast("Resultado removido e classificação recalculada", "success");
@@ -1136,7 +1107,7 @@ if (action === "create-player-access") {
     const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
 
     const response = await fetch(
-      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
+      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
       {
         method: "POST",
         headers: {
@@ -1174,10 +1145,10 @@ if (action === "create-player-access") {
 
     const safeSnapshot = repairManualSnapshot(snapshot);
     replaceState(safeSnapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
+    savePersistedState(safeSnapshot);
     render(safeSnapshot);
 
-    showToast(data.reused_existing_user ? "Acesso existente atualizado e vinculado." : "Acesso criado com sucesso.", "success");
+    showToast("Acesso criado com sucesso.", "success");
   } catch (error) {
     clearActionBusy(trigger);
     showToast(error?.message || "Erro inesperado.", "error");
@@ -1218,7 +1189,7 @@ if (action === "reset-player-password") {
     const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
 
     const response = await fetch(
-      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
+      "https://kpgghcrmbkrwpvtegcjh.supabase.co/functions/v1/admin-reset-password",
       {
         method: "POST",
         headers: {
@@ -1272,7 +1243,7 @@ if (action === "delete-player") {
 
   const confirmedDelete = await showConfirmModal({
     title: 'Excluir jogador',
-    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador, suas confirmações, vínculos de carne e registros relacionados da lista atual.`,
+    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador do app, suas confirmações, vínculos de carne e registros relacionados da lista atual.${player.auth_user_id ? ' O acesso Auth no Supabase pode continuar existindo, mas ficará sem jogador vinculado.' : ''}`,
     confirmText: 'Excluir',
     cancelText: 'Cancelar',
   });
@@ -1437,7 +1408,7 @@ document.addEventListener("change", (e) => {
   }
 });
 
-import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
+import { buildGameView, buildPlayersView } from "../domain/projection.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
@@ -1448,17 +1419,20 @@ import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
-import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 
 const appElement = document.getElementById('app');
 
-const REMOTE_SYNC_INTERVAL_MS = 4000;
+const REMOTE_SYNC_INTERVAL_MS = 2000;
 let isApplyingRemoteState = false;
 let lastDomainFingerprint = '';
+let pullRefreshStartY = null;
+let pullRefreshArmed = false;
+let pullRefreshRunning = false;
+const PULL_REFRESH_THRESHOLD_PX = 72;
 
 init();
 
@@ -1492,6 +1466,18 @@ async function init() {
 }
 
 function bindGlobalSystemEvents() {
+  setupPullToRefresh();
+
+  window.addEventListener('focus', () => {
+    applyRemoteSyncNow({ showFeedback: false });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      applyRemoteSyncNow({ showFeedback: false });
+    }
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -1506,6 +1492,83 @@ function bindGlobalSystemEvents() {
       }
     }, 600);
   });
+}
+
+
+
+function setPullRefreshHintState(state = 'idle') {
+  const hint = document.getElementById('pull-refresh-hint');
+  if (!hint) return;
+
+  if (state === 'ready') {
+    hint.innerHTML = '<span class="pull-refresh-arrow">↓</span><span>Solte para atualizar</span>';
+    hint.classList.add('is-ready');
+    hint.classList.remove('is-loading');
+    return;
+  }
+
+  if (state === 'loading') {
+    hint.innerHTML = '<span class="pull-refresh-arrow">↻</span><span>Atualizando...</span>';
+    hint.classList.add('is-loading');
+    hint.classList.remove('is-ready');
+    return;
+  }
+
+  hint.innerHTML = '<span class="pull-refresh-arrow">↓</span><span>Arraste para baixo para atualizar</span>';
+  hint.classList.remove('is-ready', 'is-loading');
+}
+
+function setupPullToRefresh() {
+  document.addEventListener('touchstart', (event) => {
+    if (!getCurrentPlayer()) return;
+    if (window.scrollY > 4) return;
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    pullRefreshStartY = touch.clientY;
+    pullRefreshArmed = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (event) => {
+    if (pullRefreshStartY === null || pullRefreshRunning) return;
+    if (window.scrollY > 4) {
+      pullRefreshStartY = null;
+      pullRefreshArmed = false;
+      setPullRefreshHintState('idle');
+      return;
+    }
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const deltaY = touch.clientY - pullRefreshStartY;
+    if (deltaY >= PULL_REFRESH_THRESHOLD_PX) {
+      pullRefreshArmed = true;
+      setPullRefreshHintState('ready');
+    } else if (deltaY > 16) {
+      setPullRefreshHintState('idle');
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', async () => {
+    if (pullRefreshStartY === null) return;
+
+    const shouldRefresh = pullRefreshArmed && !pullRefreshRunning;
+    pullRefreshStartY = null;
+    pullRefreshArmed = false;
+
+    if (!shouldRefresh) {
+      setPullRefreshHintState('idle');
+      return;
+    }
+
+    pullRefreshRunning = true;
+    setPullRefreshHintState('loading');
+    await applyRemoteSyncNow({ showFeedback: true });
+    pullRefreshRunning = false;
+    setPullRefreshHintState('idle');
+  }, { passive: true });
 }
 
 
@@ -1539,45 +1602,55 @@ function isValidRemoteDomainSnapshot(snapshot) {
   );
 }
 
-function startRemoteSync() {
-  window.setInterval(async () => {
-    try {
-      // Never poll Supabase REST while the user is not operationally authenticated.
-      // With RLS closed, polling on the login screen correctly produces 401.
-      if (!getCurrentPlayer()) {
-        return;
-      }
-
-      const localSnapshot = getState();
-      const remote = await loadRemoteState();
-
-      if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
-        return;
-      }
-
-      const repairedRemote = validateAndRepairState(remote.state);
-      const safeRemoteState = repairedRemote.state;
-
-      if (repairedRemote.warnings.length) {
-        console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
-      }
-
-      const currentFingerprint = getDomainFingerprint(localSnapshot);
-      const remoteFingerprint = getDomainFingerprint(safeRemoteState);
-
-      if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
-        lastDomainFingerprint = currentFingerprint;
-        return;
-      }
-
-      isApplyingRemoteState = true;
-      replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
-      lastDomainFingerprint = remoteFingerprint;
-      isApplyingRemoteState = false;
-    } catch (error) {
-      isApplyingRemoteState = false;
-      console.warn('[remote-sync] failed to sync remote state', error);
+async function applyRemoteSyncNow({ showFeedback = false } = {}) {
+  try {
+    // Never poll Supabase REST while the user is not operationally authenticated.
+    // With RLS closed, polling on the login screen correctly produces 401.
+    if (!getCurrentPlayer()) {
+      return false;
     }
+
+    const localSnapshot = getState();
+    const remote = await loadRemoteState();
+
+    if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
+      if (showFeedback) showToast('Não foi possível atualizar agora.', 'error');
+      return false;
+    }
+
+    const repairedRemote = validateAndRepairState(remote.state);
+    const safeRemoteState = repairedRemote.state;
+
+    if (repairedRemote.warnings.length) {
+      console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
+    }
+
+    const currentFingerprint = getDomainFingerprint(localSnapshot);
+    const remoteFingerprint = getDomainFingerprint(safeRemoteState);
+
+    if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
+      lastDomainFingerprint = currentFingerprint;
+      if (showFeedback) showToast('App já está atualizado.', 'success');
+      return false;
+    }
+
+    isApplyingRemoteState = true;
+    replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
+    lastDomainFingerprint = remoteFingerprint;
+    isApplyingRemoteState = false;
+    if (showFeedback) showToast('App atualizado.', 'success');
+    return true;
+  } catch (error) {
+    isApplyingRemoteState = false;
+    console.warn('[remote-sync] failed to sync remote state', error);
+    if (showFeedback) showToast('Erro ao atualizar.', 'error');
+    return false;
+  }
+}
+
+function startRemoteSync() {
+  window.setInterval(() => {
+    applyRemoteSyncNow({ showFeedback: false });
   }, REMOTE_SYNC_INTERVAL_MS);
 }
 
@@ -1633,6 +1706,7 @@ function render(snapshot) {
     </nav>
 
     <main class="content">
+      <div id="pull-refresh-hint" class="pull-refresh-hint"><span class="pull-refresh-arrow">↓</span><span>Arraste para baixo para atualizar</span></div>
       <div style="padding:10px;font-weight:bold;">
 ${confirmedCount} / ${maxPlayers} jogadores confirmados
 </div>
@@ -1886,35 +1960,42 @@ function bindAppEvents(currentPlayer) {
       }
 
       const currentState = getState();
-      const activeGame = getActiveGameFromSnapshot(currentState);
-      const previousGameKey = getGameKey(activeGame);
+      const previousGameDate = String(currentState?.game?.game_date || '');
       const nextGameDate = String(formData.get('game_date') || '');
-      const nextGameTime = String(formData.get('game_time') || '');
-      const nextGameKey = makeGameKeyFromForm(nextGameDate, nextGameTime);
-      const shouldCreateOrSwitchGame = previousGameKey !== nextGameKey;
 
-      const adminNotification = String(formData.get('admin_notification') || '').trim();
-      const otherNotifications = Array.isArray(currentState.notifications)
-        ? currentState.notifications.filter((item) => item?.type !== 'admin')
-        : [];
+      const shouldResetConfirmations = previousGameDate !== nextGameDate;
 
-      const updatedGame = {
-        ...(activeGame || {}), id: nextGameKey, game_key: nextGameKey,
-        game_date: nextGameDate, game_time: nextGameTime,
-        max_players: maxPlayers,
-        mens_expire_date: String(formData.get('mens_expire_date') || ''),
-        open: formData.get('open') === 'on',
-        ...(shouldCreateOrSwitchGame ? { sort_result: null } : {}),
-      };
+      const nextGameKey = nextGameDate
+        ? `game_${nextGameDate}_${String(formData.get('game_time') || '')}`
+        : `game_${Date.now()}`;
 
       patchState({
-        game: updatedGame,
-        games: replaceGameInSnapshot(currentState, updatedGame),
-        active_game_id: nextGameKey,
-        notifications: adminNotification ? [{ type: 'admin', message: adminNotification, created_at: new Date().toISOString() }, ...otherNotifications] : otherNotifications,
+        game: {
+          ...(currentState.game || {}),
+          game_date: nextGameDate,
+          game_time: String(formData.get('game_time') || ''),
+          max_players: maxPlayers,
+          mens_expire_date: String(formData.get('mens_expire_date') || ''),
+          open: formData.get('open') === 'on',
+          game_key: nextGameKey,
+          ...(shouldResetConfirmations ? { sort_result: null } : {}),
+        },
+        ...(shouldResetConfirmations ? { confirmations: [] } : {}),
       });
 
-      showToast(shouldCreateOrSwitchGame ? 'Jogo futuro criado/selecionado. Presenças anteriores foram preservadas.' : 'Configuração do jogo salva.');
+      if (shouldResetConfirmations) {
+        localStorage.removeItem('harmonia_team_draw');
+        localStorage.removeItem('harmonia_confirmations');
+        localStorage.removeItem('harmonia_game_state');
+      }
+
+      window.dispatchEvent(new CustomEvent('harmonia:game-config-saved'));
+
+      showToast(
+        shouldResetConfirmations
+          ? 'Novo jogo criado. Presenças e sorteio foram reiniciados.'
+          : 'Configuração do jogo salva.'
+      );
     });
   }
 }
@@ -1950,8 +2031,6 @@ function renderHome(snapshot, currentPlayer) {
   const game = gameView.game;
   const confirmedCount = gameView.confirmedCount;
   const maxPlayers = gameView.maxPlayers || 0;
-  const waitlistView = getWaitlistView(workingSnapshot);
-  const waitlistCount = waitlistView.length;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const mensalidade = buildMensalidadeMeta(game, activePlayer);
   const carneScheduleEntries = getCarneScheduleEntriesForApp(workingSnapshot);
@@ -1965,18 +2044,14 @@ function renderHome(snapshot, currentPlayer) {
       )
     );
   const confirmed = gameView.isConfirmed;
-  const waitlisted = gameView.isWaitlisted;
-  const waitlistPosition = gameView.waitlistPosition;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
-  const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
-  const statusNote = waitlisted
-    ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
-    : !confirmed && !capacityOk
-      ? 'O jogo já está cheio. Você pode entrar na fila de espera.'
-      : presenceGuard.ok
-        ? ''
-        : presenceGuard.message;
+  const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
+  const statusNote = !confirmed && !capacityOk
+    ? 'O jogo já está cheio.'
+    : presenceGuard.ok
+      ? ''
+      : presenceGuard.message;
   const presenceFeedback = buildPresenceFeedback({
     confirmed,
     capacityOk,
@@ -2038,34 +2113,19 @@ function renderHome(snapshot, currentPlayer) {
           <div class="progress-track">
             <div class="progress-bar" style="width:${fillPercent}%"></div>
           </div>
-          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}${waitlistCount ? ` · Fila: ${waitlistCount}` : ''}</div>
+          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}</div>
         </div>
         <div class="hero-presence-panel">
           <div>
             <div class="hero-presence-label">Sua presença</div>
-            <div class="hero-presence-status">${waitlisted ? '⏳ Na fila de espera' : `${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}`}</div>
+            <div class="hero-presence-status">${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}</div>
             ${statusNote && statusNote !== presenceFeedback.text ? `<div class="hero-presence-note">${statusNote}</div>` : ''}
           </div>
           ${canRenderPresenceAction ? `
-            <button class="btn ${confirmed || waitlisted ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar')}</button>
+            <button class="btn ${confirmed ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar' : 'Confirmar'}</button>
           ` : ''}
         </div>
       </section>
-
-      ${waitlistCount ? `
-        <section class="card home-waitlist-card">
-          <div class="card-title compact-title">Fila de espera</div>
-          ${waitlisted ? `<div class="home-waitlist-highlight">Você está em ${waitlistPosition || '?'}º na fila.</div>` : ''}
-          <div class="home-waitlist-list">
-            ${waitlistView.slice(0, 5).map((entry) => `
-              <div class="home-waitlist-row">
-                <span>#${entry.position}</span>
-                <strong>${entry.player?.name || 'Jogador'}</strong>
-              </div>
-            `).join('')}
-          </div>
-        </section>
-      ` : ''}
 
       <section class="card notifications-card">
         <div class="card-title compact-title">Notificações</div>
@@ -2087,10 +2147,7 @@ function renderHome(snapshot, currentPlayer) {
               </span>
             </div>
           ` : `
-            <div class="notification-item notification-item-admin">
-              <strong>📢 Aviso:</strong>
-              <span>${String(notification.message || '').replace(/\n/g, '<br>')}</span>
-            </div>
+            <div class="notification-item">• ${notification.message}</div>
           `).join('') : '<div class="notification-item is-empty">Nenhuma notificação recente.</div>'}
         </div>
       </section>
@@ -2100,8 +2157,7 @@ function renderHome(snapshot, currentPlayer) {
 function renderWeeklyGame(snapshot, currentPlayer) {
   const view = buildGameView(snapshot, currentPlayer?.id || null);
   const confirmed = isConfirmed(currentPlayer?.id);
-  const activeGame = view.game || getActiveGameFromSnapshot(snapshot);
-  const capacity = activeGame?.max_players || 8;
+  const capacity = snapshot.game?.max_players || 8;
   const remaining = Math.max(capacity - view.confirmedCount, 0);
   const canAct = currentPlayer && currentPlayer.plays_football !== false;
 
@@ -2110,8 +2166,8 @@ function renderWeeklyGame(snapshot, currentPlayer) {
       <section class="weekly-summary-grid">
         <div class="weekly-game-card">
           <div class="hero-label">Próximo jogo</div>
-          <div class="hero-date">${formatDate(activeGame?.game_date)}</div>
-          <div class="hero-meta">${activeGame?.game_time || '--:--'} · ${activeGame?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
+          <div class="hero-date">${formatDate(snapshot.game?.game_date)}</div>
+          <div class="hero-meta">${snapshot.game?.game_time || '--:--'} · ${snapshot.game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
           <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
           <div class="weekly-game-stats">
             <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
@@ -2135,7 +2191,7 @@ function buildTeamDrawShareText(snapshot) {
   if (!sortResult) return '';
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
-  const game = getActiveGameFromSnapshot(snapshot);
+  const game = snapshot.game || {};
   const formatTeam = (label, ids = []) => {
     const lines = ids.map((id, index) => {
       const player = playerById.get(id);
@@ -2195,8 +2251,6 @@ function renderPresenceList(snapshot, currentPlayer) {
       .filter((entry) => entry?.confirmed)
       .map((entry) => entry.player_id)
   );
-  const waitlistEntries = getWaitlistView(snapshot);
-  const waitlistedIds = new Set(waitlistEntries.map((entry) => String(entry.player_id)));
 
   const footballPlayers = (snapshot.players || [])
     .filter((player) => player.plays_football !== false)
@@ -2204,8 +2258,7 @@ function renderPresenceList(snapshot, currentPlayer) {
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
   const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
-  const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
-  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id) && !waitlistedIds.has(String(player.id)));
+  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
@@ -2245,28 +2298,6 @@ function renderPresenceList(snapshot, currentPlayer) {
           ${confirmedPlayers.length
             ? confirmedPlayers.map((player) => renderWeeklyRow(player, true)).join('')
             : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
-        </div>
-      </div>
-
-      <div class="weekly-presence-section waitlist-section">
-        <div class="weekly-presence-title">Fila de espera (${waitlistPlayers.length})</div>
-        <div class="weekly-presence-stack">
-          ${waitlistPlayers.length
-            ? waitlistPlayers.map((player, index) => `
-              <div class="weekly-player-row waitlist-player-row">
-                <div class="players-switch-player">
-                  ${renderAvatarForApp(player)}
-                  <div>
-                    <div class="row-title">#${index + 1} · ${player.name}</div>
-                    <div class="row-subtitle">${getPositionLabel(player.position)} · aguardando vaga</div>
-                  </div>
-                </div>
-                <div class="weekly-player-meta">
-                  <span class="tag is-warn">Fila</span>
-                </div>
-              </div>
-            `).join('')
-            : '<div class="empty-inline">Nenhum jogador na fila de espera.</div>'}
         </div>
       </div>
 
@@ -2417,7 +2448,7 @@ function renderConfig(snapshot, currentPlayer) {
     <section class="section-stack">
       <section class="card">
         <div class="card-title">Configuração do jogo</div>
-        <form id="game-config-form" class="player-admin-form game-config-form">
+        <form id="game-config-form" class="player-admin-form">
           <label class="field-label">
             Data do jogo
             <input class="input" type="date" name="game_date" value="${game.game_date || ''}" />
@@ -2443,33 +2474,14 @@ function renderConfig(snapshot, currentPlayer) {
             Inscrições abertas
           </label>
 
-          <label class="field-label config-notifications-field">
-            Notificações
-            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Digite aqui recados para todos os jogadores.">${(Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || ''}</textarea>
-          </label>
-          <p class="footer-note config-notifications-help">Esse recado aparece na Home para todos, abaixo da dupla da carne. Deixe vazio para ocultar.</p>
-
-          <div class="player-admin-actions game-config-actions">
+          <div class="player-admin-actions">
             <button class="btn btn-primary" type="submit">Salvar configuração</button>
           </div>
         </form>
       </section>
 
       <section class="card">
-        <div class="card-title">Jogos futuros</div>
-        <p class="footer-note">Escolha qual jogo fica ativo para Home, presença, fila, sorteio e campeonato.</p>
-        <div class="games-list-config">
-          ${getCurrentGames(snapshot).map((item) => {
-            const key = getGameKey(item);
-            const active = key === getGameKey(game);
-            const count = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed).length;
-            return `<div class="game-config-row ${active ? 'is-active' : ''}"><div><strong>${formatDate(item.game_date)} · ${item.game_time || '--:--'}</strong><span>${count}/${item.max_players || item.maxPlayers || 0} confirmados · ${item.open ? 'aberto' : 'fechado'}</span></div><button class="btn btn-secondary btn-sm" type="button" data-action="select-active-game" data-id="${key}">${active ? 'Ativo' : 'Ativar'}</button></div>`;
-          }).join('')}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Resumo do jogo ativo</div>
+        <div class="card-title">Resumo do jogo</div>
         <div class="info-block">
           <div class="info-line">• Data: ${formatDate(game.game_date)}</div>
           <div class="info-line">• Hora: ${game.game_time || '--:--'}</div>

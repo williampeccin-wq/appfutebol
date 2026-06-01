@@ -136,24 +136,15 @@ export function sanitizeConfirmations(state) {
     }
 
     const current = byPlayer.get(entry.player_id);
-    const normalizedEntry = {
-      ...entry,
-      confirmed: Boolean(entry.confirmed),
-      status: entry.status || (entry.confirmed ? 'confirmed' : 'cancelled'),
-      timestamp: entry.timestamp || entry.waitlisted_at || entry.confirmed_at || entry.cancelled_at || null,
-      waitlisted_at: entry.waitlisted_at || null,
-      waitlist_position: entry.waitlist_position || null,
-    };
-
     if (!current) {
-      byPlayer.set(entry.player_id, normalizedEntry);
+      byPlayer.set(entry.player_id, { ...entry, confirmed: Boolean(entry.confirmed), timestamp: entry.timestamp || null });
       continue;
     }
 
-    const currentTime = Date.parse(current.timestamp || current.waitlisted_at || 0) || 0;
-    const nextTime = Date.parse(normalizedEntry.timestamp || normalizedEntry.waitlisted_at || 0) || 0;
+    const currentTime = Date.parse(current.timestamp || 0) || 0;
+    const nextTime = Date.parse(entry.timestamp || 0) || 0;
     if (nextTime >= currentTime) {
-      byPlayer.set(entry.player_id, normalizedEntry);
+      byPlayer.set(entry.player_id, { ...entry, confirmed: Boolean(entry.confirmed), timestamp: entry.timestamp || null });
     }
     warnings.push(`Confirmação duplicada consolidada (${entry.player_id}).`);
   }
