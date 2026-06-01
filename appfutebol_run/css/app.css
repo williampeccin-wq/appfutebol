@@ -3758,3 +3758,55 @@ button {
     margin-right: 16px !important;
   }
 }
+
+.home-waitlist-card {
+  display: grid;
+  gap: 10px;
+}
+
+.home-waitlist-highlight {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.home-waitlist-list {
+  display: grid;
+  gap: 8px;
+}
+
+.home-waitlist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.home-waitlist-row span,
+.waitlist-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.waitlist-section {
+  border-top: 1px dashed rgba(146, 64, 14, 0.25);
+  border-bottom: 1px dashed rgba(146, 64, 14, 0.25);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.waitlist-player-row {
+  background: rgba(254, 243, 199, 0.35);
+}

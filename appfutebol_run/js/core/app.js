@@ -1419,7 +1419,7 @@ import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
@@ -2030,6 +2030,8 @@ function renderHome(snapshot, currentPlayer) {
   const gameView = buildGameView(workingSnapshot, activePlayer.id);
   const game = gameView.game;
   const confirmedCount = gameView.confirmedCount;
+  const waitlistView = getWaitlistView(workingSnapshot);
+  const waitlistCount = waitlistView.length;
   const maxPlayers = gameView.maxPlayers || 0;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const mensalidade = buildMensalidadeMeta(game, activePlayer);
@@ -2044,17 +2046,21 @@ function renderHome(snapshot, currentPlayer) {
       )
     );
   const confirmed = gameView.isConfirmed;
+  const waitlisted = gameView.isWaitlisted;
+  const waitlistPosition = gameView.waitlistPosition;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
-  const canRenderPresenceAction = confirmed || (presenceGuard.ok && capacityOk);
-  const statusNote = !confirmed && !capacityOk
-    ? 'O jogo já está cheio.'
-    : presenceGuard.ok
-      ? ''
-      : presenceGuard.message;
+  const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
+  const statusNote = waitlisted
+    ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
+    : !confirmed && !capacityOk
+      ? 'O jogo já está cheio. Você pode entrar na fila de espera.'
+      : presenceGuard.ok
+        ? ''
+        : presenceGuard.message;
   const presenceFeedback = buildPresenceFeedback({
     confirmed,
-    capacityOk,
+    capacityOk: capacityOk || waitlisted,
     presenceGuard,
     currentPlayer: activePlayer,
     carneStatus,
@@ -2113,34 +2119,41 @@ function renderHome(snapshot, currentPlayer) {
           <div class="progress-track">
             <div class="progress-bar" style="width:${fillPercent}%"></div>
           </div>
-          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}</div>
+          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}${waitlistCount ? ` · Fila: ${waitlistCount}` : ''}</div>
         </div>
         <div class="hero-presence-panel">
           <div>
             <div class="hero-presence-label">Sua presença</div>
-            <div class="hero-presence-status">${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}</div>
+            <div class="hero-presence-status">${waitlisted ? '⏳ Na fila de espera' : `${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}`}</div>
             ${statusNote && statusNote !== presenceFeedback.text ? `<div class="hero-presence-note">${statusNote}</div>` : ''}
           </div>
           ${canRenderPresenceAction ? `
-            <button class="btn ${confirmed ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar' : 'Confirmar'}</button>
+            <button class="btn ${confirmed || waitlisted ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar')}</button>
           ` : ''}
         </div>
       </section>
+
+      ${waitlistCount ? `
+        <section class="card home-waitlist-card">
+          <div class="card-title compact-title">Fila de espera</div>
+          ${waitlisted ? `<div class="home-waitlist-highlight">Você está em ${waitlistPosition || '?'}º na fila.</div>` : ''}
+          <div class="home-waitlist-list">
+            ${waitlistView.slice(0, 5).map((entry) => `
+              <div class="home-waitlist-row">
+                <span>${entry.position}º</span>
+                <strong>${entry.player?.name || 'Jogador'}</strong>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+      ` : ''}
 
       <section class="card notifications-card">
         <div class="card-title compact-title">Notificações</div>
         <div class="notification-list">
           ${notifications.length ? notifications.slice(0, 5).map((notification) => notification.type === 'carne' ? `
             <div class="notification-item notification-item-carne">
-              <span class="notification-icon-carne" aria-hidden="true">
-                <svg viewBox="0 0 64 64" focusable="false">
-                  <line x1="10" y1="54" x2="54" y2="10" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                  <ellipse cx="25" cy="39" rx="9" ry="13" transform="rotate(45 25 39)" fill="#f97316"/>
-                  <ellipse cx="39" cy="25" rx="9" ry="13" transform="rotate(45 39 25)" fill="#fb923c"/>
-                  <path d="M20 36c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
-                  <path d="M34 22c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
-                </svg>
-              </span>
+              <span class="notification-icon-carne" aria-hidden="true">🍖</span>
               <span class="notification-content-carne">
                 <strong>Dupla da carne (${notification.date}):</strong>
                 <span>${notification.player1}, ${notification.player2}</span>
@@ -2156,10 +2169,9 @@ function renderHome(snapshot, currentPlayer) {
 }
 function renderWeeklyGame(snapshot, currentPlayer) {
   const view = buildGameView(snapshot, currentPlayer?.id || null);
-  const confirmed = isConfirmed(currentPlayer?.id);
   const capacity = snapshot.game?.max_players || 8;
   const remaining = Math.max(capacity - view.confirmedCount, 0);
-  const canAct = currentPlayer && currentPlayer.plays_football !== false;
+  const waitlistCount = getWaitlistView(snapshot).length;
 
   return `
     <section class="section-stack weekly-game-screen">
@@ -2171,7 +2183,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
           <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
           <div class="weekly-game-stats">
             <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
-            <span>${remaining} vagas restantes</span>
+            <span>${remaining} vagas restantes${waitlistCount ? ` · ${waitlistCount} na fila` : ''}</span>
           </div>
         </div>
       </section>
@@ -2249,16 +2261,19 @@ function renderPresenceList(snapshot, currentPlayer) {
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
-      .map((entry) => entry.player_id)
+      .map((entry) => String(entry.player_id))
   );
+  const waitlistEntries = getWaitlistView(snapshot);
+  const waitlistedIds = new Set(waitlistEntries.map((entry) => String(entry.player_id)));
 
   const footballPlayers = (snapshot.players || [])
     .filter((player) => player.plays_football !== false)
     .filter((player) => player.role !== 'carne')
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
-  const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
-  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id));
+  const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(String(player.id)));
+  const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
+  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(String(player.id)) && !waitlistedIds.has(String(player.id)));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
@@ -2301,12 +2316,36 @@ function renderPresenceList(snapshot, currentPlayer) {
         </div>
       </div>
 
+      <div class="weekly-presence-section waitlist-section">
+        <div class="weekly-presence-title">Fila de espera (${waitlistPlayers.length})</div>
+        <div class="weekly-presence-stack">
+          ${waitlistPlayers.length
+            ? waitlistPlayers.map((player, index) => `
+              <div class="weekly-player-row waitlist-player-row">
+                <div class="players-switch-player">
+                  <span class="waitlist-position">${index + 1}º</span>
+                  ${renderAvatarForApp(player)}
+                  <div>
+                    <div class="row-title">${player.name}</div>
+                    <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
+                  </div>
+                </div>
+                <div class="weekly-player-meta">
+                  <span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>
+                  <span class="tag is-warn">Fila</span>
+                </div>
+              </div>
+            `).join('')
+            : '<div class="empty-inline">Nenhum jogador na fila de espera.</div>'}
+        </div>
+      </div>
+
       <div class="weekly-presence-section">
         <div class="weekly-presence-title">Não confirmados (${pendingPlayers.length})</div>
         <div class="weekly-presence-stack">
           ${pendingPlayers.length
             ? pendingPlayers.map((player) => renderWeeklyRow(player, false)).join('')
-            : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
+            : '<div class="empty-inline">Todos os jogadores confirmaram ou entraram na fila.</div>'}
         </div>
       </div>
     </section>
