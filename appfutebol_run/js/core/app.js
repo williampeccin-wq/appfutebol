@@ -685,6 +685,8 @@ document.addEventListener("click", async (e) => {
 
 
   if (action === "select-active-game") {
+    e.preventDefault();
+    e.stopPropagation();
     const selected = getCurrentGames(snapshot).find((game) => String(getGameKey(game)) === String(id));
     if (!selected) { showToast("Jogo não encontrado.", "error"); return; }
     patchState({ game: selected, active_game_id: getGameKey(selected) });
@@ -1872,13 +1874,18 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
-  const gameConfigForm = appElement.querySelector('#game-config-form');
-  if (gameConfigForm) {
+  appElement.querySelectorAll('[data-game-config-form="edit-game"]').forEach((gameConfigForm) => {
     gameConfigForm.addEventListener('submit', (event) => {
       event.preventDefault();
 
       const formData = new FormData(gameConfigForm);
       const maxPlayers = Number(formData.get('max_players'));
+      const originalGameKey = String(formData.get('game_key') || gameConfigForm.dataset.gameKey || '');
+
+      if (!originalGameKey) {
+        showToast('Jogo não identificado.', 'error');
+        return;
+      }
 
       if (!Number.isFinite(maxPlayers) || maxPlayers < 1) {
         showToast('Informe um limite de jogadores válido.', 'error');
@@ -1886,13 +1893,18 @@ function bindAppEvents(currentPlayer) {
       }
 
       const currentState = getState();
-      const activeGame = getActiveGameFromSnapshot(currentState);
-      const activeGameKey = getGameKey(activeGame);
+      const currentGames = getCurrentGames(currentState);
+      const existingGame = currentGames.find((item) => String(getGameKey(item)) === originalGameKey);
+
+      if (!existingGame) {
+        showToast('Jogo não encontrado.', 'error');
+        return;
+      }
 
       const updatedGame = {
-        ...(activeGame || {}),
-        id: activeGameKey,
-        game_key: activeGameKey,
+        ...(existingGame || {}),
+        id: originalGameKey,
+        game_key: originalGameKey,
         game_date: String(formData.get('game_date') || ''),
         game_time: String(formData.get('game_time') || ''),
         max_players: maxPlayers,
@@ -1900,15 +1912,18 @@ function bindAppEvents(currentPlayer) {
         open: formData.get('open') === 'on',
       };
 
+      const activeGameKey = getGameKey(getActiveGameFromSnapshot(currentState));
+      const isActiveGame = originalGameKey === activeGameKey;
+
       patchState({
-        game: updatedGame,
+        game: isActiveGame ? updatedGame : getActiveGameFromSnapshot(currentState),
         games: replaceGameInSnapshot(currentState, updatedGame),
         active_game_id: activeGameKey,
       });
 
-      showToast('Jogo ativo atualizado. Nenhum novo jogo foi criado.');
+      showToast(isActiveGame ? 'Jogo ativo atualizado.' : 'Jogo atualizado. O jogo ativo não foi alterado.');
     });
-  }
+  });
 
   const createGameForm = appElement.querySelector('#create-game-form');
   if (createGameForm) {
@@ -2483,123 +2498,135 @@ function renderConfig(snapshot, currentPlayer) {
     `;
   }
 
-  const game = snapshot.game || {};
+  const game = getActiveGameFromSnapshot(snapshot) || {};
   const games = getCurrentGames(snapshot);
-  const confirmedCount = buildGameView(snapshot, null).confirmedCount;
-  const maxPlayers = Number(game.max_players || 10);
+  const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
   const defaultNewGameMaxPlayers = maxPlayers || 10;
   const defaultMensExpireDate = game.mens_expire_date || '';
+  const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
 
-  return `
-    <section class="section-stack">
-      <section class="card active-game-config-card">
-        <div class="card-title">Jogo ativo</div>
-        <p class="footer-note">Use este formulário apenas para editar o jogo selecionado abaixo. Ele não cria novo jogo.</p>
-        <form id="game-config-form" class="player-admin-form game-config-form">
+  const renderGameEditForm = (item) => {
+    const key = getGameKey(item);
+    const active = key === getGameKey(game);
+    const count = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed).length;
+    const waitlistCount = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed !== true && (entry?.status === 'waitlist' || entry?.status === 'waitlisted')).length;
+    const limit = Number(item.max_players || item.maxPlayers || 0);
+
+    return `
+      <details class="game-config-row game-config-details ${active ? 'is-active' : ''}">
+        <summary class="game-config-summary">
+          <div class="game-config-summary-main">
+            <strong>${formatDate(item.game_date)} · ${item.game_time || '--:--'}${active ? ' · Ativo' : ''}</strong>
+            <span>${count}/${limit} confirmados${waitlistCount ? ` · ${waitlistCount} na fila` : ''} · ${item.open ? 'aberto' : 'fechado'}</span>
+          </div>
+          <div class="game-config-summary-actions">
+            <button class="btn btn-secondary btn-sm" type="button" data-action="select-active-game" data-id="${key}">${active ? 'Ativo' : 'Ativar'}</button>
+            <span class="btn btn-secondary btn-sm game-config-edit-indicator">Editar</span>
+          </div>
+        </summary>
+
+        <form data-game-config-form="edit-game" data-game-key="${key}" class="player-admin-form game-config-form game-edit-form">
+          <input type="hidden" name="game_key" value="${key}" />
+
           <label class="field-label">
-            Data do jogo ativo
-            <input class="input" type="date" name="game_date" value="${game.game_date || ''}" />
+            Data do jogo
+            <input class="input" type="date" name="game_date" value="${item.game_date || ''}" />
           </label>
 
           <label class="field-label">
-            Hora do jogo ativo
-            <input class="input" type="time" name="game_time" value="${game.game_time || ''}" />
+            Hora do jogo
+            <input class="input" type="time" name="game_time" value="${item.game_time || ''}" />
           </label>
 
           <label class="field-label">
             Máximo de jogadores
-            <input class="input" type="number" min="1" step="1" name="max_players" value="${maxPlayers}" />
+            <input class="input" type="number" min="1" step="1" name="max_players" value="${limit || 10}" />
           </label>
 
           <label class="field-label">
             Vencimento da mensalidade
-            <input class="input" type="date" name="mens_expire_date" value="${game.mens_expire_date || ''}" />
+            <input class="input" type="date" name="mens_expire_date" value="${item.mens_expire_date || ''}" />
           </label>
 
           <label class="checkbox-line">
-            <input type="checkbox" name="open" ${game.open ? 'checked' : ''} />
+            <input type="checkbox" name="open" ${item.open ? 'checked' : ''} />
             Inscrições abertas neste jogo
           </label>
 
           <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-primary" type="submit">Salvar jogo ativo</button>
+            <button class="btn btn-primary" type="submit">Salvar alterações deste jogo</button>
           </div>
         </form>
+      </details>
+    `;
+  };
+
+  return `
+    <section class="section-stack">
+      <section class="card games-config-card">
+        <div class="card-title">Jogos</div>
+        
+        <div class="games-list-config">
+          ${games.map(renderGameEditForm).join('')}
+        </div>
+      </section>
+
+      <section class="card create-game-card">
+        <details class="create-game-details">
+          <summary class="create-game-summary">
+            <span>
+              <strong>Novo jogo</strong>
+              
+            </span>
+            <span class="btn btn-secondary btn-sm create-game-open-indicator">Criar novo jogo</span>
+          </summary>
+
+          <form id="create-game-form" class="player-admin-form game-config-form create-game-form">
+            <label class="field-label">
+              Data do novo jogo
+              <input class="input" type="date" name="game_date" value="" />
+            </label>
+
+            <label class="field-label">
+              Hora do novo jogo
+              <input class="input" type="time" name="game_time" value="${game.game_time || ''}" />
+            </label>
+
+            <label class="field-label">
+              Máximo de jogadores
+              <input class="input" type="number" min="1" step="1" name="max_players" value="${defaultNewGameMaxPlayers}" />
+            </label>
+
+            <label class="field-label">
+              Vencimento da mensalidade
+              <input class="input" type="date" name="mens_expire_date" value="${defaultMensExpireDate}" />
+            </label>
+
+            <label class="checkbox-line">
+              <input type="checkbox" name="open" />
+              Já criar com inscrições abertas
+            </label>
+
+            <div class="player-admin-actions game-config-actions">
+              <button class="btn btn-primary" type="submit">Criar jogo</button>
+            </div>
+          </form>
+        </details>
       </section>
 
       <section class="card notifications-config-card">
         <div class="card-title">Notificações gerais</div>
-        <p class="footer-note">Use esta caixa para recados gerais do grupo. Não está vinculada a jogo, presença, fila, sorteio ou campeonato.</p>
+        
         <form id="notifications-config-form" class="player-admin-form notifications-config-form">
           <label class="field-label config-notifications-field">
             Recado para todos
-            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${(Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || ''}</textarea>
+            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
           </label>
-          <p class="footer-note config-notifications-help">Esse recado aparece na Home para todos, abaixo da dupla da carne. Deixe vazio para ocultar.</p>
+          <p class="footer-note config-notifications-help"></p>
           <div class="player-admin-actions game-config-actions">
             <button class="btn btn-primary" type="submit">Salvar notificação</button>
           </div>
         </form>
-      </section>
-
-      <section class="card create-game-card">
-        <div class="card-title">Criar novo jogo</div>
-        <p class="footer-note">Use este formulário somente para adicionar uma nova data. Depois de criado, o novo jogo vira o jogo ativo.</p>
-        <form id="create-game-form" class="player-admin-form game-config-form create-game-form">
-          <label class="field-label">
-            Data do novo jogo
-            <input class="input" type="date" name="game_date" value="" />
-          </label>
-
-          <label class="field-label">
-            Hora do novo jogo
-            <input class="input" type="time" name="game_time" value="${game.game_time || ''}" />
-          </label>
-
-          <label class="field-label">
-            Máximo de jogadores
-            <input class="input" type="number" min="1" step="1" name="max_players" value="${defaultNewGameMaxPlayers}" />
-          </label>
-
-          <label class="field-label">
-            Vencimento da mensalidade
-            <input class="input" type="date" name="mens_expire_date" value="${defaultMensExpireDate}" />
-          </label>
-
-          <label class="checkbox-line">
-            <input type="checkbox" name="open" />
-            Já criar com inscrições abertas
-          </label>
-
-          <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-secondary" type="submit">Criar novo jogo</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Selecionar jogo ativo</div>
-        <p class="footer-note">Escolha qual jogo aparece na Home, presença, fila, sorteio e campeonato. Isso não altera nem apaga os outros jogos.</p>
-        <div class="games-list-config">
-          ${games.map((item) => {
-            const key = getGameKey(item);
-            const active = key === getGameKey(game);
-            const count = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed).length;
-            const waitlistCount = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed !== true && (entry?.status === 'waitlist' || entry?.status === 'waitlisted')).length;
-            return `<div class="game-config-row ${active ? 'is-active' : ''}"><div><strong>${formatDate(item.game_date)} · ${item.game_time || '--:--'}</strong><span>${count}/${item.max_players || item.maxPlayers || 0} confirmados${waitlistCount ? ` · ${waitlistCount} na fila` : ''} · ${item.open ? 'aberto' : 'fechado'}</span></div><button class="btn btn-secondary btn-sm" type="button" data-action="select-active-game" data-id="${key}">${active ? 'Ativo' : 'Ativar'}</button></div>`;
-          }).join('')}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-title">Resumo do jogo ativo</div>
-        <div class="info-block">
-          <div class="info-line">• Data: ${formatDate(game.game_date)}</div>
-          <div class="info-line">• Hora: ${game.game_time || '--:--'}</div>
-          <div class="info-line">• Inscrições: ${game.open ? 'abertas' : 'fechadas'}</div>
-          <div class="info-line">• Confirmados: ${confirmedCount} / ${maxPlayers}</div>
-          <div class="info-line">• Vencimento mensalidade: ${game.mens_expire_date ? formatDate(game.mens_expire_date) : 'não definido'}</div>
-        </div>
       </section>
     </section>
   `;

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.68-dev-supabase-config';
+export const APP_VERSION = 'v1.60.69-config-games-collapsed';

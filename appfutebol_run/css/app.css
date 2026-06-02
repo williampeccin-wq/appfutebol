@@ -4093,3 +4093,145 @@ button {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* v1.60.69 - config UX: collapsed game editing and notifications at bottom */
+.games-config-card {
+  border-color: #bfdbfe;
+}
+
+.game-config-details {
+  display: block;
+}
+
+.game-config-details > summary,
+.create-game-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.game-config-details > summary::-webkit-details-marker,
+.create-game-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.game-config-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.game-config-summary-main strong,
+.game-config-summary-main span {
+  display: block;
+}
+
+.game-config-summary-main span {
+  margin-top: 3px;
+  color: #64748b;
+  font-weight: 800;
+  font-size: .86rem;
+}
+
+.game-config-summary-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.game-config-details[open] .game-config-edit-indicator,
+.create-game-details[open] .create-game-open-indicator {
+  background: #173760;
+  color: #fff;
+}
+
+.game-edit-form,
+.create-game-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dbeafe;
+}
+
+.create-game-details {
+  display: block;
+}
+
+.create-game-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.create-game-summary strong,
+.create-game-summary small {
+  display: block;
+}
+
+.create-game-summary small {
+  margin-top: 4px;
+  color: #64748b;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .game-config-summary,
+  .create-game-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .game-config-summary-actions {
+    justify-content: stretch;
+  }
+
+  .game-config-summary-actions .btn,
+  .game-config-summary-actions .game-config-edit-indicator,
+  .create-game-open-indicator {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+
+.game-edit-form.game-config-form,
+#create-game-form.game-config-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.game-edit-form.game-config-form .field-label,
+#create-game-form.game-config-form .field-label {
+  min-width: 0;
+}
+
+.game-edit-form.game-config-form .checkbox-line,
+#create-game-form.game-config-form .checkbox-line {
+  align-self: center;
+  min-height: 44px;
+}
+
+.game-edit-form.game-config-form .game-config-actions,
+#create-game-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 860px) {
+  .game-edit-form.game-config-form,
+  #create-game-form.game-config-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .game-edit-form.game-config-form,
+  #create-game-form.game-config-form {
+    grid-template-columns: 1fr !important;
+  }
+}
