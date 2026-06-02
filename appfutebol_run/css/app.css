@@ -3633,145 +3633,165 @@ button {
 }
 
 
-/* v1.60.61 prod hotfix - delete button and manual refresh */
-.header-refresh {
-  border: 1px solid rgba(255,255,255,.35);
-  background: rgba(255,255,255,.12);
-  color: #fff;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-weight: 900;
-  cursor: pointer;
+/* v1.60.61 - admin notifications and waitlist */
+.notification-textarea {
+  min-height: 104px;
+  resize: vertical;
+  line-height: 1.45;
 }
 
-.header-refresh:hover {
-  background: rgba(255,255,255,.2);
+.notification-item-admin {
+  display: grid;
+  gap: 6px;
+  align-items: start;
 }
 
-.player-delete-near-paid {
-  color: #b91c1c;
+.notification-item-admin span {
+  white-space: normal;
 }
 
-@media (max-width: 640px) {
-  .header-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+.waitlist-section {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 12px;
+}
+
+.waitlist-player-row {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.hero-presence-note {
+  max-width: 36rem;
+}
+
+
+/* v1.60.62 - config layout and waitlist stability */
+#game-config-form.game-config-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+#game-config-form.game-config-form .checkbox-line {
+  align-self: center;
+  min-height: 44px;
+}
+
+#game-config-form.game-config-form .config-notifications-field {
+  grid-column: 1 / -1;
+}
+
+#game-config-form.game-config-form .config-notifications-help {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+}
+
+#game-config-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+#game-config-form.game-config-form .notification-textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 12px 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+@media (min-width: 860px) {
+  #game-config-form.game-config-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .header-refresh,
-  .header-logout {
-    padding: 7px 10px;
-    font-size: .82rem;
+  #game-config-form.game-config-form .config-notifications-field,
+  #game-config-form.game-config-form .config-notifications-help,
+  #game-config-form.game-config-form .game-config-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  #game-config-form.game-config-form {
+    grid-template-columns: 1fr;
   }
 }
 
 
-/* v1.60.62 prod hotfix - pull to refresh */
-.pull-refresh-hint {
-  margin: 10px 16px 0;
+/* v1.60.66 - championship launch UX, responsive config, home waitlist */
+.championship-result-status-row,
+.championship-result-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.championship-result-actions-row .footer-note {
+  flex: 1 1 240px;
+}
+
+.championship-team-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.championship-team-player-pill {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 6px;
+  align-items: baseline;
   padding: 8px 10px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.championship-team-player-pill small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.championship-launch-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.championship-launch-summary-grid > div {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
   background: #f8fafc;
+}
+
+.championship-launch-summary-grid strong {
+  display: block;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.championship-launch-summary-grid span {
+  display: block;
+  margin-top: 2px;
   color: #64748b;
   font-size: .82rem;
   font-weight: 800;
-  text-align: center;
-}
-
-.pull-refresh-hint.is-ready {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.pull-refresh-hint.is-loading {
-  border-color: #16a34a;
-  background: #f0fdf4;
-  color: #166534;
-}
-
-@media (min-width: 761px) {
-  .pull-refresh-hint {
-    max-width: 440px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-
-/* v1.60.63 prod hotfix - discreet pull-to-refresh hint */
-.pull-refresh-hint {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 7px !important;
-  margin: 18px 16px 4px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  color: #64748b !important;
-  font-size: .78rem !important;
-  line-height: 1.2 !important;
-  font-weight: 700 !important;
-  text-align: left !important;
-  box-shadow: none !important;
-}
-
-.pull-refresh-hint .pull-refresh-arrow {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: auto !important;
-  height: auto !important;
-  color: #475569 !important;
-  font-size: .95rem !important;
-  font-weight: 900 !important;
-  line-height: 1 !important;
-}
-
-.pull-refresh-hint.is-ready {
-  border: 0 !important;
-  background: transparent !important;
-  color: #1d4ed8 !important;
-}
-
-.pull-refresh-hint.is-ready .pull-refresh-arrow {
-  color: #1d4ed8 !important;
-}
-
-.pull-refresh-hint.is-loading {
-  border: 0 !important;
-  background: transparent !important;
-  color: #166534 !important;
-}
-
-.pull-refresh-hint.is-loading .pull-refresh-arrow {
-  color: #166534 !important;
-}
-
-@media (min-width: 761px) {
-  .pull-refresh-hint {
-    max-width: none !important;
-    margin-left: 16px !important;
-    margin-right: 16px !important;
-  }
 }
 
 .home-waitlist-card {
-  display: grid;
-  gap: 10px;
+  border-color: #fed7aa;
+  background: #fff7ed;
 }
 
 .home-waitlist-highlight {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #92400e;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 12px;
-  padding: 8px 10px;
+  font-weight: 900;
+  color: #9a3412;
+  margin-bottom: 10px;
 }
 
 .home-waitlist-list {
@@ -3781,32 +3801,295 @@ button {
 
 .home-waitlist-row {
   display: flex;
-  align-items: center;
   gap: 10px;
-  font-size: 0.92rem;
-}
-
-.home-waitlist-row span,
-.waitlist-position {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 34px;
-  height: 28px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #fed7aa;
+}
+
+.home-waitlist-row span {
+  font-weight: 900;
+  color: #c2410c;
+}
+
+#game-config-form.game-config-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: end !important;
+}
+
+#game-config-form.game-config-form label,
+#game-config-form.game-config-form .field-label {
+  min-width: 0;
+}
+
+#game-config-form.game-config-form .config-notifications-field,
+#game-config-form.game-config-form .config-notifications-help,
+#game-config-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1 !important;
+}
+
+#game-config-form.game-config-form .notification-textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .championship-launch-summary-grid,
+  #game-config-form.game-config-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .championship-audit-item summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .championship-result-actions-row .btn {
+    width: 100%;
+  }
+}
+
+
+/* v1.60.67 - real championship current focus and draw history */
+.championship-hero-current {
+  border: 2px solid rgba(29, 78, 216, .18);
+}
+
+.championship-current-ranking-card {
+  border: 2px solid rgba(29, 78, 216, .20);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .08);
+}
+
+.championship-result-grid {
+  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .8fr) minmax(170px, 1fr);
+}
+
+.championship-result-status-row,
+.championship-result-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.championship-team-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.championship-team-player-pill {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 6px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
   border-radius: 999px;
-  font-size: 0.78rem;
+  background: #fff;
+}
+
+.championship-team-player-pill small {
+  color: #64748b;
   font-weight: 800;
-  background: #fef3c7;
-  color: #92400e;
 }
 
-.waitlist-section {
-  border-top: 1px dashed rgba(146, 64, 14, 0.25);
-  border-bottom: 1px dashed rgba(146, 64, 14, 0.25);
-  padding-top: 12px;
-  padding-bottom: 12px;
+.championship-launch-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.waitlist-player-row {
-  background: rgba(254, 243, 199, 0.35);
+.championship-launch-summary-grid > div {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.championship-launch-summary-grid strong {
+  display: block;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.championship-launch-summary-grid span {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .championship-result-grid,
+  .championship-launch-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .championship-result-actions-row .btn {
+    width: 100%;
+  }
+}
+
+
+/* v1.60.68 - championship result form layout fix */
+.championship-result-card {
+  overflow: hidden;
+}
+
+.championship-result-card .championship-result-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0 18px;
+}
+
+.championship-result-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  gap: 14px;
+  align-items: end;
+  margin-top: 8px;
+}
+
+.championship-result-form-grid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.championship-result-form-grid .championship-draw-select-field {
+  grid-column: 1 / -1;
+}
+
+.championship-result-form-grid input,
+.championship-result-form-grid select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.championship-result-card .championship-teams-result-details {
+  margin-top: 18px;
+}
+
+.championship-result-card .championship-result-actions-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.championship-result-card .championship-result-actions-row .btn {
+  width: 100%;
+}
+
+.championship-result-card .championship-result-actions-row .footer-note {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .championship-result-card .championship-result-status-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .championship-result-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .championship-result-card .championship-result-actions-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* v1.60.69 - real clean layout for championship result form */
+.championship-result-card-v2{padding:28px 32px!important;overflow:hidden}
+.championship-result-header-v2{display:grid;grid-template-columns:48px minmax(0,1fr);gap:16px;align-items:start}
+.championship-result-icon-v2{display:grid;place-items:center;width:48px;height:48px;border-radius:999px;background:#0f3765;color:#fff;font-size:1.45rem}
+.championship-result-subtitle-v2{margin:8px 0 0;color:#64748b;font-weight:700;line-height:1.45}
+.championship-result-badges-v2{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0 0}
+.championship-pill-v2{display:inline-flex;align-items:center;border-radius:999px;padding:8px 14px;font-weight:900;font-size:.92rem}
+.championship-pill-v2.is-blue{color:#12356a;background:#e8f0fb}
+.championship-pill-v2.is-gold{color:#8a5a00;background:#fff2d2}
+.championship-pill-v2.is-green{color:#166534;background:#dcfce7}
+.championship-result-divider-v2{height:1px;background:#e5e7eb;margin:22px 0}
+.championship-result-form-v2{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:18px!important;align-items:end!important}
+.championship-field-v2{display:grid!important;gap:8px!important;min-width:0!important;margin:0!important;font-weight:900!important;color:#0f172a!important}
+.championship-draw-field-v2{grid-column:1/-1!important}
+.championship-control-v2{width:100%!important;max-width:100%!important;min-width:0!important;height:56px!important;box-sizing:border-box!important;border:2px solid #153660!important;border-radius:10px!important;background:#fff!important;color:#0f172a!important;font-size:1rem!important;font-weight:700!important;line-height:1.2!important;padding:0 14px!important}
+.championship-teams-result-details-v2{margin-top:22px!important;border:1px solid #bfdbfe!important;background:#f8fbff!important;border-radius:14px!important}
+.championship-teams-result-details-v2>summary{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;gap:8px!important;align-items:center!important;padding:16px!important}
+.championship-teams-result-details-v2>summary span{font-weight:950!important;color:#173760!important}
+.championship-teams-result-details-v2>summary small{display:block!important;grid-column:2!important;color:#334155!important;font-weight:800!important}
+.championship-save-result-btn-v2{width:100%!important;height:64px!important;margin-top:24px!important;font-size:1.15rem!important}
+.championship-result-info-v2{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#173760;font-weight:800;line-height:1.35}
+.championship-result-info-v2 strong{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:#1d4ed8;color:#fff}
+@media(max-width:760px){.championship-result-card-v2{padding:20px 16px!important}.championship-result-header-v2{grid-template-columns:40px minmax(0,1fr);gap:12px}.championship-result-icon-v2{width:40px;height:40px;font-size:1.15rem}.championship-result-badges-v2{display:grid;grid-template-columns:1fr}.championship-result-form-v2{grid-template-columns:1fr!important}.championship-control-v2{height:52px!important;font-size:.95rem!important}}
+
+/* v1.60.70 - multiple future games */
+.games-list-config{display:grid;gap:10px;margin-top:12px}.game-config-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.game-config-row.is-active{border-color:#2563eb;background:#eff6ff}.game-config-row strong,.game-config-row span{display:block}.game-config-row span{margin-top:3px;color:#64748b;font-weight:800;font-size:.86rem}@media(max-width:640px){.game-config-row{grid-template-columns:1fr}.game-config-row .btn{width:100%}}
+
+
+/* v1.60.66 - multiple games config UX separation */
+#game-config-form.game-config-form,
+#create-game-form.game-config-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+#game-config-form.game-config-form label,
+#game-config-form.game-config-form .field-label,
+#create-game-form.game-config-form label,
+#create-game-form.game-config-form .field-label {
+  min-width: 0;
+}
+
+#game-config-form.game-config-form .checkbox-line,
+#create-game-form.game-config-form .checkbox-line {
+  align-self: center;
+  min-height: 44px;
+}
+
+#game-config-form.game-config-form .config-notifications-field,
+#game-config-form.game-config-form .config-notifications-help,
+#game-config-form.game-config-form .game-config-actions,
+#create-game-form.game-config-form .game-config-actions {
+  grid-column: 1 / -1;
+}
+
+.active-game-config-card {
+  border-color: #bfdbfe;
+}
+
+.create-game-card {
+  border-color: #fed7aa;
+  background: #fffaf0;
+}
+
+@media (min-width: 860px) {
+  #game-config-form.game-config-form,
+  #create-game-form.game-config-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  #game-config-form.game-config-form,
+  #create-game-form.game-config-form {
+    grid-template-columns: 1fr !important;
+  }
 }
