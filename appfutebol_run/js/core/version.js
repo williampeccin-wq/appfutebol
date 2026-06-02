@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.69-config-games-collapsed';
+export const APP_VERSION = 'v1.60.75-home-carne-avatars';

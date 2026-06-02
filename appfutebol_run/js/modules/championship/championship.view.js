@@ -17,6 +17,7 @@ import {
   getManualChampionshipResults,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
+import { getAvatarHtml } from '../players/players.service.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -68,7 +69,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
         <thead>
           <tr>
             <th>Pos.</th>
-            <th>Jogador</th>
+            <th>Foto</th><th>Jogador</th>
             <th>Pts</th>
             ${annual ? '<th>Abertura</th><th>Inverno</th>' : '<th>V</th><th>E</th><th>D</th><th>NJ</th>'}
           </tr>
@@ -77,7 +78,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
               ${annual ? `
                 <td>${row.abertura_points || 0}</td>
@@ -253,7 +254,7 @@ function renderSimpleAnnualHistoryTable(rows) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
             </tr>
           `).join('')}

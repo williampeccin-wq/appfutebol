@@ -2092,6 +2092,8 @@ function renderHome(snapshot, currentPlayer) {
         date: formatDate(nextCarneEntry.date),
         player1: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-',
         player2: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-',
+        player1Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id)) || null,
+        player2Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id)) || null,
         message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
       }
     : null;
@@ -2171,8 +2173,14 @@ function renderHome(snapshot, currentPlayer) {
                 </svg>
               </span>
               <span class="notification-content-carne">
-                <strong>Dupla da carne (${notification.date}):</strong>
-                <span>${notification.player1}, ${notification.player2}</span>
+                <span class="home-carne-avatars" aria-hidden="true">
+                  ${notification.player1Record ? renderAvatarForApp(notification.player1Record, 'home-carne-avatar') : `<span class="avatar home-carne-avatar">${String(notification.player1 || '?').trim().charAt(0).toUpperCase() || '?'}</span>`}
+                  ${notification.player2Record ? renderAvatarForApp(notification.player2Record, 'home-carne-avatar') : `<span class="avatar home-carne-avatar">${String(notification.player2 || '?').trim().charAt(0).toUpperCase() || '?'}</span>`}
+                </span>
+                <span class="home-carne-text">
+                  <strong>Dupla da carne (${notification.date}):</strong>
+                  <span>${notification.player1}, ${notification.player2}</span>
+                </span>
               </span>
             </div>
           ` : `

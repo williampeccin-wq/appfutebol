@@ -221,7 +221,7 @@ button {
   align-self: flex-end;
   padding: 8px 12px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 17px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -518,8 +518,8 @@ button {
 }
 
 .avatar {
-  width: 38px;
-  height: 38px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -532,9 +532,9 @@ button {
 }
 
 .avatar-lg {
-  width: 48px;
-  height: 48px;
-  font-size: 15px;
+  width: 62px;
+  height: 62px;
+  font-size: 20px;
 }
 
 .row-title {
@@ -2717,9 +2717,9 @@ button {
   }
 
   .players-switch-player .avatar {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
   }
 
   .players-switch-player .row-title {
@@ -4235,3 +4235,145 @@ button {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* v1.60.72 - tamanho global das fotos/avatares de jogadores */
+:root {
+  --player-avatar-size: 62px;
+  --player-avatar-font-size: 20px;
+}
+
+.avatar,
+.avatar-lg,
+.player-avatar,
+.player-photo,
+.player-initials,
+.avatar-circle,
+.players-switch-player .avatar,
+.players-switch-row.player-row-card .avatar,
+.players-switch-row.player-row-card .player-avatar,
+.players-switch-row.player-row-card .player-photo,
+.players-switch-row.player-row-card .player-initials,
+.players-switch-row.player-row-card .avatar-circle {
+  width: var(--player-avatar-size) !important;
+  height: var(--player-avatar-size) !important;
+  min-width: var(--player-avatar-size) !important;
+  flex: 0 0 var(--player-avatar-size) !important;
+  font-size: var(--player-avatar-font-size) !important;
+}
+
+.avatar-photo img,
+.avatar .avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+@media (max-width: 1100px) {
+  .players-switch-row.player-row-card {
+    grid-template-columns: var(--player-avatar-size) minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .player-row-status,
+  .player-row-actions {
+    padding-left: calc(var(--player-avatar-size) + 12px) !important;
+  }
+}
+
+/* v1.60.73 - avatares também no Campeonato */
+.championship-player-avatar,
+.championship-avatar,
+.championship-photo,
+.championship-player-photo,
+.championship-table .avatar,
+.championship-table .avatar-lg,
+.championship-ranking .avatar,
+.championship-ranking .avatar-lg,
+.championship-card .avatar,
+.championship-card .avatar-lg,
+.championship-row .avatar,
+.championship-row .avatar-lg,
+.ranking-player-avatar,
+.ranking-avatar,
+.ranking-photo,
+.ranking-player-photo,
+.standings-player-avatar,
+.standings-avatar,
+.standings-photo,
+.standings-player-photo {
+  width: var(--player-avatar-size) !important;
+  height: var(--player-avatar-size) !important;
+  min-width: var(--player-avatar-size) !important;
+  flex: 0 0 var(--player-avatar-size) !important;
+  font-size: var(--player-avatar-font-size) !important;
+}
+
+.championship-player-avatar img,
+.championship-avatar img,
+.championship-photo img,
+.championship-player-photo img,
+.ranking-player-avatar img,
+.ranking-avatar img,
+.ranking-photo img,
+.ranking-player-photo img,
+.standings-player-avatar img,
+.standings-avatar img,
+.standings-photo img,
+.standings-player-photo img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* v1.60.75 - avatares na notificação da dupla da carne na Home */
+.notification-content-carne {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.home-carne-avatars {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.home-carne-avatars .home-carne-avatar + .home-carne-avatar {
+  margin-left: -10px;
+}
+
+.home-carne-avatar {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  flex: 0 0 44px !important;
+  font-size: 16px !important;
+  border: 2px solid #ffffff;
+}
+
+.home-carne-avatar img,
+.home-carne-avatar .avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.home-carne-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .notification-content-carne {
+    align-items: flex-start;
+  }
+
+  .home-carne-text {
+    display: block;
+  }
+}
+
