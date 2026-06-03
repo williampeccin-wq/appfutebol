@@ -48,6 +48,49 @@ function patchActiveGame(snapshot, updatedGame) {
   });
 }
 
+function patchForActiveGame(snapshot, updatedGame) {
+  const key = activeGameKey(snapshot);
+  return {
+    game: updatedGame,
+    games: (snapshot.games || []).map((item) => String(item.game_key || item.id) === key ? updatedGame : item),
+  };
+}
+
+function buildDrawRemovalPatch(snapshot, playerId, now = new Date().toISOString()) {
+  const game = activeGame(snapshot);
+  const sortResult = game?.sort_result;
+
+  if (!sortResult) {
+    return {};
+  }
+
+  const targetId = String(playerId);
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const removeFromTeam = (team) => (
+    Array.isArray(team)
+      ? team.filter((entry) => String(getEntryId(entry)) !== targetId)
+      : []
+  );
+
+  const adjustedDraw = {
+    ...sortResult,
+    team_a: removeFromTeam(sortResult.team_a),
+    team_b: removeFromTeam(sortResult.team_b),
+    adjusted_at: now,
+  };
+
+  const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
+  const updatedGame = {
+    ...game,
+    sort_result: adjustedDraw,
+    draw_history: drawHistory.map((entry) => (
+      String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
+    )),
+  };
+
+  return patchForActiveGame(snapshot, updatedGame);
+}
+
 function clearActiveDrawFromGame(game = {}) {
   return {
     ...game,
@@ -247,13 +290,19 @@ export function toggleConfirmation(playerId) {
   if (currentlyConfirmed) {
     const cancelled = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: false, status: 'cancelled', removed_by_admin: false, confirmed_at: null, cancelled_at: now, timestamp: now } : entry);
     const promoted = promoteFirstWaitlisted(cancelled, now, playerId);
-    patchScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations));
+    patchState({
+      confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations)),
+      ...buildDrawRemovalPatch(snapshot, playerId, now),
+    });
     return { ok: true, message: promoted.promoted ? 'Presença cancelada. Primeiro da fila entrou automaticamente.' : 'Presença cancelada.' };
   }
 
   if (currentlyWaitlisted) {
     const updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: false, status: 'cancelled', removed_by_admin: false, confirmed_at: null, cancelled_at: now, waitlisted_at: null, waitlist_position: null, timestamp: now } : entry);
-    patchScopedConfirmations(snapshot, normalizeWaitlistPositions(updated));
+    patchState({
+      confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(updated)),
+      ...buildDrawRemovalPatch(snapshot, playerId, now),
+    });
     return { ok: true, message: 'Você saiu da fila de espera.' };
   }
 
@@ -305,8 +354,10 @@ export function adminRemovePlayerFromGame(playerId) {
 
   const targetId = String(playerId);
   const now = new Date().toISOString();
+  const gameKey = activeGameKey(snapshot);
 
-  const updatedConfirmations = (snapshot.confirmations || []).map((entry) => (
+  const scoped = scopedConfirmations(snapshot);
+  const updatedScopedConfirmations = scoped.map((entry) => (
     String(entry.player_id) === targetId
       ? {
           ...entry,
@@ -322,28 +373,11 @@ export function adminRemovePlayerFromGame(playerId) {
       : entry
   ));
 
-  const promoted = promoteFirstWaitlisted(updatedConfirmations, now, targetId);
-
-  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
-  const removeFromTeam = (team) => (Array.isArray(team) ? team.filter((entry) => String(getEntryId(entry)) !== targetId) : []);
-
-  let updatedGame = { ...(snapshot.game || {}) };
-
-  if (updatedGame?.sort_result) {
-    updatedGame = {
-      ...updatedGame,
-      sort_result: {
-        ...updatedGame.sort_result,
-        team_a: removeFromTeam(updatedGame.sort_result.team_a),
-        team_b: removeFromTeam(updatedGame.sort_result.team_b),
-        adjusted_at: now,
-      },
-    };
-  }
+  const promoted = promoteFirstWaitlisted(updatedScopedConfirmations, now, targetId);
 
   patchState({
-    confirmations: normalizeWaitlistPositions(promoted.confirmations),
-    game: updatedGame,
+    confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations)),
+    ...buildDrawRemovalPatch(snapshot, targetId, now),
   });
 
   return {
@@ -353,6 +387,7 @@ export function adminRemovePlayerFromGame(playerId) {
       : 'Jogador removido do jogo pelo admin.',
   };
 }
+
 
 function getPositionBucket(player) {
   const raw = String(player?.position || 'meia')
