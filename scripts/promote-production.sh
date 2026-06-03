@@ -31,7 +31,7 @@ git pull --ff-only origin production
 
 git checkout "$REF" -- appfutebol_run supabase .vscode scripts
 
-scripts/use-prod.sh
+bash scripts/use-prod.sh
 
 grep -q "kpgghcrmbkrwpvtegcjh" appfutebol_run/env.js
 grep -q "prod-supabase" appfutebol_run/env.js

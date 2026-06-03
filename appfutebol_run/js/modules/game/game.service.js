@@ -1,6 +1,6 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
-import { getPresenceDecision, isGameFull } from '../../domain/rules.engine.js';
+import { getPresenceDecision, isGameFull, isGoalkeeperEntry } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 
 
@@ -16,6 +16,93 @@ function mergeScopedConfirmations(snapshot, scoped) {
   return [...others, ...scoped.map((entry) => ({ ...entry, game_key: key }))];
 }
 function patchScopedConfirmations(snapshot, scoped) { patchState({ confirmations: mergeScopedConfirmations(snapshot, scoped) }); }
+
+function isGoalkeeperPlayer(player) {
+  const raw = String(player?.position || '').trim().toLowerCase();
+  return raw === 'gol' || raw === 'goleiro';
+}
+
+function getConfirmedGoalkeeperCount(confirmations = [], players = []) {
+  const playersById = new Map((players || []).map((player) => [String(player.id), player]));
+  return (Array.isArray(confirmations) ? confirmations : [])
+    .filter((entry) => entry?.confirmed)
+    .filter((entry) => isGoalkeeperEntry(entry) || isGoalkeeperPlayer(playersById.get(String(entry.player_id))))
+    .length;
+}
+
+function normalizeGoalkeeperConfirmation(entry, player) {
+  if (!isGoalkeeperPlayer(player)) return entry;
+  return {
+    ...entry,
+    goalkeeper: true,
+    segment: 'goalkeeper',
+    presence_role: 'goalkeeper',
+  };
+}
+
+function patchActiveGame(snapshot, updatedGame) {
+  const key = activeGameKey(snapshot);
+  patchState({
+    game: updatedGame,
+    games: (snapshot.games || []).map((item) => String(item.game_key || item.id) === key ? updatedGame : item),
+  });
+}
+
+function clearActiveDrawFromGame(game = {}) {
+  return {
+    ...game,
+    sort_result: null,
+  };
+}
+
+function clearActiveDraw(snapshot = getState()) {
+  const game = activeGame(snapshot);
+  patchActiveGame(snapshot, clearActiveDrawFromGame(game));
+}
+
+function getRentalGoalkeepers(game = activeGame()) {
+  return Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [];
+}
+
+export function addRentalGoalkeeper(name = '') {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const current = getRentalGoalkeepers(game);
+  const cleanName = String(name || '').trim() || `Goleiro de aluguel ${current.length + 1}`;
+
+  if (current.length >= 2) {
+    return { ok: false, message: 'Limite de 2 goleiros atingido.' };
+  }
+
+  const entry = {
+    id: `rental_goalkeeper_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    name: cleanName,
+    temporary: true,
+    created_at: new Date().toISOString(),
+  };
+
+  patchActiveGame(snapshot, {
+    ...game,
+    rental_goalkeepers: [...current, entry].slice(0, 2),
+  });
+
+  return { ok: true, message: `${cleanName} adicionado como goleiro.`, goalkeeper: entry };
+}
+
+export function removeRentalGoalkeeper(id) {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const current = getRentalGoalkeepers(game);
+  const next = current.filter((entry) => String(entry.id) !== String(id));
+
+  patchActiveGame(snapshot, {
+    ...game,
+    rental_goalkeepers: next,
+  });
+
+  return { ok: true, message: 'Goleiro de aluguel removido.' };
+}
+
 
 export function hasCapacity() {
   const snapshot = getState();
@@ -170,22 +257,35 @@ export function toggleConfirmation(playerId) {
     return { ok: true, message: 'Você saiu da fila de espera.' };
   }
 
+  const goalkeeperPlayer = isGoalkeeperPlayer(player);
+  const goalkeeperCount = getConfirmedGoalkeeperCount(confirmations, snapshot.players || []);
+
+  if (goalkeeperPlayer && goalkeeperCount >= 2) {
+    return { ok: false, message: 'O jogo já tem 2 goleiros confirmados.' };
+  }
+
   const decision = getPresenceDecision({ player, game, confirmations });
+
   if (!decision.canConfirm) {
-    if (decision.reasonBlocked === 'game_full') {
+    if (decision.reasonBlocked === 'game_full' && !goalkeeperPlayer) {
       const updated = normalizeWaitlistPositions(upsertWaitlistEntry({ ...snapshot, confirmations }, playerId, now));
       const position = getWaitlistEntries(updated).findIndex((entry) => String(entry.player_id) === String(playerId)) + 1;
       patchScopedConfirmations(snapshot, updated);
-      return { ok: true, message: `Jogo cheio. Você entrou na fila de espera${position ? ` na posição ${position}` : ''}.` };
+        return { ok: true, message: `Jogo cheio. Você entrou na fila de espera${position ? ` na posição ${position}` : ''}.` };
     }
-    return { ok: false, message: decision.message || 'Você não pode confirmar presença agora.' };
+
+    if (decision.reasonBlocked === 'game_full' && goalkeeperPlayer) {
+      // Goleiro tem segmento próprio e não deve ser bloqueado pela lotação dos jogadores de linha.
+    } else {
+      return { ok: false, message: decision.message || 'Você não pode confirmar presença agora.' };
+    }
   }
 
   let updated;
   if (existing) {
-    updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? { ...entry, confirmed: true, status: 'confirmed', waitlisted_at: null, waitlist_position: null, removed_by_admin: false, confirmed_at: now, cancelled_at: null, timestamp: now, game_key: gameKey } : entry);
+    updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? normalizeGoalkeeperConfirmation({ ...entry, confirmed: true, status: 'confirmed', waitlisted_at: null, waitlist_position: null, removed_by_admin: false, confirmed_at: now, cancelled_at: null, timestamp: now, game_key: gameKey }, player) : entry);
   } else {
-    updated = [...confirmations, { player_id: playerId, game_key: gameKey, confirmed: true, status: 'confirmed', removed_by_admin: false, confirmed_at: now, cancelled_at: null, waitlisted_at: null, waitlist_position: null, timestamp: now }];
+    updated = [...confirmations, normalizeGoalkeeperConfirmation({ player_id: playerId, game_key: gameKey, confirmed: true, status: 'confirmed', removed_by_admin: false, confirmed_at: now, cancelled_at: null, waitlisted_at: null, waitlist_position: null, timestamp: now }, player)];
   }
   patchScopedConfirmations(snapshot, normalizeWaitlistPositions(updated));
   return { ok: true, message: 'Presença confirmada.' };
@@ -353,10 +453,22 @@ export function drawTeams() {
       .map((entry) => entry.player_id)
   );
 
-  const eligiblePlayers = (snapshot.players || [])
-    .filter((player) => confirmedIds.has(player.id))
+  const confirmedPlayers = (snapshot.players || [])
+    .filter((player) => confirmedIds.has(String(player.id)))
     .filter((player) => player.plays_football !== false)
     .filter((player) => !isCarneOnly(player));
+
+  const rentalGoalkeepers = getRentalGoalkeepers(game).map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    position: 'gol',
+    plays_football: true,
+    role: 'player',
+    temporary: true,
+    rental_goalkeeper: true,
+  }));
+
+  const eligiblePlayers = [...confirmedPlayers, ...rentalGoalkeepers];
 
   if (eligiblePlayers.length < 2) {
     return {
@@ -376,8 +488,8 @@ export function drawTeams() {
     game_time: game.game_time || '',
     created_at: createdAt,
     total_players: eligiblePlayers.length,
-    team_a: teamA.map((player) => player.id),
-    team_b: teamB.map((player) => player.id),
+    team_a: teamA.map((player) => player.rental_goalkeeper ? player : player.id),
+    team_b: teamB.map((player) => player.rental_goalkeeper ? player : player.id),
   };
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
@@ -390,6 +502,74 @@ export function drawTeams() {
     message: 'Times sorteados com sucesso.',
     sortResult,
   };
+}
+
+
+export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const sortResult = game?.sort_result;
+
+  if (!sortResult) {
+    return { ok: false, message: 'Nenhum sorteio disponível para editar.' };
+  }
+
+  const targetKey = targetTeamKey === 'team_b' ? 'team_b' : 'team_a';
+  const sourceKey = targetKey === 'team_a' ? 'team_b' : 'team_a';
+
+  const teamA = Array.isArray(sortResult.team_a) ? [...sortResult.team_a] : [];
+  const teamB = Array.isArray(sortResult.team_b) ? [...sortResult.team_b] : [];
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const targetId = String(playerId);
+
+  if ([...teamA, ...teamB].some((entry) => String(getEntryId(entry)) === targetId)) {
+    return { ok: false, message: 'Jogador já está no sorteio.' };
+  }
+
+  const confirmedIds = new Set(
+    scopedConfirmations(snapshot)
+      .filter((entry) => entry?.confirmed)
+      .map((entry) => String(entry.player_id))
+  );
+
+  const rentalGoalkeeper = getRentalGoalkeepers(game).find((entry) => String(entry.id) === targetId);
+  const registeredPlayer = (snapshot.players || []).find((player) => String(player.id) === targetId);
+
+  if (!rentalGoalkeeper && (!registeredPlayer || !confirmedIds.has(targetId))) {
+    return { ok: false, message: 'Jogador precisa estar confirmado para entrar no sorteio.' };
+  }
+
+  const playerEntry = rentalGoalkeeper
+    ? {
+        id: rentalGoalkeeper.id,
+        name: rentalGoalkeeper.name,
+        position: 'gol',
+        plays_football: true,
+        role: 'player',
+        temporary: true,
+        rental_goalkeeper: true,
+      }
+    : registeredPlayer.id;
+
+  const adjustedDraw = {
+    ...sortResult,
+    [targetKey]: targetKey === 'team_a' ? [...teamA, playerEntry] : [...teamB, playerEntry],
+    [sourceKey]: sourceKey === 'team_a' ? teamA : teamB,
+    adjusted_at: new Date().toISOString(),
+  };
+
+  const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
+  const updatedGame = {
+    ...game,
+    sort_result: adjustedDraw,
+    draw_history: drawHistory.map((entry) => (
+      String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
+    )),
+  };
+
+  patchActiveGame(snapshot, updatedGame);
+
+  return { ok: true, message: 'Jogador incluído no sorteio.' };
 }
 
 

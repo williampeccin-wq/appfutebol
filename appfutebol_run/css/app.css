@@ -4459,3 +4459,73 @@ button {
   object-fit: cover !important;
 }
 
+/* v1.60.90 - segmento exclusivo de goleiros */
+.goalkeeper-section {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.96));
+  border-radius: 18px;
+  padding: 12px;
+}
+
+.goalkeeper-player-row {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(239, 246, 255, 0.72);
+}
+
+.rental-goalkeeper-row {
+  background: rgba(255, 251, 235, 0.82);
+  border-color: rgba(245, 158, 11, 0.32);
+}
+
+.rental-goalkeeper-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.rental-goalkeeper-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.goalkeeper-pending-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.weekly-copy-presence-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+@media (min-width: 760px) {
+  .rental-goalkeeper-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+/* v1.60.93 - inclusão manual de confirmados no sorteio */
+.draw-outside-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.draw-outside-row {
+  background: rgba(255, 251, 235, 0.72);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.draw-add-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
