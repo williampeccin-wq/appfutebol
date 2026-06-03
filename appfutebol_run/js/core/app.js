@@ -2097,9 +2097,87 @@ function renderHome(snapshot, currentPlayer) {
         message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
       }
     : null;
-  const notifications = carneNotification
-    ? [carneNotification, ...storedNotifications]
-    : storedNotifications;
+
+  const allGamesForBirthdays = getCurrentGames(workingSnapshot)
+    .map((game) => ({ ...game, dateForBirthday: game.game_date || game.date || null }))
+    .filter((game) => !!game.dateForBirthday)
+    .sort((a,b) => String(a.dateForBirthday).localeCompare(String(b.dateForBirthday)));
+
+  let birthdayNotifications = [];
+
+  try {
+    const parseBirthMonthDay = (birthDate) => {
+      const raw = String(birthDate || '').trim();
+
+      let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match) {
+        return { month: Number(match[2]), day: Number(match[3]) };
+      }
+
+      match = raw.match(/^(\d{2})\/(\d{2})(?:\/(\d{4}))?$/);
+      if (match) {
+        return { day: Number(match[1]), month: Number(match[2]) };
+      }
+
+      return null;
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const nextGameEntry = allGamesForBirthdays.find((game) => {
+      const gameDate = new Date(`${game.dateForBirthday}T00:00:00`);
+      return gameDate >= today;
+    });
+
+    if (nextGameEntry?.dateForBirthday) {
+      const nextGameIndex = allGamesForBirthdays.findIndex((game) => String(game.dateForBirthday) === String(nextGameEntry.dateForBirthday));
+      const previousGameEntry = nextGameIndex > 0 ? allGamesForBirthdays[nextGameIndex - 1] : null;
+
+      const end = new Date(`${nextGameEntry.dateForBirthday}T00:00:00`);
+      const start = previousGameEntry?.dateForBirthday
+        ? new Date(`${previousGameEntry.dateForBirthday}T00:00:00`)
+        : new Date(end);
+
+      if (previousGameEntry?.dateForBirthday) {
+        start.setDate(start.getDate() + 1);
+      } else {
+        start.setDate(start.getDate() - 6);
+      }
+
+      birthdayNotifications = (workingSnapshot.players || [])
+        .filter((player) => player?.birthDate)
+        .map((player) => {
+          const parsed = parseBirthMonthDay(player.birthDate);
+          if (!parsed?.month || !parsed?.day) return null;
+
+          const birthday = new Date(end.getFullYear(), parsed.month - 1, parsed.day);
+
+          return {
+            player,
+            birthday,
+            inRange: birthday >= start && birthday <= end,
+          };
+        })
+        .filter((entry) => entry?.inRange)
+        .sort((a,b) => a.birthday - b.birthday || String(a.player.name || '').localeCompare(String(b.player.name || ''), 'pt-BR'))
+        .map((entry) => ({
+          type: 'birthday',
+          playerName: entry.player.name,
+          birthDate: entry.player.birthDate,
+          birthdayDate: formatDate(entry.birthday.toISOString().slice(0, 10)),
+        }));
+    }
+  } catch (e) {
+    console.warn('birthday notification failed', e);
+  }
+
+  const notifications = [
+    ...(carneNotification ? [carneNotification] : []),
+    ...birthdayNotifications,
+    ...storedNotifications
+  ];
+
 
   return `
     <section class="section-stack home-stack">
@@ -2161,7 +2239,15 @@ function renderHome(snapshot, currentPlayer) {
       <section class="card notifications-card">
         <div class="card-title compact-title">Notificações</div>
         <div class="notification-list">
-          ${notifications.length ? notifications.slice(0, 5).map((notification) => notification.type === 'carne' ? `
+          ${notifications.length ? notifications.slice(0, 5).map((notification) => notification.type === 'birthday' ? `
+            <div class="notification-item notification-item-birthday">
+              <span class="notification-icon-birthday" aria-hidden="true">🎂</span>
+              <span class="notification-content-birthday">
+                <strong>🎂 Aniversariante da semana:</strong>
+                <span>${notification.playerName}${notification.birthdayDate ? ` · ${notification.birthdayDate}` : ''}</span>
+              </span>
+            </div>
+          ` : notification.type === 'carne' ? `
             <div class="notification-item notification-item-carne">
               <span class="notification-icon-carne" aria-hidden="true">
                 <svg viewBox="0 0 64 64" focusable="false">

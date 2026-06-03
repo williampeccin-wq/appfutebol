@@ -4377,3 +4377,35 @@ button {
   }
 }
 
+/* v1.60.77 - notificação automática de aniversariantes */
+.notification-item-birthday {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(254, 243, 199, 0.86));
+}
+
+.notification-icon-birthday {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.22);
+  font-size: 24px;
+}
+
+.notification-content-birthday {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notification-content-birthday strong {
+  color: #92400e;
+}
+

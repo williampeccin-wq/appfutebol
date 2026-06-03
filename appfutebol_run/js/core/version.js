@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.75-home-carne-avatars';
+export const APP_VERSION = 'v1.60.80-birthday-week-fallback-fix';
