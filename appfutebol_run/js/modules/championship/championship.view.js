@@ -19,6 +19,38 @@ import {
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml } from '../players/players.service.js';
 
+function normalizeChampionshipPlayerName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function findChampionshipPlayerRecord(snapshot, row) {
+  const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+  const target = normalizeChampionshipPlayerName(row?.name || row?.player || row?.jogador);
+
+  return players.find((player) => normalizeChampionshipPlayerName(player?.name) === target) || null;
+}
+
+function getChampionshipPlayerPhoto(player) {
+  return player?.photo || player?.photo_url || player?.avatar || player?.image || player?.image_url || '';
+}
+
+function renderChampionshipPlayerAvatar(snapshot, row) {
+  const player = findChampionshipPlayerRecord(snapshot, row);
+
+  if (player) {
+    return getAvatarHtml(player, 'championship-ranking-avatar');
+  }
+
+  const name = row?.name || row?.player || row?.jogador || '?';
+  const initial = String(name).trim().charAt(0).toUpperCase() || '?';
+  return `<div class="championship-ranking-avatar">${escapeHtml(initial)}</div>`;
+}
+
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -58,7 +90,7 @@ function getPositionShortLabel(position) {
 }
 
 
-function renderRankingTable(rows, { annual = false } = {}) {
+function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
   if (!rows.length) {
     return '<div class="empty-state">Nenhum jogador elegível para o campeonato.</div>';
   }
@@ -78,7 +110,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-avatar">${renderChampionshipPlayerAvatar(snapshot, row)}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
               ${annual ? `
                 <td>${row.abertura_points || 0}</td>
@@ -254,7 +286,7 @@ function renderSimpleAnnualHistoryTable(rows) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
             </tr>
           `).join('')}
@@ -264,7 +296,7 @@ function renderSimpleAnnualHistoryTable(rows) {
   `;
 }
 
-function renderHistoricalBlock() {
+function renderHistoricalBlock(snapshot, ) {
   const tournaments = getHistoricalTournaments();
   const annual = getHistoricalAnnual();
 
@@ -289,7 +321,7 @@ function renderHistoricalBlock() {
           ${tournaments.map((item) => `
             <div class="history-card">
               <div class="history-title">${escapeHtml(item.name)}</div>
-              ${renderRankingTable(item.rows.slice(0, 10))}
+              ${renderRankingTable(snapshot, item.rows.slice(0, 10), { snapshot })}
             </div>
           `).join('')}
         </div>
@@ -316,7 +348,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
       <section class="card championship-current-ranking-card">
         <div class="card-title">Classificação atual · Inverno 26</div>
         <p class="footer-note">Este é o bloco principal da aba. Ele usa a planilha inicial importada e todos os resultados lançados no app.</p>
-        ${renderRankingTable(currentRanking)}
+        ${renderRankingTable(currentRanking, { snapshot })}
       </section>
 
       ${renderResultForm(snapshot, currentPlayer)}
@@ -334,11 +366,11 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
       <section class="card">
         <div class="card-title">Classificação anual · 2026</div>
         <p class="footer-note">Soma do Abertura 26 importado do histórico com o Inverno 26 calculado pelo app.</p>
-        ${renderRankingTable(annualRanking, { annual: true })}
+        ${renderRankingTable(annualRanking, { annual: true, snapshot })}
       </section>
 
       ${renderResultsHistory(snapshot, currentPlayer)}
-      ${renderHistoricalBlock()}
+      ${renderHistoricalBlock(snapshot, )}
     </section>
   `;
 }

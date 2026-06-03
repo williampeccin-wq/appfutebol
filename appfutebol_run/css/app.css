@@ -4409,3 +4409,53 @@ button {
   color: #92400e;
 }
 
+/* v1.60.84 - avatares locais no Campeonato sem import externo */
+.championship-player-avatar {
+  vertical-align: middle;
+}
+
+.championship-ranking-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px !important;
+  height: 62px !important;
+  min-width: 62px !important;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e8eef7;
+  color: #143966;
+  font-weight: 900;
+  font-size: 20px !important;
+}
+
+.championship-ranking-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* v1.60.87 - Campeonato usa getAvatarHtml real dos jogadores */
+.championship-player-avatar {
+  vertical-align: middle;
+}
+
+.championship-ranking-avatar,
+.championship-player-avatar .championship-ranking-avatar,
+.championship-player-avatar .avatar {
+  width: 62px !important;
+  height: 62px !important;
+  min-width: 62px !important;
+  flex: 0 0 62px !important;
+  font-size: 20px !important;
+}
+
+.championship-ranking-avatar img,
+.championship-ranking-avatar .avatar-image,
+.championship-player-avatar img,
+.championship-player-avatar .avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
