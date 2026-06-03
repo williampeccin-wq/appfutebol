@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.80-birthday-week-fallback-fix';
+export const APP_VERSION = 'v1.60.82-env-separation-real';
