@@ -170,6 +170,85 @@ function replaceGameInSnapshot(snapshot, updatedGame) {
 }
 function scopedConfirmationsForApp(snapshot, game) { const key = getGameKey(game || getActiveGameFromSnapshot(snapshot)); return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key); }
 
+function promoteWaitlistForGameCapacity(snapshot, game) {
+  const key = getGameKey(game || getActiveGameFromSnapshot(snapshot));
+  const maxPlayers = Number(game?.max_players || game?.maxPlayers || 0);
+
+  if (!maxPlayers || maxPlayers < 1) {
+    return Array.isArray(snapshot.confirmations) ? snapshot.confirmations : [];
+  }
+
+  const confirmations = Array.isArray(snapshot.confirmations) ? snapshot.confirmations : [];
+  const scoped = confirmations.filter((entry) => String(entry?.game_key || key) === String(key));
+  const others = confirmations.filter((entry) => String(entry?.game_key || key) !== String(key));
+
+  const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
+  const isGoalkeeper = (player) => {
+    const raw = String(player?.position || '').trim().toLowerCase();
+    return raw === 'gol' || raw === 'goleiro';
+  };
+
+  const lineConfirmedCount = scoped
+    .filter((entry) => entry?.confirmed)
+    .filter((entry) => !isGoalkeeper(playersById.get(String(entry.player_id))))
+    .length;
+
+  let availableSlots = Math.max(maxPlayers - lineConfirmedCount, 0);
+  if (!availableSlots) {
+    return confirmations;
+  }
+
+  const now = new Date().toISOString();
+  const waitlistEntries = scoped
+    .filter((entry) => entry?.confirmed !== true)
+    .filter((entry) => entry?.status === 'waitlist' || entry?.status === 'waitlisted')
+    .sort((a, b) => {
+      const posA = Number(a?.waitlist_position || 9999);
+      const posB = Number(b?.waitlist_position || 9999);
+      if (posA !== posB) return posA - posB;
+      return String(a?.waitlisted_at || '').localeCompare(String(b?.waitlisted_at || ''));
+    });
+
+  const promoteIds = new Set(waitlistEntries.slice(0, availableSlots).map((entry) => String(entry.player_id)));
+
+  const promotedScoped = scoped.map((entry) => (
+    promoteIds.has(String(entry.player_id))
+      ? {
+          ...entry,
+          confirmed: true,
+          status: 'confirmed',
+          waitlisted_at: null,
+          waitlist_position: null,
+          removed_by_admin: false,
+          confirmed_at: now,
+          cancelled_at: null,
+          timestamp: now,
+          game_key: key,
+        }
+      : entry
+  ));
+
+  const remainingWaitlist = promotedScoped
+    .filter((entry) => entry?.confirmed !== true)
+    .filter((entry) => entry?.status === 'waitlist' || entry?.status === 'waitlisted')
+    .sort((a, b) => {
+      const posA = Number(a?.waitlist_position || 9999);
+      const posB = Number(b?.waitlist_position || 9999);
+      if (posA !== posB) return posA - posB;
+      return String(a?.waitlisted_at || '').localeCompare(String(b?.waitlisted_at || ''));
+    })
+    .map((entry, index) => ({ ...entry, waitlist_position: index + 1 }));
+
+  const remainingById = new Map(remainingWaitlist.map((entry) => [String(entry.player_id), entry]));
+  const normalizedScoped = promotedScoped.map((entry) => {
+    const replacement = remainingById.get(String(entry.player_id));
+    return replacement || entry;
+  });
+
+  return [...others, ...normalizedScoped.map((entry) => ({ ...entry, game_key: key }))];
+}
+
+
 function getCurrentSnapshotPlayer(snapshot) {
   return Array.isArray(snapshot?.players)
     ? snapshot.players.find((player) => String(player.id) === String(snapshot.session?.playerId))
@@ -2022,7 +2101,10 @@ function bindAppEvents(currentPlayer) {
       const activeGameKey = getGameKey(getActiveGameFromSnapshot(currentState));
       const isActiveGame = originalGameKey === activeGameKey;
 
+      const promotedConfirmations = promoteWaitlistForGameCapacity(currentState, updatedGame);
+
       patchState({
+        confirmations: promotedConfirmations,
         game: isActiveGame ? updatedGame : getActiveGameFromSnapshot(currentState),
         games: replaceGameInSnapshot(currentState, updatedGame),
         active_game_id: activeGameKey,
@@ -2285,105 +2367,160 @@ function renderHome(snapshot, currentPlayer) {
     ...storedNotifications
   ];
 
+  const homeGameKey = getGameKey(game);
+  const homeConfirmedIds = new Set(
+    (workingSnapshot.confirmations || [])
+      .filter((entry) => entry && entry.confirmed)
+      .filter((entry) => String(entry.game_key || homeGameKey) === String(homeGameKey))
+      .map((entry) => String(entry.player_id))
+  );
+  const isHomeGoalkeeper = (player) => {
+    const raw = String((player && player.position) || '').trim().toLowerCase();
+    return raw === 'gol' || raw === 'goleiro';
+  };
+  const homeConfirmedPlayers = (workingSnapshot.players || [])
+    .filter((player) => homeConfirmedIds.has(String(player.id)))
+    .filter((player) => player.plays_football !== false)
+    .filter((player) => player.role !== 'carne');
+  const homeLinePlayers = homeConfirmedPlayers.filter((player) => !isHomeGoalkeeper(player));
+  const homeGoalkeepers = homeConfirmedPlayers.filter(isHomeGoalkeeper);
+  const homeRentalGoalkeepers = Array.isArray(game && game.rental_goalkeepers) ? game.rental_goalkeepers : [];
+  const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
+  const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
+  const homeStatusText = game && game.open ? 'Aberto' : 'Fechado';
+  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : 'Pendente');
+  const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
+  const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
+  const homeMoreLine = Math.max(homeLinePlayers.length - 5, 0);
+  const homeGoalkeeperAvatars = [
+    ...homeGoalkeepers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')),
+    ...homeRentalGoalkeepers.map((entry) => '<span class="home-v2-avatar home-v2-rental-goalie-avatar">🧤</span>')
+  ].join('');
+  const homeMoreGoalkeepers = Math.max(homeGoalkeeperCount - 5, 0);
+  const homeGoalkeeperNames = [
+    ...homeGoalkeepers.map((player) => player.name),
+    ...homeRentalGoalkeepers.map((entry) => String(entry.name || '') + ' (aluguel)')
+  ].filter(Boolean).join(', ') || 'Nenhum goleiro confirmado';
+  const homeNoticeItems = [
+    carneNotification ? {
+      icon: '🍢',
+      title: 'Dupla da carne',
+      text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-')
+    } : null,
+    ...birthdayNotifications.map((notification) => ({
+      icon: '🎂',
+      title: 'Aniversariante',
+      text: String(notification.playerName || 'Jogador') + (notification.birthdayDate ? ' · ' + notification.birthdayDate : '')
+    })),
+    storedNotifications.length ? {
+      icon: '📢',
+      title: 'Avisos',
+      text: String(storedNotifications.length) + ' recado(s)'
+    } : null
+  ].filter(Boolean);
+
 
   return `
-    <section class="section-stack home-stack">
-      <section class="card home-user-card">
-        <div class="home-user-main">
-          ${renderAvatarForApp(activePlayer)}
-          <div class="home-user-text">
-            <div class="home-user-name">${activePlayer.name}</div>
-            <div class="home-user-meta">${authzIsAdmin(activePlayer) ? `Administrador · ${getPositionLabel(activePlayer.position)}` : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</div>
+    <section class="home-v2">
+      <section class="home-v2-hero">
+        <div class="home-v2-hero-main">
+          <div>
+            <div class="home-v2-kicker">Hoje no Harmonia</div>
+            <div class="home-v2-date">${formatDate(game && game.game_date)}</div>
+            <div class="home-v2-time">${(game && game.game_time) || '--:--'} · ${homeStatusText}</div>
           </div>
-          <button class="btn btn-secondary btn-compact" type="button" data-action="toggle-self-profile-edit">${selfProfileEditOpen ? 'Fechar' : 'Editar'}</button>
+          <div class="home-v2-status ${confirmed ? 'is-ok' : waitlisted ? 'is-wait' : 'is-off'}">${homePresenceText}</div>
         </div>
-        <div class="home-user-status">
-          <span class="tag ${mensalidade.className}">Mensalidade: ${mensalidade.title}</span>
-          <span class="tag is-neutral">${carneStatus ? 'Carne ativo' : 'Sem carne'}</span>
+
+        <div class="home-v2-big-number">
+          <strong>${homeLinePlayers.length}/${maxPlayers || 0}</strong>
+          <span>confirmados de linha</span>
         </div>
-        <div class="home-user-note">${mensalidade.subline}</div>
+
+        <div class="home-v2-progress" aria-label="Ocupação do jogo">
+          <div class="home-v2-progress-track">
+            <div class="home-v2-progress-bar" style="width:${maxPlayers ? Math.min(100, Math.round((homeLinePlayers.length / maxPlayers) * 100)) : 0}%"></div>
+          </div>
+          <div class="home-v2-progress-caption">
+            <span>${maxPlayers ? Math.min(100, Math.round((homeLinePlayers.length / maxPlayers) * 100)) : 0}% preenchido</span>
+            <span>${homeRemainingLine} vaga${homeRemainingLine === 1 ? '' : 's'} restante${homeRemainingLine === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+
+        <div class="home-v2-actions">
+          ${canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : ''}
+          <button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>
+        </div>
+      </section>
+
+      <section class="home-v2-metrics">
+        <div class="home-v2-metric">
+          <strong>${homeLinePlayers.length}</strong>
+          <span>Linha</span>
+        </div>
+        <div class="home-v2-metric">
+          <strong>${homeGoalkeeperCount}/2</strong>
+          <span>Gols</span>
+        </div>
+        <div class="home-v2-metric">
+          <strong>${waitlistCount}</strong>
+          <span>Fila</span>
+        </div>
+        <div class="home-v2-metric">
+          <strong>${homeStatusText}</strong>
+          <span>Status</span>
+        </div>
+      </section>
+
+      <section class="home-v2-card home-v2-confirmed-card">
+        <div class="home-v2-card-head">
+          <div>
+            <strong>Confirmados</strong>
+            <span>${homeRemainingLine} vaga${homeRemainingLine === 1 ? '' : 's'} de linha</span>
+          </div>
+          <button class="home-v2-link" type="button" data-tab="weekly_game">Lista</button>
+        </div>
+
+        <div class="home-v2-confirmed-group">
+          <div class="home-v2-confirmed-group-title">Linha (${homeLinePlayers.length})</div>
+          <div class="home-v2-avatar-row">
+            ${homeLineAvatars || '<span class="home-v2-empty">Nenhum jogador de linha confirmado.</span>'}
+            ${homeMoreLine ? '<span class="home-v2-more">+' + homeMoreLine + '</span>' : ''}
+          </div>
+        </div>
+
+        <div class="home-v2-confirmed-group home-v2-confirmed-goalkeepers">
+          <div class="home-v2-confirmed-group-title">🧤 Goleiros (${homeGoalkeeperCount}/2)</div>
+          <div class="home-v2-avatar-row">
+            ${homeGoalkeeperAvatars || '<span class="home-v2-empty">Nenhum goleiro confirmado.</span>'}
+            ${homeMoreGoalkeepers ? '<span class="home-v2-more">+' + homeMoreGoalkeepers + '</span>' : ''}
+          </div>
+          <div class="home-v2-goalie-names">${homeGoalkeeperNames}</div>
+        </div>
+      </section>
+
+      <section class="home-v2-card">
+        <div class="home-v2-card-head">
+          <div>
+            <strong>Notificações</strong>
+            <span>Resumo da semana</span>
+          </div>
+        </div>
+        <div class="home-v2-notices">
+          ${homeNoticeItems.length ? homeNoticeItems.map((item) => '<div class="home-v2-notice"><span>' + item.icon + '</span><div><strong>' + item.title + '</strong><small>' + item.text + '</small></div></div>').join('') : '<span class="home-v2-empty">Sem notificações por enquanto.</span>'}
+        </div>
+      </section>
+
+      <section class="home-v2-profile">
+        ${renderAvatarForApp(activePlayer, 'home-v2-profile-avatar')}
+        <div>
+          <strong>${activePlayer.name}</strong>
+          <span>${authzIsAdmin(activePlayer) ? 'Administrador · ' + getPositionLabel(activePlayer.position) : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</span>
+        </div>
+        <button class="home-v2-link" type="button" data-action="toggle-self-profile-edit">${selfProfileEditOpen ? 'Fechar' : 'Editar'}</button>
       </section>
 
       ${renderSelfProfileEditCardForHome(activePlayer)}
-
-      <section class="hero-card next-game-card">
-        <div class="hero-label">Próximo jogo</div>
-        <div class="hero-date">${formatDate(game?.game_date)}</div>
-        <div class="hero-meta">${game?.game_time || '--:--'} · ${game?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
-        <div class="hero-progress">
-          <div class="progress-track">
-            <div class="progress-bar" style="width:${fillPercent}%"></div>
-          </div>
-          <div class="progress-text">Confirmados: ${confirmedCount} / ${maxPlayers}${waitlistCount ? ` · Fila: ${waitlistCount}` : ''}</div>
-        </div>
-        <div class="hero-presence-panel">
-          <div>
-            <div class="hero-presence-label">Sua presença</div>
-            <div class="hero-presence-status">${waitlisted ? '⏳ Na fila de espera' : `${presenceFeedback.icon} ${confirmed ? 'Confirmada' : 'Não confirmada'}`}</div>
-            ${statusNote && statusNote !== presenceFeedback.text ? `<div class="hero-presence-note">${statusNote}</div>` : ''}
-          </div>
-          ${canRenderPresenceAction ? `
-            <button class="btn ${confirmed || waitlisted ? 'btn-secondary' : 'btn-primary'}" type="button" id="confirm-btn">${confirmed ? 'Cancelar presença' : waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar')}</button>
-          ` : ''}
-        </div>
-      </section>
-
-      ${waitlistCount ? `
-        <section class="card home-waitlist-card">
-          <div class="card-title compact-title">Fila de espera</div>
-          ${waitlisted ? `<div class="home-waitlist-highlight">Você está em ${waitlistPosition || '?'}º na fila.</div>` : ''}
-          <div class="home-waitlist-list">
-            ${waitlistView.slice(0, 5).map((entry) => `
-              <div class="home-waitlist-row">
-                <span>#${entry.position}</span>
-                <strong>${entry.player?.name || 'Jogador'}</strong>
-              </div>
-            `).join('')}
-          </div>
-        </section>
-      ` : ''}
-
-      <section class="card notifications-card">
-        <div class="card-title compact-title">Notificações</div>
-        <div class="notification-list">
-          ${notifications.length ? notifications.slice(0, 5).map((notification) => notification.type === 'birthday' ? `
-            <div class="notification-item notification-item-birthday">
-              <span class="notification-icon-birthday" aria-hidden="true">🎂</span>
-              <span class="notification-content-birthday">
-                <strong>🎂 Aniversariante da semana:</strong>
-                <span>${notification.playerName}${notification.birthdayDate ? ` · ${notification.birthdayDate}` : ''}</span>
-              </span>
-            </div>
-          ` : notification.type === 'carne' ? `
-            <div class="notification-item notification-item-carne">
-              <span class="notification-icon-carne" aria-hidden="true">
-                <svg viewBox="0 0 64 64" focusable="false">
-                  <line x1="10" y1="54" x2="54" y2="10" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                  <ellipse cx="25" cy="39" rx="9" ry="13" transform="rotate(45 25 39)" fill="#f97316"/>
-                  <ellipse cx="39" cy="25" rx="9" ry="13" transform="rotate(45 39 25)" fill="#fb923c"/>
-                  <path d="M20 36c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
-                  <path d="M34 22c3 1 7 5 8 8" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
-                </svg>
-              </span>
-              <span class="notification-content-carne">
-                <span class="home-carne-avatars" aria-hidden="true">
-                  ${notification.player1Record ? renderAvatarForApp(notification.player1Record, 'home-carne-avatar') : `<span class="avatar home-carne-avatar">${String(notification.player1 || '?').trim().charAt(0).toUpperCase() || '?'}</span>`}
-                  ${notification.player2Record ? renderAvatarForApp(notification.player2Record, 'home-carne-avatar') : `<span class="avatar home-carne-avatar">${String(notification.player2 || '?').trim().charAt(0).toUpperCase() || '?'}</span>`}
-                </span>
-                <span class="home-carne-text">
-                  <strong>Dupla da carne (${notification.date}):</strong>
-                  <span>${notification.player1}, ${notification.player2}</span>
-                </span>
-              </span>
-            </div>
-          ` : `
-            <div class="notification-item notification-item-admin">
-              <strong>📢 Aviso:</strong>
-              <span>${String(notification.message || '').replace(/\n/g, '<br>')}</span>
-            </div>
-          `).join('') : '<div class="notification-item is-empty">Nenhuma notificação recente.</div>'}
-        </div>
-      </section>
     </section>
   `;
 }
