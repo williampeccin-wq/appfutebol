@@ -491,7 +491,8 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
         ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador">✎</button>` : ''}
         ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha">🔑</button>` : ''}
         ${isAdmin(currentPlayer) && !player.auth_user_id ? `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}" title="Criar acesso" aria-label="Criar acesso">Criar acesso</button>` : ''}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="${player.auth_user_id ? 'Excluir jogador do app; o acesso Auth pode continuar existindo no Supabase' : 'Excluir jogador'}" aria-label="Excluir jogador">🗑</button>` : ''}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) && !player.auth_user_id ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador">🗑</button>` : ''}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-delete-protected" type="button" data-action="delete-player-protected" data-id="${player.id}" title="Jogador com acesso ativo. Remova o acesso antes de excluir." aria-label="Exclusão bloqueada">🔒</button>` : ''}
       </div>
     </div>
   `;

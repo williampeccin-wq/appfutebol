@@ -8,6 +8,8 @@ export const state = {
   },
   players: [],
   game: null,
+  games: [],
+  active_game_id: null,
   confirmations: [],
   championship: null,
   carne: [],
@@ -37,6 +39,8 @@ export function replaceState(nextState) {
   };
   state.players = Array.isArray(safeState.players) ? safeState.players : [];
   state.game = safeState.game || null;
+  state.games = Array.isArray(safeState.games) ? safeState.games : [];
+  state.active_game_id = safeState.active_game_id || null;
   state.confirmations = Array.isArray(safeState.confirmations) ? safeState.confirmations : [];
   state.championship = safeState.championship || null;
   state.carne = Array.isArray(safeState.carne) ? safeState.carne : [];
@@ -62,6 +66,12 @@ export function patchState(patch) {
   if (Object.prototype.hasOwnProperty.call(patch, 'game')) {
     state.game = patch.game || null;
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'games')) {
+    state.games = Array.isArray(patch.games) ? patch.games : [];
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'active_game_id')) {
+    state.active_game_id = patch.active_game_id || null;
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'confirmations')) {
     state.confirmations = Array.isArray(patch.confirmations) ? patch.confirmations : [];
   }
@@ -83,6 +93,8 @@ export function patchState(patch) {
   state.session = repaired.state.session || state.session;
   state.players = Array.isArray(repaired.state.players) ? repaired.state.players : [];
   state.game = repaired.state.game || null;
+  state.games = Array.isArray(repaired.state.games) ? repaired.state.games : [];
+  state.active_game_id = repaired.state.active_game_id || null;
   state.confirmations = Array.isArray(repaired.state.confirmations) ? repaired.state.confirmations : [];
   state.championship = repaired.state.championship || null;
   state.carne = Array.isArray(repaired.state.carne) ? repaired.state.carne : [];

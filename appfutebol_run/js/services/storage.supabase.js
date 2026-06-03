@@ -92,6 +92,8 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     game: normalizeGameForPresenceCutover(game),
     confirmations,
     championship: meta.championship || null,
+    games: Array.isArray(meta.games) ? meta.games : (game ? [normalizeGameForPresenceCutover(game)] : []),
+    active_game_id: meta.active_game_id || game?.game_key || null,
     carne: Array.isArray(meta.carne) ? meta.carne : [],
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
     ui: {
@@ -109,6 +111,8 @@ function splitState(state) {
     confirmations: Array.isArray(state.confirmations) ? state.confirmations : [],
     meta: {
       championship: state.championship || null,
+      games: Array.isArray(state.games) ? state.games : [],
+      active_game_id: state.active_game_id || state.game?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
     },
@@ -186,8 +190,8 @@ function confirmationFromPresenceRow(row) {
   if (!row || typeof row !== 'object') return null;
 
   const data = row.data && typeof row.data === 'object' ? row.data : {};
-  const dataStatus = String(data.status || '').toLowerCase();
   const rowStatus = String(row.status || '').toLowerCase();
+  const dataStatus = String(data.status || '').toLowerCase();
   const status = (dataStatus === 'waitlist' || dataStatus === 'waitlisted') ? dataStatus : (rowStatus || dataStatus);
   const confirmed = status ? status === 'confirmed' : data.confirmed === true;
   const timestamp = data.waitlisted_at || data.timestamp || row.confirmed_at || row.cancelled_at || row.updated_at || null;
@@ -462,16 +466,7 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     }
   }
 
-  if (previousGameKey !== nextGameKey) {
-    operations.push({
-      type: 'delete_previous_game_presence_confirmations',
-      run: () => requestNoContent(
-        config,
-        tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}`),
-        { method: 'DELETE' }
-      ),
-    });
-  }
+  // v1.60.70: multiple future games preserve previous game confirmations.
 
   for (const [playerId, confirmation] of nextConfirmations.entries()) {
     const normalizedConfirmation = {

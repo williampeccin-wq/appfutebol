@@ -12,9 +12,12 @@ import {
   getEffectiveChampionshipResults,
   getResultAuditRows,
   getActiveDrawTeams,
+  getChampionshipDrawOptions,
   getTeamOutcomeLabel,
+  getManualChampionshipResults,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
+import { getAvatarHtml } from '../players/players.service.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -46,6 +49,14 @@ function getStatusClass(status) {
   return 'is-no-play';
 }
 
+function getPositionShortLabel(position) {
+  const value = String(position || '').toLowerCase();
+  if (value === 'gol') return 'Gol';
+  if (value === 'zag') return 'Zag';
+  if (value === 'atk') return 'Ata';
+  return 'Meia';
+}
+
 
 function renderRankingTable(rows, { annual = false } = {}) {
   if (!rows.length) {
@@ -58,7 +69,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
         <thead>
           <tr>
             <th>Pos.</th>
-            <th>Jogador</th>
+            <th>Foto</th><th>Jogador</th>
             <th>Pts</th>
             ${annual ? '<th>Abertura</th><th>Inverno</th>' : '<th>V</th><th>E</th><th>D</th><th>NJ</th>'}
           </tr>
@@ -67,7 +78,7 @@ function renderRankingTable(rows, { annual = false } = {}) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
               ${annual ? `
                 <td>${row.abertura_points || 0}</td>
@@ -91,69 +102,86 @@ function renderResultForm(snapshot, currentPlayer) {
 
   const players = getFootballPlayers(snapshot);
   if (!players.length) {
-    return `
-      <section class="card">
-        <div class="card-title">Lançar resultado</div>
-        <div class="empty-state">Cadastre jogadores com perfil jogador antes de lançar resultados.</div>
-      </section>
-    `;
+    return `<section class="card"><div class="card-title">Lançar resultado</div><div class="empty-state">Cadastre jogadores com perfil jogador antes de lançar resultados.</div></section>`;
   }
 
-  const draw = getActiveDrawTeams(snapshot);
-  if (!draw.ok) {
+  const draws = getChampionshipDrawOptions(snapshot);
+  if (!draws.length) {
     return `
-      <section class="card championship-result-card">
+      <section class="card championship-result-card championship-result-card-v2">
         <div class="card-title">Lançar resultado do jogo</div>
-        <div class="empty-state">${escapeHtml(draw.message)}</div>
-        <p class="footer-note">O resultado do campeonato usa o último sorteio da aba Jogo da semana. Depois do sorteio, informe qual time venceu ou se houve empate.</p>
-      </section>
-    `;
+        <div class="empty-state">Faça o sorteio dos times antes de lançar o resultado do campeonato.</div>
+        <p class="footer-note">O lançamento fica vinculado ao sorteio para manter auditoria visual do campeonato.</p>
+      </section>`;
   }
 
+  const selectedDraw = draws[0];
   const playerById = new Map(players.map((player) => [String(player.id), player]));
+  const selectedDate = selectedDraw.date || (selectedDraw.created_at ? new Date(selectedDraw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const manualResults = getManualChampionshipResults(snapshot);
+  const existingResult = manualResults.find((result) => String(result.draw_id || '') === String(selectedDraw.id || '') || String(result.date || '') === String(selectedDate));
+
   const renderTeamPlayers = (ids) => ids.map((playerId) => {
     const player = playerById.get(String(playerId));
-    return `<span>${escapeHtml(player?.name || 'Jogador removido')}</span>`;
+    return `<span class="championship-team-player-pill"><strong>${escapeHtml(player?.name || 'Jogador removido')}</strong><small>${escapeHtml(getPositionShortLabel(player?.position))}</small></span>`;
   }).join('');
 
-  const today = draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-
   return `
-    <section class="card championship-result-card">
-      <div class="card-title">Lançar resultado do jogo</div>
-      <p class="footer-note">Informe o resultado do sorteio atual. Depois de criar o próximo jogo e sortear novamente, este mesmo formulário ficará disponível para o novo lançamento.</p>
-      <div class="form-grid compact-grid championship-date-grid">
-        <label>
-          Data do jogo
-          <input type="date" id="championship-result-date" value="${today}">
+    <section class="card championship-result-card championship-result-card-v2">
+      <div class="championship-result-header-v2">
+        <div class="championship-result-icon-v2">🏆</div>
+        <div>
+          <div class="card-title">Lançar resultado do jogo</div>
+          <p class="championship-result-subtitle-v2">Selecione o sorteio correto. O lançamento fica auditável e vinculado ao sorteio, não apenas ao último jogo aberto.</p>
+        </div>
+      </div>
+
+      <div class="championship-result-badges-v2">
+        <span class="championship-pill-v2 is-blue">Sorteios disponíveis: ${draws.length}</span>
+        <span class="championship-pill-v2 ${existingResult ? 'is-gold' : 'is-green'}">${existingResult ? 'Sorteio já lançado' : 'Sorteio sem resultado'}</span>
+      </div>
+
+      <div class="championship-result-divider-v2"></div>
+
+      <div class="championship-result-form-v2">
+        <label class="championship-field-v2 championship-draw-field-v2">
+          <span>Sorteio</span>
+          <select id="championship-draw-id" class="championship-control-v2">
+            ${draws.map((draw) => {
+              const date = draw.date || (draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : '');
+              const result = manualResults.find((entry) => String(entry.draw_id || '') === String(draw.id || '') || String(entry.date || '') === String(date));
+              const total = (draw.team_a?.length || 0) + (draw.team_b?.length || 0);
+              return `<option value="${escapeHtml(draw.id)}">${formatDate(date)} · ${draw.game_time || '--:--'} · ${total} jogadores${result ? ' · lançado' : ''}</option>`;
+            }).join('')}
+          </select>
         </label>
-        <label>
-          Resultado
-          <select id="championship-team-outcome">
+
+        <label class="championship-field-v2">
+          <span>Data do jogo</span>
+          <input id="championship-result-date" class="championship-control-v2" type="date" value="${selectedDate}">
+        </label>
+
+        <label class="championship-field-v2">
+          <span>Resultado</span>
+          <select id="championship-team-outcome" class="championship-control-v2">
             ${TEAM_RESULT_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('')}
           </select>
         </label>
       </div>
-      <details class="championship-teams-result-details">
-        <summary>Ver escalações do sorteio</summary>
+
+      <details class="championship-teams-result-details championship-teams-result-details-v2">
+        <summary><span>Ver escalações do sorteio selecionado</span><small>Time A ${selectedDraw.team_a.length} x ${selectedDraw.team_b.length} Time B</small></summary>
         <div class="championship-teams-result-grid">
-          <div class="championship-team-result-box">
-            <div class="championship-team-label">Time A</div>
-            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_a)}</div>
-          </div>
-          <div class="championship-team-result-box">
-            <div class="championship-team-label">Time B</div>
-            <div class="championship-team-player-list">${renderTeamPlayers(draw.team_b)}</div>
-          </div>
+          <div class="championship-team-result-box"><div class="championship-team-label">Time A</div><div class="championship-team-player-list">${renderTeamPlayers(selectedDraw.team_a)}</div></div>
+          <div class="championship-team-result-box"><div class="championship-team-label">Time B</div><div class="championship-team-player-list">${renderTeamPlayers(selectedDraw.team_b)}</div></div>
         </div>
       </details>
-      <div class="actions">
-        <button class="btn btn-primary" type="button" data-action="save-championship-result">Salvar resultado</button>
-      </div>
-    </section>
-  `;
-}
 
+      <button class="btn btn-primary championship-save-result-btn-v2" type="button" data-action="save-championship-result">Salvar resultado</button>
+
+      <div class="championship-result-info-v2"><strong>i</strong><span>Se este sorteio já tiver resultado, salvar novamente substitui o lançamento anterior.</span></div>
+    </section>`;
+}
 function renderResultsHistory(snapshot, currentPlayer) {
   const results = getEffectiveChampionshipResults(snapshot);
   const players = getFootballPlayers(snapshot);
@@ -226,7 +254,7 @@ function renderSimpleAnnualHistoryTable(rows) {
           ${rows.map((row) => `
             <tr>
               <td><span class="rank-badge">${row.rank}</span></td>
-              <td class="championship-player-name">${escapeHtml(row.name)}</td>
+              <td class="championship-player-avatar">${getAvatarHtml(row, 'avatar-sm')}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
             </tr>
           `).join('')}
@@ -275,31 +303,32 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
   const currentRanking = calculateCurrentRanking(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
+  const manualResults = getManualChampionshipResults(snapshot);
 
   return `
     <section class="section-stack championship-screen">
-      <section class="hero-card championship-hero">
+      <section class="hero-card championship-hero championship-hero-current">
         <div class="hero-label">Campeonato atual</div>
         <div class="hero-date">${ACTIVE_CHAMPIONSHIP.label}</div>
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      <section class="card championship-rule-card">
-        <div class="card-title">Regra de pontuação</div>
-        <div class="championship-rule-grid">
-          <div><strong>3</strong><span>Vitória</span></div>
-          <div><strong>2</strong><span>Empate</span></div>
-          <div><strong>1</strong><span>Derrota</span></div>
-          <div><strong>0</strong><span>Não jogou</span></div>
-        </div>
-        <p class="footer-note">Desempate: pontos, vitórias, empates e derrotas. Se persistir empate, os jogadores mantêm a mesma posição.</p>
+      <section class="card championship-current-ranking-card">
+        <div class="card-title">Classificação atual · Inverno 26</div>
+        <p class="footer-note">Este é o bloco principal da aba. Ele usa a planilha inicial importada e todos os resultados lançados no app.</p>
+        ${renderRankingTable(currentRanking)}
       </section>
 
       ${renderResultForm(snapshot, currentPlayer)}
 
-      <section class="card">
-        <div class="card-title">Classificação · Inverno 26</div>
-        ${renderRankingTable(currentRanking)}
+      <section class="card championship-launch-summary-card">
+        <div class="card-title">Controle de lançamentos</div>
+        <p class="footer-note">Cada resultado fica vinculado ao sorteio escolhido, permitindo auditar jogo por jogo.</p>
+        <div class="championship-launch-summary-grid">
+          <div><strong>${manualResults.length}</strong><span>lançamentos manuais</span></div>
+          <div><strong>${Math.max(resultCount - manualResults.length, 0)}</strong><span>rodadas importadas</span></div>
+          <div><strong>${currentRanking.length}</strong><span>jogadores elegíveis</span></div>
+        </div>
       </section>
 
       <section class="card">
