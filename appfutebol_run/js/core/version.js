@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.60.93-draw-manual-include-confirmed';
+export const APP_VERSION = 'v1.60.94-prod-whatsapp-draw-fix';
