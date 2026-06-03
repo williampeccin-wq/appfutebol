@@ -268,6 +268,79 @@ function renderAvatarForApp(player, extraClass = '') {
   return `<div class="avatar ${extraClass}">${initials}</div>`;
 }
 
+
+function isGoalkeeperPlayerForApp(player) {
+  const raw = String(player?.position || '').trim().toLowerCase();
+  return raw === 'gol' || raw === 'goleiro';
+}
+
+function getActiveRentalGoalkeepersForApp(snapshot) {
+  const game = getActiveGameFromSnapshot(snapshot);
+  return Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [];
+}
+
+function buildConfirmedPresenceShareText(snapshot) {
+  const game = getActiveGameFromSnapshot(snapshot);
+  const confirmedIds = new Set(
+    (snapshot.confirmations || [])
+      .filter((entry) => entry?.confirmed)
+      .filter((entry) => String(entry?.game_key || getGameKey(game)) === String(getGameKey(game)))
+      .map((entry) => String(entry.player_id))
+  );
+
+  const players = (snapshot.players || []).filter((player) => confirmedIds.has(String(player.id)));
+  const goalkeepers = players.filter(isGoalkeeperPlayerForApp);
+  const linePlayers = players.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
+
+  const lines = [
+    '⚽ Presença Harmonia FC',
+    `Jogo: ${formatDate(game.game_date)} às ${game.game_time || '--:--'}`,
+    '',
+    `🧤 Goleiros (${goalkeepers.length + rentalGoalkeepers.length}/2):`,
+    ...(goalkeepers.length || rentalGoalkeepers.length
+      ? [
+          ...goalkeepers.map((player, index) => `${index + 1}. ${player.name}`),
+          ...rentalGoalkeepers.map((entry, index) => `${goalkeepers.length + index + 1}. ${entry.name} (aluguel)`),
+        ]
+      : ['Nenhum goleiro confirmado.']),
+    '',
+    `✅ Linha (${linePlayers.length}):`,
+    ...(linePlayers.length
+      ? linePlayers.map((player, index) => `${index + 1}. ${player.name}`)
+      : ['Nenhum jogador de linha confirmado.']),
+  ];
+
+  return lines.join('\n');
+}
+
+async function copyConfirmedPresenceToClipboard() {
+  const snapshot = getState();
+  const text = buildConfirmedPresenceShareText(snapshot);
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    }
+
+    showToast('Lista de presença copiada.');
+  } catch (error) {
+    console.error(error);
+    showToast('Não foi possível copiar automaticamente.', 'error');
+  }
+}
+
+
 function readAndResizePlayerPhoto(file, maxSize = 360, quality = 0.82) {
   return new Promise((resolve, reject) => {
     if (!file) {
@@ -1450,7 +1523,7 @@ import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
@@ -1867,9 +1940,43 @@ function bindAppEvents(currentPlayer) {
     copyTeamDrawToClipboard();
   });
 
+  appElement.querySelector('#copy-confirmed-btn')?.addEventListener('click', () => {
+    copyConfirmedPresenceToClipboard();
+  });
+
+  appElement.querySelector('#add-rental-goalkeeper-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('rental-goalkeeper-name');
+    const result = addRentalGoalkeeper(input?.value || '');
+    if (result.ok && input) input.value = '';
+    const safeSnapshot = repairManualSnapshot(getState());
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+    showToast(result.message, result.ok ? 'success' : 'error');
+  });
+
+  appElement.querySelectorAll('[data-action="remove-rental-goalkeeper"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const result = removeRentalGoalkeeper(button.dataset.id);
+      const safeSnapshot = repairManualSnapshot(getState());
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
+      showToast(result.message, result.ok ? 'success' : 'error');
+    });
+  });
+
   appElement.querySelectorAll('[data-action="move-drawn-player"]').forEach((button) => {
     button.addEventListener('click', () => {
       const result = moveDrawnPlayer(button.dataset.playerId, button.dataset.fromTeam);
+      showToast(result.message, result.ok ? 'success' : 'error');
+    });
+  });
+
+  appElement.querySelectorAll('[data-action="add-player-to-draw"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const result = addConfirmedPlayerToDraw(button.dataset.playerId, button.dataset.team);
+      const safeSnapshot = repairManualSnapshot(getState());
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
       showToast(result.message, result.ok ? 'success' : 'error');
     });
   });
@@ -2321,9 +2428,9 @@ function buildTeamDrawShareText(snapshot) {
   const game = getActiveGameFromSnapshot(snapshot);
   const formatTeam = (label, ids = []) => {
     const lines = ids.map((id, index) => {
-      const player = playerById.get(id);
+      const player = (id && typeof id === 'object') ? id : playerById.get(id);
       const name = player?.name || 'Jogador removido';
-      const position = getPositionLabel(player?.position);
+      const position = player?.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player?.position);
       return `${index + 1}. ${name} (${position})`;
     });
 
@@ -2373,10 +2480,13 @@ async function copyTeamDrawToClipboard() {
 
 function renderPresenceList(snapshot, currentPlayer) {
   const adminMode = canManagePresenceAuthz(currentPlayer);
+  const game = getActiveGameFromSnapshot(snapshot);
+  const gameKey = getGameKey(game);
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
-      .map((entry) => entry.player_id)
+      .filter((entry) => String(entry?.game_key || gameKey) === String(gameKey))
+      .map((entry) => String(entry.player_id))
   );
   const waitlistEntries = getWaitlistView(snapshot);
   const waitlistedIds = new Set(waitlistEntries.map((entry) => String(entry.player_id)));
@@ -2386,9 +2496,15 @@ function renderPresenceList(snapshot, currentPlayer) {
     .filter((player) => player.role !== 'carne')
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
-  const confirmedPlayers = footballPlayers.filter((player) => confirmedIds.has(player.id));
+  const confirmedFootballPlayers = footballPlayers.filter((player) => confirmedIds.has(String(player.id)));
+  const goalkeeperPlayers = confirmedFootballPlayers.filter(isGoalkeeperPlayerForApp).slice(0, 2);
+  const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
+  const totalGoalkeepers = goalkeeperPlayers.length + rentalGoalkeepers.length;
   const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
-  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(player.id) && !waitlistedIds.has(String(player.id)));
+  const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(String(player.id)) && !waitlistedIds.has(String(player.id)));
+  const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayerForApp);
+  const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
@@ -2418,16 +2534,84 @@ function renderPresenceList(snapshot, currentPlayer) {
     </div>
   `;
 
+  const renderGoalkeeperRow = (player) => `
+    <div class="weekly-player-row goalkeeper-player-row">
+      <div class="players-switch-player">
+        ${renderAvatarForApp(player)}
+        <div>
+          <div class="row-title">🧤 ${player.name}</div>
+          <div class="row-subtitle">Goleiro confirmado · não ocupa vaga de linha</div>
+        </div>
+      </div>
+      <div class="weekly-player-meta">
+        <span class="tag is-ok">Goleiro</span>
+        ${adminMode ? `
+          <button
+            class="switch-control switch-control-inline is-on"
+            type="button"
+            data-action="admin-remove-from-game"
+            data-id="${player.id}"
+            aria-pressed="true"
+            title="Remover goleiro do jogo"
+          >
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label is-ok">Dentro</span>
+          </button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  const renderRentalGoalkeeperRow = (entry) => `
+    <div class="weekly-player-row goalkeeper-player-row rental-goalkeeper-row">
+      <div class="players-switch-player">
+        <div class="avatar rental-goalkeeper-avatar">🧤</div>
+        <div>
+          <div class="row-title">${escapeHtml(entry.name)}</div>
+          <div class="row-subtitle">Goleiro de aluguel · temporário deste jogo</div>
+        </div>
+      </div>
+      <div class="weekly-player-meta">
+        <span class="tag is-warn">Aluguel</span>
+        ${adminMode ? `<button class="btn btn-secondary btn-sm" type="button" data-action="remove-rental-goalkeeper" data-id="${escapeHtml(entry.id)}">Remover</button>` : ''}
+      </div>
+    </div>
+  `;
+
   return `
     <section class="weekly-presence-card">
       <div class="card-title weekly-presence-main-title">Lista de presença</div>
 
+      <div class="weekly-presence-section goalkeeper-section">
+        <div class="weekly-presence-title">🧤 Goleiros (${totalGoalkeepers}/2)</div>
+        <div class="weekly-presence-stack">
+          ${goalkeeperPlayers.length || rentalGoalkeepers.length
+            ? `${goalkeeperPlayers.map(renderGoalkeeperRow).join('')}${rentalGoalkeepers.map(renderRentalGoalkeeperRow).join('')}`
+            : '<div class="empty-inline">Nenhum goleiro confirmado ainda.</div>'}
+        </div>
+        ${adminMode && totalGoalkeepers < 2 ? `
+          <div class="rental-goalkeeper-form">
+            <input id="rental-goalkeeper-name" class="input" type="text" placeholder="Nome do goleiro de aluguel" />
+            <button id="add-rental-goalkeeper-btn" class="btn btn-secondary" type="button">Adicionar goleiro de aluguel</button>
+          </div>
+        ` : ''}
+        ${pendingGoalkeepers.length ? `
+          <div class="goalkeeper-pending-list">
+            <div class="weekly-presence-subtitle">Goleiros cadastrados ainda fora</div>
+            ${pendingGoalkeepers.map((player) => renderWeeklyRow(player, false)).join('')}
+          </div>
+        ` : ''}
+      </div>
+
       <div class="weekly-presence-section">
-        <div class="weekly-presence-title">Confirmados (${confirmedPlayers.length})</div>
+        <div class="weekly-presence-title">Confirmados linha (${confirmedPlayers.length})</div>
         <div class="weekly-presence-stack">
           ${confirmedPlayers.length
             ? confirmedPlayers.map((player) => renderWeeklyRow(player, true)).join('')
-            : '<div class="empty-inline">Nenhum jogador confirmado ainda.</div>'}
+            : '<div class="empty-inline">Nenhum jogador de linha confirmado ainda.</div>'}
+        </div>
+        <div class="weekly-copy-presence-actions">
+          <button class="btn btn-secondary btn-sm" type="button" id="copy-confirmed-btn">Copiar presença para WhatsApp</button>
         </div>
       </div>
 
@@ -2454,11 +2638,11 @@ function renderPresenceList(snapshot, currentPlayer) {
       </div>
 
       <div class="weekly-presence-section">
-        <div class="weekly-presence-title">Não confirmados (${pendingPlayers.length})</div>
+        <div class="weekly-presence-title">Não confirmados linha (${pendingLinePlayers.length})</div>
         <div class="weekly-presence-stack">
-          ${pendingPlayers.length
-            ? pendingPlayers.map((player) => renderWeeklyRow(player, false)).join('')
-            : '<div class="empty-inline">Todos os jogadores confirmaram.</div>'}
+          ${pendingLinePlayers.length
+            ? pendingLinePlayers.map((player) => renderWeeklyRow(player, false)).join('')
+            : '<div class="empty-inline">Todos os jogadores de linha confirmaram.</div>'}
         </div>
       </div>
     </section>
@@ -2493,8 +2677,41 @@ function sortDrawEntriesForDisplay(entries = [], playerById = new Map()) {
 
 function renderTeamDraw(snapshot, currentPlayer) {
   const sortResult = snapshot.game?.sort_result;
-  const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
+  const playerById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
+  const game = getActiveGameFromSnapshot(snapshot);
+  const gameKey = getGameKey(game);
   const confirmedCount = buildGameView(snapshot, currentPlayer?.id || null).confirmedCount;
+  const isAdmin = authzIsAdmin(currentPlayer);
+
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const sortEntryIds = sortResult
+    ? new Set([...(sortResult.team_a || []), ...(sortResult.team_b || [])].map((entry) => String(getEntryId(entry))))
+    : new Set();
+
+  const confirmedIds = new Set(
+    (snapshot.confirmations || [])
+      .filter((entry) => entry?.confirmed)
+      .filter((entry) => String(entry?.game_key || gameKey) === String(gameKey))
+      .map((entry) => String(entry.player_id))
+  );
+
+  const confirmedPlayersOutsideDraw = (snapshot.players || [])
+    .filter((player) => confirmedIds.has(String(player.id)))
+    .filter((player) => !sortEntryIds.has(String(player.id)))
+    .filter((player) => player.plays_football !== false)
+    .filter((player) => player.role !== 'carne')
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
+
+  const rentalGoalkeepersOutsideDraw = (Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [])
+    .filter((entry) => !sortEntryIds.has(String(entry.id)))
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      position: 'gol',
+      rental_goalkeeper: true,
+    }));
+
+  const outsideDraw = [...confirmedPlayersOutsideDraw, ...rentalGoalkeepersOutsideDraw];
 
   if (!sortResult) {
     return `
@@ -2513,11 +2730,9 @@ function renderTeamDraw(snapshot, currentPlayer) {
     `;
   }
 
-  const isAdmin = authzIsAdmin(currentPlayer);
-
   const resolveDrawEntry = (entry) => {
-    const id = (entry && typeof entry === 'object') ? entry.id : entry;
-    const player = (entry && typeof entry === 'object') ? entry : playerById.get(id);
+    const id = getEntryId(entry);
+    const player = (entry && typeof entry === 'object') ? entry : playerById.get(String(id));
     return { id, player };
   };
 
@@ -2534,7 +2749,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
                 <div class="avatar">${getInitials(player?.name || '?')}</div>
                 <div class="team-draw-player-text">
                   <div class="row-title">${player?.name || 'Jogador removido'}</div>
-                  <div class="row-subtitle">${getPositionLabel(player?.position)}</div>
+                  <div class="row-subtitle">${player?.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player?.position)}</div>
                 </div>
               </div>
               ${isAdmin && id && player ? `
@@ -2563,12 +2778,36 @@ function renderTeamDraw(snapshot, currentPlayer) {
       <div class="card-title">Sorteio de times</div>
       <div class="info-block">
         <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
-        <div class="info-line">• Jogadores sorteados: ${sortResult.total_players}</div>
+        <div class="info-line">• Jogadores sorteados: ${[...(sortResult.team_a || []), ...(sortResult.team_b || [])].length}</div>
       </div>
       <div class="team-draw-grid">
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
         ${renderTeam('Time B', sortResult.team_b, 'team_b')}
       </div>
+
+      ${isAdmin && outsideDraw.length ? `
+        <div class="draw-outside-panel">
+          <div class="weekly-presence-title">Confirmados fora do sorteio</div>
+          <div class="weekly-presence-stack">
+            ${outsideDraw.map((player) => `
+              <div class="weekly-player-row draw-outside-row">
+                <div class="players-switch-player">
+                  ${player.rental_goalkeeper ? `<div class="avatar rental-goalkeeper-avatar">🧤</div>` : renderAvatarForApp(player)}
+                  <div>
+                    <div class="row-title">${player.name}</div>
+                    <div class="row-subtitle">${player.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player.position)}</div>
+                  </div>
+                </div>
+                <div class="weekly-player-meta draw-add-actions">
+                  <button class="btn btn-secondary btn-sm" type="button" data-action="add-player-to-draw" data-player-id="${player.id}" data-team="team_a">Time A</button>
+                  <button class="btn btn-secondary btn-sm" type="button" data-action="add-player-to-draw" data-player-id="${player.id}" data-team="team_b">Time B</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       ${canManagePresenceAuthz(currentPlayer) ? `
         <div class="actions" style="margin-top:12px;">
           <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>

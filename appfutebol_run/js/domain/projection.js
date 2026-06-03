@@ -29,7 +29,15 @@ function __legacyGameFromState(state) {
   const activeGameKey = getGameKey(legacyGame);
   const confirmations = (Array.isArray(state.confirmations) ? state.confirmations : [])
     .filter((item) => String(item?.game_key || activeGameKey) === activeGameKey);
-  const confirmedPlayerIds = confirmations.filter((item) => item && item.confirmed).map((item) => item.player_id);
+  const playersByIdForCount = new Map((Array.isArray(state.players) ? state.players : []).map((player) => [String(player.id), player]));
+  const isGoalkeeperPlayerForCount = (player) => {
+    const raw = String(player?.position || '').trim().toLowerCase();
+    return raw === 'gol' || raw === 'goleiro';
+  };
+  const confirmedPlayerIds = confirmations
+    .filter((item) => item && item.confirmed)
+    .filter((item) => !item.goalkeeper && item.segment !== 'goalkeeper' && !isGoalkeeperPlayerForCount(playersByIdForCount.get(String(item.player_id))))
+    .map((item) => item.player_id);
   const waitlistPlayerIds = confirmations
     .filter((item) => item && item.confirmed !== true && (item.status === 'waitlist' || item.status === 'waitlisted'))
     .sort((left, right) => String(left.waitlisted_at || left.timestamp || '').localeCompare(String(right.waitlisted_at || right.timestamp || '')))

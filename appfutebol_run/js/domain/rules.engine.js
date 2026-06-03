@@ -3,10 +3,14 @@ export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+export function isGoalkeeperEntry(entry) {
+  return entry?.goalkeeper === true || entry?.segment === 'goalkeeper' || entry?.presence_role === 'goalkeeper';
+}
+
 export function isGameFull(game, confirmations = []) {
-  const confirmedCount = confirmations.filter((entry) => entry?.confirmed).length;
+  const lineConfirmedCount = confirmations.filter((entry) => entry?.confirmed && !isGoalkeeperEntry(entry)).length;
   const maxPlayers = Number(game?.max_players || 0);
-  return maxPlayers > 0 && confirmedCount >= maxPlayers;
+  return maxPlayers > 0 && lineConfirmedCount >= maxPlayers;
 }
 
 export function canLogin(player, password) {
