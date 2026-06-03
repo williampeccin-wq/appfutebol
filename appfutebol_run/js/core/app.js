@@ -2427,11 +2427,16 @@ function buildTeamDrawShareText(snapshot) {
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
   const game = getActiveGameFromSnapshot(snapshot);
   const formatTeam = (label, ids = []) => {
-    const lines = ids.map((id, index) => {
-      const player = (id && typeof id === 'object') ? id : playerById.get(id);
-      const name = player?.name || 'Jogador removido';
-      const position = player?.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player?.position);
-      return `${index + 1}. ${name} (${position})`;
+    const players = ids.map((id) => ((id && typeof id === 'object') ? id : playerById.get(id)));
+    const goalkeepers = players.filter((p) => p && (p.rental_goalkeeper || ['gol','goleiro'].includes(String(p.position || '').toLowerCase())));
+    const linePlayers = players.filter((p) => p && !goalkeepers.includes(p));
+    const ordered = [...goalkeepers, ...linePlayers];
+
+    const lines = ordered.map((player, index) => {
+      const prefix = (player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase()))
+        ? '🧤 '
+        : '';
+      return `${index + 1}. ${prefix}${player?.name || 'Jogador removido'}`;
     });
 
     return [`${label}:`, ...lines].join('\n');
@@ -2748,8 +2753,8 @@ function renderTeamDraw(snapshot, currentPlayer) {
               <div class="placeholder-main team-draw-player-main">
                 <div class="avatar">${getInitials(player?.name || '?')}</div>
                 <div class="team-draw-player-text">
-                  <div class="row-title">${player?.name || 'Jogador removido'}</div>
-                  <div class="row-subtitle">${player?.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player?.position)}</div>
+                  <div class="row-title">${(player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : ''}${player?.name || 'Jogador removido'}</div>
+                  <div class="row-subtitle">${(player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? 'Goleiro' : 'Linha'}</div>
                 </div>
               </div>
               ${isAdmin && id && player ? `
