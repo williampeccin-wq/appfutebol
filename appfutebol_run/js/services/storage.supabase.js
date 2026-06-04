@@ -457,14 +457,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     }
   }
 
-  for (const id of previousPlayers.keys()) {
-    if (!nextPlayers.has(id)) {
-      operations.push({
-        type: 'delete_player',
-        run: () => deleteRow(config, SPLIT_TABLES.players, 'id', id),
-      });
-    }
-  }
+  // HOTFIX v1.70.14
+  // Nunca deletar players automaticamente por diff de snapshot.
+  // Exclusão de jogador deve ser ação explícita.
+
 
   // v1.60.70: multiple future games preserve previous game confirmations.
 
@@ -485,18 +481,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     }
   }
 
-  for (const playerId of previousConfirmations.keys()) {
-    if (!nextConfirmations.has(playerId)) {
-      operations.push({
-        type: 'delete_presence_confirmation',
-        run: () => requestNoContent(
-          config,
-          tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}&player_id=eq.${encodeURIComponent(String(playerId))}`),
-          { method: 'DELETE' }
-        ),
-      });
-    }
-  }
+  // HOTFIX v1.70.14
+  // Nunca deletar confirmações automaticamente por diff de snapshot.
+  // Remoções devem ocorrer por fluxo explícito do domínio.
+
 
   if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
     operations.push({
