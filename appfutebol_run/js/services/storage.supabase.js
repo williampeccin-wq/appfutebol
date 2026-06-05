@@ -3,6 +3,7 @@ import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 let lastRemoteUpdatedAt = null;
 let lastSplitSnapshot = null;
 let lastSplitFingerprint = '';
+let gameStateHadVolatileDraw = false;
 
 const SPLIT_TABLES = {
   players: 'players',
@@ -85,15 +86,65 @@ function isValidSplitState(state) {
   );
 }
 
+function hasVolatileDrawFields(game) {
+  if (!game || typeof game !== 'object') return false;
+
+  return (
+    Object.prototype.hasOwnProperty.call(game, 'sort_result') ||
+    Object.prototype.hasOwnProperty.call(game, 'draw_history') ||
+    (game.data && typeof game.data === 'object' && (
+      Object.prototype.hasOwnProperty.call(game.data, 'sort_result') ||
+      Object.prototype.hasOwnProperty.call(game.data, 'draw_history')
+    ))
+  );
+}
+
+function stripVolatileDrawFields(game) {
+  if (!game || typeof game !== 'object') return game || null;
+
+  const nextGame = cloneJson(game) || {};
+  delete nextGame.sort_result;
+  delete nextGame.draw_history;
+
+  if (nextGame.data && typeof nextGame.data === 'object') {
+    delete nextGame.data.sort_result;
+    delete nextGame.data.draw_history;
+  }
+
+  return nextGame;
+}
+
+function mergeGameStateWithMetaGame(game, meta = {}) {
+  const normalizedGame = normalizeGameForPresenceCutover(game);
+  const games = Array.isArray(meta.games) ? meta.games : [];
+  const activeGameId = String(meta.active_game_id || normalizedGame?.game_key || '').trim();
+
+  const metaGame = games.find((item) => {
+    const key = String(item?.game_key || item?.id || '').trim();
+    return key && (key === activeGameId || key === String(normalizedGame?.game_key || '').trim());
+  }) || games[0] || null;
+
+  if (!metaGame) return normalizedGame;
+
+  return normalizeGameForPresenceCutover({
+    ...(normalizedGame || {}),
+    ...metaGame,
+    game_key: metaGame.game_key || metaGame.id || normalizedGame?.game_key,
+  });
+}
+
 function composeState({ players = [], game = null, confirmations = [], meta = {} }) {
+  const games = Array.isArray(meta.games) ? meta.games : (game ? [normalizeGameForPresenceCutover(game)] : []);
+  const activeGame = mergeGameStateWithMetaGame(game, { ...meta, games });
+
   return {
     session: { playerId: null },
     players,
-    game: normalizeGameForPresenceCutover(game),
+    game: activeGame,
     confirmations,
     championship: meta.championship || null,
-    games: Array.isArray(meta.games) ? meta.games : (game ? [normalizeGameForPresenceCutover(game)] : []),
-    active_game_id: meta.active_game_id || game?.game_key || null,
+    games,
+    active_game_id: meta.active_game_id || activeGame?.game_key || game?.game_key || null,
     carne: Array.isArray(meta.carne) ? meta.carne : [],
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
     ui: {
@@ -105,14 +156,18 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
 }
 
 function splitState(state) {
+  const normalizedGame = normalizeGameForPresenceCutover(state.game || null);
+
   return {
     players: Array.isArray(state.players) ? state.players : [],
-    game: normalizeGameForPresenceCutover(state.game || null),
+    // Fonte única do sorteio: app_meta.data.games[].
+    // game_state guarda apenas configuração do jogo atual/presença.
+    game: stripVolatileDrawFields(normalizedGame),
     confirmations: Array.isArray(state.confirmations) ? state.confirmations : [],
     meta: {
       championship: state.championship || null,
       games: Array.isArray(state.games) ? state.games : [],
-      active_game_id: state.active_game_id || state.game?.game_key || null,
+      active_game_id: state.active_game_id || normalizedGame?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
     },
@@ -338,7 +393,9 @@ async function loadSplitState(config) {
     : [];
 
   const gameRow = Array.isArray(gameResult.data) ? gameResult.data[0] : null;
-  const normalizedGame = normalizeGameForPresenceCutover(gameRow?.data || null);
+  const rawGameData = gameRow?.data || null;
+  gameStateHadVolatileDraw = hasVolatileDrawFields(rawGameData);
+  const normalizedGame = normalizeGameForPresenceCutover(stripVolatileDrawFields(rawGameData));
   const activeGameKey = getActiveGameKey(normalizedGame);
 
   const presenceResult = await requestJson(
@@ -489,7 +546,14 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
     operations.push({
       type: 'upsert_game',
-      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: nextParts.game, updated_at: now }),
+      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
+    });
+  }
+
+  if (gameStateHadVolatileDraw && !operations.some((operation) => operation.type === 'upsert_game')) {
+    operations.push({
+      type: 'cleanup_game_draw_fields',
+      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
     });
   }
 
@@ -533,6 +597,7 @@ async function saveSplitState(config, state) {
   }
 
   rememberSplitSnapshot(state, now);
+  gameStateHadVolatileDraw = false;
 
   return {
     ok: true,

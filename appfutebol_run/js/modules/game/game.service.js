@@ -610,7 +610,8 @@ export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
 
 export function moveDrawnPlayer(playerId, fromTeamKey) {
   const snapshot = getState();
-  const sortResult = snapshot.game?.sort_result;
+  const game = activeGame(snapshot);
+  const sortResult = game?.sort_result;
 
   if (!sortResult) {
     return { ok: false, message: 'Nenhum sorteio disponível para ajustar.' };
@@ -641,17 +642,14 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
     [targetKey]: targetTeam,
     adjusted_at: new Date().toISOString(),
   };
-  const game = snapshot.game || {};
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
 
-  patchState({
-    game: {
-      ...game,
-      sort_result: adjustedDraw,
-      draw_history: drawHistory.map((entry) => (
-        String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
-      )),
-    },
+  patchActiveGame(snapshot, {
+    ...game,
+    sort_result: adjustedDraw,
+    draw_history: drawHistory.map((entry) => (
+      String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
+    )),
   });
 
   return { ok: true, message: 'Jogador movido.' };
@@ -659,11 +657,11 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
 
 export function clearTeamDraw() {
   const snapshot = getState();
-  patchState({
-    game: {
-      ...(snapshot.game || {}),
-      sort_result: null,
-    },
+  const game = activeGame(snapshot);
+  patchActiveGame(snapshot, {
+    ...game,
+    sort_result: null,
+    draw_history: [],
   });
 
   return { ok: true, message: 'Sorteio limpo.' };
