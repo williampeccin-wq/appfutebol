@@ -129,7 +129,7 @@ function createHybridStorageAdapter() {
 
       if (!isValidAppState(safeState)) {
         console.warn("[storage.adapter] blocked invalid state write", safeState);
-        return;
+        return Promise.resolve({ ok: false, reason: 'invalid_state' });
       }
 
       saveLocalState(safeState);
@@ -158,8 +158,13 @@ function createHybridStorageAdapter() {
           }
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
+          return { ok: false, reason: 'remote_save_queue_failed', error };
         });
+
+        return remoteSaveQueue;
       }
+
+      return Promise.resolve({ ok: true, reason: 'local_saved' });
     },
 
     async resetState() {
@@ -197,7 +202,7 @@ export async function getState() {
 }
 
 export function saveState(state) {
-  activeStorageAdapter.saveState(state);
+  return activeStorageAdapter.saveState(state);
 }
 
 export async function resetState() {

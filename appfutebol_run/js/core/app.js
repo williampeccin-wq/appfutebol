@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.60.0-presence-normalization-foundation';
+window.__HARMONIA_BUILD__ = 'v1.70.25-player-delete-active-flag-fix';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1462,9 +1462,25 @@ if (action === "delete-player") {
       })
     : [];
 
+  const tombstoneResult = await savePlayerLogicalDelete(player.id);
+  console.info('[players] logical delete result', tombstoneResult);
+
+  if (!tombstoneResult.ok) {
+    console.warn('[players] Falha ao persistir exclusão lógica:', tombstoneResult);
+    uiActionInFlight = false;
+    setActionBusy(trigger, null);
+    showToast("Não foi possível salvar a exclusão. Tente novamente.", "error");
+    return;
+  }
+
   const safeSnapshot = repairManualSnapshot(snapshot);
+
+  // v1.70.25: a exclusão lógica é gravada diretamente na linha do player (active=false).
+  // Não chamar savePersistedState aqui; o save completo não deve tentar reconciliar exclusão
+  // por diff de snapshot.
   replaceState(safeSnapshot);
-  savePersistedState(safeSnapshot);
+  saveLocalState(safeSnapshot);
+
   uiActionInFlight = false;
   showToast("Jogador removido", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1593,10 +1609,11 @@ document.addEventListener("change", (e) => {
 
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js";
+import { APP_VERSION } from "./version.js?v=1.70.23";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
-import { loadRemoteState } from '../services/storage.supabase.js';
+import { saveLocalState } from '../services/storage.local.js';
+import { loadRemoteState, savePlayerLogicalDelete } from '../services/storage.supabase.js?v=1.70.25';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
@@ -2405,7 +2422,14 @@ function renderHome(snapshot, currentPlayer) {
     carneNotification ? {
       icon: '🍢',
       title: 'Dupla da carne',
-      text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-')
+      text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-'),
+      html: '<div class="notification-content-carne">'
+        + '<div class="home-carne-avatars">'
+        + (carneNotification.player1Record ? renderAvatarForApp(carneNotification.player1Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
+        + (carneNotification.player2Record ? renderAvatarForApp(carneNotification.player2Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
+        + '</div>'
+        + '<div class="home-carne-text"><span>' + escapeHtml(String(carneNotification.player1 || '-')) + '</span><span>e</span><span>' + escapeHtml(String(carneNotification.player2 || '-')) + '</span></div>'
+        + '</div>'
     } : null,
     ...birthdayNotifications.map((notification) => ({
       icon: '🎂',
@@ -2460,7 +2484,7 @@ function renderHome(snapshot, currentPlayer) {
         </div>
         <div class="home-v2-metric">
           <strong>${homeGoalkeeperCount}/2</strong>
-          <span>Gols</span>
+          <span>Goleiros</span>
         </div>
         <div class="home-v2-metric">
           <strong>${waitlistCount}</strong>
@@ -2507,7 +2531,7 @@ function renderHome(snapshot, currentPlayer) {
           </div>
         </div>
         <div class="home-v2-notices">
-          ${homeNoticeItems.length ? homeNoticeItems.map((item) => '<div class="home-v2-notice"><span>' + item.icon + '</span><div><strong>' + item.title + '</strong><small>' + item.text + '</small></div></div>').join('') : '<span class="home-v2-empty">Sem notificações por enquanto.</span>'}
+          ${homeNoticeItems.length ? homeNoticeItems.map((item) => '<div class="home-v2-notice"><span>' + item.icon + '</span><div><strong>' + escapeHtml(item.title) + '</strong><small>' + (item.html || escapeHtml(item.text || '')) + '</small></div></div>').join('') : '<span class="home-v2-empty">Sem notificações por enquanto.</span>'}
         </div>
       </section>
 

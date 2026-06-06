@@ -133,20 +133,59 @@ function mergeGameStateWithMetaGame(game, meta = {}) {
   });
 }
 
+function normalizeDeletedPlayerIds(meta = {}) {
+  return Array.isArray(meta.deleted_player_ids)
+    ? [...new Set(meta.deleted_player_ids.map((id) => String(id)).filter(Boolean))]
+    : [];
+}
+
+function normalizeDeletedPlayerPhones(meta = {}) {
+  return Array.isArray(meta.deleted_player_phones)
+    ? [...new Set(meta.deleted_player_phones.map((phone) => String(phone || '').replace(/\D/g, '')).filter(Boolean))]
+    : [];
+}
+
+function isDeletedPlayerRecord(player, deletedIds, deletedPhones) {
+  if (!player) return false;
+  const playerId = String(player.id || '');
+  const phone = String(player.phone || '').replace(/\D/g, '');
+  const logicallyInactive = player.active === false || player.deleted === true || !!player.deleted_at;
+  return logicallyInactive || deletedIds.includes(playerId) || (phone && deletedPhones.includes(phone));
+}
+
 function composeState({ players = [], game = null, confirmations = [], meta = {} }) {
   const games = Array.isArray(meta.games) ? meta.games : (game ? [normalizeGameForPresenceCutover(game)] : []);
   const activeGame = mergeGameStateWithMetaGame(game, { ...meta, games });
+  const deletedPlayerIds = normalizeDeletedPlayerIds(meta);
+  const deletedPlayerPhones = normalizeDeletedPlayerPhones(meta);
+  const visiblePlayers = Array.isArray(players)
+    ? players.filter((player) => !isDeletedPlayerRecord(player, deletedPlayerIds, deletedPlayerPhones))
+    : [];
+  const visiblePlayerIds = new Set(visiblePlayers.map((player) => String(player.id)));
+  const visibleConfirmations = Array.isArray(confirmations)
+    ? confirmations.filter((entry) => visiblePlayerIds.has(String(entry?.player_id)))
+    : [];
+  const visibleCarne = Array.isArray(meta.carne)
+    ? meta.carne.filter((entry) => {
+        if (entry?.type === 'carne_schedule') {
+          return visiblePlayerIds.has(String(entry.player1_id)) && visiblePlayerIds.has(String(entry.player2_id));
+        }
+        return visiblePlayerIds.has(String(entry?.player_id));
+      })
+    : [];
 
   return {
     session: { playerId: null },
-    players,
+    players: visiblePlayers,
     game: activeGame,
-    confirmations,
+    confirmations: visibleConfirmations,
     championship: meta.championship || null,
     games,
     active_game_id: meta.active_game_id || activeGame?.game_key || game?.game_key || null,
-    carne: Array.isArray(meta.carne) ? meta.carne : [],
+    carne: visibleCarne,
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
+    deleted_player_ids: deletedPlayerIds,
+    deleted_player_phones: deletedPlayerPhones,
     ui: {
       currentTab: 'home',
       authMode: 'login',
@@ -170,6 +209,8 @@ function splitState(state) {
       active_game_id: state.active_game_id || normalizedGame?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
+      deleted_player_ids: Array.isArray(state.deleted_player_ids) ? state.deleted_player_ids.map((id) => String(id)) : [],
+      deleted_player_phones: Array.isArray(state.deleted_player_phones) ? state.deleted_player_phones.map((phone) => String(phone)) : [],
     },
   };
 }
@@ -517,7 +558,15 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   // HOTFIX v1.70.14
   // Nunca deletar players automaticamente por diff de snapshot.
   // Exclusão de jogador deve ser ação explícita.
+  const explicitDeletedPlayerIds = new Set(
+    (Array.isArray(nextParts.meta?.deleted_player_ids) ? nextParts.meta.deleted_player_ids : [])
+      .map((playerId) => String(playerId))
+      .filter(Boolean)
+  );
 
+  // v1.70.20: exclusão de jogador é lógica.
+  // Não deletar public.players aqui. O tombstone em app_meta é a fonte de verdade
+  // para ocultar o jogador sem destruir histórico de campeonato/carne/presença.
 
   // v1.60.70: multiple future games preserve previous game confirmations.
 
@@ -541,6 +590,18 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   // HOTFIX v1.70.14
   // Nunca deletar confirmações automaticamente por diff de snapshot.
   // Remoções devem ocorrer por fluxo explícito do domínio.
+  for (const playerId of previousConfirmations.keys()) {
+    if (!nextConfirmations.has(playerId) && explicitDeletedPlayerIds.has(String(playerId))) {
+      operations.push({
+        type: 'delete_presence_confirmation_explicit',
+        run: () => requestNoContent(
+          config,
+          tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}&player_id=eq.${encodeURIComponent(String(playerId))}`),
+          { method: 'DELETE' }
+        ),
+      });
+    }
+  }
 
 
   if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
@@ -644,6 +705,165 @@ export async function saveRemoteState(state, _options = {}) {
     console.warn('[storage.supabase] save failed; local storage remains available', error);
     return { ok: false, conflict: false, reason: 'single_source_save_exception' };
   }
+}
+
+
+export async function savePlayerLogicalDelete(playerId) {
+  const config = getConfig();
+
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'supabase_not_configured' };
+  }
+
+  const normalizedId = String(playerId || '').trim();
+
+  if (!normalizedId) {
+    return { ok: false, reason: 'missing_player_id' };
+  }
+
+  const currentResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+    { method: 'GET' }
+  );
+
+  if (!currentResult.ok) {
+    return { ok: false, reason: `load_player_failed_${currentResult.status}`, status: currentResult.status, body: currentResult.body };
+  }
+
+  const row = Array.isArray(currentResult.data) ? currentResult.data[0] : null;
+
+  if (!row) {
+    return { ok: false, reason: 'player_not_found' };
+  }
+
+  const now = new Date().toISOString();
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const nextData = {
+    ...currentData,
+    id: normalizedId,
+    active: false,
+    deleted: true,
+    deleted_at: now,
+    deleted_by_auth_user_id: getCurrentAuthUserId(),
+  };
+
+  const patchResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at`),
+    {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        data: nextData,
+        updated_at: now,
+      }),
+    }
+  );
+
+  if (!patchResult.ok) {
+    return { ok: false, reason: `save_player_logical_delete_failed_${patchResult.status}`, status: patchResult.status, body: patchResult.body };
+  }
+
+  const savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  const savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : null;
+
+  if (!savedData || savedData.active !== false || savedData.deleted !== true) {
+    return {
+      ok: false,
+      reason: 'save_player_logical_delete_did_not_persist',
+      status: patchResult.status,
+      body: JSON.stringify(patchResult.data || null),
+    };
+  }
+
+  if (lastSplitSnapshot?.players) {
+    lastSplitSnapshot.players = lastSplitSnapshot.players.filter((player) => String(player?.id) !== normalizedId);
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = savedRow?.updated_at || now;
+
+  return { ok: true, reason: 'player_logical_delete_saved_on_player_row', updatedAt: lastRemoteUpdatedAt };
+}
+
+export async function savePlayerDeletionTombstone(playerId, phone = '') {
+  const config = getConfig();
+
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'supabase_not_configured' };
+  }
+
+  const normalizedId = String(playerId || '').trim();
+  const normalizedPhone = String(phone || '').replace(/\D/g, '');
+
+  if (!normalizedId) {
+    return { ok: false, reason: 'missing_player_id' };
+  }
+
+  const currentResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'),
+    { method: 'GET' }
+  );
+
+  if (!currentResult.ok) {
+    return { ok: false, reason: `load_meta_failed_${currentResult.status}`, status: currentResult.status, body: currentResult.body };
+  }
+
+  const row = Array.isArray(currentResult.data) ? currentResult.data[0] : null;
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const deletedIds = Array.isArray(currentData.deleted_player_ids) ? currentData.deleted_player_ids.map((id) => String(id)) : [];
+  const deletedPhones = Array.isArray(currentData.deleted_player_phones) ? currentData.deleted_player_phones.map((value) => String(value || '').replace(/\D/g, '')).filter(Boolean) : [];
+
+  const nextData = {
+    ...currentData,
+    deleted_player_ids: [...new Set([...deletedIds, normalizedId])],
+    deleted_player_phones: [...new Set([...deletedPhones, normalizedPhone].filter(Boolean))],
+  };
+
+  const now = new Date().toISOString();
+
+  // v1.70.21: gravar tombstone por PATCH direto no app_meta existente.
+  // O POST/upsert genérico pode ser bloqueado por políticas/triggers de insert
+  // e mascarar a exclusão lógica. Aqui a operação é explicitamente UPDATE.
+  const patchResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at'),
+    {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        data: nextData,
+        updated_at: now,
+      }),
+    }
+  );
+
+  if (!patchResult.ok) {
+    return { ok: false, reason: `save_meta_patch_failed_${patchResult.status}`, status: patchResult.status, body: patchResult.body };
+  }
+
+  const savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  const savedIds = Array.isArray(savedRow?.data?.deleted_player_ids)
+    ? savedRow.data.deleted_player_ids.map((id) => String(id))
+    : [];
+
+  if (!savedIds.includes(normalizedId)) {
+    return {
+      ok: false,
+      reason: 'save_meta_patch_did_not_persist_tombstone',
+      status: patchResult.status,
+      body: JSON.stringify(patchResult.data || null),
+    };
+  }
+
+  if (lastSplitSnapshot?.meta) {
+    lastSplitSnapshot.meta = cloneJson(nextData);
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = savedRow?.updated_at || now;
+
+  return { ok: true, reason: 'player_deletion_tombstone_saved_by_patch', updatedAt: lastRemoteUpdatedAt };
 }
 
 export function getSupabaseMeta() {
