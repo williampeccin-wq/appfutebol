@@ -4935,3 +4935,299 @@ button {
   line-height: 1.25;
 }
 
+
+/* v1.70.17 - login somente entrar e avatares da carne na Home */
+.auth-tabs-single {
+  grid-template-columns: 1fr;
+}
+
+.home-v2-notice .notification-content-carne {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-v2-notice .home-carne-avatars {
+  display: inline-flex;
+  align-items: center;
+}
+
+.home-v2-notice .home-carne-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  flex: 0 0 34px !important;
+  font-size: 13px !important;
+}
+
+.home-v2-notice .home-carne-avatar + .home-carne-avatar {
+  margin-left: -8px;
+}
+
+.home-v2-notice .home-carne-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+
+/* v1.70.27 - visualizacao segura jogo a jogo do campeonato */
+.championship-rounds-card {
+  overflow: visible;
+}
+
+.championship-round-matrix-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.championship-round-matrix-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.championship-round-matrix-table th,
+.championship-round-matrix-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.championship-round-matrix-table th {
+  color: #475569;
+  background: #f8fafc;
+  font-size: 0.7rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.championship-round-matrix-table tbody tr:nth-child(odd) td {
+  background: #f8fbff;
+}
+
+.championship-round-matrix-table tbody tr:hover td {
+  background: #eef6ff;
+}
+
+.championship-round-matrix-table .round-matrix-player {
+  min-width: 132px;
+  text-align: left;
+}
+
+.round-matrix-cell {
+  display: inline-flex;
+  min-width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.round-matrix-cell.is-win,
+.championship-round-matrix-legend b.is-win {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.round-matrix-cell.is-draw,
+.championship-round-matrix-legend b.is-draw {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.round-matrix-cell.is-loss,
+.championship-round-matrix-legend b.is-loss {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.round-matrix-cell.is-no-play,
+.championship-round-matrix-legend b.is-no-play {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.championship-round-matrix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.championship-round-matrix-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.championship-round-matrix-legend b {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+
+
+/* v1.70.28 - campeonato: classificacao e rodadas na mesma tabela */
+.championship-current-ranking-card.championship-rounds-card .championship-round-matrix-wrap {
+  margin-top: 14px;
+}
+
+.championship-round-matrix-table th:nth-child(1),
+.championship-round-matrix-table td:nth-child(1) {
+  width: 38px;
+  min-width: 38px;
+}
+
+.championship-round-matrix-table th:nth-child(2),
+.championship-round-matrix-table td:nth-child(2) {
+  min-width: 132px;
+}
+
+.championship-round-matrix-table th:nth-child(3),
+.championship-round-matrix-table td:nth-child(3) {
+  font-weight: 900;
+}
+
+@media (min-width: 760px) {
+  .championship-round-matrix-table th:nth-child(1),
+  .championship-round-matrix-table td:nth-child(1),
+  .championship-round-matrix-table th:nth-child(2),
+  .championship-round-matrix-table td:nth-child(2) {
+    position: sticky;
+    z-index: 2;
+  }
+
+  .championship-round-matrix-table th:nth-child(1),
+  .championship-round-matrix-table td:nth-child(1) {
+    left: 0;
+  }
+
+  .championship-round-matrix-table th:nth-child(2),
+  .championship-round-matrix-table td:nth-child(2) {
+    left: 38px;
+    box-shadow: 8px 0 12px rgba(15, 23, 42, 0.06);
+  }
+
+  .championship-round-matrix-table th:nth-child(1),
+  .championship-round-matrix-table th:nth-child(2) {
+    z-index: 3;
+  }
+}
+
+/* v1.70.31 - campeonato: estabiliza scroll horizontal da matriz jogo a jogo */
+.championship-round-matrix-wrap {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+.championship-round-matrix-table {
+  table-layout: auto;
+}
+
+.championship-round-matrix-table th,
+.championship-round-matrix-table td {
+  box-sizing: border-box;
+}
+
+.championship-round-matrix-table th:nth-child(1),
+.championship-round-matrix-table td:nth-child(1),
+.championship-round-matrix-table th:nth-child(2),
+.championship-round-matrix-table td:nth-child(2) {
+  position: sticky;
+  z-index: 4;
+}
+
+.championship-round-matrix-table th:nth-child(1),
+.championship-round-matrix-table td:nth-child(1) {
+  left: 0;
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
+}
+
+.championship-round-matrix-table th:nth-child(2),
+.championship-round-matrix-table td:nth-child(2) {
+  left: 38px;
+  min-width: 128px;
+  max-width: 128px;
+  box-shadow: 10px 0 14px rgba(15, 23, 42, 0.08);
+}
+
+.championship-round-matrix-table th:nth-child(1),
+.championship-round-matrix-table th:nth-child(2) {
+  z-index: 6;
+  background: #f8fafc;
+}
+
+.championship-round-matrix-table tbody td:nth-child(1),
+.championship-round-matrix-table tbody td:nth-child(2) {
+  background: #fff;
+}
+
+.championship-round-matrix-table tbody tr:nth-child(odd) td:nth-child(1),
+.championship-round-matrix-table tbody tr:nth-child(odd) td:nth-child(2) {
+  background: #f8fbff;
+}
+
+.championship-round-matrix-table tbody tr:hover td:nth-child(1),
+.championship-round-matrix-table tbody tr:hover td:nth-child(2) {
+  background: #eef6ff;
+}
+
+.championship-round-matrix-table th:nth-child(n+3),
+.championship-round-matrix-table td:nth-child(n+3) {
+  min-width: 34px;
+}
+
+.championship-round-matrix-table th:nth-child(n+9),
+.championship-round-matrix-table td:nth-child(n+9) {
+  min-width: 42px;
+}
+
+@media (max-width: 520px) {
+  .championship-round-matrix-table th,
+  .championship-round-matrix-table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  .championship-round-matrix-table th:nth-child(1),
+  .championship-round-matrix-table td:nth-child(1) {
+    width: 34px;
+    min-width: 34px;
+    max-width: 34px;
+  }
+
+  .championship-round-matrix-table th:nth-child(2),
+  .championship-round-matrix-table td:nth-child(2) {
+    left: 34px;
+    min-width: 124px;
+    max-width: 124px;
+  }
+
+  .championship-round-matrix-table .round-matrix-player strong {
+    display: inline-block;
+    max-width: 106px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+}

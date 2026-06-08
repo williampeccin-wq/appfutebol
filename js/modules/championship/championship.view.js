@@ -15,6 +15,7 @@ import {
   getChampionshipDrawOptions,
   getTeamOutcomeLabel,
   getManualChampionshipResults,
+  getChampionshipRoundMatrix,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml } from '../players/players.service.js';
@@ -125,6 +126,63 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
           `).join('')}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+
+function getRoundCellClass(points) {
+  if (Number(points) === 3) return 'is-win';
+  if (Number(points) === 2) return 'is-draw';
+  if (Number(points) === 1) return 'is-loss';
+  return 'is-no-play';
+}
+
+function renderRoundByRoundTable(snapshot) {
+  const matrix = getChampionshipRoundMatrix(snapshot);
+
+  if (!matrix.rounds.length) {
+    return '<div class="empty-state">Nenhuma rodada disponível para detalhar.</div>';
+  }
+
+  return `
+    <div class="championship-round-matrix-wrap">
+      <table class="championship-round-matrix-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Atleta</th>
+            <th>P</th>
+            <th>V</th>
+            <th>E</th>
+            <th>D</th>
+            <th>WO</th>
+            <th>Ap</th>
+            ${matrix.rounds.map((round) => `<th title="${escapeHtml(round.date)}${round.imported ? ' · importado' : ''}">${escapeHtml(round.label)}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${matrix.rows.map((row) => `
+            <tr>
+              <td><strong>${row.rank || '-'}</strong></td>
+              <td class="round-matrix-player"><strong>${escapeHtml(row.name)}</strong></td>
+              <td><strong>${row.points}</strong></td>
+              <td>${row.wins}</td>
+              <td>${row.draws}</td>
+              <td>${row.losses}</td>
+              <td>${row.no_play}</td>
+              <td>${row.availability}%</td>
+              ${row.cells.map((cell) => `<td><span class="round-matrix-cell ${getRoundCellClass(cell.points)}" title="${escapeHtml(getStatusLabel(cell.status))}">${cell.points}</span></td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="championship-round-matrix-legend">
+      <span><b class="is-win">3</b> Vitória</span>
+      <span><b class="is-draw">2</b> Empate</span>
+      <span><b class="is-loss">1</b> Derrota</span>
+      <span><b class="is-no-play">0</b> Não jogou / WO</span>
     </div>
   `;
 }
@@ -345,10 +403,10 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      <section class="card championship-current-ranking-card">
+      <section class="card championship-current-ranking-card championship-rounds-card">
         <div class="card-title">Classificação atual · Inverno 26</div>
-        <p class="footer-note">Este é o bloco principal da aba. Ele usa a planilha inicial importada e todos os resultados lançados no app.</p>
-        ${renderRankingTable(currentRanking, { snapshot })}
+        <p class="footer-note">Tabela no modelo da planilha: pontuação, vitórias, empates, derrotas, WO/aproveitamento e cada rodada na mesma linha.</p>
+        ${renderRoundByRoundTable(snapshot)}
       </section>
 
       ${renderResultForm(snapshot, currentPlayer)}

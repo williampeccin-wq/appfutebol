@@ -1,7 +1,7 @@
 import { APP_VERSION } from "../../core/version.js";
 
 export function renderAuthScreen(uiState = {}) {
-  const mode = uiState.authMode === 'register' ? 'register' : 'login';
+  const mode = 'login';
   const message = uiState.authMessage;
 
   return `
@@ -11,9 +11,8 @@ export function renderAuthScreen(uiState = {}) {
       <div class="login-subtitle">Login com telefone e senha.</div>
 
       <section class="auth-card">
-        <div class="auth-tabs">
-          <button class="auth-tab ${mode === 'login' ? 'is-active' : ''}" type="button" data-auth-mode="login">Entrar</button>
-          <button class="auth-tab ${mode === 'register' ? 'is-active' : ''}" type="button" data-auth-mode="register">Cadastrar</button>
+        <div class="auth-tabs auth-tabs-single">
+          <button class="auth-tab is-active" type="button" data-auth-mode="login">Entrar</button>
         </div>
 
         ${message ? `<div class="message-box ${message.type === 'success' ? 'is-success' : 'is-error'}">${message.text}</div>` : ''}

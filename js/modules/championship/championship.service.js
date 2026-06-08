@@ -589,6 +589,68 @@ export function calculateAnnualRanking(snapshot) {
   return applyRanks(rows.sort(compareRows));
 }
 
+
+export function getChampionshipRoundMatrix(snapshot) {
+  const players = getFootballPlayers(snapshot);
+  const ranking = calculateCurrentRanking(snapshot);
+  const rankByPlayerId = new Map(ranking.map((row) => [String(row.player_id), row.rank]));
+  const results = getEffectiveChampionshipResults(snapshot);
+
+  const rounds = results.map((result) => ({
+    id: String(result.id || result.date || ''),
+    date: String(result.date || ''),
+    label: formatShortRoundDate(result.date),
+    imported: !!result.imported,
+    source: result.source || '',
+    outcome: result.outcome || null,
+  }));
+
+  const rows = players.map((player) => {
+    const cells = results.map((result) => {
+      const rawStatus = result.statuses?.[String(player.id)];
+      const status = Object.prototype.hasOwnProperty.call(POINTS_BY_STATUS, rawStatus) ? rawStatus : 'no_play';
+      return {
+        result_id: String(result.id || ''),
+        date: String(result.date || ''),
+        status,
+        points: POINTS_BY_STATUS[status] || 0,
+      };
+    });
+
+    const wins = cells.filter((cell) => cell.status === 'win').length;
+    const draws = cells.filter((cell) => cell.status === 'draw').length;
+    const losses = cells.filter((cell) => cell.status === 'loss').length;
+    const no_play = cells.filter((cell) => cell.status === 'no_play').length;
+    const points = cells.reduce((total, cell) => total + Number(cell.points || 0), 0);
+    const played = wins + draws + losses;
+    const availability = results.length ? Math.round((played / results.length) * 100) : 0;
+
+    return {
+      player_id: String(player.id),
+      name: player.name || 'Sem nome',
+      position: player.position || '',
+      rank: rankByPlayerId.get(String(player.id)) || null,
+      points,
+      wins,
+      draws,
+      losses,
+      no_play,
+      played,
+      availability,
+      cells,
+    };
+  }).sort(compareRows);
+
+  return { rounds, rows };
+}
+
+function formatShortRoundDate(value) {
+  if (!value) return '--/--';
+  const [year, month, day] = String(value).split('-');
+  if (!year || !month || !day) return String(value || '--/--');
+  return `${day}/${month}`;
+}
+
 export function getActiveChampionshipMeta(snapshot) {
   const championship = getChampionshipState(snapshot);
   return {
