@@ -866,6 +866,154 @@ export async function savePlayerDeletionTombstone(playerId, phone = '') {
   return { ok: true, reason: 'player_deletion_tombstone_saved_by_patch', updatedAt: lastRemoteUpdatedAt };
 }
 
+export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
+  const config = getConfig();
+
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'supabase_not_configured' };
+  }
+
+  const normalizedPhone = String(phone || '').replace(/\D/g, '');
+
+  if (!normalizedPhone) {
+    return { ok: false, reason: 'missing_phone' };
+  }
+
+  const [playersResult, metaResult] = await Promise.all([
+    requestJson(
+      config,
+      tableUrl(config, SPLIT_TABLES.players, `data->>phone=eq.${encodeURIComponent(normalizedPhone)}&select=id,auth_user_id,is_admin,data,updated_at`),
+      { method: 'GET' }
+    ),
+    requestJson(
+      config,
+      tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'),
+      { method: 'GET' }
+    ),
+  ]);
+
+  if (!playersResult.ok) {
+    return { ok: false, reason: `load_player_by_phone_failed_${playersResult.status}`, status: playersResult.status, body: playersResult.body };
+  }
+
+  if (!metaResult.ok) {
+    return { ok: false, reason: `load_meta_failed_${metaResult.status}`, status: metaResult.status, body: metaResult.body };
+  }
+
+  const metaRow = Array.isArray(metaResult.data) ? metaResult.data[0] : null;
+  const currentMeta = metaRow?.data && typeof metaRow.data === 'object' ? metaRow.data : {};
+  const deletedIds = normalizeDeletedPlayerIds(currentMeta);
+  const deletedPhones = normalizeDeletedPlayerPhones(currentMeta);
+
+  const rows = Array.isArray(playersResult.data) ? playersResult.data : [];
+  const deletedRows = rows.filter((row) => {
+    const data = row?.data && typeof row.data === 'object' ? row.data : {};
+    const rowPhone = String(data.phone || '').replace(/\D/g, '');
+    return (
+      rowPhone === normalizedPhone &&
+      (
+        data.active === false ||
+        data.deleted === true ||
+        !!data.deleted_at ||
+        deletedIds.includes(String(row.id || data.id || '')) ||
+        deletedPhones.includes(normalizedPhone)
+      )
+    );
+  });
+
+  const row = deletedRows[0] || null;
+
+  if (!row) {
+    return { ok: false, reason: 'deleted_player_not_found_for_phone' };
+  }
+
+  const playerId = String(row.id || row.data?.id || '').trim();
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const now = new Date().toISOString();
+  const nextData = {
+    ...currentData,
+    ...updates,
+    id: playerId,
+    phone: normalizedPhone,
+    active: true,
+    deleted: false,
+  };
+
+  delete nextData.deleted_at;
+  delete nextData.deleted_by_auth_user_id;
+
+  const nextAuthUserId = nextData.auth_user_id || row.auth_user_id || null;
+  const nextIsAdmin = nextData.is_admin === true || row.is_admin === true;
+
+  if (nextAuthUserId) {
+    nextData.auth_user_id = nextAuthUserId;
+  }
+  nextData.is_admin = nextIsAdmin;
+
+  const patchPlayerResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(playerId)}&select=id,auth_user_id,is_admin,data,updated_at`),
+    {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        auth_user_id: nextAuthUserId,
+        is_admin: nextIsAdmin,
+        data: nextData,
+        updated_at: now,
+      }),
+    }
+  );
+
+  if (!patchPlayerResult.ok) {
+    return { ok: false, reason: `restore_player_failed_${patchPlayerResult.status}`, status: patchPlayerResult.status, body: patchPlayerResult.body };
+  }
+
+  const nextMeta = {
+    ...currentMeta,
+    deleted_player_ids: deletedIds.filter((id) => id !== playerId),
+    deleted_player_phones: deletedPhones.filter((value) => value !== normalizedPhone),
+  };
+
+  const patchMetaResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at'),
+    {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        data: nextMeta,
+        updated_at: now,
+      }),
+    }
+  );
+
+  if (!patchMetaResult.ok) {
+    return { ok: false, reason: `restore_meta_tombstone_cleanup_failed_${patchMetaResult.status}`, status: patchMetaResult.status, body: patchMetaResult.body };
+  }
+
+  const savedRow = Array.isArray(patchPlayerResult.data) ? patchPlayerResult.data[0] : null;
+  const savedPlayer = savedRow ? {
+    ...(savedRow.data || {}),
+    id: savedRow.id || savedRow.data?.id,
+    auth_user_id: savedRow.auth_user_id || savedRow.data?.auth_user_id || null,
+    is_admin: savedRow.is_admin === true,
+  } : { ...nextData, auth_user_id: nextAuthUserId, is_admin: nextIsAdmin };
+
+  if (lastSplitSnapshot) {
+    lastSplitSnapshot.meta = cloneJson(nextMeta);
+    const currentPlayers = Array.isArray(lastSplitSnapshot.players) ? lastSplitSnapshot.players : [];
+    lastSplitSnapshot.players = [
+      ...currentPlayers.filter((player) => String(player?.id) !== playerId),
+      savedPlayer,
+    ];
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = now;
+
+  return { ok: true, reason: 'deleted_player_restored_by_phone', player: savedPlayer, updatedAt: now };
+}
+
 export function getSupabaseMeta() {
   const config = getConfig();
   return {

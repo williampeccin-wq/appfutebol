@@ -1,4 +1,4 @@
-window.__HARMONIA_BUILD__ = 'v1.70.25-player-delete-active-flag-fix';
+window.__HARMONIA_BUILD__ = 'v1.70.30-restore-deleted-player-by-phone-dev';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1104,6 +1104,56 @@ document.addEventListener("click", async (e) => {
 
   const isEditing = !!editingPlayerId;
 
+  if (!isEditing) {
+    const restoreResult = await restoreDeletedPlayerByPhone(phone, {
+      name,
+      phone,
+      birthDate,
+      plays_football: role === "player",
+      in_carne_group: true,
+      position: role === "player" ? position : null,
+      mens_ok: role === "player" ? !!mens_ok : false,
+      is_admin: !!is_admin,
+      ...(photoDataUrl ? { photoDataUrl } : {}),
+    });
+
+    if (restoreResult.ok) {
+      const remoteResult = await loadRemoteState();
+      const nextSnapshot = remoteResult.ok && remoteResult.state ? repairManualSnapshot(remoteResult.state) : repairManualSnapshot({
+        ...snapshot,
+        players: [
+          ...snapshot.players.filter((player) => normalizeAdminPhone(player.phone) !== phone),
+          restoreResult.player,
+        ],
+        deleted_player_ids: Array.isArray(snapshot.deleted_player_ids)
+          ? snapshot.deleted_player_ids.filter((playerId) => String(playerId) !== String(restoreResult.player?.id || ''))
+          : [],
+        deleted_player_phones: Array.isArray(snapshot.deleted_player_phones)
+          ? snapshot.deleted_player_phones.filter((deletedPhone) => normalizeAdminPhone(deletedPhone) !== phone)
+          : [],
+      });
+
+      replaceState(nextSnapshot);
+      saveLocalState(nextSnapshot);
+      editingPlayerId = null;
+      setPlayerFormMode(false);
+      resetPlayerForm();
+      clearActionBusy(trigger);
+      uiActionInFlight = false;
+      showToast("Jogador restaurado com sucesso", "success");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    if (restoreResult.reason && restoreResult.reason !== 'deleted_player_not_found_for_phone') {
+      console.warn('[players] Falha ao verificar/restaurar jogador excluído:', restoreResult);
+      clearActionBusy(trigger);
+      uiActionInFlight = false;
+      showToast("Não foi possível verificar jogador excluído com este telefone. Tente novamente.", "error");
+      return;
+    }
+  }
+
   if (editingPlayerId) {
     const playerToEdit = snapshot.players.find((p) => p.id === editingPlayerId);
     if (!playerToEdit) {
@@ -1132,9 +1182,11 @@ document.addEventListener("click", async (e) => {
       plays_football: role === "player",
       in_carne_group: true,
       position: role === "player" ? position : null,
-      mens_ok,
-      is_admin,
-      photoDataUrl
+      mens_ok: role === "player" ? !!mens_ok : false,
+      is_admin: !!is_admin,
+      photoDataUrl,
+      active: true,
+      deleted: false
     });
   }
 
@@ -1613,7 +1665,7 @@ import { APP_VERSION } from "./version.js?v=1.70.23";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, savePlayerLogicalDelete } from '../services/storage.supabase.js?v=1.70.25';
+import { loadRemoteState, savePlayerLogicalDelete, restoreDeletedPlayerByPhone } from '../services/storage.supabase.js?v=1.70.29';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
