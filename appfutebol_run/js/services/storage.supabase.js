@@ -654,7 +654,7 @@ async function saveSplitState(config, state) {
   const failed = results.find((result) => !result.ok);
 
   if (failed) {
-    return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}` };
+    return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}`, status: failed.status, body: failed.body || '' };
   }
 
   rememberSplitSnapshot(state, now);

@@ -28,15 +28,40 @@ function isValidAppState(snapshot) {
   );
 }
 
-function hasStoredAccessToken() {
+function getStoredAuthSession() {
   try {
     const raw = localStorage.getItem("harmonia_auth_session");
-    if (!raw) return false;
-    const session = JSON.parse(raw);
-    return !!session?.access_token;
+    return raw ? JSON.parse(raw) : null;
   } catch (_error) {
-    return false;
+    localStorage.removeItem("harmonia_auth_session");
+    return null;
   }
+}
+
+function hasStoredAccessToken() {
+  return !!getStoredAuthSession()?.access_token;
+}
+
+function isStoredSessionExpired(skewSeconds = 15) {
+  const session = getStoredAuthSession();
+  const expiresAt = Number(session?.expires_at || 0);
+  if (!session?.access_token || !expiresAt) return false;
+  return Math.floor(Date.now() / 1000) >= (expiresAt - skewSeconds);
+}
+
+function clearStoredAuthSession() {
+  localStorage.removeItem("harmonia_auth_session");
+}
+
+function notifySessionExpired(reason = "expired_session") {
+  clearStoredAuthSession();
+  window.dispatchEvent(new CustomEvent("harmonia:session-expired", {
+    detail: { reason },
+  }));
+}
+
+function hasOperationalSession(state) {
+  return !!(state?.session?.playerId || state?.session?.authUserId || getStoredAuthSession()?.user?.id);
 }
 
 function getSafeLocalSnapshot() {
@@ -51,14 +76,7 @@ function getSafeLocalSnapshot() {
 }
 
 function getStoredAuthUserId() {
-  try {
-    const raw = localStorage.getItem("harmonia_auth_session");
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    return session?.user?.id || null;
-  } catch (_error) {
-    return null;
-  }
+  return getStoredAuthSession()?.user?.id || null;
 }
 
 function resolveSessionFromAuth(remoteSnapshot, localSnapshot) {
@@ -103,6 +121,15 @@ function createHybridStorageAdapter() {
         return localSnapshot;
       }
 
+      if (isStoredSessionExpired()) {
+        notifySessionExpired("expired_before_load");
+        return {
+          ...localSnapshot,
+          session: { playerId: null, authUserId: null },
+          ui: { ...DEFAULT_UI, authMessage: null },
+        };
+      }
+
       const remote = await loadRemoteState();
 
       if (remote.ok && isValidAppState(remote.state)) {
@@ -132,6 +159,13 @@ function createHybridStorageAdapter() {
         return Promise.resolve({ ok: false, reason: 'invalid_state' });
       }
 
+      if (isSupabaseConfigured() && hasOperationalSession(safeState)) {
+        if (!hasStoredAccessToken() || isStoredSessionExpired()) {
+          notifySessionExpired("expired_before_save");
+          return Promise.resolve({ ok: false, reason: "expired_session" });
+        }
+      }
+
       saveLocalState(safeState);
 
       if (isSupabaseConfigured() && hasStoredAccessToken()) {
@@ -155,6 +189,9 @@ function createHybridStorageAdapter() {
 
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
+            if (result.status === 401 || result.status === 403 || /401|403|jwt|token|session/i.test(String(result.reason || ""))) {
+              notifySessionExpired(result.reason || "remote_save_auth_failed");
+            }
           }
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);

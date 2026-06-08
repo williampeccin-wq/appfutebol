@@ -1,4 +1,22 @@
-window.__HARMONIA_BUILD__ = 'v1.70.30-restore-deleted-player-by-phone-dev';
+import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
+import { validateAndRepairState } from "../domain/state.guard.js";
+import { APP_VERSION } from "./version.js?v=1.70.32";
+import { getState, patchState, replaceState, subscribe } from './state.js';
+import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
+import { saveLocalState } from '../services/storage.local.js';
+import { loadRemoteState, savePlayerLogicalDelete, restoreDeletedPlayerByPhone } from '../services/storage.supabase.js?v=1.70.32';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword, clearAuthSession } from '../services/auth.service.js';
+import { renderAuthScreen } from '../modules/auth/auth.view.js';
+import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
+import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
+import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
+import { hasCapacity } from '../modules/game/game.service.js';
+import { canConfirm } from '../modules/finance/finance.service.js';
+import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
+import { SUPABASE_CONFIG } from "../config/supabase.config.js";
+
+window.__HARMONIA_BUILD__ = 'v1.70.32-session-expiration-hardening';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1659,23 +1677,6 @@ document.addEventListener("change", (e) => {
   }
 });
 
-import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
-import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js?v=1.70.23";
-import { getState, patchState, replaceState, subscribe } from './state.js';
-import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
-import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, savePlayerLogicalDelete, restoreDeletedPlayerByPhone } from '../services/storage.supabase.js?v=1.70.29';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
-import { renderAuthScreen } from '../modules/auth/auth.view.js';
-import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
-import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
-import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
-import { hasCapacity } from '../modules/game/game.service.js';
-import { canConfirm } from '../modules/finance/finance.service.js';
-import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
-import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 
 const appElement = document.getElementById('app');
 
@@ -1715,6 +1716,10 @@ async function init() {
 }
 
 function bindGlobalSystemEvents() {
+  window.addEventListener('harmonia:session-expired', () => {
+    handleExpiredSession();
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -1731,6 +1736,39 @@ function bindGlobalSystemEvents() {
   });
 }
 
+function handleExpiredSession() {
+  clearAuthSession();
+  showExpiredSessionModal();
+}
+
+function showExpiredSessionModal() {
+  document.querySelector('.session-expired-modal-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-modal-overlay session-expired-modal-overlay';
+  overlay.innerHTML = `
+    <div class="confirm-modal session-expired-modal" role="alertdialog" aria-modal="true" aria-labelledby="session-expired-title">
+      <div class="confirm-modal-title" id="session-expired-title">Sessão expirada</div>
+      <div class="confirm-modal-message">Por segurança, faça login novamente antes de continuar.</div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-primary" data-session-expired-login>Fazer login novamente</button>
+      </div>
+    </div>
+  `;
+
+  overlay.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-session-expired-login]');
+    if (!button) return;
+    overlay.remove();
+    patchState({
+      session: { playerId: null, authUserId: null },
+      ui: { currentTab: 'home', authMode: 'login', authMessage: null },
+    });
+  });
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-session-expired-login]')?.focus();
+}
 
 function getDomainFingerprint(snapshot) {
   return JSON.stringify({

@@ -43,6 +43,19 @@ function clearStoredSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+export function clearAuthSession() {
+  clearStoredSession();
+  patchState({
+    session: { playerId: null, authUserId: null },
+    ui: { authMode: 'login', currentTab: 'home' },
+  });
+}
+
+export function hasExpiredStoredSession(skewSeconds = 0) {
+  const stored = loadStoredSession();
+  return !!stored?.access_token && isSessionExpired(stored, skewSeconds);
+}
+
 function isSessionExpired(session, skewSeconds = 60) {
   const expiresAt = Number(session?.expires_at || 0);
   if (!expiresAt) return false;
