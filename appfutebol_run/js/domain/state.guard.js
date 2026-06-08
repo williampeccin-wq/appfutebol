@@ -44,6 +44,10 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
   for (const player of Array.isArray(players) ? players : []) {
     if (!player || typeof player !== 'object') continue;
     const phone = normalizePhone(player.phone);
+    if (tombstones.ids.includes(String(player.id)) || tombstones.phones.includes(phone)) {
+      warnings.push(`Player removido explicitamente ignorado (${player.id || phone}).`);
+      continue;
+    }
     if (!phone) {
       warnings.push(`Player descartado sem telefone válido (${player.id || 'sem-id'}).`);
       continue;

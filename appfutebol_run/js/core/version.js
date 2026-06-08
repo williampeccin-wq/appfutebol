@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.70.16-draw-game-state-cleanup-fix';
+export const APP_VERSION = 'v1.70.30-restore-deleted-player-by-phone-dev';
