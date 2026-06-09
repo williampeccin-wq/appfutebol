@@ -1,4 +1,6 @@
-window.__HARMONIA_BUILD__ = 'v1.70.30-restore-deleted-player-by-phone-dev';
+import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js';
+assertRuntimeEnvironmentAllowed();
+window.__HARMONIA_BUILD__ = 'v1.70.35-critical-player-operations';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -54,11 +56,22 @@ function clearActionBusy(trigger) {
   delete trigger.dataset.originalText;
 }
 
+async function reloadRemoteStateAfterCriticalOperation(fallbackSnapshot = null) {
+  const freshState = await loadPersistedState();
+  const safeSnapshot = repairManualSnapshot(freshState || fallbackSnapshot || getState());
+  replaceState(safeSnapshot);
+  saveLocalState(safeSnapshot);
+  render(safeSnapshot);
+  return safeSnapshot;
+}
+
 function showConfirmModal({
   title = 'Confirmar ação',
   message = 'Tem certeza que deseja continuar?',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
+  requiredText = '',
+  requiredLabel = '',
 } = {}) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
@@ -67,9 +80,15 @@ function showConfirmModal({
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="confirm-modal-title" id="confirm-modal-title">${title}</div>
         <div class="confirm-modal-message">${message}</div>
+        ${requiredText ? `
+          <label class="confirm-modal-field">
+            <span>${requiredLabel || `Digite "${requiredText}" para confirmar:`}</span>
+            <input type="text" class="input" data-confirm-modal-input autocomplete="off" />
+          </label>
+        ` : ''}
         <div class="confirm-modal-actions">
           <button type="button" class="btn btn-secondary" data-confirm-modal="cancel">${cancelText}</button>
-          <button type="button" class="btn btn-primary" data-confirm-modal="confirm">${confirmText}</button>
+          <button type="button" class="btn btn-primary" data-confirm-modal="confirm" ${requiredText ? 'disabled' : ''}>${confirmText}</button>
         </div>
       </div>
     `;
@@ -88,12 +107,21 @@ function showConfirmModal({
       if (event.target === overlay) cleanup(false);
       const button = event.target.closest('[data-confirm-modal]');
       if (!button) return;
+      if (button.dataset.confirmModal === 'confirm' && button.disabled) return;
       cleanup(button.dataset.confirmModal === 'confirm');
     });
 
+    const input = overlay.querySelector('[data-confirm-modal-input]');
+    const confirmButton = overlay.querySelector('[data-confirm-modal="confirm"]');
+    if (input && confirmButton) {
+      input.addEventListener('input', () => {
+        confirmButton.disabled = String(input.value || '').trim() !== String(requiredText || '').trim();
+      });
+    }
+
     document.addEventListener('keydown', handleKeydown);
     document.body.appendChild(overlay);
-    overlay.querySelector('[data-confirm-modal="confirm"]')?.focus();
+    (input || confirmButton)?.focus();
   });
 }
 
@@ -1105,7 +1133,14 @@ document.addEventListener("click", async (e) => {
   const isEditing = !!editingPlayerId;
 
   if (!isEditing) {
-    const restoreResult = await restoreDeletedPlayerByPhone(phone, {
+    const deletedPhoneExistsLocally = Array.isArray(snapshot.deleted_player_phones) && snapshot.deleted_player_phones.includes(phone);
+    if (deletedPhoneExistsLocally && !requireCriticalOperationAllowed('restaurar jogador excluído', trigger)) {
+      clearActionBusy(trigger);
+      uiActionInFlight = false;
+      return;
+    }
+
+    const restoreResult = await restoreDeletedPlayerByPhoneOperation(phone, {
       name,
       phone,
       birthDate,
@@ -1307,6 +1342,7 @@ if (action === "update-self-profile") {
 
 if (action === "create-player-access") {
   if (!requireAdmin(snapshot, "Apenas administrador pode criar acesso")) return;
+  if (!requireCriticalOperationAllowed('criar acesso de jogador', trigger)) return;
 
   const player = snapshot.players.find((p) => String(p.id) === String(id));
   if (!player) {
@@ -1319,19 +1355,8 @@ if (action === "create-player-access") {
     return;
   }
 
-  const phone = normalizeAdminPhone(player.phone);
-  if (phone.length < 10 || phone.length > 11) {
-    showToast("Este jogador precisa ter telefone válido antes de criar acesso.", "error");
-    return;
-  }
-
   const newPassword = window.prompt(`Senha inicial para ${player.name}:`);
   if (!newPassword) return;
-
-  if (String(newPassword).length < 6) {
-    showToast("Senha deve ter pelo menos 6 caracteres.", "error");
-    return;
-  }
 
   const adminSecret = window.prompt("Informe o segredo admin para criar acesso:");
   if (!adminSecret) return;
@@ -1339,51 +1364,17 @@ if (action === "create-player-access") {
   setActionBusy(trigger, "Criando...");
 
   try {
-    const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
-
-    const response = await fetch(
-      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token || ""}`,
-        },
-        body: JSON.stringify({
-          mode: "create_access",
-          admin_secret: adminSecret,
-          player_id: player.id,
-          name: player.name,
-          phone,
-          birth_date: player.birthDate || "",
-          new_password: newPassword,
-        }),
-      },
-    );
-
-    const data = await response.json().catch(() => ({}));
-
+    const result = await createPlayerAccessOperation({ player, newPassword, adminSecret });
     clearActionBusy(trigger);
 
-    if (!response.ok || !data?.user_id) {
-      showToast(data.error || "Falha ao criar acesso.", "error");
+    if (!result.ok) {
+      showToast(result.message || "Falha ao criar acesso.", "error");
+      console.warn("[players] create access failed", result);
       return;
     }
 
-    const target = snapshot.players.find((p) => String(p.id) === String(player.id));
-    if (target) {
-      target.auth_user_id = data.user_id;
-      target.email = data.email || `${phone}@harmonia.app`;
-      target.login_phone = phone;
-      target.phone = phone;
-    }
-
-    const safeSnapshot = repairManualSnapshot(snapshot);
-    replaceState(safeSnapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
-    render(safeSnapshot);
-
-    showToast(data.reused_existing_user ? "Acesso existente atualizado e vinculado." : "Acesso criado com sucesso.", "success");
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast(result.message || "Acesso criado com sucesso.", "success");
   } catch (error) {
     clearActionBusy(trigger);
     showToast(error?.message || "Erro inesperado.", "error");
@@ -1395,6 +1386,7 @@ if (action === "create-player-access") {
 
 if (action === "reset-player-password") {
   if (!requireAdmin(snapshot, "Apenas administrador pode resetar senha")) return;
+  if (!requireCriticalOperationAllowed('resetar senha de jogador', trigger)) return;
 
   const player = snapshot.players.find((p) => String(p.id) === String(id));
   if (!player) {
@@ -1402,18 +1394,8 @@ if (action === "reset-player-password") {
     return;
   }
 
-  if (!player.auth_user_id) {
-    showToast("Este jogador ainda não tem acesso criado.", "error");
-    return;
-  }
-
   const newPassword = window.prompt(`Nova senha para ${player.name}:`);
   if (!newPassword) return;
-
-  if (String(newPassword).length < 6) {
-    showToast("Senha deve ter pelo menos 6 caracteres.", "error");
-    return;
-  }
 
   const adminSecret = window.prompt("Informe o segredo admin da recuperação de senha:");
   if (!adminSecret) return;
@@ -1421,35 +1403,17 @@ if (action === "reset-player-password") {
   setActionBusy(trigger, "Resetando...");
 
   try {
-    const session = JSON.parse(localStorage.getItem("harmonia_auth_session") || "{}");
-
-    const response = await fetch(
-      `${SUPABASE_CONFIG.url}/functions/v1/admin-reset-password`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token || ""}`,
-        },
-        body: JSON.stringify({
-          mode: "reset_password",
-          admin_secret: adminSecret,
-          user_id: player.auth_user_id,
-          new_password: newPassword,
-        }),
-      },
-    );
-
-    const data = await response.json().catch(() => ({}));
-
+    const result = await resetPlayerPasswordOperation({ player, newPassword, adminSecret });
     clearActionBusy(trigger);
 
-    if (!response.ok) {
-      showToast(data.error || "Falha ao resetar senha.", "error");
+    if (!result.ok) {
+      showToast(result.message || "Falha ao resetar senha.", "error");
+      console.warn("[players] reset password failed", result);
       return;
     }
 
-    showToast("Senha resetada com sucesso.", "success");
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast(result.message || "Senha resetada com sucesso.", "success");
   } catch (error) {
     clearActionBusy(trigger);
     showToast(error?.message || "Erro inesperado.", "error");
@@ -1461,81 +1425,53 @@ if (action === "reset-player-password") {
 
 if (action === "delete-player") {
   if (!requireAdmin(snapshot, 'Apenas administrador pode excluir jogadores')) return;
-  const player = snapshot.players.find(p => p.id === id);
+  if (!requireCriticalOperationAllowed('excluir jogador', trigger)) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
   if (!player) return;
 
-  const current = snapshot.session?.playerId;
-  if (player.id === current) {
-    showToast("Você não pode excluir seu próprio usuário", "error");
-    return;
-  }
+  const currentPlayerId = snapshot.session?.playerId;
 
-  const admins = snapshot.players.filter(p => p.is_admin);
-  if (player.is_admin && admins.length <= 1) {
-    showToast("Não é possível remover o último administrador", "error");
-    return;
-  }
-
-  const confirmedDelete = await showConfirmModal({
+  const typedName = await showConfirmModal({
     title: 'Excluir jogador',
-    message: `Tem certeza de que deseja excluir ${player.name}? Essa ação remove o jogador, suas confirmações, vínculos de carne e registros relacionados da lista atual.`,
-    confirmText: 'Excluir',
+    message: `Essa é uma operação crítica. Para excluir ${player.name}, digite exatamente o nome do jogador abaixo.`,
+    confirmText: 'Excluir jogador',
     cancelText: 'Cancelar',
+    requiredText: player.name,
+    requiredLabel: `Digite exatamente "${player.name}" para confirmar a exclusão:`,
   });
 
-  if (!confirmedDelete) return;
+  if (!typedName) return;
 
   uiActionInFlight = true;
   setActionBusy(trigger, 'Excluindo...');
 
-  if (!Array.isArray(snapshot.deleted_player_ids)) snapshot.deleted_player_ids = [];
-  if (!Array.isArray(snapshot.deleted_player_phones)) snapshot.deleted_player_phones = [];
+  try {
+    const result = await deletePlayerOperation({
+      player,
+      currentPlayerId,
+      allPlayers: snapshot.players,
+      confirmationText: player.name,
+    });
 
-  snapshot.deleted_player_ids = [...new Set([...snapshot.deleted_player_ids, String(player.id)])];
-  const normalizedDeletedPhone = String(player.phone || '').replace(/\D/g, '');
-  snapshot.deleted_player_phones = [...new Set([...snapshot.deleted_player_phones, normalizedDeletedPhone].filter(Boolean))];
-
-  snapshot.players = snapshot.players.filter(p => p.id !== id);
-  snapshot.confirmations = Array.isArray(snapshot.confirmations)
-    ? snapshot.confirmations.filter(entry => entry.player_id !== id)
-    : [];
-  if (snapshot.championship?.ranking) {
-    snapshot.championship = {
-      ...snapshot.championship,
-      ranking: snapshot.championship.ranking.filter(entry => entry.player_id !== id),
-    };
-  }
-  snapshot.carne = Array.isArray(snapshot.carne)
-    ? snapshot.carne.filter((entry) => {
-        if (entry?.type === 'carne_schedule') {
-          return String(entry.player1_id) !== String(id) && String(entry.player2_id) !== String(id);
-        }
-        return String(entry.player_id) !== String(id);
-      })
-    : [];
-
-  const tombstoneResult = await savePlayerLogicalDelete(player.id);
-  console.info('[players] logical delete result', tombstoneResult);
-
-  if (!tombstoneResult.ok) {
-    console.warn('[players] Falha ao persistir exclusão lógica:', tombstoneResult);
+    clearActionBusy(trigger);
     uiActionInFlight = false;
-    setActionBusy(trigger, null);
-    showToast("Não foi possível salvar a exclusão. Tente novamente.", "error");
-    return;
+
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível excluir o jogador.', 'error');
+      console.warn('[players] delete operation failed', result);
+      return;
+    }
+
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast(result.message || 'Jogador removido.', 'success');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    showToast(error?.message || 'Erro inesperado ao excluir jogador.', 'error');
   }
 
-  const safeSnapshot = repairManualSnapshot(snapshot);
-
-  // v1.70.25: a exclusão lógica é gravada diretamente na linha do player (active=false).
-  // Não chamar savePersistedState aqui; o save completo não deve tentar reconciliar exclusão
-  // por diff de snapshot.
-  replaceState(safeSnapshot);
-  saveLocalState(safeSnapshot);
-
-  uiActionInFlight = false;
-  showToast("Jogador removido", "success");
-  window.scrollTo({ top: 0, behavior: "smooth" });
   return;
 }
 
@@ -1665,7 +1601,8 @@ import { APP_VERSION } from "./version.js?v=1.70.23";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, savePlayerLogicalDelete, restoreDeletedPlayerByPhone } from '../services/storage.supabase.js?v=1.70.29';
+import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.31';
+import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
@@ -1676,6 +1613,7 @@ import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
+import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 
 const appElement = document.getElementById('app');
 
@@ -1685,7 +1623,30 @@ let lastDomainFingerprint = '';
 
 init();
 
+
+function displayEnvironmentSafetyBanner() {
+  if (!isLocalhostWithProdSupabase()) return;
+  if (document.querySelector('[data-env-safety-banner="prod-local"]')) return;
+
+  const config = getRuntimeSupabaseConfig();
+  const banner = document.createElement('div');
+  banner.dataset.envSafetyBanner = 'prod-local';
+  banner.className = 'env-safety-banner env-safety-banner--danger';
+  banner.textContent = `⚠ Localhost conectado ao PROD (${config.environment || 'prod'}). Escritas críticas estão bloqueadas.`;
+  document.body.prepend(banner);
+}
+
+function requireCriticalOperationAllowed(operation, trigger = null) {
+  const guard = assertCriticalOperationAllowed(operation);
+  if (guard.ok) return true;
+  if (trigger) clearActionBusy(trigger);
+  showToast(guard.message, 'error');
+  console.warn('[safety] blocked critical operation', guard);
+  return false;
+}
+
 async function init() {
+  displayEnvironmentSafetyBanner();
   await prepareStoredSession();
 
   // Auth gate:

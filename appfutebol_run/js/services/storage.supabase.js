@@ -1,4 +1,5 @@
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
+import { assertCriticalOperationAllowed } from './environment.guard.js';
 
 let lastRemoteUpdatedAt = null;
 let lastSplitSnapshot = null;
@@ -693,6 +694,12 @@ export async function loadRemoteState() {
 }
 
 export async function saveRemoteState(state, _options = {}) {
+  const operationGuard = assertCriticalOperationAllowed('salvar estado remoto');
+  if (!operationGuard.ok) {
+    console.warn('[storage.supabase] blocked remote save', operationGuard);
+    return { ok: false, conflict: false, reason: operationGuard.reason, message: operationGuard.message };
+  }
+
   const config = getConfig();
 
   if (!isSupabaseConfigured()) {
@@ -708,7 +715,137 @@ export async function saveRemoteState(state, _options = {}) {
 }
 
 
+
+
+export async function savePlayerAccessLink({ playerId, authUserId, email, phone }) {
+  const operationGuard = assertCriticalOperationAllowed('vincular acesso de jogador');
+  if (!operationGuard.ok) {
+    return { ok: false, reason: operationGuard.reason, message: operationGuard.message };
+  }
+
+  const config = getConfig();
+
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'supabase_not_configured' };
+  }
+
+  const normalizedId = String(playerId || '').trim();
+  const normalizedAuthUserId = String(authUserId || '').trim();
+  const normalizedPhone = String(phone || '').replace(/\D/g, '');
+  const normalizedEmail = String(email || (normalizedPhone ? `${normalizedPhone}@harmonia.app` : '')).trim();
+
+  if (!normalizedId || !normalizedAuthUserId || !normalizedPhone || !normalizedEmail) {
+    return { ok: false, reason: 'missing_required_access_link_fields' };
+  }
+
+  const currentResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+    { method: 'GET' }
+  );
+
+  if (!currentResult.ok) {
+    return { ok: false, reason: `load_player_failed_${currentResult.status}`, status: currentResult.status, body: currentResult.body };
+  }
+
+  const row = Array.isArray(currentResult.data) ? currentResult.data[0] : null;
+
+  if (!row) {
+    return { ok: false, reason: 'player_not_found' };
+  }
+
+  const now = new Date().toISOString();
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const nextData = {
+    ...currentData,
+    id: normalizedId,
+    auth_user_id: normalizedAuthUserId,
+    email: normalizedEmail,
+    login_phone: normalizedPhone,
+    phone: normalizedPhone,
+  };
+
+  const patchResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at`),
+    {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        auth_user_id: normalizedAuthUserId,
+        data: nextData,
+        updated_at: now,
+      }),
+    }
+  );
+
+  if (!patchResult.ok) {
+    return { ok: false, reason: `save_player_access_link_failed_${patchResult.status}`, status: patchResult.status, body: patchResult.body };
+  }
+
+  let savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  let savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : {};
+
+  const representationLooksPersisted =
+    String(savedRow?.auth_user_id || '') === normalizedAuthUserId &&
+    String(savedData.auth_user_id || '') === normalizedAuthUserId;
+
+  if (!representationLooksPersisted) {
+    const verifyResult = await requestJson(
+      config,
+      tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+      { method: 'GET' }
+    );
+
+    if (!verifyResult.ok) {
+      return {
+        ok: false,
+        reason: `save_player_access_link_verify_failed_${verifyResult.status}`,
+        status: verifyResult.status,
+        body: verifyResult.body,
+      };
+    }
+
+    savedRow = Array.isArray(verifyResult.data) ? verifyResult.data[0] : null;
+    savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : {};
+  }
+
+  if (String(savedRow?.auth_user_id || '') !== normalizedAuthUserId || String(savedData.auth_user_id || '') !== normalizedAuthUserId) {
+    return {
+      ok: false,
+      reason: 'save_player_access_link_did_not_persist',
+      status: patchResult.status,
+      patchBody: JSON.stringify(patchResult.data || null),
+      savedAuthUserId: savedRow?.auth_user_id || null,
+      savedDataAuthUserId: savedData.auth_user_id || null,
+    };
+  }
+
+  if (lastSplitSnapshot?.players) {
+    lastSplitSnapshot.players = lastSplitSnapshot.players.map((player) => (
+      String(player?.id) === normalizedId
+        ? {
+            ...player,
+            auth_user_id: normalizedAuthUserId,
+            email: normalizedEmail,
+            login_phone: normalizedPhone,
+            phone: normalizedPhone,
+          }
+        : player
+    ));
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = savedRow?.updated_at || now;
+
+  return { ok: true, reason: 'player_access_link_saved_on_player_row', updatedAt: lastRemoteUpdatedAt };
+}
+
 export async function savePlayerLogicalDelete(playerId) {
+  const operationGuard = assertCriticalOperationAllowed('excluir jogador');
+  if (!operationGuard.ok) {
+    return { ok: false, reason: operationGuard.reason, message: operationGuard.message };
+  }
+
   const config = getConfig();
 
   if (!isSupabaseConfigured()) {
@@ -867,6 +1004,11 @@ export async function savePlayerDeletionTombstone(playerId, phone = '') {
 }
 
 export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
+  const operationGuard = assertCriticalOperationAllowed('restaurar jogador excluído');
+  if (!operationGuard.ok) {
+    return { ok: false, reason: operationGuard.reason, message: operationGuard.message };
+  }
+
   const config = getConfig();
 
   if (!isSupabaseConfigured()) {
