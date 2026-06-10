@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.70.45-championship-inverno26';
+export const APP_VERSION = 'v1.70.46-championship-inverno26';
