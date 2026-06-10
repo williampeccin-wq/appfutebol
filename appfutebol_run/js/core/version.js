@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.70.43-global-mensalidade-due-date';
+export const APP_VERSION = 'v1.70.44-cache-headers';

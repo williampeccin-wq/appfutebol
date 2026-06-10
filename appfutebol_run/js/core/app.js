@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.70.43-global-mensalidade-due-date';
+window.__HARMONIA_BUILD__ = 'v1.70.44-cache-headers';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1627,11 +1627,11 @@ document.addEventListener("change", (e) => {
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js?v=1.70.43";
+import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.43';
+import { loadRemoteState } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
