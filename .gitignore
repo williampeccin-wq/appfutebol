@@ -1,0 +1,12 @@
+# Artefatos locais
+*.zip
+appfutebol_fixed/
+
+# Dependências
+node_modules/
+
+# Sistema
+.DS_Store
+
+# Config local do Claude Code (mantém .claude/settings.json, ignora overrides locais)
+.claude/settings.local.json
