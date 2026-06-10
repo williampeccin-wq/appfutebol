@@ -31,6 +31,8 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 const IMPORTED_SHEET_NAME_ALIASES = {
   // De/para validado com a planilha Inverno 26.
   'ADRIANO': 'DANO',
+  'CAUE': 'S2CANSADO',
+  'VINICIUS': 'VINICIUS AMIGO CAUE',
   'ANDRE DAMS': 'ANDRE',
   'ANDRÉ DAMS': 'ANDRE',
   'LUCAS SILVA': 'LUCAS',
