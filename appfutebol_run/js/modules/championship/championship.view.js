@@ -129,6 +129,60 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
   `;
 }
 
+function shortRoundLabel(date) {
+  const [year, month, day] = String(date || '').split('-');
+  if (!year || !month || !day) return escapeHtml(String(date || ''));
+  return `${day}/${month}`;
+}
+
+// Matriz jogador × data: replica a planilha Rei da Quadra (Pos, Jogador, Pts,
+// V/E/D/WO, Ap% e uma coluna por rodada com os pontos daquele dia, coloridos
+// pelo resultado). É a visão principal do campeonato atual.
+function renderRoundMatrix(snapshot) {
+  const ranking = calculateCurrentRanking(snapshot);
+  if (!ranking.length) {
+    return '<div class="empty-state">Nenhum jogador elegível para o campeonato.</div>';
+  }
+
+  const rounds = getEffectiveChampionshipResults(snapshot);
+  const pointsByStatus = { win: 3, draw: 2, loss: 1, no_play: 0 };
+
+  return `
+    <div class="championship-table-wrap championship-matrix-wrap">
+      <table class="championship-table championship-matrix-table">
+        <thead>
+          <tr>
+            <th>Pos.</th>
+            <th class="championship-matrix-name-col">Jogador</th>
+            <th>Pts</th>
+            <th>V</th><th>E</th><th>D</th><th>WO</th><th>Ap</th>
+            ${rounds.map((round) => `<th title="${escapeHtml(round.date)}">${shortRoundLabel(round.date)}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${ranking.map((row) => {
+            const ap = row.played ? Math.round((row.points / (3 * row.played)) * 100) : null;
+            return `
+              <tr>
+                <td><span class="rank-badge">${row.rank}</span></td>
+                <td class="championship-player-name championship-matrix-name-col">${escapeHtml(row.name)}</td>
+                <td><strong>${row.points}</strong></td>
+                <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
+                <td>${ap === null ? '–' : `${ap}%`}</td>
+                ${rounds.map((round) => {
+                  const status = round.statuses?.[String(row.player_id)] || 'no_play';
+                  const pts = pointsByStatus[status] ?? 0;
+                  return `<td class="championship-matrix-cell ${getStatusClass(status)}">${pts}</td>`;
+                }).join('')}
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderResultForm(snapshot, currentPlayer) {
   if (!canManageChampionship(currentPlayer)) return '';
 
@@ -321,7 +375,7 @@ function renderHistoricalBlock(snapshot, ) {
           ${tournaments.map((item) => `
             <div class="history-card">
               <div class="history-title">${escapeHtml(item.name)}</div>
-              ${renderRankingTable(snapshot, item.rows.slice(0, 10), { snapshot })}
+              ${renderRankingTable(item.rows.slice(0, 10), { snapshot })}
             </div>
           `).join('')}
         </div>
@@ -347,8 +401,8 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
 
       <section class="card championship-current-ranking-card">
         <div class="card-title">Classificação atual · Inverno 26</div>
-        <p class="footer-note">Este é o bloco principal da aba. Ele usa a planilha inicial importada e todos os resultados lançados no app.</p>
-        ${renderRankingTable(currentRanking, { snapshot })}
+        <p class="footer-note">Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.</p>
+        ${renderRoundMatrix(snapshot)}
       </section>
 
       ${renderResultForm(snapshot, currentPlayer)}

@@ -1351,6 +1351,29 @@ button {
   border-right: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 0 12px 12px 0;
 }
+/* Matriz jogador × rodada (Inverno 26): tabela larga com scroll horizontal,
+   uma coluna por data e pontos coloridos pelo resultado. */
+.championship-matrix-table {
+  min-width: max-content;
+}
+.championship-matrix-table th,
+.championship-matrix-table td {
+  text-align: center;
+  padding: 8px 6px;
+  white-space: nowrap;
+}
+.championship-matrix-table th.championship-matrix-name-col,
+.championship-matrix-table td.championship-matrix-name-col {
+  text-align: left;
+}
+.championship-matrix-cell {
+  font-weight: 800;
+  min-width: 34px;
+}
+.championship-matrix-cell.is-win { color: #166534; background: #dcfce7; }
+.championship-matrix-cell.is-draw { color: #1d4ed8; background: #dbeafe; }
+.championship-matrix-cell.is-loss { color: #92400e; background: #fef3c7; }
+.championship-matrix-cell.is-no-play { color: #94a3b8; background: #f1f5f9; }
 .rank-badge {
   display: inline-flex;
   min-width: 28px;
