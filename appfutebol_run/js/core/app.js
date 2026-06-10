@@ -1,6 +1,8 @@
 import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js';
+import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
-window.__HARMONIA_BUILD__ = 'v1.70.35-critical-player-operations';
+window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
+window.__HARMONIA_BUILD__ = 'v1.70.40-presence-single-source-hardening';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -196,7 +198,7 @@ function replaceGameInSnapshot(snapshot, updatedGame) {
   const nextGames = exists ? games.map((game) => String(game.game_key || game.id) === String(normalized.game_key) ? normalized : game) : [...games, normalized];
   return nextGames.sort((a,b)=>String(a.game_date||'').localeCompare(String(b.game_date||'')) || String(a.game_time||'').localeCompare(String(b.game_time||'')));
 }
-function scopedConfirmationsForApp(snapshot, game) { const key = getGameKey(game || getActiveGameFromSnapshot(snapshot)); return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key); }
+function scopedConfirmationsForApp(snapshot, game) { const key = getGameKey(game || getActiveGameFromSnapshot(snapshot)); return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') === key); }
 
 function promoteWaitlistForGameCapacity(snapshot, game) {
   const key = getGameKey(game || getActiveGameFromSnapshot(snapshot));
@@ -207,8 +209,8 @@ function promoteWaitlistForGameCapacity(snapshot, game) {
   }
 
   const confirmations = Array.isArray(snapshot.confirmations) ? snapshot.confirmations : [];
-  const scoped = confirmations.filter((entry) => String(entry?.game_key || key) === String(key));
-  const others = confirmations.filter((entry) => String(entry?.game_key || key) !== String(key));
+  const scoped = confirmations.filter((entry) => String(entry?.game_key || '') === String(key));
+  const others = confirmations.filter((entry) => String(entry?.game_key || '') !== String(key));
 
   const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
   const isGoalkeeper = (player) => {
@@ -2664,7 +2666,7 @@ function renderPresenceList(snapshot, currentPlayer) {
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
-      .filter((entry) => String(entry?.game_key || gameKey) === String(gameKey))
+      .filter((entry) => String(entry?.game_key || '') === String(gameKey))
       .map((entry) => String(entry.player_id))
   );
   const waitlistEntries = getWaitlistView(snapshot);
@@ -2870,7 +2872,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
       .filter((entry) => entry?.confirmed)
-      .filter((entry) => String(entry?.game_key || gameKey) === String(gameKey))
+      .filter((entry) => String(entry?.game_key || '') === String(gameKey))
       .map((entry) => String(entry.player_id))
   );
 

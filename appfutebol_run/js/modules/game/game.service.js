@@ -281,7 +281,7 @@ function normalizeWaitlistPositions(confirmations = []) {
 
 export function getWaitlistView(snapshot = getState()) {
   const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
-  return getWaitlistEntries(snapshot.confirmations || [])
+  return getWaitlistEntries(scopedConfirmations(snapshot))
     .map((entry, index) => ({
       ...entry,
       position: index + 1,
