@@ -1,0 +1,8 @@
+# Harmonia FC — política de cache (Cloudflare Pages)
+#
+# HTML, JS e CSS mudam a cada deploy. Com "no-cache" o navegador ainda guarda
+# o arquivo, mas SEMPRE revalida com o servidor (ETag / If-None-Match): se nada
+# mudou recebe 304 (rápido); se mudou, baixa a versão nova. Assim um F5 normal
+# já traz o deploy — sem hard refresh e sem ?v manual em cada import de módulo.
+/*
+  Cache-Control: no-cache
