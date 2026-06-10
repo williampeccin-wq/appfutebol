@@ -221,12 +221,6 @@ function getLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateString()) {
-  const dueDate = String(game?.mens_expire_date || '').slice(0, 10);
-  if (!dueDate) return false;
-  return String(referenceDate) > dueDate;
-}
-
 function getPlayerIdFromDrawEntry(entry) {
   return entry && typeof entry === 'object' ? entry.id : entry;
 }
@@ -235,9 +229,10 @@ export function enforceFinancialPresenceConsistency(state) {
   const nextState = clone(state || {});
   const warnings = [];
   const players = Array.isArray(nextState.players) ? nextState.players : [];
-  const game = nextState.game || {};
+  // Vencimento da mensalidade é global (settings), com fallback ao valor legado por-jogo.
+  const dueDate = String(nextState.settings?.mens_expire_date || nextState.game?.mens_expire_date || '').slice(0, 10);
 
-  if (!isAfterMensalidadeDueDate(game)) {
+  if (!dueDate || getLocalDateString() <= dueDate) {
     return { state: nextState, warnings };
   }
 
@@ -308,6 +303,16 @@ export function validateAndRepairState(state, options = {}) {
   nextState.confirmations = Array.isArray(nextState.confirmations) ? nextState.confirmations : [];
   nextState.carne = Array.isArray(nextState.carne) ? nextState.carne : [];
   nextState.notifications = Array.isArray(nextState.notifications) ? nextState.notifications : [];
+  nextState.settings = (nextState.settings && typeof nextState.settings === 'object') ? { ...nextState.settings } : {};
+  if (!nextState.settings.mens_expire_date) {
+    // Migração: o vencimento da mensalidade era guardado por jogo. Passa a ser
+    // uma configuração global única do clube, herdando o valor do jogo ativo.
+    const legacyDue = String(nextState.game?.mens_expire_date || '').slice(0, 10);
+    nextState.settings.mens_expire_date = legacyDue || '';
+    if (legacyDue) {
+      warnings.push('Vencimento da mensalidade migrado do jogo ativo para configuração global.');
+    }
+  }
   nextState.ui = sanitizeUi(nextState.ui, defaultUi);
   const tombstones = normalizeDeletedPlayers(nextState);
   nextState.deleted_player_ids = tombstones.ids;
