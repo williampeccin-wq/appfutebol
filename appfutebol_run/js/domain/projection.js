@@ -21,11 +21,23 @@ export function getGames(state) {
   return [...byKey.values()].sort((a,b)=>String(a.game_date||'').localeCompare(String(b.game_date||'')) || String(a.game_time||'').localeCompare(String(b.game_time||'')));
 }
 
+// O vencimento da mensalidade é uma configuração GLOBAL do clube (state.settings),
+// não mais por jogo. Projetamos esse valor sobre o jogo ativo materializado, para
+// que regra (rules.engine) e feedback (app) continuem lendo `game.mens_expire_date`
+// sem alteração de assinatura — mas agora recebendo a fonte única global.
+function withGlobalMensExpireDate(state, game) {
+  if (!game) return game;
+  const globalDue = state?.settings?.mens_expire_date;
+  if (globalDue === undefined || globalDue === null) return game;
+  return { ...game, mens_expire_date: String(globalDue).slice(0, 10) };
+}
+
 export function getActiveGame(state) {
   const games = getGames(state);
-  if (!games.length) return state?.game || {};
+  if (!games.length) return withGlobalMensExpireDate(state, state?.game || {});
   const explicit = String(state?.active_game_id || state?.game?.game_key || '').trim();
-  return games.find((g)=>String(g.id||g.game_key)===explicit || String(g.game_key)===explicit) || games[0];
+  const found = games.find((g)=>String(g.id||g.game_key)===explicit || String(g.game_key)===explicit) || games[0];
+  return withGlobalMensExpireDate(state, found);
 }
 
 function __legacyGameFromState(state) {

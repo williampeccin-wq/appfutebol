@@ -185,6 +185,9 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     active_game_id: meta.active_game_id || activeGame?.game_key || game?.game_key || null,
     carne: visibleCarne,
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
+    // Configuração global do clube. Migração: se ainda não existir em meta,
+    // herda o vencimento do jogo ativo (valor legado por-jogo).
+    settings: { mens_expire_date: String(meta.settings?.mens_expire_date || activeGame?.mens_expire_date || '').slice(0, 10) },
     deleted_player_ids: deletedPlayerIds,
     deleted_player_phones: deletedPlayerPhones,
     ui: {
@@ -210,6 +213,7 @@ function splitState(state) {
       active_game_id: state.active_game_id || normalizedGame?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
+      settings: { mens_expire_date: String(state.settings?.mens_expire_date || '').slice(0, 10) },
       deleted_player_ids: Array.isArray(state.deleted_player_ids) ? state.deleted_player_ids.map((id) => String(id)) : [],
       deleted_player_phones: Array.isArray(state.deleted_player_phones) ? state.deleted_player_phones.map((phone) => String(phone)) : [],
     },
@@ -415,10 +419,12 @@ async function loadSplitState(config) {
   ]);
 
   if (!playersResult.ok || !gameResult.ok || !metaResult.ok) {
+    const failed = [playersResult, gameResult, metaResult].find((result) => !result.ok);
     return {
       ok: false,
       state: null,
       updatedAt: null,
+      status: failed?.status || null,
       reason: 'single_source_tables_unavailable',
     };
   }
@@ -451,6 +457,7 @@ async function loadSplitState(config) {
       ok: false,
       state: null,
       updatedAt: null,
+      status: presenceResult.status || null,
       reason: 'single_source_presence_unavailable',
     };
   }

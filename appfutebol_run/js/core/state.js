@@ -14,6 +14,8 @@ export const state = {
   championship: null,
   carne: [],
   notifications: [],
+  // Configurações globais do clube (não por jogo). Ex.: vencimento único da mensalidade.
+  settings: { mens_expire_date: '' },
   deleted_player_ids: [],
   deleted_player_phones: [],
   ui: {
@@ -47,6 +49,7 @@ export function replaceState(nextState) {
   state.championship = safeState.championship || null;
   state.carne = Array.isArray(safeState.carne) ? safeState.carne : [];
   state.notifications = Array.isArray(safeState.notifications) ? safeState.notifications : [];
+  state.settings = (safeState.settings && typeof safeState.settings === 'object') ? { ...safeState.settings } : { mens_expire_date: '' };
   state.deleted_player_ids = Array.isArray(safeState.deleted_player_ids) ? safeState.deleted_player_ids.map((id) => String(id)).filter(Boolean) : [];
   state.deleted_player_phones = Array.isArray(safeState.deleted_player_phones) ? safeState.deleted_player_phones.map((phone) => String(phone || '').replace(/\D/g, '')).filter(Boolean) : [];
   state.ui = {
@@ -94,6 +97,9 @@ export function patchState(patch) {
   if (Object.prototype.hasOwnProperty.call(patch, 'notifications')) {
     state.notifications = Array.isArray(patch.notifications) ? patch.notifications : [];
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'settings')) {
+    state.settings = { ...(state.settings || {}), ...(patch.settings || {}) };
+  }
 
   const repaired = validateAndRepairState(state);
   if (repaired.warnings.length) {
@@ -109,6 +115,7 @@ export function patchState(patch) {
   state.championship = repaired.state.championship || null;
   state.carne = Array.isArray(repaired.state.carne) ? repaired.state.carne : [];
   state.notifications = Array.isArray(repaired.state.notifications) ? repaired.state.notifications : [];
+  state.settings = (repaired.state.settings && typeof repaired.state.settings === 'object') ? { ...repaired.state.settings } : (state.settings || { mens_expire_date: '' });
   state.deleted_player_ids = Array.isArray(repaired.state.deleted_player_ids) ? repaired.state.deleted_player_ids.map((id) => String(id)).filter(Boolean) : [];
   state.deleted_player_phones = Array.isArray(repaired.state.deleted_player_phones) ? repaired.state.deleted_player_phones.map((phone) => String(phone || '').replace(/\D/g, '')).filter(Boolean) : [];
   state.ui = repaired.state.ui || state.ui;

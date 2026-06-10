@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.70.42-waitlist-autopromote-on-load';
+window.__HARMONIA_BUILD__ = 'v1.70.43-global-mensalidade-due-date';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1627,11 +1627,11 @@ document.addEventListener("change", (e) => {
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js?v=1.70.42";
+import { APP_VERSION } from "./version.js?v=1.70.43";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.42';
+import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.43';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
@@ -1753,6 +1753,17 @@ function isValidRemoteDomainSnapshot(snapshot) {
   );
 }
 
+// Sessão do Supabase Auth expirou e o refresh falhou (401/403 nas chamadas REST).
+// Encerra a sessão local e leva ao login, em vez de deixar o polling repetir o
+// erro indefinidamente. Após o logout, getCurrentPlayer() fica nulo e o guarda
+// no topo do polling interrompe naturalmente as chamadas.
+async function handleExpiredSession() {
+  if (!getCurrentPlayer()) return;
+  console.warn('[auth] Sessão do Supabase expirou (401/403). Encerrando sessão e voltando ao login.');
+  await logout();
+  patchState({ ui: { authMode: 'login', authMessage: 'Sua sessão expirou. Faça login novamente.' } });
+}
+
 function startRemoteSync() {
   window.setInterval(async () => {
     try {
@@ -1766,6 +1777,11 @@ function startRemoteSync() {
       const remote = await loadRemoteState();
 
       if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
+        // Sessão do Supabase morta (token expirado/refresh inválido): em vez de
+        // ficar batendo 401 a cada ciclo, encerra a sessão e volta ao login.
+        if (remote.status === 401 || remote.status === 403) {
+          await handleExpiredSession();
+        }
         return;
       }
 
@@ -2167,7 +2183,6 @@ function bindAppEvents(currentPlayer) {
         game_date: String(formData.get('game_date') || ''),
         game_time: String(formData.get('game_time') || ''),
         max_players: maxPlayers,
-        mens_expire_date: String(formData.get('mens_expire_date') || ''),
         open: formData.get('open') === 'on',
       };
 
@@ -2222,14 +2237,12 @@ function bindAppEvents(currentPlayer) {
         return;
       }
 
-      const activeGame = getActiveGameFromSnapshot(currentState);
       const newGame = {
         id: newGameKey,
         game_key: newGameKey,
         game_date: gameDate,
         game_time: gameTime,
         max_players: maxPlayers,
-        mens_expire_date: String(formData.get('mens_expire_date') || activeGame?.mens_expire_date || ''),
         open: formData.get('open') === 'on',
         sort_result: null,
         draw_history: [],
@@ -2243,6 +2256,18 @@ function bindAppEvents(currentPlayer) {
 
       createGameForm.reset();
       showToast('Novo jogo criado e selecionado como ativo.');
+    });
+  }
+
+  const mensalidadeForm = appElement.querySelector('#mensalidade-config-form');
+  if (mensalidadeForm) {
+    mensalidadeForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!requireAdmin(getState(), 'Apenas administrador pode alterar o vencimento da mensalidade')) return;
+      const formData = new FormData(mensalidadeForm);
+      const mensExpireDate = String(formData.get('mens_expire_date') || '').slice(0, 10);
+      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate } });
+      showToast(mensExpireDate ? 'Vencimento da mensalidade atualizado.' : 'Vencimento da mensalidade removido.');
     });
   }
 
@@ -3045,7 +3070,6 @@ function renderConfig(snapshot, currentPlayer) {
   const games = getCurrentGames(snapshot);
   const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
   const defaultNewGameMaxPlayers = maxPlayers || 10;
-  const defaultMensExpireDate = game.mens_expire_date || '';
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
 
   const renderGameEditForm = (item) => {
@@ -3088,11 +3112,6 @@ function renderConfig(snapshot, currentPlayer) {
             <input class="input" type="number" min="1" step="1" name="max_players" value="${limit || 10}" />
           </label>
 
-          <label class="field-label">
-            Vencimento da mensalidade
-            <input class="input" type="date" name="mens_expire_date" value="${item.mens_expire_date || ''}" />
-          </label>
-
           <label class="checkbox-line">
             <input type="checkbox" name="open" ${item.open ? 'checked' : ''} />
             Inscrições abertas neste jogo
@@ -3114,6 +3133,20 @@ function renderConfig(snapshot, currentPlayer) {
         <div class="games-list-config">
           ${games.map(renderGameEditForm).join('')}
         </div>
+      </section>
+
+      <section class="card mensalidade-config-card">
+        <div class="card-title">Vencimento da mensalidade</div>
+        <p class="footer-note">Data única, válida para todos os jogos do clube.</p>
+        <form id="mensalidade-config-form" class="player-admin-form game-config-form">
+          <label class="field-label">
+            Data de vencimento
+            <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
+          </label>
+          <div class="player-admin-actions game-config-actions">
+            <button class="btn btn-primary" type="submit">Salvar vencimento</button>
+          </div>
+        </form>
       </section>
 
       <section class="card create-game-card">
@@ -3140,11 +3173,6 @@ function renderConfig(snapshot, currentPlayer) {
             <label class="field-label">
               Máximo de jogadores
               <input class="input" type="number" min="1" step="1" name="max_players" value="${defaultNewGameMaxPlayers}" />
-            </label>
-
-            <label class="field-label">
-              Vencimento da mensalidade
-              <input class="input" type="date" name="mens_expire_date" value="${defaultMensExpireDate}" />
             </label>
 
             <label class="checkbox-line">
