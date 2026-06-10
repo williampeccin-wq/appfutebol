@@ -1,4 +1,27 @@
 import { isCarneOnly as authzIsCarneOnly } from './authz.js';
+
+function getLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateString()) {
+  const dueDate = String(game?.mens_expire_date || '').slice(0, 10);
+  if (!dueDate) return false;
+  return String(referenceDate) > dueDate;
+}
+
+export function shouldBlockPresenceForFinance(player, game, referenceDate = getLocalDateString()) {
+  if (!player) return false;
+  const carneOnly = authzIsCarneOnly(player);
+  if (carneOnly) return false;
+  return player.mens_ok !== true && isAfterMensalidadeDueDate(game, referenceDate);
+}
+
+
 export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -7,8 +30,14 @@ export function isGoalkeeperEntry(entry) {
   return entry?.goalkeeper === true || entry?.segment === 'goalkeeper' || entry?.presence_role === 'goalkeeper';
 }
 
+export function getLineConfirmedCount(confirmations = []) {
+  return (Array.isArray(confirmations) ? confirmations : [])
+    .filter((entry) => entry?.confirmed === true && !isGoalkeeperEntry(entry))
+    .length;
+}
+
 export function isGameFull(game, confirmations = []) {
-  const lineConfirmedCount = confirmations.filter((entry) => entry?.confirmed && !isGoalkeeperEntry(entry)).length;
+  const lineConfirmedCount = getLineConfirmedCount(confirmations);
   const maxPlayers = Number(game?.max_players || 0);
   return maxPlayers > 0 && lineConfirmedCount >= maxPlayers;
 }
@@ -45,9 +74,7 @@ export function getPlayerBlockReasons(player, game) {
     reasons.push('carne_only');
   }
 
-  const financeApplies = !carneOnly;
-
-  if (financeApplies && player.mens_ok !== true) {
+  if (shouldBlockPresenceForFinance(player, game)) {
     reasons.push('mensalidade_pendente');
   }
 
@@ -73,7 +100,7 @@ function getBlockMessage(reason) {
     case 'carne_only':
       return 'Perfis somente carne não participam da confirmação do jogo.';
     case 'mensalidade_pendente':
-      return 'Você não pode confirmar presença pois sua mensalidade está pendente.';
+      return 'Você não pode confirmar presença pois a mensalidade está pendente e o vencimento já passou.';
     case 'inscricoes_fechadas':
       return 'As inscrições estão fechadas.';
     case 'game_full':

@@ -39,6 +39,8 @@ export function canManageFinance(player) {
   return isAdmin(player);
 }
 
+import { isAfterMensalidadeDueDate } from './rules.engine.js';
+
 export function canManageChampionship(player) {
   return isAdmin(player);
 }
@@ -59,11 +61,12 @@ export function canEditOwnProfile(actor, target) {
   return !!actor && !!target && (isAdmin(actor) || actor.id === target.id);
 }
 
-export function canConfirmPresence(player) {
+export function canConfirmPresence(player, game = null) {
   if (!player) return false;
   if (isCarneOnly(player)) return false;
   if (player.status === 'inactive') return false;
-  return player.mens_ok === true;
+  if (player.mens_ok === true) return true;
+  return !isAfterMensalidadeDueDate(game);
 }
 
 export function exposeAuthz(currentPlayerProvider) {

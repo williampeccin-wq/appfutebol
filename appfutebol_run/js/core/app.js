@@ -3158,8 +3158,8 @@ function buildMensalidadeMeta(game, currentPlayer) {
       className: 'is-danger',
       title: 'Pendente',
       subline: game?.mens_expire_date
-        ? `Vencimento ${formatDate(game.mens_expire_date)}. Pagamento pendente, você não poderá confirmar presença.`
-        : 'Pagamento pendente, você não poderá confirmar presença.',
+        ? `Vencimento ${formatDate(game.mens_expire_date)}. Se o vencimento já passou, regularize para confirmar presença.`
+        : 'Pagamento pendente.',
     };
   }
 

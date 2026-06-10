@@ -212,6 +212,21 @@ export function sanitizeCarne(state) {
 }
 
 
+
+function getLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateString()) {
+  const dueDate = String(game?.mens_expire_date || '').slice(0, 10);
+  if (!dueDate) return false;
+  return String(referenceDate) > dueDate;
+}
+
 function getPlayerIdFromDrawEntry(entry) {
   return entry && typeof entry === 'object' ? entry.id : entry;
 }
@@ -220,6 +235,12 @@ export function enforceFinancialPresenceConsistency(state) {
   const nextState = clone(state || {});
   const warnings = [];
   const players = Array.isArray(nextState.players) ? nextState.players : [];
+  const game = nextState.game || {};
+
+  if (!isAfterMensalidadeDueDate(game)) {
+    return { state: nextState, warnings };
+  }
+
   const blockedPlayerIds = new Set(
     players
       .filter((player) => {

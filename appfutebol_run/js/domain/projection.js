@@ -28,21 +28,30 @@ function __legacyGameFromState(state) {
   const legacyGame = getActiveGame(state) || {};
   const activeGameKey = getGameKey(legacyGame);
   const confirmations = (Array.isArray(state.confirmations) ? state.confirmations : [])
-    .filter((item) => String(item?.game_key || activeGameKey) === activeGameKey);
+    .filter((item) => String(item?.game_key || '') === activeGameKey);
   const playersByIdForCount = new Map((Array.isArray(state.players) ? state.players : []).map((player) => [String(player.id), player]));
   const isGoalkeeperPlayerForCount = (player) => {
     const raw = String(player?.position || '').trim().toLowerCase();
     return raw === 'gol' || raw === 'goleiro';
   };
-  const confirmedPlayerIds = confirmations
-    .filter((item) => item && item.confirmed)
+  const confirmedEntries = confirmations.filter((item) => item && item.confirmed);
+  const confirmedGoalkeeperIds = confirmedEntries
+    .filter((item) => item.goalkeeper || item.segment === 'goalkeeper' || isGoalkeeperPlayerForCount(playersByIdForCount.get(String(item.player_id))))
+    .map((item) => item.player_id);
+  const confirmedPlayerIds = confirmedEntries
     .filter((item) => !item.goalkeeper && item.segment !== 'goalkeeper' && !isGoalkeeperPlayerForCount(playersByIdForCount.get(String(item.player_id))))
     .map((item) => item.player_id);
   const waitlistPlayerIds = confirmations
     .filter((item) => item && item.confirmed !== true && (item.status === 'waitlist' || item.status === 'waitlisted'))
     .sort((left, right) => String(left.waitlisted_at || left.timestamp || '').localeCompare(String(right.waitlisted_at || right.timestamp || '')))
     .map((item) => item.player_id);
-  return { ...legacyGame, confirmedPlayerIds, waitlistPlayerIds, maxPlayers: legacyGame.max_players || legacyGame.maxPlayers || 0 };
+  return {
+    ...legacyGame,
+    confirmedPlayerIds,
+    confirmedGoalkeeperIds,
+    waitlistPlayerIds,
+    maxPlayers: legacyGame.max_players || legacyGame.maxPlayers || 0,
+  };
 }
 
 export function buildGameView(state, currentPlayerId) {
@@ -50,15 +59,37 @@ export function buildGameView(state, currentPlayerId) {
   const players = Array.isArray(state.players) ? state.players : [];
   const playersById = Object.fromEntries(players.map((p) => [p.id, p]));
   const confirmedPlayerIds = Array.isArray(rawGame.confirmedPlayerIds) ? rawGame.confirmedPlayerIds : [];
+  const confirmedGoalkeeperIds = Array.isArray(rawGame.confirmedGoalkeeperIds) ? rawGame.confirmedGoalkeeperIds : [];
   const waitlistPlayerIds = Array.isArray(rawGame.waitlistPlayerIds) ? rawGame.waitlistPlayerIds : [];
   const confirmed = confirmedPlayerIds.map((id) => playersById[id]).filter(Boolean);
+  const confirmedGoalkeepers = confirmedGoalkeeperIds.map((id) => playersById[id]).filter(Boolean);
   const waitlist = waitlistPlayerIds.map((id) => playersById[id]).filter(Boolean);
   const isConfirmed = !!currentPlayerId && confirmedPlayerIds.includes(currentPlayerId);
   const isWaitlisted = !!currentPlayerId && waitlistPlayerIds.includes(currentPlayerId);
   const waitlistPosition = isWaitlisted ? waitlistPlayerIds.indexOf(currentPlayerId) + 1 : null;
   const maxPlayers = rawGame.maxPlayers || rawGame.max_players || 0;
   const spotsLeft = Math.max(0, maxPlayers - confirmed.length);
-  return { game: rawGame, games: getGames(state), activeGameId: rawGame.id || rawGame.game_key || null, confirmed, confirmedCount: confirmed.length, confirmedPlayerIds, waitlist, waitlistPlayerIds, isConfirmed, isWaitlisted, waitlistPosition, spotsLeft, canConfirm: !isConfirmed && !isWaitlisted && spotsLeft > 0, canCancel: isConfirmed || isWaitlisted, maxPlayers };
+  return {
+    game: rawGame,
+    games: getGames(state),
+    activeGameId: rawGame.id || rawGame.game_key || null,
+    confirmed,
+    confirmedGoalkeepers,
+    confirmedCount: confirmed.length,
+    confirmedGoalkeeperCount: confirmedGoalkeepers.length,
+    totalConfirmedCount: confirmed.length + confirmedGoalkeepers.length,
+    confirmedPlayerIds,
+    confirmedGoalkeeperIds,
+    waitlist,
+    waitlistPlayerIds,
+    isConfirmed,
+    isWaitlisted,
+    waitlistPosition,
+    spotsLeft,
+    canConfirm: !isConfirmed && !isWaitlisted && spotsLeft > 0,
+    canCancel: isConfirmed || isWaitlisted,
+    maxPlayers
+  };
 }
 
 export function buildPlayersView(state) {

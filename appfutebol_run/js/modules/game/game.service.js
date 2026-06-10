@@ -8,11 +8,11 @@ function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
 function activeGameKey(snapshot = getState()) { return getGameKey(activeGame(snapshot)); }
 function scopedConfirmations(snapshot = getState()) {
   const key = activeGameKey(snapshot);
-  return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) === key);
+  return (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') === key);
 }
 function mergeScopedConfirmations(snapshot, scoped) {
   const key = activeGameKey(snapshot);
-  const others = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || key) !== key);
+  const others = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') !== key);
   return [...others, ...scoped.map((entry) => ({ ...entry, game_key: key }))];
 }
 function patchScopedConfirmations(snapshot, scoped) { patchState({ confirmations: mergeScopedConfirmations(snapshot, scoped) }); }
@@ -39,6 +39,19 @@ function normalizeGoalkeeperConfirmation(entry, player) {
     presence_role: 'goalkeeper',
   };
 }
+
+function normalizeConfirmationSegments(confirmations = [], players = []) {
+  const playersById = new Map((players || []).map((player) => [String(player.id), player]));
+  return (Array.isArray(confirmations) ? confirmations : []).map((entry) => (
+    normalizeGoalkeeperConfirmation(entry, playersById.get(String(entry?.player_id)))
+  ));
+}
+
+function getLineConfirmedCount(confirmations = [], players = []) {
+  const normalized = normalizeConfirmationSegments(confirmations, players);
+  return normalized.filter((entry) => entry?.confirmed && !isGoalkeeperEntry(entry)).length;
+}
+
 
 function patchActiveGame(snapshot, updatedGame) {
   const key = activeGameKey(snapshot);
@@ -149,7 +162,8 @@ export function removeRentalGoalkeeper(id) {
 
 export function hasCapacity() {
   const snapshot = getState();
-  return !isGameFull(activeGame(snapshot), scopedConfirmations(snapshot));
+  const confirmations = normalizeConfirmationSegments(scopedConfirmations(snapshot), snapshot.players || []);
+  return !isGameFull(activeGame(snapshot), confirmations);
 }
 
 export function isConfirmed(playerId) {
@@ -159,10 +173,11 @@ export function isConfirmed(playerId) {
 
 export function getPresenceGuard(player, game) {
   const snapshot = getState();
+  const confirmations = normalizeConfirmationSegments(scopedConfirmations(snapshot), snapshot.players || []);
   const decision = getPresenceDecision({
     player,
     game: activeGame(snapshot),
-    confirmations: scopedConfirmations(snapshot),
+    confirmations,
   });
 
   return {
@@ -281,6 +296,7 @@ export function toggleConfirmation(playerId) {
   const game = activeGame(snapshot);
   const gameKey = activeGameKey(snapshot);
   const confirmations = scopedConfirmations(snapshot);
+  const capacityConfirmations = normalizeConfirmationSegments(confirmations, snapshot.players || []);
   const player = snapshot.players.find((item) => String(item.id) === String(playerId));
   const existing = confirmations.find((entry) => String(entry.player_id) === String(playerId));
   const currentlyConfirmed = existing?.confirmed === true;
@@ -307,13 +323,13 @@ export function toggleConfirmation(playerId) {
   }
 
   const goalkeeperPlayer = isGoalkeeperPlayer(player);
-  const goalkeeperCount = getConfirmedGoalkeeperCount(confirmations, snapshot.players || []);
+  const goalkeeperCount = getConfirmedGoalkeeperCount(capacityConfirmations, snapshot.players || []);
 
   if (goalkeeperPlayer && goalkeeperCount >= 2) {
     return { ok: false, message: 'O jogo já tem 2 goleiros confirmados.' };
   }
 
-  const decision = getPresenceDecision({ player, game, confirmations });
+  const decision = getPresenceDecision({ player, game, confirmations: capacityConfirmations });
 
   if (!decision.canConfirm) {
     if (decision.reasonBlocked === 'game_full' && !goalkeeperPlayer) {

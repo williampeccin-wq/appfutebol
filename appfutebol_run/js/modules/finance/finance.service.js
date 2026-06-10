@@ -1,4 +1,5 @@
 import { isCarneOnly } from '../../domain/authz.js';
+import { isAfterMensalidadeDueDate } from '../../domain/rules.engine.js';
 
 // PHASE 8 — FINANCE BASIC
 
@@ -12,11 +13,12 @@ export function isMensalidadeOk(player) {
   return player.mens_ok === true;
 }
 
-export function canConfirm(player) {
+export function canConfirm(player, game = null) {
   if (!player) return false;
   if (isCarneOnly(player)) return false;
   if (player.status === 'inactive') return false;
-  return player.mens_ok === true;
+  if (player.mens_ok === true) return true;
+  return !isAfterMensalidadeDueDate(game);
 }
 
 export function marcarComoPago(snapshot, playerId) {
