@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.70.41-config-line-count-aligned';
+window.__HARMONIA_BUILD__ = 'v1.70.42-waitlist-autopromote-on-load';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -276,6 +276,33 @@ function promoteWaitlistForGameCapacity(snapshot, game) {
   });
 
   return [...others, ...normalizedScoped.map((entry) => ({ ...entry, game_key: key }))];
+}
+
+// Assinatura semântica das confirmações (player_id + confirmado + status),
+// ignorando diferenças de referência/ordem. Usada para detectar se a
+// reconciliação por capacidade realmente mudou algo (promoveu alguém).
+function confirmationsFingerprint(confirmations) {
+  return (Array.isArray(confirmations) ? confirmations : [])
+    .map((entry) => `${entry?.player_id}:${entry?.confirmed === true ? 1 : 0}:${String(entry?.status || '')}`)
+    .sort()
+    .join('|');
+}
+
+// Reconcilia a fila de espera do jogo ativo contra a capacidade de linha ao
+// CARREGAR o estado. Antes, a promoção automática só rodava em três eventos
+// (cancelar, remover por admin, editar o jogo); se uma vaga abrisse por
+// qualquer outro caminho, o primeiro da fila ficava preso indefinidamente.
+// Aqui aplicamos a mesma regra do form de editar jogo, de forma idempotente,
+// para que uma vaga aberta nunca deixe alguém preso.
+function reconcileWaitlistOnLoad(loadedState) {
+  const game = getActiveGameFromSnapshot(loadedState);
+  const reconciledConfirmations = promoteWaitlistForGameCapacity(loadedState, game);
+  const changed = confirmationsFingerprint(loadedState?.confirmations)
+    !== confirmationsFingerprint(reconciledConfirmations);
+  if (!changed) {
+    return { state: loadedState, changed: false };
+  }
+  return { state: { ...loadedState, confirmations: reconciledConfirmations }, changed: true };
 }
 
 
@@ -1600,11 +1627,11 @@ document.addEventListener("change", (e) => {
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js?v=1.70.23";
+import { APP_VERSION } from "./version.js?v=1.70.42";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.31';
+import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.42';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
@@ -1743,10 +1770,20 @@ function startRemoteSync() {
       }
 
       const repairedRemote = validateAndRepairState(remote.state);
-      const safeRemoteState = repairedRemote.state;
+      let safeRemoteState = repairedRemote.state;
 
       if (repairedRemote.warnings.length) {
         console.warn('[remote-sync] Reparos aplicados antes de comparar estado remoto:', repairedRemote.warnings);
+      }
+
+      // Auto-promoção da fila ao carregar: se o jogo ativo tem vaga de linha
+      // aberta e alguém na fila, promove e persiste o estado curado de volta,
+      // para o DB convergir e a fila não ficar presa em nenhum cliente.
+      const reconciled = reconcileWaitlistOnLoad(safeRemoteState);
+      safeRemoteState = reconciled.state;
+      if (reconciled.changed) {
+        savePersistedState(safeRemoteState);
+        console.info('[remote-sync] Fila reconciliada: jogador(es) promovido(s) por vaga aberta.');
       }
 
       const currentFingerprint = getDomainFingerprint(localSnapshot);
