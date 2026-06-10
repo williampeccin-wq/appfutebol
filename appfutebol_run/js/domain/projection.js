@@ -1,5 +1,9 @@
 
 // PHASE 6 — PROJECTION LAYER
+// Agora delega a contagem de confirmados ao módulo canônico
+// (domain/confirmations.js), eliminando os contadores divergentes.
+
+import { classifyGameConfirmations } from './confirmations.js';
 
 export function getGameKey(game) {
   return String(game?.game_key || game?.id || (game?.game_date ? `game_${game.game_date}_${String(game.game_time || '').replace(/[^0-9]/g, '') || '0000'}` : 'default'));
@@ -27,29 +31,15 @@ export function getActiveGame(state) {
 function __legacyGameFromState(state) {
   const legacyGame = getActiveGame(state) || {};
   const activeGameKey = getGameKey(legacyGame);
-  const confirmations = (Array.isArray(state.confirmations) ? state.confirmations : [])
-    .filter((item) => String(item?.game_key || '') === activeGameKey);
-  const playersByIdForCount = new Map((Array.isArray(state.players) ? state.players : []).map((player) => [String(player.id), player]));
-  const isGoalkeeperPlayerForCount = (player) => {
-    const raw = String(player?.position || '').trim().toLowerCase();
-    return raw === 'gol' || raw === 'goleiro';
-  };
-  const confirmedEntries = confirmations.filter((item) => item && item.confirmed);
-  const confirmedGoalkeeperIds = confirmedEntries
-    .filter((item) => item.goalkeeper || item.segment === 'goalkeeper' || isGoalkeeperPlayerForCount(playersByIdForCount.get(String(item.player_id))))
-    .map((item) => item.player_id);
-  const confirmedPlayerIds = confirmedEntries
-    .filter((item) => !item.goalkeeper && item.segment !== 'goalkeeper' && !isGoalkeeperPlayerForCount(playersByIdForCount.get(String(item.player_id))))
-    .map((item) => item.player_id);
-  const waitlistPlayerIds = confirmations
-    .filter((item) => item && item.confirmed !== true && (item.status === 'waitlist' || item.status === 'waitlisted'))
-    .sort((left, right) => String(left.waitlisted_at || left.timestamp || '').localeCompare(String(right.waitlisted_at || right.timestamp || '')))
-    .map((item) => item.player_id);
+
+  // Fonte única: uma so regra de confirmado/escopo/goleiro/carne.
+  const classified = classifyGameConfirmations(state, activeGameKey);
+
   return {
     ...legacyGame,
-    confirmedPlayerIds,
-    confirmedGoalkeeperIds,
-    waitlistPlayerIds,
+    confirmedPlayerIds: classified.linePlayerIds,
+    confirmedGoalkeeperIds: classified.goalkeeperIds,
+    waitlistPlayerIds: classified.waitlistPlayerIds,
     maxPlayers: legacyGame.max_players || legacyGame.maxPlayers || 0,
   };
 }
@@ -57,18 +47,24 @@ function __legacyGameFromState(state) {
 export function buildGameView(state, currentPlayerId) {
   const rawGame = __legacyGameFromState(state) || {};
   const players = Array.isArray(state.players) ? state.players : [];
-  const playersById = Object.fromEntries(players.map((p) => [p.id, p]));
-  const confirmedPlayerIds = Array.isArray(rawGame.confirmedPlayerIds) ? rawGame.confirmedPlayerIds : [];
-  const confirmedGoalkeeperIds = Array.isArray(rawGame.confirmedGoalkeeperIds) ? rawGame.confirmedGoalkeeperIds : [];
-  const waitlistPlayerIds = Array.isArray(rawGame.waitlistPlayerIds) ? rawGame.waitlistPlayerIds : [];
+  const playersById = Object.fromEntries(players.map((p) => [String(p.id), p]));
+
+  const confirmedPlayerIds = Array.isArray(rawGame.confirmedPlayerIds) ? rawGame.confirmedPlayerIds.map(String) : [];
+  const confirmedGoalkeeperIds = Array.isArray(rawGame.confirmedGoalkeeperIds) ? rawGame.confirmedGoalkeeperIds.map(String) : [];
+  const waitlistPlayerIds = Array.isArray(rawGame.waitlistPlayerIds) ? rawGame.waitlistPlayerIds.map(String) : [];
+
   const confirmed = confirmedPlayerIds.map((id) => playersById[id]).filter(Boolean);
   const confirmedGoalkeepers = confirmedGoalkeeperIds.map((id) => playersById[id]).filter(Boolean);
   const waitlist = waitlistPlayerIds.map((id) => playersById[id]).filter(Boolean);
-  const isConfirmed = !!currentPlayerId && confirmedPlayerIds.includes(currentPlayerId);
-  const isWaitlisted = !!currentPlayerId && waitlistPlayerIds.includes(currentPlayerId);
-  const waitlistPosition = isWaitlisted ? waitlistPlayerIds.indexOf(currentPlayerId) + 1 : null;
+
+  const currentId = currentPlayerId != null ? String(currentPlayerId) : null;
+  const isConfirmed = !!currentId && confirmedPlayerIds.includes(currentId);
+  const isWaitlisted = !!currentId && waitlistPlayerIds.includes(currentId);
+  const waitlistPosition = isWaitlisted ? waitlistPlayerIds.indexOf(currentId) + 1 : null;
+
   const maxPlayers = rawGame.maxPlayers || rawGame.max_players || 0;
   const spotsLeft = Math.max(0, maxPlayers - confirmed.length);
+
   return {
     game: rawGame,
     games: getGames(state),
@@ -94,6 +90,6 @@ export function buildGameView(state, currentPlayerId) {
 
 export function buildPlayersView(state) {
   const gameView = buildGameView(state, null);
-  const confirmedIds = new Set(gameView.confirmedPlayerIds);
-  return (state.players || []).map((p) => ({ ...p, isActive: p.status !== 'inactive', isConfirmed: confirmedIds.has(p.id), isInadimplente: (p.plays_football !== undefined ? p.plays_football : p.role !== 'carne') && !p.mens_ok }));
+  const confirmedIds = new Set(gameView.confirmedPlayerIds.map(String));
+  return (state.players || []).map((p) => ({ ...p, isActive: p.status !== 'inactive', isConfirmed: confirmedIds.has(String(p.id)), isInadimplente: (p.plays_football !== undefined ? p.plays_football : p.role !== 'carne') && !p.mens_ok }));
 }

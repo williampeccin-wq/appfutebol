@@ -1,37 +1,33 @@
 import { getActiveGame, getGameKey } from './projection.js';
+import { classifyGameConfirmations, isConfirmedEntry, isWaitlistEntry } from './confirmations.js';
 
-function isGoalkeeper(player) {
-  const raw = String(player?.position || '').trim().toLowerCase();
-  return raw === 'gol' || raw === 'goleiro';
-}
-
-function isWaitlistEntry(entry) {
-  return !!entry && entry.confirmed !== true && (entry.status === 'waitlist' || entry.status === 'waitlisted');
-}
-
+// Oraculo de teste: usa a MESMA fonte unica das telas (classifyGameConfirmations),
+// e adiciona diagnosticos uteis (orfaos e confirmacoes sem game_key).
 export function auditPresenceProjection(snapshot = {}) {
   const game = getActiveGame(snapshot);
   const gameKey = getGameKey(game);
   const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
-  const scoped = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') === String(gameKey));
 
-  const confirmed = scoped.filter((entry) => entry?.confirmed === true);
-  const goalkeepers = confirmed.filter((entry) => isGoalkeeper(playersById.get(String(entry.player_id))));
-  const line = confirmed.filter((entry) => !isGoalkeeper(playersById.get(String(entry.player_id))));
-  const waitlist = scoped.filter(isWaitlistEntry);
+  const classified = classifyGameConfirmations(snapshot, gameKey);
+
+  const scoped = (snapshot.confirmations || []).filter(
+    (entry) => String((entry && entry.game_key) || gameKey) === String(gameKey)
+  );
 
   return {
     game_key: gameKey,
     max_line_players: Number(game?.max_players || 0),
-    confirmed_total: confirmed.length,
-    confirmed_line: line.length,
-    confirmed_goalkeepers: goalkeepers.length,
-    waitlist: waitlist.length,
+    confirmed_line: classified.lineCount,
+    confirmed_goalkeepers: classified.goalkeeperCount,
+    confirmed_total: classified.lineCount + classified.goalkeeperCount,
+    waitlist: classified.waitlistCount,
+    // Diagnosticos: estes deveriam estar vazios em uma base saudavel.
     orphan_confirmations: scoped
+      .filter((entry) => isConfirmedEntry(entry) || isWaitlistEntry(entry))
       .filter((entry) => !playersById.has(String(entry.player_id)))
       .map((entry) => entry.player_id),
     unscoped_confirmations: (snapshot.confirmations || [])
-      .filter((entry) => !entry?.game_key)
-      .map((entry) => entry.player_id),
+      .filter((entry) => !entry || !entry.game_key)
+      .map((entry) => entry && entry.player_id),
   };
 }

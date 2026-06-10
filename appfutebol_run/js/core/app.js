@@ -1,8 +1,8 @@
 import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js';
-import { auditPresenceProjection } from '../domain/presence.audit.js';
+import { auditPresenceProjection } from '../domain/presence.audit.js?v=1.70.41';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.70.40-presence-single-source-hardening';
+window.__HARMONIA_BUILD__ = 'v1.70.41-config-line-count-aligned';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1597,13 +1597,14 @@ document.addEventListener("change", (e) => {
   }
 });
 
-import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
+import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js?v=1.70.41";
+import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { APP_VERSION } from "./version.js?v=1.70.23";
+import { APP_VERSION } from "./version.js?v=1.70.41";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.31';
+import { loadRemoteState } from '../services/storage.supabase.js?v=1.70.41';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
@@ -1772,9 +1773,12 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
-  const confirmedCount = snapshot.confirmations?.filter(c => c.confirmed).length || 0;
-  const maxPlayers = snapshot.game?.max_players || 10;
-  console.log(`CONFIRMADOS: ${confirmedCount}/${maxPlayers}`);
+  // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
+  // Antes este banner somava confirmações de TODOS os jogos e incluía
+  // goleiros/carne, divergindo do resto da home e do banco.
+  const headerView = buildGameView(snapshot, null);
+  const confirmedCount = headerView.confirmedCount;
+  const maxPlayers = headerView.maxPlayers || 0;
 
   const currentPlayer = getCurrentPlayer();
 
@@ -1820,7 +1824,7 @@ function render(snapshot) {
 
     <main class="content">
       <div style="padding:10px;font-weight:bold;">
-${confirmedCount} / ${maxPlayers} jogadores confirmados
+${confirmedCount} / ${maxPlayers} jogadores de linha confirmados
 </div>
 ${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
@@ -2399,23 +2403,11 @@ function renderHome(snapshot, currentPlayer) {
     ...storedNotifications
   ];
 
-  const homeGameKey = getGameKey(game);
-  const homeConfirmedIds = new Set(
-    (workingSnapshot.confirmations || [])
-      .filter((entry) => entry && entry.confirmed)
-      .filter((entry) => String(entry.game_key || homeGameKey) === String(homeGameKey))
-      .map((entry) => String(entry.player_id))
-  );
-  const isHomeGoalkeeper = (player) => {
-    const raw = String((player && player.position) || '').trim().toLowerCase();
-    return raw === 'gol' || raw === 'goleiro';
-  };
-  const homeConfirmedPlayers = (workingSnapshot.players || [])
-    .filter((player) => homeConfirmedIds.has(String(player.id)))
-    .filter((player) => player.plays_football !== false)
-    .filter((player) => player.role !== 'carne');
-  const homeLinePlayers = homeConfirmedPlayers.filter((player) => !isHomeGoalkeeper(player));
-  const homeGoalkeepers = homeConfirmedPlayers.filter(isHomeGoalkeeper);
+  // Fonte única: usa diretamente o gameView (mesma regra do banner e da tela
+  // de jogo). Removido o recálculo local que divergia do resto e do banco.
+  const sortByName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR');
+  const homeLinePlayers = [...gameView.confirmed].sort(sortByName);
+  const homeGoalkeepers = [...gameView.confirmedGoalkeepers].sort(sortByName);
   const homeRentalGoalkeepers = Array.isArray(game && game.rental_goalkeepers) ? game.rental_goalkeepers : [];
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
@@ -3022,8 +3014,10 @@ function renderConfig(snapshot, currentPlayer) {
   const renderGameEditForm = (item) => {
     const key = getGameKey(item);
     const active = key === getGameKey(game);
-    const count = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed).length;
-    const waitlistCount = scopedConfirmationsForApp(snapshot, item).filter((entry) => entry?.confirmed !== true && (entry?.status === 'waitlist' || entry?.status === 'waitlisted')).length;
+    // Mesma regra da home: conta jogadores de LINHA (goleiros e carne não somam).
+    const classified = classifyGameConfirmations(snapshot, key);
+    const count = classified.lineCount;
+    const waitlistCount = classified.waitlistCount;
     const limit = Number(item.max_players || item.maxPlayers || 0);
 
     return `

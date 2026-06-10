@@ -531,8 +531,11 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   const previousGameKey = getActiveGameKey(previousParts?.game || null);
   const nextGameKey = getActiveGameKey(nextParts.game || null);
 
-  const previousConfirmations = indexBy(previousParts?.confirmations || [], (entry) => entry.player_id);
-  const nextConfirmations = indexBy(nextParts.confirmations, (entry) => entry.player_id);
+  // Chave composta: cada confirmação pertence ao par (game_key, player_id),
+  // que é exatamente a chave única da tabela presence_confirmations.
+  const confKey = (entry) => `${String((entry && entry.game_key) || '')}|${String((entry && entry.player_id) || '')}`;
+  const previousConfirmations = indexBy(previousParts?.confirmations || [], confKey);
+  const nextConfirmations = indexBy(nextParts.confirmations, confKey);
 
   for (const [id, player] of nextPlayers.entries()) {
     if (stableStringify(previousPlayers.get(id)) !== stableStringify(player)) {
@@ -569,21 +572,22 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   // Não deletar public.players aqui. O tombstone em app_meta é a fonte de verdade
   // para ocultar o jogador sem destruir histórico de campeonato/carne/presença.
 
-  // v1.60.70: multiple future games preserve previous game confirmations.
-
-  for (const [playerId, confirmation] of nextConfirmations.entries()) {
+  // v1.70.41: CADA confirmação é gravada sob a SUA própria game_key.
+  // Antes, o save re-carimbava todas com a chave do jogo ativo (e reescrevia
+  // tudo quando o jogo ativo mudava), fazendo confirmações de um jogo
+  // "vazarem" para o jogo seguinte. Agora a chave é preservada; só caímos
+  // no jogo ativo quando a confirmação é nova e ainda não tem chave.
+  for (const [key, confirmation] of nextConfirmations.entries()) {
+    const ownGameKey = String(confirmation?.game_key || '') || nextGameKey;
     const normalizedConfirmation = {
       ...confirmation,
-      game_key: nextGameKey,
+      game_key: ownGameKey,
     };
 
-    if (
-      previousGameKey !== nextGameKey ||
-      stableStringify(previousConfirmations.get(playerId)) !== stableStringify(normalizedConfirmation)
-    ) {
+    if (stableStringify(previousConfirmations.get(key)) !== stableStringify(normalizedConfirmation)) {
       operations.push({
         type: 'upsert_presence_confirmation',
-        run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, nextGameKey),
+        run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, ownGameKey),
       });
     }
   }
@@ -591,13 +595,16 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   // HOTFIX v1.70.14
   // Nunca deletar confirmações automaticamente por diff de snapshot.
   // Remoções devem ocorrer por fluxo explícito do domínio.
-  for (const playerId of previousConfirmations.keys()) {
-    if (!nextConfirmations.has(playerId) && explicitDeletedPlayerIds.has(String(playerId))) {
+  for (const [, confirmation] of previousConfirmations.entries()) {
+    const key = confKey(confirmation);
+    const entryGameKey = String(confirmation?.game_key || '') || previousGameKey;
+    const entryPlayerId = String(confirmation?.player_id || '');
+    if (!nextConfirmations.has(key) && explicitDeletedPlayerIds.has(entryPlayerId)) {
       operations.push({
         type: 'delete_presence_confirmation_explicit',
         run: () => requestNoContent(
           config,
-          tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(previousGameKey)}&player_id=eq.${encodeURIComponent(String(playerId))}`),
+          tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(entryGameKey)}&player_id=eq.${encodeURIComponent(entryPlayerId)}`),
           { method: 'DELETE' }
         ),
       });
