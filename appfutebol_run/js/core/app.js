@@ -1866,21 +1866,14 @@ function render(snapshot) {
       </div>
     </div>
 
-    <nav class="nav" aria-label="Navegação principal">
-      ${renderNavButton('home', 'Home', activeTab)}
-      ${renderNavButton('weekly_game', 'Jogo da semana', activeTab)}
-      ${renderNavButton('players', 'Jogadores', activeTab)}
-      ${renderNavButton('carne', 'Carne', activeTab)}
-      ${renderNavButton('championship', 'Campeonato', activeTab)}
-      ${canAccessConfig(currentPlayer) ? renderNavButton('config', 'Config', activeTab) : ''}
-    </nav>
-
     <main class="content content--${activeTab}">
       <div style="padding:10px;font-weight:bold;">
 ${confirmedCount} / ${maxPlayers} jogadores de linha confirmados
 </div>
 ${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
+
+    ${renderBottomNav(activeTab, currentPlayer)}
   `;
 
   bindAppEvents(currentPlayer);
@@ -2302,6 +2295,36 @@ function bindAppEvents(currentPlayer) {
 function renderNavButton(tab, label, activeTab) {
   const activeClass = tab === activeTab ? 'is-active' : '';
   return `<button class="nav-button ${activeClass}" type="button" data-tab="${tab}">${label}</button>`;
+}
+
+const BOTTOM_NAV_ICONS = {
+  home: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>',
+  weekly_game: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.7h-5L8 10z"/></svg>',
+  players: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 13.7a5.5 5.5 0 0 1 3.5 6.3"/></svg>',
+  carne: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v6a2 2 0 0 0 2 2v10"/><path d="M8 3v5"/><path d="M16 3c-1.6 0-2.6 2-2.6 5s1 4 2.6 4v9"/></svg>',
+  championship: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9 21h6"/><path d="M12 14v7"/></svg>',
+  config: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>',
+};
+
+function renderBottomNav(activeTab, currentPlayer) {
+  const items = [
+    ['home', 'Home'],
+    ['weekly_game', 'Jogo da semana'],
+    ['players', 'Jogadores'],
+    ['carne', 'Carne'],
+    ['championship', 'Campeonato'],
+  ];
+  if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
+
+  return `
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      ${items.map(([tab, label]) => `
+        <button class="bnav-btn ${tab === activeTab ? 'is-active' : ''}" type="button" data-tab="${tab}" aria-label="${label}" title="${label}">
+          ${BOTTOM_NAV_ICONS[tab] || ''}
+        </button>
+      `).join('')}
+    </nav>
+  `;
 }
 
 function renderTab(snapshot, activeTab, currentPlayer) {
