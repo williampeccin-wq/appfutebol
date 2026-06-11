@@ -5639,3 +5639,22 @@ body {
 }
 .content--players .players-pay-due { color: var(--hfc-text-muted); font-size: 13px; }
 .content--players .players-pay-due strong { color: var(--hfc-text); }
+
+/* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
+.content--players .icon-action-button {
+  background: var(--hfc-glass) !important;
+  border: 1px solid var(--hfc-glass-border) !important;
+  color: var(--hfc-text) !important;
+  border-radius: 11px;
+}
+.content--players .icon-action-button.player-edit-near-paid { color: var(--hfc-accent-blue) !important; }
+.content--players .icon-action-button.player-reset-password-near-paid { color: var(--hfc-gold-200) !important; }
+.content--players .icon-action-button.player-delete-near-paid { color: #f0897b !important; }
+.content--players .icon-action-button:hover { background: rgba(255, 255, 255, 0.12) !important; }
+.content--players .access-action-button {
+  background: rgba(240, 165, 0, 0.14) !important;
+  border: 1px solid rgba(240, 165, 0, 0.35) !important;
+  color: var(--hfc-gold-200) !important;
+  border-radius: 11px;
+}
+.content--players .access-action-button:hover { background: rgba(240, 165, 0, 0.22) !important; }
