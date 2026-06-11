@@ -2384,6 +2384,11 @@ function renderHome(snapshot, currentPlayer) {
   const waitlistPosition = gameView.waitlistPosition;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
+  // Bloqueio por inadimplência (modo parcial/total, após o vencimento). Só vale
+  // como CTA visível quando as inscrições estão abertas e o jogador ainda não
+  // está confirmado/na fila — aí o botão troca para "Bloqueado · Inadimplente".
+  const presenceReasons = Array.isArray(presenceGuard?.decision?.reasons) ? presenceGuard.decision.reasons : [];
+  const financeBlocked = !!(game && game.open) && !confirmed && !waitlisted && presenceReasons.includes('mensalidade_pendente');
   const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
   const statusNote = waitlisted
     ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
@@ -2513,7 +2518,7 @@ function renderHome(snapshot, currentPlayer) {
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
   const homeStatusText = game && game.open ? 'Aberto' : 'Fechado';
-  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve'));
+  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
   const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
   const homeMoreLine = Math.max(homeLinePlayers.length - 5, 0);
@@ -2561,7 +2566,7 @@ function renderHome(snapshot, currentPlayer) {
             <div class="home-v2-date">${formatDate(game && game.game_date)}</div>
             <div class="home-v2-time">${(game && game.game_time) || '--:--'} · ${homeStatusText}</div>
           </div>
-          <div class="home-v2-status ${confirmed ? 'is-ok' : waitlisted ? 'is-wait' : 'is-off'}${(!confirmed && !waitlisted && !(game && game.open)) ? ' is-soon' : ''}">${homePresenceText}</div>
+          <div class="home-v2-status ${confirmed ? 'is-ok' : waitlisted ? 'is-wait' : financeBlocked ? 'is-blocked' : 'is-off'}${(!confirmed && !waitlisted && !financeBlocked && !(game && game.open)) ? ' is-soon' : ''}">${homePresenceText}</div>
         </div>
 
         <div class="home-v2-big-number">
@@ -2580,9 +2585,12 @@ function renderHome(snapshot, currentPlayer) {
         </div>
 
         <div class="home-v2-actions">
-          ${canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : ''}
+          ${financeBlocked
+            ? '<button class="home-v2-primary is-blocked" type="button" disabled title="Mensalidade pendente e vencimento já passou. Regularize para confirmar.">Bloqueado · Inadimplente</button>'
+            : (canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : '')}
           <button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>
         </div>
+        ${financeBlocked ? '<p class="home-v2-blocked-note">Mensalidade pendente e o vencimento já passou. Regularize com o administrador para confirmar presença.</p>' : ''}
       </section>
 
       <section class="home-v2-metrics">

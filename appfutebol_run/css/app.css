@@ -6128,3 +6128,23 @@ body {
   min-width: 0;
   width: 100%;
 }
+
+/* ---------- HOME: bloqueio por inadimplência (parcial/total) ---------- */
+.home-v2-status.is-blocked {
+  background: rgba(239, 68, 68, 0.20);
+  color: #fecaca;
+}
+.home-v2-primary.is-blocked,
+.home-v2-primary.is-blocked:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.40);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.home-v2-blocked-note {
+  margin: 10px 2px 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #fecaca;
+}
