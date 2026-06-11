@@ -1,5 +1,13 @@
 import { isCarneOnly as authzIsCarneOnly } from './authz.js';
 
+// PAUSADO: o controle de mensalidade está temporariamente INÓCUO até definirmos
+// as regras de negócio. Com isto em false:
+//  - inadimplentes NÃO são bloqueados de confirmar presença (aqui);
+//  - inadimplentes NÃO são removidos automaticamente do jogo (state.guard).
+// Os rótulos "Pago/Pendente" continuam aparecendo (apenas informativos).
+// Para religar a regra: mude para true.
+export const MENSALIDADE_ENFORCEMENT_ENABLED = false;
+
 function getLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -15,6 +23,7 @@ export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateStri
 }
 
 export function shouldBlockPresenceForFinance(player, game, referenceDate = getLocalDateString()) {
+  if (!MENSALIDADE_ENFORCEMENT_ENABLED) return false;
   if (!player) return false;
   const carneOnly = authzIsCarneOnly(player);
   if (carneOnly) return false;
