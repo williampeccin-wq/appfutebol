@@ -5658,3 +5658,109 @@ body {
   border-radius: 11px;
 }
 .content--players .access-action-button:hover { background: rgba(240, 165, 0, 0.22) !important; }
+
+/* ---------- CAMPEONATO (Stadium Glass) ---------- */
+.content--championship {
+  background: radial-gradient(130% 45% at 50% -5%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 36%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);
+}
+.content--championship > div:first-child { display: none; }
+
+.content--championship .hero-card,
+.content--championship .championship-hero {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='160' viewBox='0 0 320 160'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.10' stroke-width='2'%3E%3Ccircle cx='160' cy='80' r='42'/%3E%3Cline x1='0' y1='80' x2='320' y2='80'/%3E%3C/g%3E%3C/svg%3E") center / cover no-repeat,
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.16), transparent 16rem),
+    linear-gradient(150deg, rgba(27, 58, 115, 0.6), rgba(10, 18, 38, 0.65));
+  border: 1px solid var(--hfc-glass-border);
+  color: #fff;
+  overflow: hidden;
+}
+.content--championship .championship-hero-current { border: 1px solid var(--hfc-glass-border); }
+
+.content--championship .card,
+.content--championship .championship-current-ranking-card,
+.content--championship .championship-launch-summary-card,
+.content--championship .championship-result-card-v2,
+.content--championship .history-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--championship .card-title { color: var(--hfc-text); }
+.content--championship .footer-note,
+.content--championship .empty-state { color: var(--hfc-text-muted); }
+
+.content--championship .championship-table th { color: var(--hfc-text-muted); }
+.content--championship .championship-table td {
+  background: var(--hfc-glass-2);
+  color: var(--hfc-text);
+  border-top-color: var(--hfc-glass-border);
+  border-bottom-color: var(--hfc-glass-border);
+}
+.content--championship .championship-table td:first-child { border-left-color: var(--hfc-glass-border); }
+.content--championship .championship-table td:last-child { border-right-color: var(--hfc-glass-border); }
+.content--championship .championship-player-name { color: var(--hfc-text); }
+.content--championship .rank-badge { background: rgba(255, 255, 255, 0.10); color: var(--hfc-text); }
+.content--championship .championship-ranking-avatar { background: rgba(143, 180, 255, 0.16); color: #cfe0ff; }
+
+.content--championship .championship-field-v2 { color: var(--hfc-text) !important; }
+.content--championship .championship-control-v2 {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: var(--hfc-text) !important;
+}
+.content--championship .championship-result-subtitle-v2 { color: var(--hfc-text-muted); }
+.content--championship .championship-result-divider-v2 { background: var(--hfc-glass-border); }
+.content--championship .championship-pill-v2.is-blue { background: rgba(143, 180, 255, 0.16); color: var(--hfc-accent-blue); }
+.content--championship .championship-pill-v2.is-gold { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); }
+.content--championship .championship-pill-v2.is-green { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); }
+.content--championship .championship-result-info-v2 {
+  background: rgba(143, 180, 255, 0.08);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text-muted);
+}
+.content--championship .championship-team-result-box,
+.content--championship .championship-team-player-pill {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--championship .championship-team-label,
+.content--championship .championship-teams-result-details > summary { color: var(--hfc-text-muted); }
+
+.content--championship .championship-launch-summary-grid > div {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--championship .championship-launch-summary-grid strong { color: var(--hfc-text); }
+.content--championship .championship-launch-summary-grid span { color: var(--hfc-text-muted); }
+
+.content--championship .championship-audit-item {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--championship .championship-audit-item summary strong { color: var(--hfc-text); }
+.content--championship .championship-audit-item summary span,
+.content--championship .championship-audit-item summary small { color: var(--hfc-text-muted); }
+.content--championship .championship-audit-table th { color: var(--hfc-text-muted); }
+.content--championship .championship-audit-table td { color: var(--hfc-text); border-color: var(--hfc-glass-border); }
+
+.content--championship .history-details summary,
+.content--championship .history-title { color: var(--hfc-text); }
+.content--championship .history-card .championship-table th { color: var(--hfc-text-muted); }
+.content--championship .history-card .championship-table td { color: var(--hfc-text); }
+
+.content--championship .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  border: none;
+}
+.content--championship .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
