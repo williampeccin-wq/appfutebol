@@ -569,14 +569,34 @@ export function getManualChampionshipResults(snapshot) {
     .sort((left, right) => String(left.date).localeCompare(String(right.date)));
 }
 
+// Mapa game_key -> jogadores removidos do jogo por admin. Quem foi removido da
+// escalação não pontua naquele jogo, mesmo que um resultado já tenha sido
+// lançado antes da remoção (rede de segurança para dados já gravados).
+function buildRemovedByGameKey(snapshot) {
+  const map = new Map();
+  (Array.isArray(snapshot?.confirmations) ? snapshot.confirmations : []).forEach((entry) => {
+    if (!entry || entry.confirmed === true) return;
+    const out = entry.removed_by_admin === true || entry.status === 'removed' || entry.status === 'cancelled';
+    if (!out) return;
+    const key = String(entry.game_key || '');
+    if (!key) return;
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(String(entry.player_id));
+  });
+  return map;
+}
+
 export function calculateCurrentRanking(snapshot) {
   const players = getFootballPlayers(snapshot);
   const rowsById = new Map(players.map((player) => [String(player.id), buildEmptyRow(player)]));
   const results = getEffectiveChampionshipResults(snapshot);
+  const removedByGameKey = buildRemovedByGameKey(snapshot);
 
   results.forEach((result) => {
+    const gameKey = String(result.game_key || '');
+    const removedSet = gameKey ? removedByGameKey.get(gameKey) : null;
     rowsById.forEach((row, playerId) => {
-      const rawStatus = result.statuses?.[playerId] || 'no_play';
+      const rawStatus = (removedSet && removedSet.has(playerId)) ? 'no_play' : (result.statuses?.[playerId] || 'no_play');
       const status = Object.prototype.hasOwnProperty.call(POINTS_BY_STATUS, rawStatus) ? rawStatus : 'no_play';
       row.points += POINTS_BY_STATUS[status] || 0;
 
