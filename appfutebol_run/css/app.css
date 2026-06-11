@@ -5428,3 +5428,116 @@ body {
 .content--home .home-v2-notice > span { color: var(--hfc-text-muted); }
 .content--home .home-v2-empty { color: var(--hfc-text-muted); }
 .content--home .home-carne-text { color: var(--hfc-text-muted); }
+
+/* ---------- JOGO DA SEMANA (Stadium Glass) ---------- */
+.content--weekly_game {
+  background: radial-gradient(130% 55% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  position: relative;
+  color: var(--hfc-text);
+}
+.content--weekly_game > div:first-child { display: none; }
+
+.content--weekly_game .weekly-game-card {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.10' stroke-width='2'%3E%3Ccircle cx='160' cy='100' r='48'/%3E%3Cline x1='0' y1='100' x2='320' y2='100'/%3E%3Crect x='100' y='-2' width='120' height='44' rx='3'/%3E%3Crect x='100' y='158' width='120' height='44' rx='3'/%3E%3C/g%3E%3C/svg%3E") center / cover no-repeat,
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.16), transparent 16rem),
+    linear-gradient(150deg, rgba(27, 58, 115, 0.6), rgba(10, 18, 38, 0.65));
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: var(--hfc-radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+.content--weekly_game .weekly-game-stats span { color: var(--hfc-grass); }
+
+.content--weekly_game .card,
+.content--weekly_game .weekly-presence-card,
+.content--weekly_game .weekly-self-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--weekly_game .card-title,
+.content--weekly_game .weekly-presence-main-title,
+.content--weekly_game .weekly-presence-title,
+.content--weekly_game .row-title { color: var(--hfc-text); }
+.content--weekly_game .row-subtitle,
+.content--weekly_game .footer-note,
+.content--weekly_game .info-line,
+.content--weekly_game .weekly-presence-subtitle,
+.content--weekly_game .empty-inline { color: var(--hfc-text-muted); }
+
+.content--weekly_game .weekly-player-row,
+.content--weekly_game .placeholder-row { border-color: rgba(255, 255, 255, 0.08); }
+.content--weekly_game .avatar { background: rgba(143, 180, 255, 0.16); color: #cfe0ff; }
+
+.content--weekly_game .switch-track { background: rgba(255, 255, 255, 0.16); }
+.content--weekly_game .switch-control.is-on .switch-track { background: var(--hfc-gold); }
+.content--weekly_game .switch-label { color: var(--hfc-text-muted); }
+.content--weekly_game .switch-label.is-ok { color: var(--hfc-grass); }
+.content--weekly_game .switch-label.is-warn { color: var(--hfc-gold-200); }
+
+.content--weekly_game .tag.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); }
+.content--weekly_game .tag.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); }
+
+.content--weekly_game .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  border: none;
+}
+.content--weekly_game .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+
+.content--weekly_game .weekly-presence-tabs {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.content--weekly_game .weekly-presence-tab { color: var(--hfc-text-muted); }
+.content--weekly_game .weekly-presence-tab.is-active { color: var(--hfc-gold-200); }
+.content--weekly_game .weekly-presence-status.is-confirmed { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); }
+.content--weekly_game .weekly-presence-status.is-pending { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); }
+
+.content--weekly_game .goalkeeper-section,
+.content--weekly_game .waitlist-section,
+.content--weekly_game .draw-outside-panel {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--weekly_game .rental-goalkeeper-avatar { background: rgba(143, 180, 255, 0.16); color: #cfe0ff; }
+
+/* Sorteio: caixas de vidro + linhas compactas sem o "Mover" sobre o nome */
+.content--weekly_game .team-draw-box {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: 16px;
+}
+.content--weekly_game .team-draw-title { color: var(--hfc-accent-blue); }
+.content--weekly_game .team-draw-player-row .avatar {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  flex: 0 0 40px !important;
+  font-size: 13px !important;
+}
+.content--weekly_game .team-draw-player-row .row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.content--weekly_game .team-inline-move-button {
+  min-width: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  gap: 0;
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+  box-shadow: none;
+}
+.content--weekly_game .team-inline-move-button span { display: none; }
