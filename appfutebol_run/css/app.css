@@ -5541,3 +5541,13 @@ body {
   box-shadow: none;
 }
 .content--weekly_game .team-inline-move-button span { display: none; }
+
+/* Jogo da semana: linhas de jogador (presença/fora) em vidro — corrige nome
+   claro sobre card branco (contraste) */
+.content--weekly_game .weekly-player-row,
+.content--weekly_game .draw-outside-row {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--weekly_game .weekly-presence-section { border-top-color: var(--hfc-glass-border); }
+.content--weekly_game .weekly-presence-main-title { color: var(--hfc-text); }
