@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.70.48-championship-inverno26';
+export const APP_VERSION = 'v1.70.49-champ-removal-points';

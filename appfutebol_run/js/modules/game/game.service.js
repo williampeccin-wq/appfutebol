@@ -356,6 +356,34 @@ export function toggleConfirmation(playerId) {
   return { ok: true, message: 'Presença confirmada.' };
 }
 
+// Remove um jogador do resultado de campeonato JÁ LANÇADO do jogo informado
+// (tira dos statuses e dos times A/B). Sem isto, remover alguém da escalação
+// deixava os pontos daquele jogo pendurados na classificação — um jogador que
+// não jogou continuava com a derrota (1 ponto) lançada pelo sorteio.
+function scrubPlayerFromGameResults(championship, gameKey, playerId) {
+  const active = championship && typeof championship === 'object' ? championship.active : null;
+  if (!active || !Array.isArray(active.results)) return { championship, changed: false };
+  const pid = String(playerId);
+  let changed = false;
+  const results = active.results.map((result) => {
+    if (String(result?.game_key || '') !== String(gameKey)) return result;
+    const inStatuses = result.statuses && Object.prototype.hasOwnProperty.call(result.statuses, pid);
+    const inTeams = (Array.isArray(result.team_a) && result.team_a.some((id) => String(id) === pid)) ||
+                    (Array.isArray(result.team_b) && result.team_b.some((id) => String(id) === pid));
+    if (!inStatuses && !inTeams) return result;
+    changed = true;
+    const statuses = { ...(result.statuses || {}) };
+    delete statuses[pid];
+    return {
+      ...result,
+      statuses,
+      team_a: (Array.isArray(result.team_a) ? result.team_a : []).filter((id) => String(id) !== pid),
+      team_b: (Array.isArray(result.team_b) ? result.team_b : []).filter((id) => String(id) !== pid),
+    };
+  });
+  return changed ? { championship: { ...championship, active: { ...active, results } }, changed: true } : { championship, changed: false };
+}
+
 /**
  * Remove um jogador confirmado do jogo vigente por ação administrativa.
  *
@@ -363,6 +391,7 @@ export function toggleConfirmation(playerId) {
  * - marca a confirmação como false;
  * - preserva o histórico da entrada em confirmations;
  * - remove o jogador dos times sorteados, quando houver sorteio ativo;
+ * - remove o jogador do resultado de campeonato já lançado deste jogo;
  * - libera a vaga para nova confirmação futura.
  */
 export function adminRemovePlayerFromGame(playerId) {
@@ -390,9 +419,11 @@ export function adminRemovePlayerFromGame(playerId) {
   ));
 
   const promoted = promoteFirstWaitlisted(updatedScopedConfirmations, now, targetId);
+  const scrub = scrubPlayerFromGameResults(snapshot.championship, gameKey, targetId);
 
   patchState({
     confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations)),
+    ...(scrub.changed ? { championship: scrub.championship } : {}),
     ...buildDrawRemovalPatch(snapshot, targetId, now),
   });
 
@@ -400,7 +431,9 @@ export function adminRemovePlayerFromGame(playerId) {
     ok: true,
     message: promoted.promoted
       ? 'Jogador removido. Primeiro da fila entrou automaticamente.'
-      : 'Jogador removido do jogo pelo admin.',
+      : (scrub.changed
+          ? 'Jogador removido do jogo e dos pontos deste jogo no campeonato.'
+          : 'Jogador removido do jogo pelo admin.'),
   };
 }
 
