@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.71.0-stadium-glass';
+export const APP_VERSION = 'v1.71.2-mensalidade';

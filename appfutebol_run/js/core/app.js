@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.70.51-mensalidade-paused';
+window.__HARMONIA_BUILD__ = 'v1.71.2-mensalidade';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -179,7 +179,10 @@ function repairManualSnapshot(snapshot) {
   if (repaired.warnings.length) {
     console.warn('[app] Reparos aplicados antes do save manual:', repaired.warnings);
   }
-  return repaired.state;
+  // Após reparo (que pode REMOVER inadimplentes no "Bloqueio total"), promove a
+  // fila para preencher vagas liberadas — mesma regra idempotente do load.
+  const reconciled = reconcileWaitlistOnLoad(repaired.state);
+  return reconciled.state;
 }
 
 
@@ -1568,7 +1571,7 @@ if (action === "admin-add-to-game") {
   uiActionInFlight = true;
   setActionBusy(trigger, 'Incluindo...');
 
-  const result = toggleConfirmation(id);
+  const result = toggleConfirmation(id, { bypassFinance: true });
   const safeSnapshot = repairManualSnapshot(getState());
   savePersistedState(safeSnapshot);
   render(safeSnapshot);
@@ -1627,6 +1630,7 @@ document.addEventListener("change", (e) => {
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
+import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
@@ -2260,11 +2264,19 @@ function bindAppEvents(currentPlayer) {
   if (mensalidadeForm) {
     mensalidadeForm.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (!requireAdmin(getState(), 'Apenas administrador pode alterar o vencimento da mensalidade')) return;
+      if (!requireAdmin(getState(), 'Apenas administrador pode alterar a mensalidade')) return;
       const formData = new FormData(mensalidadeForm);
       const mensExpireDate = String(formData.get('mens_expire_date') || '').slice(0, 10);
-      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate } });
-      showToast(mensExpireDate ? 'Vencimento da mensalidade atualizado.' : 'Vencimento da mensalidade removido.');
+      const rawMode = String(formData.get('mens_enforcement_mode') || '');
+      const mensMode = [MENSALIDADE_MODES.PARTIAL, MENSALIDADE_MODES.TOTAL].includes(rawMode) ? rawMode : MENSALIDADE_MODES.NONE;
+      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode } });
+      // Aplica imediatamente a regra (no "total" pode remover inadimplentes e
+      // promover a fila) e persiste/renderiza no padrão das demais ações admin.
+      const safeSnapshot = repairManualSnapshot(getState());
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
+      const modeLabel = mensMode === MENSALIDADE_MODES.TOTAL ? 'Bloqueio total' : mensMode === MENSALIDADE_MODES.PARTIAL ? 'Bloqueio parcial' : 'Sem bloqueio';
+      showToast(`Mensalidade salva. Regra: ${modeLabel}.`);
     });
   }
 
@@ -2356,7 +2368,7 @@ function renderHome(snapshot, currentPlayer) {
   const waitlistView = getWaitlistView(workingSnapshot);
   const waitlistCount = waitlistView.length;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
-  const mensalidade = buildMensalidadeMeta(game, activePlayer);
+  const mensalidade = buildMensalidadeMeta(game, activePlayer, getMensalidadeMode(workingSnapshot.settings));
   const carneScheduleEntries = getCarneScheduleEntriesForApp(workingSnapshot);
   const carneStatus =
     workingSnapshot.carne.some((entry) => String(entry?.player_id || '') === String(activePlayer.id) && entry?.active !== false) ||
@@ -2372,6 +2384,11 @@ function renderHome(snapshot, currentPlayer) {
   const waitlistPosition = gameView.waitlistPosition;
   const presenceGuard = canManagePresence(activePlayer, game);
   const capacityOk = confirmed || gameView.canConfirm || hasCapacity();
+  // Bloqueio por inadimplência (modo parcial/total, após o vencimento). Só vale
+  // como CTA visível quando as inscrições estão abertas e o jogador ainda não
+  // está confirmado/na fila — aí o botão troca para "Bloqueado · Inadimplente".
+  const presenceReasons = Array.isArray(presenceGuard?.decision?.reasons) ? presenceGuard.decision.reasons : [];
+  const financeBlocked = !!(game && game.open) && !confirmed && !waitlisted && presenceReasons.includes('mensalidade_pendente');
   const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
   const statusNote = waitlisted
     ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
@@ -2501,7 +2518,7 @@ function renderHome(snapshot, currentPlayer) {
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
   const homeStatusText = game && game.open ? 'Aberto' : 'Fechado';
-  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : 'Pendente');
+  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
   const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
   const homeMoreLine = Math.max(homeLinePlayers.length - 5, 0);
@@ -2549,7 +2566,7 @@ function renderHome(snapshot, currentPlayer) {
             <div class="home-v2-date">${formatDate(game && game.game_date)}</div>
             <div class="home-v2-time">${(game && game.game_time) || '--:--'} · ${homeStatusText}</div>
           </div>
-          <div class="home-v2-status ${confirmed ? 'is-ok' : waitlisted ? 'is-wait' : 'is-off'}">${homePresenceText}</div>
+          <div class="home-v2-status ${confirmed ? 'is-ok' : waitlisted ? 'is-wait' : financeBlocked ? 'is-blocked' : 'is-off'}${(!confirmed && !waitlisted && !financeBlocked && !(game && game.open)) ? ' is-soon' : ''}">${homePresenceText}</div>
         </div>
 
         <div class="home-v2-big-number">
@@ -2568,9 +2585,12 @@ function renderHome(snapshot, currentPlayer) {
         </div>
 
         <div class="home-v2-actions">
-          ${canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : ''}
+          ${financeBlocked
+            ? '<button class="home-v2-primary is-blocked" type="button" disabled title="Mensalidade pendente e vencimento já passou. Regularize para confirmar.">Bloqueado · Inadimplente</button>'
+            : (canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : '')}
           <button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>
         </div>
+        ${financeBlocked ? '<p class="home-v2-blocked-note">Mensalidade pendente e o vencimento já passou. Regularize com o administrador para confirmar presença.</p>' : ''}
       </section>
 
       <section class="home-v2-metrics">
@@ -3142,6 +3162,7 @@ function renderConfig(snapshot, currentPlayer) {
   const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
   const defaultNewGameMaxPlayers = maxPlayers || 10;
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
+  const mensEnforcementMode = getMensalidadeMode(snapshot.settings);
 
   const renderGameEditForm = (item) => {
     const key = getGameKey(item);
@@ -3207,15 +3228,34 @@ function renderConfig(snapshot, currentPlayer) {
       </section>
 
       <section class="card mensalidade-config-card">
-        <div class="card-title">Vencimento da mensalidade</div>
-        <p class="footer-note">Data única, válida para todos os jogos do clube.</p>
+        <div class="card-title">Mensalidade</div>
+        <p class="footer-note">Vencimento único, válido para todos os jogos do clube. A regra abaixo só passa a valer depois do vencimento.</p>
         <form id="mensalidade-config-form" class="player-admin-form game-config-form">
           <label class="field-label">
             Data de vencimento
             <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
           </label>
+
+          <fieldset class="mens-mode-fieldset">
+            <legend class="field-label">Regra para inadimplentes</legend>
+            ${[
+              { value: 'none', title: 'Sem bloqueio', desc: 'Inadimplência é só informativa. Ninguém é bloqueado nem removido.' },
+              { value: 'partial', title: 'Bloqueio parcial', desc: 'Inadimplente não pode confirmar, mas quem já está confirmado permanece na escalação.' },
+              { value: 'total', title: 'Bloqueio total', desc: 'Inadimplente não pode confirmar e quem já está confirmado é removido — a vaga vai para a fila.' },
+            ].map((opt) => `
+              <label class="mens-mode-option${mensEnforcementMode === opt.value ? ' is-selected' : ''}">
+                <input type="radio" name="mens_enforcement_mode" value="${opt.value}" ${mensEnforcementMode === opt.value ? 'checked' : ''} />
+                <span class="mens-mode-text">
+                  <strong>${opt.title}</strong>
+                  <small>${opt.desc}</small>
+                </span>
+              </label>
+            `).join('')}
+          </fieldset>
+          <p class="footer-note">O administrador sempre pode confirmar e remover qualquer jogador, mesmo inadimplente.</p>
+
           <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-primary" type="submit">Salvar vencimento</button>
+            <button class="btn btn-primary" type="submit">Salvar mensalidade</button>
           </div>
         </form>
       </section>
@@ -3276,7 +3316,7 @@ function renderConfig(snapshot, currentPlayer) {
   `;
 }
 
-function buildMensalidadeMeta(game, currentPlayer) {
+function buildMensalidadeMeta(game, currentPlayer, mode = MENSALIDADE_MODES.NONE) {
   if (authzIsCarneOnly(currentPlayer)) {
     return {
       className: 'is-ok',
@@ -3286,12 +3326,21 @@ function buildMensalidadeMeta(game, currentPlayer) {
   }
 
   if (currentPlayer.mens_ok !== true) {
+    // A consequência da pendência depende da regra do clube (modo).
+    let consequence;
+    if (mode === MENSALIDADE_MODES.TOTAL) {
+      consequence = 'Após o vencimento você não pode confirmar e, se já estiver confirmado, será removido (a vaga vai para a fila).';
+    } else if (mode === MENSALIDADE_MODES.PARTIAL) {
+      consequence = 'Após o vencimento você não pode confirmar presença até regularizar.';
+    } else {
+      consequence = 'Apenas informativo: regularize quando puder.';
+    }
     return {
       className: 'is-danger',
       title: 'Pendente',
       subline: game?.mens_expire_date
-        ? `Vencimento ${formatDate(game.mens_expire_date)}. Se o vencimento já passou, regularize para confirmar presença.`
-        : 'Pagamento pendente.',
+        ? `Vencimento ${formatDate(game.mens_expire_date)}. ${consequence}`
+        : consequence,
     };
   }
 

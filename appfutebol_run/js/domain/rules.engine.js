@@ -1,12 +1,28 @@
 import { isCarneOnly as authzIsCarneOnly } from './authz.js';
 
-// PAUSADO: o controle de mensalidade está temporariamente INÓCUO até definirmos
-// as regras de negócio. Com isto em false:
-//  - inadimplentes NÃO são bloqueados de confirmar presença (aqui);
-//  - inadimplentes NÃO são removidos automaticamente do jogo (state.guard).
-// Os rótulos "Pago/Pendente" continuam aparecendo (apenas informativos).
-// Para religar a regra: mude para true.
-export const MENSALIDADE_ENFORCEMENT_ENABLED = false;
+// Controle de mensalidade com TRÊS modos concorrentes (escolha única do clube,
+// guardada em state.settings.mens_enforcement_mode). Só passa a valer DEPOIS do
+// vencimento (mens_expire_date). O administrador nunca é bloqueado.
+//
+//  - 'none'    : sem bloqueio. Inadimplência é apenas informativa (Pago/Pendente).
+//  - 'partial' : bloqueio parcial. Inadimplente NÃO CONFIRMADO não pode confirmar;
+//                inadimplente já confirmado PERMANECE na escalação.
+//  - 'total'   : bloqueio total. Inadimplente não confirmado não pode confirmar E
+//                inadimplente confirmado é REMOVIDO da escalação (libera vaga para
+//                a fila) e não pode mais confirmar.
+export const MENSALIDADE_MODES = { NONE: 'none', PARTIAL: 'partial', TOTAL: 'total' };
+
+export function getMensalidadeMode(settings) {
+  const mode = String(settings?.mens_enforcement_mode || '').toLowerCase();
+  return (mode === MENSALIDADE_MODES.PARTIAL || mode === MENSALIDADE_MODES.TOTAL)
+    ? mode
+    : MENSALIDADE_MODES.NONE;
+}
+
+// Compat: alguns pontos só perguntam "a regra está ligada?". Ligada = partial OU total.
+export function isMensalidadeEnforcementEnabled(settings) {
+  return getMensalidadeMode(settings) !== MENSALIDADE_MODES.NONE;
+}
 
 function getLocalDateString() {
   const now = new Date();
@@ -22,8 +38,11 @@ export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateStri
   return String(referenceDate) > dueDate;
 }
 
-export function shouldBlockPresenceForFinance(player, game, referenceDate = getLocalDateString()) {
-  if (!MENSALIDADE_ENFORCEMENT_ENABLED) return false;
+// Bloqueia a CONFIRMAÇÃO de presença de inadimplente. Vale tanto no modo
+// 'partial' quanto 'total' (ambos impedem inadimplente de confirmar). No modo
+// 'none' nunca bloqueia.
+export function shouldBlockPresenceForFinance(player, game, mode = MENSALIDADE_MODES.NONE, referenceDate = getLocalDateString()) {
+  if (mode !== MENSALIDADE_MODES.PARTIAL && mode !== MENSALIDADE_MODES.TOTAL) return false;
   if (!player) return false;
   const carneOnly = authzIsCarneOnly(player);
   if (carneOnly) return false;
@@ -69,7 +88,7 @@ export function canLogin(player, password) {
   return { ok: true, message: '', player };
 }
 
-export function getPlayerBlockReasons(player, game) {
+export function getPlayerBlockReasons(player, game, mode = MENSALIDADE_MODES.NONE) {
   const reasons = [];
 
   if (!player) {
@@ -83,7 +102,7 @@ export function getPlayerBlockReasons(player, game) {
     reasons.push('carne_only');
   }
 
-  if (shouldBlockPresenceForFinance(player, game)) {
+  if (shouldBlockPresenceForFinance(player, game, mode)) {
     reasons.push('mensalidade_pendente');
   }
 
@@ -94,8 +113,8 @@ export function getPlayerBlockReasons(player, game) {
   return reasons;
 }
 
-export function getPlayerStatus(player, game) {
-  const reasons = getPlayerBlockReasons(player, game);
+export function getPlayerStatus(player, game, mode = MENSALIDADE_MODES.NONE) {
+  const reasons = getPlayerBlockReasons(player, game, mode);
   return {
     blocked: reasons.length > 0,
     reasons,
@@ -119,8 +138,8 @@ function getBlockMessage(reason) {
   }
 }
 
-export function getPresenceDecision({ player, game, confirmations = [] }) {
-  const reasons = getPlayerBlockReasons(player, game);
+export function getPresenceDecision({ player, game, confirmations = [], mode = MENSALIDADE_MODES.NONE }) {
+  const reasons = getPlayerBlockReasons(player, game, mode);
   const isConfirmed = confirmations.some((entry) => entry?.player_id === player?.id && entry?.confirmed);
   const gameFull = isGameFull(game, confirmations);
 

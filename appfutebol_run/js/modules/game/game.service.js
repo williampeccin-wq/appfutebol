@@ -1,6 +1,6 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
-import { getPresenceDecision, isGameFull, isGoalkeeperEntry } from '../../domain/rules.engine.js';
+import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 
 
@@ -178,6 +178,7 @@ export function getPresenceGuard(player, game) {
     player,
     game: activeGame(snapshot),
     confirmations,
+    mode: getMensalidadeMode(snapshot.settings),
   });
 
   return {
@@ -291,9 +292,12 @@ export function getWaitlistView(snapshot = getState()) {
 }
 
 
-export function toggleConfirmation(playerId) {
+export function toggleConfirmation(playerId, options = {}) {
   const snapshot = getState();
   const game = activeGame(snapshot);
+  // Admin pode confirmar inadimplente a qualquer momento: ignora o bloqueio
+  // financeiro tratando o modo como 'none' só para esta decisão.
+  const effectiveMode = options.bypassFinance ? MENSALIDADE_MODES.NONE : getMensalidadeMode(snapshot.settings);
   const gameKey = activeGameKey(snapshot);
   const confirmations = scopedConfirmations(snapshot);
   const capacityConfirmations = normalizeConfirmationSegments(confirmations, snapshot.players || []);
@@ -329,7 +333,7 @@ export function toggleConfirmation(playerId) {
     return { ok: false, message: 'O jogo já tem 2 goleiros confirmados.' };
   }
 
-  const decision = getPresenceDecision({ player, game, confirmations: capacityConfirmations });
+  const decision = getPresenceDecision({ player, game, confirmations: capacityConfirmations, mode: effectiveMode });
 
   if (!decision.canConfirm) {
     if (decision.reasonBlocked === 'game_full' && !goalkeeperPlayer) {

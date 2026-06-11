@@ -187,7 +187,10 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
     // Configuração global do clube. Migração: se ainda não existir em meta,
     // herda o vencimento do jogo ativo (valor legado por-jogo).
-    settings: { mens_expire_date: String(meta.settings?.mens_expire_date || activeGame?.mens_expire_date || '').slice(0, 10) },
+    settings: {
+      mens_expire_date: String(meta.settings?.mens_expire_date || activeGame?.mens_expire_date || '').slice(0, 10),
+      mens_enforcement_mode: String(meta.settings?.mens_enforcement_mode || 'none'),
+    },
     deleted_player_ids: deletedPlayerIds,
     deleted_player_phones: deletedPlayerPhones,
     ui: {
@@ -213,7 +216,10 @@ function splitState(state) {
       active_game_id: state.active_game_id || normalizedGame?.game_key || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
-      settings: { mens_expire_date: String(state.settings?.mens_expire_date || '').slice(0, 10) },
+      settings: {
+        mens_expire_date: String(state.settings?.mens_expire_date || '').slice(0, 10),
+        mens_enforcement_mode: String(state.settings?.mens_enforcement_mode || 'none'),
+      },
       deleted_player_ids: Array.isArray(state.deleted_player_ids) ? state.deleted_player_ids.map((id) => String(id)) : [],
       deleted_player_phones: Array.isArray(state.deleted_player_phones) ? state.deleted_player_phones.map((phone) => String(phone)) : [],
     },

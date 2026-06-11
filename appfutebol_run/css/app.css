@@ -5791,8 +5791,8 @@ body {
 }
 .content--championship .championship-matrix-table thead .cm-freeze { z-index: 3; }
 .content--championship .championship-matrix-table .cm-c1 { left: 0; width: 44px; min-width: 44px; }
-.content--championship .championship-matrix-table .cm-c2 { left: 44px; width: 150px; min-width: 150px; max-width: 150px; }
-.content--championship .championship-matrix-table .cm-c3 { left: 194px; width: 48px; min-width: 48px; }
+.content--championship .championship-matrix-table .cm-c2 { left: 44px; width: 116px; min-width: 116px; max-width: 116px; }
+.content--championship .championship-matrix-table .cm-c3 { left: 160px; width: 44px; min-width: 44px; }
 
 /* ---------- NAV INFERIOR (chrome Stadium Glass) ---------- */
 .nav { display: none; }
@@ -6055,3 +6055,96 @@ body {
 }
 .content--config .game-config-row strong { color: var(--hfc-text); }
 .content--config .game-config-row span { color: var(--hfc-text-muted); }
+
+/* ---------- HOME: badge longo "Abertura das inscrições em breve" ---------- */
+.home-v2-status.is-soon {
+  white-space: normal;
+  text-align: right;
+  max-width: 168px;
+  line-height: 1.15;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* ---------- CONFIG: regra de inadimplência (modos de mensalidade) ---------- */
+.content--config .mens-mode-fieldset {
+  border: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.content--config .mens-mode-fieldset > legend {
+  padding: 0;
+  margin-bottom: 2px;
+}
+.content--config .mens-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--hfc-glass-border);
+  background: var(--hfc-glass-2);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.content--config .mens-mode-option.is-selected {
+  border-color: var(--hfc-gold);
+  background: rgba(240, 165, 0, 0.10);
+}
+.content--config .mens-mode-option input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--hfc-gold);
+  flex: 0 0 auto;
+}
+.content--config .mens-mode-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.content--config .mens-mode-text strong {
+  color: var(--hfc-text);
+  font-size: 14px;
+}
+.content--config .mens-mode-text small {
+  color: var(--hfc-text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* ---------- CONFIG: form da mensalidade em COLUNA ÚNICA ----------
+   As regras de grid single-column existentes miram só #game-config-form /
+   #create-game-form por ID; este form ficava no grid base (1fr 1fr auto) e
+   espremia data, regras e nota lado a lado. Força empilhamento full-width. */
+.content--config #mensalidade-config-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+.content--config #mensalidade-config-form > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
+
+/* ---------- HOME: bloqueio por inadimplência (parcial/total) ---------- */
+.home-v2-status.is-blocked {
+  background: rgba(239, 68, 68, 0.20);
+  color: #fecaca;
+}
+.home-v2-primary.is-blocked,
+.home-v2-primary.is-blocked:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.40);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.home-v2-blocked-note {
+  margin: 10px 2px 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #fecaca;
+}
