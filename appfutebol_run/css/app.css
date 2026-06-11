@@ -5551,3 +5551,91 @@ body {
 }
 .content--weekly_game .weekly-presence-section { border-top-color: var(--hfc-glass-border); }
 .content--weekly_game .weekly-presence-main-title { color: var(--hfc-text); }
+
+/* ---------- JOGADORES (Stadium Glass) ---------- */
+.content--players {
+  background: radial-gradient(130% 50% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 38%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);
+}
+.content--players > div:first-child { display: none; }
+
+.content--players .card,
+.content--players .players-admin-panel,
+.content--players .session-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--players .card-title,
+.content--players .players-admin-header h2,
+.content--players .row-title { color: var(--hfc-text); }
+.content--players .row-subtitle,
+.content--players .players-admin-header p,
+.content--players .footer-note { color: var(--hfc-text-muted); }
+
+.content--players .players-admin-header,
+.content--players .players-switch-row,
+.content--players .players-switch-head { border-color: var(--hfc-glass-border); }
+.content--players .players-switch-head {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--hfc-text-muted);
+}
+.content--players .players-switch-row.is-current { background: rgba(143, 180, 255, 0.08); }
+
+.content--players .filter-pill {
+  background: var(--hfc-glass-2);
+  border-color: var(--hfc-glass-border);
+  color: var(--hfc-text-muted);
+}
+.content--players .filter-pill.is-active { background: rgba(143, 180, 255, 0.16); color: var(--hfc-accent-blue); border-color: transparent; }
+.content--players .filter-pill.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); border-color: transparent; }
+.content--players .filter-pill.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); border-color: transparent; }
+
+.content--players .input,
+.content--players .select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--hfc-text);
+}
+.content--players .input::placeholder { color: #6b7691; }
+.content--players .input:focus,
+.content--players .select:focus { border-color: var(--hfc-gold); outline: none; }
+
+.content--players .tag.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); }
+.content--players .tag.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); }
+.content--players .tag.is-neutral { background: rgba(255, 255, 255, 0.08); color: var(--hfc-text-muted); }
+.content--players .switch-track { background: rgba(255, 255, 255, 0.16); }
+.content--players .switch-control.is-on .switch-track { background: var(--hfc-gold); }
+.content--players .switch-label.is-ok { color: var(--hfc-grass); }
+.content--players .switch-label.is-warn { color: var(--hfc-gold-200); }
+.content--players .switch-label.is-neutral { color: var(--hfc-text-muted); }
+.content--players .static-finance-label.is-ok { color: var(--hfc-grass); }
+.content--players .static-finance-label.is-warn { color: var(--hfc-gold-200); }
+
+.content--players .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  border: none;
+}
+.content--players .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--players .avatar { background: rgba(143, 180, 255, 0.16); color: #cfe0ff; }
+.content--players .switch-legend { color: var(--hfc-text-muted); }
+
+.content--players .players-pay-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.content--players .players-pay-due { color: var(--hfc-text-muted); font-size: 13px; }
+.content--players .players-pay-due strong { color: var(--hfc-text); }

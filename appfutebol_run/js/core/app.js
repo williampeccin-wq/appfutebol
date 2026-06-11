@@ -2108,6 +2108,10 @@ function bindAppEvents(currentPlayer) {
     copyTeamDrawToClipboard();
   });
 
+  appElement.querySelector('#copy-payments-btn')?.addEventListener('click', () => {
+    copyPaymentsToClipboard();
+  });
+
   appElement.querySelector('#copy-confirmed-btn')?.addEventListener('click', () => {
     copyConfirmedPresenceToClipboard();
   });
@@ -2707,6 +2711,50 @@ async function copyTeamDrawToClipboard() {
     }
 
     showToast('Times copiados.');
+  } catch (error) {
+    console.error(error);
+    showToast('Não foi possível copiar automaticamente.', 'error');
+  }
+}
+
+function buildPaymentsShareText(snapshot) {
+  const players = (snapshot.players || [])
+    .filter((player) => player && player.plays_football !== false && player.role !== 'carne')
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
+  const unpaid = players.filter((player) => player.mens_ok !== true);
+  const paid = players.filter((player) => player.mens_ok === true);
+  const due = String(snapshot.settings?.mens_expire_date || '').slice(0, 10);
+  const list = (arr) => (arr.length ? arr.map((player, index) => `${index + 1}. ${player.name}`).join('\n') : '—');
+
+  return [
+    '💰 Mensalidade Harmonia FC',
+    due ? `Vencimento: ${formatDate(due)}` : 'Vencimento: não definido',
+    '',
+    `❌ Pendentes (${unpaid.length}):`,
+    list(unpaid),
+    '',
+    `✅ Pagos (${paid.length}):`,
+    list(paid),
+  ].join('\n');
+}
+
+async function copyPaymentsToClipboard() {
+  const text = buildPaymentsShareText(getState());
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    }
+    showToast('Lista de pagamentos copiada.');
   } catch (error) {
     console.error(error);
     showToast('Não foi possível copiar automaticamente.', 'error');

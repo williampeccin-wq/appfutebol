@@ -135,6 +135,8 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
   const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
+  const mensDue = String(snapshot?.settings?.mens_expire_date || '').slice(0, 10);
+  const mensDueLabel = mensDue ? mensDue.split('-').reverse().join('/') : 'não definido';
 
   return `
     <section class="section-stack">
@@ -170,6 +172,13 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             <span class="filter-pill is-ok">Dentro do jogo <strong>${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</strong></span>
           </div>
         </div>
+
+        ${isAdmin(currentPlayer) ? `
+          <div class="players-pay-actions">
+            <span class="players-pay-due">Vencimento da mensalidade: <strong>${mensDueLabel}</strong></span>
+            <button class="btn btn-secondary btn-sm" type="button" id="copy-payments-btn">Copiar pagos/pendentes</button>
+          </div>
+        ` : ''}
 
         <div class="players-switch-table" role="table" aria-label="Jogadores">
           <div class="players-switch-head" role="row">
