@@ -6148,3 +6148,97 @@ body {
   line-height: 1.35;
   color: #fecaca;
 }
+
+/* ---------- LOGIN: aviso informativo (ex.: sessão expirada) ---------- */
+.message-box.is-info {
+  background: rgba(143, 180, 255, 0.12);
+  color: #dbe7ff;
+  border: 1px solid rgba(143, 180, 255, 0.30);
+}
+
+/* ---------- JOGADORES: formulário "Novo jogador" colapsável ---------- */
+.content--players .player-create-details {
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: 16px;
+  background: var(--hfc-glass-2);
+  overflow: hidden;
+}
+.content--players .player-create-details[open] {
+  background: transparent;
+}
+.content--players .player-create-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.content--players .player-create-summary::-webkit-details-marker { display: none; }
+.content--players .player-create-summary .card-title { margin: 0; }
+.content--players .player-create-open-indicator {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+.content--players .player-create-details[open] .player-create-summary {
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.content--players .player-create-details[open] .player-create-open-indicator { display: none; }
+.content--players .player-create-details .player-admin-form { padding: 14px 16px 16px; }
+
+/* ---------- CAMPEONATO: histórico navegável (cada temporada colapsável) ---------- */
+.content--championship .history-section-label {
+  margin: 16px 2px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hfc-accent-blue);
+}
+.content--championship .history-list { display: grid; gap: 10px; }
+.content--championship .history-year {
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: 14px;
+  background: var(--hfc-glass-2);
+  overflow: hidden;
+}
+.content--championship .history-year-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.content--championship .history-year-summary::-webkit-details-marker { display: none; }
+.content--championship .history-year-name {
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--hfc-text);
+}
+.content--championship .history-year-hint {
+  font-size: 12px;
+  color: var(--hfc-text-muted);
+}
+.content--championship .history-year[open] .history-year-summary {
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.content--championship .history-year > .championship-table-wrap { padding: 8px 12px 12px; }
+
+/* Histórico anual simples (Pos/Jogador/Pts): cabe sem scroll lateral; PTS sempre visível */
+.content--championship .championship-table-simple {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.content--championship .championship-table-simple th:first-child,
+.content--championship .championship-table-simple td:first-child { width: 56px; }
+.content--championship .championship-table-simple th:last-child,
+.content--championship .championship-table-simple td:last-child { width: 56px; text-align: center; }
+.content--championship .championship-table-simple .championship-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

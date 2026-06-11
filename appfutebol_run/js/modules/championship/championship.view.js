@@ -339,7 +339,7 @@ function renderSimpleAnnualHistoryTable(rows) {
   if (!rows.length) return '<div class="empty-state">Sem dados.</div>';
   return `
     <div class="championship-table-wrap">
-      <table class="championship-table">
+      <table class="championship-table championship-table-simple">
         <thead><tr><th>Pos.</th><th>Jogador</th><th>Pts</th></tr></thead>
         <tbody>
           ${rows.map((row) => `
@@ -362,29 +362,33 @@ function renderHistoricalBlock(snapshot, ) {
   return `
     <section class="card">
       <div class="card-title">Histórico estático</div>
-      <p class="footer-note">Importado do arquivo Rei da Quadra. Nesta versão o histórico é somente leitura; o campeonato atual é calculado pelo app.</p>
-      <details class="history-details" open>
-        <summary>Anuais</summary>
-        <div class="history-grid">
-          ${annual.map((item) => `
-            <div class="history-card">
-              <div class="history-title">${item.year}</div>
-              ${renderSimpleAnnualHistoryTable(item.rows.slice(0, 10))}
-            </div>
-          `).join('')}
-        </div>
-      </details>
-      <details class="history-details">
-        <summary>Campeonatos anteriores</summary>
-        <div class="history-grid">
-          ${tournaments.map((item) => `
-            <div class="history-card">
-              <div class="history-title">${escapeHtml(item.name)}</div>
-              ${renderRankingTable(item.rows.slice(0, 10), { snapshot })}
-            </div>
-          `).join('')}
-        </div>
-      </details>
+      <p class="footer-note">Importado do arquivo Rei da Quadra. Somente leitura; o campeonato atual é calculado pelo app. Toque em cada temporada para abrir.</p>
+
+      <div class="history-section-label">Anuais</div>
+      <div class="history-list">
+        ${annual.map((item, index) => `
+          <details class="history-year"${index === 0 ? ' open' : ''}>
+            <summary class="history-year-summary">
+              <span class="history-year-name">${item.year}</span>
+              <span class="history-year-hint">${item.rows.length} jogador${item.rows.length === 1 ? '' : 'es'}</span>
+            </summary>
+            ${renderSimpleAnnualHistoryTable(item.rows.slice(0, 10))}
+          </details>
+        `).join('')}
+      </div>
+
+      <div class="history-section-label">Campeonatos anteriores</div>
+      <div class="history-list">
+        ${tournaments.map((item, index) => `
+          <details class="history-year"${index === 0 ? ' open' : ''}>
+            <summary class="history-year-summary">
+              <span class="history-year-name">${escapeHtml(item.name)}</span>
+              <span class="history-year-hint">${item.rows.length} jogador${item.rows.length === 1 ? '' : 'es'}</span>
+            </summary>
+            ${renderRankingTable(item.rows.slice(0, 10), { snapshot })}
+          </details>
+        `).join('')}
+      </div>
     </section>
   `;
 }

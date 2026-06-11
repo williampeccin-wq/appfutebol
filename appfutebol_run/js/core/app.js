@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.71.2-mensalidade';
+window.__HARMONIA_BUILD__ = 'v1.71.3-ui';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -131,10 +131,15 @@ function setPlayerFormMode(isEditing) {
   const submitButton = document.querySelector('[data-action="add-player"]');
   const cancelButton = document.getElementById('cancel-edit-button');
   const title = document.getElementById('player-management-title');
+  const details = document.getElementById('player-form-details');
+  const indicator = document.querySelector('.player-create-open-indicator');
 
   if (submitButton) submitButton.textContent = isEditing ? 'Salvar alteração' : 'Adicionar';
   if (cancelButton) cancelButton.style.display = isEditing ? 'inline-flex' : 'none';
-  if (title) title.textContent = isEditing ? 'Editando jogador' : 'Gerenciar jogadores';
+  if (title) title.textContent = isEditing ? 'Editando jogador' : 'Novo jogador';
+  if (indicator) indicator.style.display = isEditing ? 'none' : '';
+  // Ao editar, o formulário precisa estar aberto para ser visível/preenchido.
+  if (details && isEditing) details.open = true;
 }
 
 function resetPlayerForm() {
@@ -162,6 +167,8 @@ function resetPlayerForm() {
     photoInput.dataset.photoDataUrl = "";
   }
   setPlayerPhotoPreview("", "");
+  // Volta o formulário ao estado recolhido ("Novo jogador") após adicionar/cancelar.
+  document.getElementById('player-form-details')?.removeAttribute('open');
 }
 
 function normalizePlayer(player) {
@@ -1765,7 +1772,7 @@ async function handleExpiredSession() {
   if (!getCurrentPlayer()) return;
   console.warn('[auth] Sessão do Supabase expirou (401/403). Encerrando sessão e voltando ao login.');
   await logout();
-  patchState({ ui: { authMode: 'login', authMessage: 'Sua sessão expirou. Faça login novamente.' } });
+  patchState({ ui: { authMode: 'login', authMessage: { type: 'info', text: 'Sua sessão expirou por segurança. Faça login novamente para continuar.' } } });
 }
 
 function startRemoteSync() {
