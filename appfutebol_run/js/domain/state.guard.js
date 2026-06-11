@@ -1,4 +1,4 @@
-import { MENSALIDADE_ENFORCEMENT_ENABLED } from './rules.engine.js';
+import { getMensalidadeMode, MENSALIDADE_MODES } from './rules.engine.js';
 
 function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
@@ -229,8 +229,9 @@ function getPlayerIdFromDrawEntry(entry) {
 export function enforceFinancialPresenceConsistency(state) {
   const nextState = clone(state || {});
   const warnings = [];
-  // Controle de mensalidade pausado: não remover ninguém automaticamente.
-  if (!MENSALIDADE_ENFORCEMENT_ENABLED) {
+  // Remoção automática de inadimplente confirmado SÓ no "Bloqueio total".
+  // Nos modos 'none' e 'partial' ninguém é removido por mensalidade.
+  if (getMensalidadeMode(nextState.settings) !== MENSALIDADE_MODES.TOTAL) {
     return { state: nextState, warnings };
   }
   const players = Array.isArray(nextState.players) ? nextState.players : [];
