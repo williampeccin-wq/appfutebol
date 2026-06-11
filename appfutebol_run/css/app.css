@@ -5859,3 +5859,109 @@ body {
 /* Header do app rola junto (nav agora é inferior); libera o topo para o
    cabeçalho congelado das tabelas */
 .header { position: static; }
+
+/* ---------- CARNE (Stadium Glass) ---------- */
+.content--carne {
+  background: radial-gradient(130% 48% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 38%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);
+}
+.content--carne > div:first-child { display: none; }
+
+.content--carne .card,
+.content--carne .session-card,
+.content--carne .carne-schedule-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--carne .card-title,
+.content--carne .carne-schedule-title,
+.content--carne .row-title { color: var(--hfc-text); }
+.content--carne .carne-schedule-subtitle,
+.content--carne .carne-schedule-list-head,
+.content--carne .row-subtitle,
+.content--carne .footer-note,
+.content--carne .empty-inline,
+.content--carne .carne-next-note { color: var(--hfc-text-muted); }
+
+.content--carne .carne-schedule-item,
+.content--carne .carne-schedule-item:nth-child(odd) {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--carne .carne-schedule-item.is-next {
+  background: rgba(240, 165, 0, 0.10);
+  border-color: rgba(240, 165, 0, 0.30);
+  box-shadow: inset 4px 0 0 var(--hfc-gold);
+}
+.content--carne .carne-date-box,
+.content--carne .carne-player-box {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--carne .carne-date-box small,
+.content--carne .carne-next-pill span { color: var(--hfc-text-muted); }
+.content--carne .carne-next-pill {
+  background: rgba(240, 165, 0, 0.14);
+  color: var(--hfc-gold-200);
+}
+.content--carne .carne-next-pill strong { color: var(--hfc-text); }
+
+.content--carne .filter-pill {
+  background: var(--hfc-glass-2);
+  border-color: var(--hfc-glass-border);
+  color: var(--hfc-text-muted);
+}
+.content--carne .filter-pill.is-active { background: rgba(143, 180, 255, 0.16); color: var(--hfc-accent-blue); border-color: transparent; }
+.content--carne .filter-pill.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); border-color: transparent; }
+.content--carne .filter-pill.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); border-color: transparent; }
+
+.content--carne .input,
+.content--carne .select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--hfc-text);
+}
+.content--carne .input::placeholder { color: #6b7691; }
+.content--carne .input:focus,
+.content--carne .select:focus { border-color: var(--hfc-gold); outline: none; }
+
+.content--carne .tag.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); }
+.content--carne .tag.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); }
+.content--carne .tag.is-neutral { background: rgba(255, 255, 255, 0.08); color: var(--hfc-text-muted); }
+.content--carne .position-pill { background: rgba(143, 180, 255, 0.16); color: var(--hfc-accent-blue); border-color: transparent; }
+.content--carne .avatar { background: rgba(143, 180, 255, 0.16); color: #cfe0ff; }
+
+.content--carne .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  border: none;
+}
+.content--carne .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+
+/* Carne: cards de resumo (kpi) em vidro */
+.content--carne .kpi-box {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+  box-shadow: none;
+}
+.content--carne .kpi-value { color: var(--hfc-text); }
+.content--carne .kpi-label { color: var(--hfc-text-muted); }
+
+/* Botões de excluir (btn-danger) nas telas escuras */
+.content--carne .btn-danger,
+.content--championship .btn-danger,
+.content--weekly_game .btn-danger,
+.content--players .btn-danger {
+  background: rgba(240, 137, 123, 0.16);
+  color: #f0897b;
+  border: 1px solid rgba(240, 137, 123, 0.35);
+}
