@@ -80,7 +80,11 @@ function renderPlayerManagementCard(currentPlayer) {
 
   return `
     <section class="card" id="player-management-card">
-      <div class="card-title" id="player-management-title">Gerenciar jogadores</div>
+      <details class="player-create-details" id="player-form-details">
+        <summary class="player-create-summary">
+          <span class="card-title" id="player-management-title">Novo jogador</span>
+          <span class="btn btn-secondary btn-sm player-create-open-indicator">Adicionar jogador</span>
+        </summary>
       <div class="player-admin-form">
         <input id="new-name" class="input" type="text" placeholder="Nome" />
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
@@ -112,6 +116,7 @@ function renderPlayerManagementCard(currentPlayer) {
 
         <div class="player-admin-actions"><button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button><button class="btn btn-secondary" type="button" data-action="cancel-edit" id="cancel-edit-button" style="display:none;">Cancelar</button></div>
       </div>
+      </details>
     </section>
   `;
 }
