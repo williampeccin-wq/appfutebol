@@ -9,6 +9,32 @@ import { validateAndRepairState, sanitizeUi } from '../domain/state.guard.js';
 const STORAGE_KEY = 'harmonia_browser_state';
 const LEGACY_STORAGE_KEY = 'harmonia_data';
 
+let __quotaWarned = false;
+
+// Gravação tolerante a falhas de localStorage. Em modo privado/anônimo ou com a
+// cota estourada (o estado carrega fotos base64), setItem lança — e como a
+// persistência roda dentro do ciclo de clique, esse throw quebrava a ação e
+// impedia o render seguinte. Aqui apenas avisamos e seguimos: o estado remoto
+// (Supabase) continua sendo a fonte de verdade.
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    const isQuota = error && (error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014);
+    if (isQuota && !__quotaWarned) {
+      __quotaWarned = true;
+      try {
+        window.dispatchEvent(new CustomEvent('harmonia:storage-full'));
+      } catch (_) {}
+      console.warn('[storage.local] Armazenamento local cheio (provável foto grande). Continuando só com o Supabase.');
+    } else if (!isQuota) {
+      console.warn('[storage.local] localStorage indisponível; seguindo sem cache local.', error);
+    }
+    return false;
+  }
+}
+
 const defaultSeed = {
   session: {
     playerId: null,
@@ -230,12 +256,18 @@ function buildMergedData(parsed) {
 }
 
 export function loadLocalState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  // Em modo privado estrito até LER o localStorage pode lançar; protegemos.
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('[storage.local] localStorage indisponível para leitura; usando seed.', error);
+  }
 
   if (!raw) {
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    safeSetItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -256,17 +288,17 @@ export function loadLocalState() {
     }
 
     if (normalizedRaw !== raw) {
-      localStorage.setItem(STORAGE_KEY, normalizedRaw);
+      safeSetItem(STORAGE_KEY, normalizedRaw);
     }
 
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (_) {}
 
     return repaired.state;
   } catch (error) {
     console.warn('Falha ao ler dados locais. Seed padrão foi restaurada.', error);
     const seed = validateAndRepairState(normalizeData(structuredClone(defaultSeed)), { defaultSeed }).state;
     if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    safeSetItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }
@@ -283,7 +315,7 @@ export function saveLocalState(data) {
   }
 
   if (__isValidStateForWrite(repaired.state)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(repaired.state));
+    safeSetItem(STORAGE_KEY, JSON.stringify(repaired.state));
   } else {
     console.warn("[storage.local] blocked invalid repaired.state write");
   }
@@ -292,7 +324,7 @@ export function saveLocalState(data) {
 export function resetLocalState() {
   const seed = normalizeData(structuredClone(defaultSeed));
   if (__isValidStateForWrite(seed)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+    safeSetItem(STORAGE_KEY, JSON.stringify(seed));
   } else {
     console.warn("[storage.local] blocked invalid seed write");
   }

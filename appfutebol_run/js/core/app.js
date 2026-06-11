@@ -182,7 +182,10 @@ function normalizePlayer(player) {
 }
 
 function repairManualSnapshot(snapshot) {
-  const repaired = validateAndRepairState(snapshot);
+  // enforceFinance: true -> a regra de bloqueio total (remover inadimplente
+  // confirmado) só roda em ações explícitas do admin (marcar inadimplente,
+  // salvar modo "total"), nunca no poll de sync. Ver state.guard.js.
+  const repaired = validateAndRepairState(snapshot, { enforceFinance: true });
   if (repaired.warnings.length) {
     console.warn('[app] Reparos aplicados antes do save manual:', repaired.warnings);
   }
@@ -1662,6 +1665,33 @@ const REMOTE_SYNC_INTERVAL_MS = 4000;
 let isApplyingRemoteState = false;
 let lastDomainFingerprint = '';
 
+// Rede de segurança global: erros não tratados (síncronos ou de promessas) não
+// devem passar despercebidos. Apenas registram no console — a recuperação de
+// "tela branca" é feita pelos try/catch de init()/render() abaixo.
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[harmonia] Promessa não tratada:', event.reason);
+});
+window.addEventListener('error', (event) => {
+  console.error('[harmonia] Erro não tratado:', event.error || event.message);
+});
+
+// Tela de fallback quando init()/render() lançam: evita ficar preso no boot
+// screen ou com a tela em branco, e oferece recarregar.
+function renderFatalError() {
+  try {
+    appElement.innerHTML = `
+      <div class="fatal-screen">
+        <div class="fatal-card">
+          <div class="fatal-title">Ops, algo deu errado</div>
+          <p class="fatal-text">O app encontrou um erro inesperado ao desenhar a tela. Seus dados continuam salvos. Tente recarregar.</p>
+          <button class="btn btn-primary" type="button" onclick="window.location.reload()">Recarregar</button>
+        </div>
+      </div>`;
+  } catch (_) {
+    appElement.textContent = 'Erro ao carregar. Recarregue a página.';
+  }
+}
+
 init();
 
 
@@ -1687,6 +1717,15 @@ function requireCriticalOperationAllowed(operation, trigger = null) {
 }
 
 async function init() {
+  try {
+    await initInner();
+  } catch (err) {
+    console.error('[harmonia] Falha no boot do app:', err);
+    renderFatalError();
+  }
+}
+
+async function initInner() {
   displayEnvironmentSafetyBanner();
   await prepareStoredSession();
 
@@ -1717,6 +1756,10 @@ async function init() {
 }
 
 function bindGlobalSystemEvents() {
+  window.addEventListener('harmonia:storage-full', () => {
+    showToast('Armazenamento do aparelho cheio. Os dados seguem salvos no servidor; considere remover fotos grandes.', 'error');
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -1837,6 +1880,17 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  // Qualquer throw aqui apagaria a tela (innerHTML) sem repintar. O try/catch
+  // garante uma tela de erro recuperável em vez de "tela branca" travada.
+  try {
+    renderInner(snapshot);
+  } catch (err) {
+    console.error('[harmonia] Falha ao renderizar a tela:', err);
+    renderFatalError();
+  }
+}
+
+function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
   // Antes este banner somava confirmações de TODOS os jogos e incluía
   // goleiros/carne, divergindo do resto da home e do banco.

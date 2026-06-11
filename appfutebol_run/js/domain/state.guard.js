@@ -248,7 +248,11 @@ export function enforceFinancialPresenceConsistency(state) {
         if (!player || !player.id) return false;
         const isCarneOnly = player.role === 'carne';
         const playsFootball = player.plays_football !== false && !isCarneOnly;
-        return playsFootball && player.mens_ok !== true;
+        // IMPORTANTE: só remove quem é EXPLICITAMENTE inadimplente (mens_ok === false).
+        // Antes era `!== true`, então jogadores cujo registro chegasse SEM o campo
+        // (undefined, comum em sync parcial) eram removidos mesmo estando em dia —
+        // causa do sumiço "16/16 -> 14/16".
+        return playsFootball && player.mens_ok === false;
       })
       .map((player) => String(player.id))
   );
@@ -258,9 +262,31 @@ export function enforceFinancialPresenceConsistency(state) {
   }
 
   const confirmations = Array.isArray(nextState.confirmations) ? nextState.confirmations : [];
-  const nextConfirmations = confirmations.filter((entry) => !blockedPlayerIds.has(String(entry?.player_id || '')));
-  if (nextConfirmations.length !== confirmations.length) {
-    warnings.push('Confirmação removida automaticamente de jogador inadimplente.');
+  const now = new Date().toISOString();
+  let changedConfirmations = false;
+  // Em vez de SUMIR com a confirmação do array (o que nunca era propagado ao
+  // Supabase, deixando 16 no banco e 14 na tela), marcamos como CANCELADA. Assim
+  // o persistidor faz upsert do estado cancelado e a contagem converge entre
+  // dispositivos. Só transiciona quem ainda está confirmado (idempotente).
+  const nextConfirmations = confirmations.map((entry) => {
+    if (blockedPlayerIds.has(String(entry?.player_id || '')) && entry?.confirmed === true) {
+      changedConfirmations = true;
+      return {
+        ...entry,
+        confirmed: false,
+        status: 'cancelled',
+        removed_by_admin: false,
+        confirmed_at: null,
+        cancelled_at: now,
+        waitlisted_at: null,
+        waitlist_position: null,
+        timestamp: now,
+      };
+    }
+    return entry;
+  });
+  if (changedConfirmations) {
+    warnings.push('Confirmação cancelada automaticamente de jogador inadimplente (bloqueio total).');
   }
   nextState.confirmations = nextConfirmations;
 
@@ -347,9 +373,15 @@ export function validateAndRepairState(state, options = {}) {
   nextState = confirmationsResult.state;
   warnings.push(...confirmationsResult.warnings);
 
-  const financialPresenceResult = enforceFinancialPresenceConsistency(nextState);
-  nextState = financialPresenceResult.state;
-  warnings.push(...financialPresenceResult.warnings);
+  // A remoção destrutiva de inadimplentes (bloqueio total) NÃO roda no caminho
+  // de load/save/sync — só quando explicitamente pedida (ações de admin), via
+  // options.enforceFinance. Antes rodava a cada poll (4s) em todo cliente,
+  // removendo confirmados sem ação do admin e sem convergir.
+  if (options.enforceFinance) {
+    const financialPresenceResult = enforceFinancialPresenceConsistency(nextState);
+    nextState = financialPresenceResult.state;
+    warnings.push(...financialPresenceResult.warnings);
+  }
 
   const rankingResult = sanitizeRanking(nextState);
   nextState = rankingResult.state;
