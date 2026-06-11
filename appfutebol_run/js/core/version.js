@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.70.49-champ-removal-points';
+export const APP_VERSION = 'v1.70.50-champ-matrix-removed';

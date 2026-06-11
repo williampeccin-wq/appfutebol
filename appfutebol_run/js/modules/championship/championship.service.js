@@ -572,7 +572,7 @@ export function getManualChampionshipResults(snapshot) {
 // Mapa game_key -> jogadores removidos do jogo por admin. Quem foi removido da
 // escalação não pontua naquele jogo, mesmo que um resultado já tenha sido
 // lançado antes da remoção (rede de segurança para dados já gravados).
-function buildRemovedByGameKey(snapshot) {
+export function buildRemovedByGameKey(snapshot) {
   const map = new Map();
   (Array.isArray(snapshot?.confirmations) ? snapshot.confirmations : []).forEach((entry) => {
     if (!entry || entry.confirmed === true) return;
