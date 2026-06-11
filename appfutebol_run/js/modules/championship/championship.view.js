@@ -154,9 +154,9 @@ function renderRoundMatrix(snapshot) {
       <table class="championship-table championship-matrix-table">
         <thead>
           <tr>
-            <th>Pos.</th>
-            <th class="championship-matrix-name-col">Jogador</th>
-            <th>Pts</th>
+            <th class="cm-freeze cm-c1">Pos.</th>
+            <th class="cm-freeze cm-c2 championship-matrix-name-col">Jogador</th>
+            <th class="cm-freeze cm-c3">Pts</th>
             <th>V</th><th>E</th><th>D</th><th>WO</th><th>Ap</th>
             ${rounds.map((round) => `<th title="${escapeHtml(round.date)}">${shortRoundLabel(round.date)}</th>`).join('')}
           </tr>
@@ -166,9 +166,9 @@ function renderRoundMatrix(snapshot) {
             const ap = row.played ? Math.round((row.points / (3 * row.played)) * 100) : null;
             return `
               <tr>
-                <td><span class="rank-badge">${row.rank}</span></td>
-                <td class="championship-player-name championship-matrix-name-col">${escapeHtml(row.name)}</td>
-                <td><strong>${row.points}</strong></td>
+                <td class="cm-freeze cm-c1"><span class="rank-badge">${row.rank}</span></td>
+                <td class="cm-freeze cm-c2 championship-player-name championship-matrix-name-col"><div class="cm-name">${renderChampionshipPlayerAvatar(snapshot, row)}<span>${escapeHtml(row.name)}</span></div></td>
+                <td class="cm-freeze cm-c3"><strong>${row.points}</strong></td>
                 <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
                 <td>${ap === null ? '–' : `${ap}%`}</td>
                 ${rounds.map((round) => {

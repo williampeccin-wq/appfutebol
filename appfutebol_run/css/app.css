@@ -5764,3 +5764,32 @@ body {
   color: var(--hfc-text);
   border: 1px solid var(--hfc-glass-border);
 }
+
+/* Campeonato: avatar na matriz + colunas congeladas (Pos/Jogador/Pts) na rolagem lateral */
+.content--championship .championship-matrix-table .cm-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.content--championship .championship-matrix-table .cm-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.content--championship .championship-matrix-table .championship-ranking-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+  font-size: 11px !important;
+}
+.content--championship .championship-matrix-table .cm-freeze {
+  position: sticky;
+  z-index: 2;
+  background: #101f3e;
+}
+.content--championship .championship-matrix-table thead .cm-freeze { z-index: 3; }
+.content--championship .championship-matrix-table .cm-c1 { left: 0; width: 44px; min-width: 44px; }
+.content--championship .championship-matrix-table .cm-c2 { left: 44px; width: 150px; min-width: 150px; max-width: 150px; }
+.content--championship .championship-matrix-table .cm-c3 { left: 194px; width: 48px; min-width: 48px; }
