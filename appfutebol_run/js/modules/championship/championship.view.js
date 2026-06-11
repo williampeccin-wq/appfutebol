@@ -10,6 +10,7 @@ import {
   getHistoricalTournaments,
   getResultSummary,
   getEffectiveChampionshipResults,
+  buildRemovedByGameKey,
   getResultAuditRows,
   getActiveDrawTeams,
   getChampionshipDrawOptions,
@@ -145,6 +146,7 @@ function renderRoundMatrix(snapshot) {
   }
 
   const rounds = getEffectiveChampionshipResults(snapshot);
+  const removedByGameKey = buildRemovedByGameKey(snapshot);
   const pointsByStatus = { win: 3, draw: 2, loss: 1, no_play: 0 };
 
   return `
@@ -170,7 +172,10 @@ function renderRoundMatrix(snapshot) {
                 <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
                 <td>${ap === null ? '–' : `${ap}%`}</td>
                 ${rounds.map((round) => {
-                  const status = round.statuses?.[String(row.player_id)] || 'no_play';
+                  const removedSet = round.game_key ? removedByGameKey.get(String(round.game_key)) : null;
+                  const status = (removedSet && removedSet.has(String(row.player_id)))
+                    ? 'no_play'
+                    : (round.statuses?.[String(row.player_id)] || 'no_play');
                   const pts = pointsByStatus[status] ?? 0;
                   return `<td class="championship-matrix-cell ${getStatusClass(status)}">${pts}</td>`;
                 }).join('')}
