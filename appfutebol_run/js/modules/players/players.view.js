@@ -135,6 +135,8 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
   const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
+  const mensDue = String(snapshot?.settings?.mens_expire_date || '').slice(0, 10);
+  const mensDueLabel = mensDue ? mensDue.split('-').reverse().join('/') : 'não definido';
 
   return `
     <section class="section-stack">
@@ -170,6 +172,13 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             <span class="filter-pill is-ok">Dentro do jogo <strong>${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</strong></span>
           </div>
         </div>
+
+        ${isAdmin(currentPlayer) ? `
+          <div class="players-pay-actions">
+            <span class="players-pay-due">Vencimento da mensalidade: <strong>${mensDueLabel}</strong></span>
+            <button class="btn btn-secondary btn-sm" type="button" id="copy-payments-btn">Copiar pagos/pendentes</button>
+          </div>
+        ` : ''}
 
         <div class="players-switch-table" role="table" aria-label="Jogadores">
           <div class="players-switch-head" role="row">
@@ -488,10 +497,10 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
       </div>
 
       <div class="player-row-actions" role="cell">
-        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador">✎</button>` : ''}
-        ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha">🔑</button>` : ''}
+        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>` : ''}
+        ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>` : ''}
         ${isAdmin(currentPlayer) && !player.auth_user_id ? `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}" title="Criar acesso" aria-label="Criar acesso">Criar acesso</button>` : ''}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador">🗑</button>` : ''}
+        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
       </div>
     </div>
   `;
