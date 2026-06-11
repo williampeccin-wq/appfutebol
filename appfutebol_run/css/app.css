@@ -6112,3 +6112,19 @@ body {
   font-size: 12px;
   line-height: 1.3;
 }
+
+/* ---------- CONFIG: form da mensalidade em COLUNA ÚNICA ----------
+   As regras de grid single-column existentes miram só #game-config-form /
+   #create-game-form por ID; este form ficava no grid base (1fr 1fr auto) e
+   espremia data, regras e nota lado a lado. Força empilhamento full-width. */
+.content--config #mensalidade-config-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+.content--config #mensalidade-config-form > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
