@@ -1,3 +1,4 @@
+import { MENSALIDADE_ENFORCEMENT_ENABLED } from './rules.engine.js';
 
 function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
@@ -228,6 +229,10 @@ function getPlayerIdFromDrawEntry(entry) {
 export function enforceFinancialPresenceConsistency(state) {
   const nextState = clone(state || {});
   const warnings = [];
+  // Controle de mensalidade pausado: não remover ninguém automaticamente.
+  if (!MENSALIDADE_ENFORCEMENT_ENABLED) {
+    return { state: nextState, warnings };
+  }
   const players = Array.isArray(nextState.players) ? nextState.players : [];
   // Vencimento da mensalidade é global (settings), com fallback ao valor legado por-jogo.
   const dueDate = String(nextState.settings?.mens_expire_date || nextState.game?.mens_expire_date || '').slice(0, 10);
