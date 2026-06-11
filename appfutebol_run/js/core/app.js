@@ -1875,7 +1875,7 @@ function render(snapshot) {
       ${canAccessConfig(currentPlayer) ? renderNavButton('config', 'Config', activeTab) : ''}
     </nav>
 
-    <main class="content">
+    <main class="content content--${activeTab}">
       <div style="padding:10px;font-weight:bold;">
 ${confirmedCount} / ${maxPlayers} jogadores de linha confirmados
 </div>

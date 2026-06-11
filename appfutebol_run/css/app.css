@@ -5315,3 +5315,113 @@ body {
   border-radius: 14px;
   box-shadow: 0 8px 20px rgba(240, 165, 0, 0.32);
 }
+
+/* ---------- HOME (Stadium Glass) ---------- */
+.content--home {
+  background: radial-gradient(130% 60% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  position: relative;
+  overflow: hidden;
+}
+.content--home::before {
+  content: '';
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  width: 300px;
+  height: 300px;
+  margin-left: -150px;
+  border: 1.5px solid var(--hfc-line);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.content--home::after {
+  content: '';
+  position: absolute;
+  top: 214px;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: var(--hfc-line);
+  pointer-events: none;
+}
+.content--home > * {
+  position: relative;
+  z-index: 1;
+}
+.content--home > div:first-child {
+  display: none;
+}
+.content--home .home-v2-hero {
+  background:
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.16), transparent 16rem),
+    linear-gradient(150deg, rgba(27, 58, 115, 0.55), rgba(10, 18, 38, 0.6));
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: var(--hfc-radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+}
+.content--home .home-v2-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  box-shadow: 0 8px 20px rgba(240, 165, 0, 0.32);
+}
+.content--home .home-v2-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .home-v2-metric {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+.content--home .home-v2-metric strong { color: var(--hfc-text); }
+.content--home .home-v2-metric span { color: var(--hfc-text-muted); }
+.content--home .home-v2-card,
+.content--home .home-v2-profile {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+}
+.content--home .home-v2-goalkeepers { background: var(--hfc-glass-2); }
+.content--home .home-v2-card-head strong,
+.content--home .home-v2-profile strong { color: var(--hfc-text); }
+.content--home .home-v2-card-head span,
+.content--home .home-v2-profile span { color: var(--hfc-text-muted); }
+.content--home .home-v2-link {
+  background: rgba(240, 165, 0, 0.14);
+  color: var(--hfc-gold-200);
+}
+.content--home .home-v2-count {
+  background: rgba(143, 180, 255, 0.16);
+  color: var(--hfc-accent-blue);
+}
+.content--home .home-v2-confirmed-group {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .home-v2-confirmed-goalkeepers {
+  background: rgba(143, 180, 255, 0.08);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .home-v2-confirmed-group-title { color: var(--hfc-accent-blue); }
+.content--home .home-v2-goalie-names { color: var(--hfc-text-muted); }
+.content--home .home-v2-rental-goalie-avatar {
+  background: rgba(143, 180, 255, 0.16);
+  color: var(--hfc-accent-blue);
+}
+.content--home .home-v2-notice {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .home-v2-notice:nth-child(1) > span { background: transparent; }
+.content--home .home-v2-notice strong { color: var(--hfc-text); }
+.content--home .home-v2-notice small,
+.content--home .home-v2-notice > span { color: var(--hfc-text-muted); }
+.content--home .home-v2-empty { color: var(--hfc-text-muted); }
+.content--home .home-carne-text { color: var(--hfc-text-muted); }
