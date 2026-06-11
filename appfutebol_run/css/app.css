@@ -5216,7 +5216,7 @@ button {
   --hfc-glass: rgba(255, 255, 255, 0.06);
   --hfc-glass-2: rgba(255, 255, 255, 0.05);
   --hfc-glass-border: rgba(255, 255, 255, 0.12);
-  --hfc-line: rgba(150, 195, 255, 0.10);
+  --hfc-line: rgba(150, 195, 255, 0.16);
   --hfc-text: #eef2f9;
   --hfc-text-muted: #8b97b0;
   --hfc-text-dim: #7e8aa3;
@@ -5352,7 +5352,9 @@ body {
   display: none;
 }
 .content--home .home-v2-hero {
+  position: relative;
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.11' stroke-width='2'%3E%3Ccircle cx='160' cy='110' r='52'/%3E%3Cline x1='0' y1='110' x2='320' y2='110'/%3E%3Crect x='98' y='-2' width='124' height='48' rx='3'/%3E%3Crect x='98' y='174' width='124' height='48' rx='3'/%3E%3C/g%3E%3Ccircle cx='160' cy='110' r='3' fill='%23ffffff' fill-opacity='0.14'/%3E%3C/svg%3E") center / cover no-repeat,
     radial-gradient(circle at top right, rgba(240, 165, 0, 0.16), transparent 16rem),
     linear-gradient(150deg, rgba(27, 58, 115, 0.55), rgba(10, 18, 38, 0.6));
   border: 1px solid var(--hfc-glass-border);
@@ -5360,6 +5362,7 @@ body {
   backdrop-filter: blur(14px);
   border-radius: var(--hfc-radius-lg);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
 }
 .content--home .home-v2-primary {
   background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
