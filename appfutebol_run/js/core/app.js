@@ -3052,7 +3052,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
           return `
             <div class="placeholder-row team-draw-player-row">
               <div class="placeholder-main team-draw-player-main">
-                <div class="avatar">${getInitials(player?.name || '?')}</div>
+                ${renderAvatarForApp(player)}
                 <div class="team-draw-player-text">
                   <div class="row-title">${(player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : ''}${player?.name || 'Jogador removido'}</div>
                   <div class="row-subtitle">${getPositionLabel(player?.position)}</div>

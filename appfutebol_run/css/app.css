@@ -5965,3 +5965,93 @@ body {
   color: #f0897b;
   border: 1px solid rgba(240, 137, 123, 0.35);
 }
+
+/* Jogadores: card de upload de foto em vidro (corrige contraste do nome/título) */
+.content--players .player-photo-upload {
+  background: var(--hfc-glass-2);
+  border: 1px dashed var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--players .player-photo-preview {
+  background: rgba(143, 180, 255, 0.16) !important;
+  color: var(--hfc-text) !important;
+}
+.content--players .player-photo-upload-copy strong { color: var(--hfc-text); }
+.content--players .player-photo-upload-copy small { color: var(--hfc-text-muted); }
+
+/* Carne: form de cadastro da dupla — empilha em coluna única para o
+   container estreito (~390px). Em 3 colunas o select de "Responsável 1"
+   ficava espremido/truncado. Cada campo ocupa a largura total. */
+.content--carne .carne-schedule-form {
+  grid-template-columns: 1fr;
+}
+.content--carne .carne-schedule-form .player-admin-actions {
+  grid-column: 1 / -1;
+}
+
+/* ---------- CONFIG (Stadium Glass) ---------- */
+.content--config {
+  background: radial-gradient(130% 46% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 38%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);
+}
+.content--config > div:first-child { display: none; }
+
+.content--config .card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--config .games-config-card { border-color: var(--hfc-glass-border); }
+.content--config .card-title,
+.content--config .game-config-summary-main strong,
+.content--config .create-game-summary strong,
+.content--config .field-label { color: var(--hfc-text); }
+.content--config .game-config-summary-main span,
+.content--config .create-game-summary small,
+.content--config .footer-note,
+.content--config .config-notifications-help { color: var(--hfc-text-muted); }
+
+.content--config .input,
+.content--config .notification-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--hfc-text);
+}
+.content--config .input::placeholder,
+.content--config .notification-textarea::placeholder { color: #6b7691; }
+.content--config .input:focus,
+.content--config .notification-textarea:focus { border-color: var(--hfc-gold); outline: none; }
+
+.content--config .game-edit-form,
+.content--config .create-game-form { border-top-color: var(--hfc-glass-border); }
+.content--config .game-config-details[open] .game-config-edit-indicator,
+.content--config .create-game-details[open] .create-game-open-indicator {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+}
+
+.content--config .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+  border: none;
+}
+.content--config .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+
+/* Config: blocos de jogo (lista) em vidro */
+.content--config .game-config-row {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--config .game-config-row.is-active {
+  background: rgba(240, 165, 0, 0.10);
+  border-color: rgba(240, 165, 0, 0.30);
+}
+.content--config .game-config-row strong { color: var(--hfc-text); }
+.content--config .game-config-row span { color: var(--hfc-text-muted); }
