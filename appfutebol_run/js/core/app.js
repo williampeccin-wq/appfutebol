@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.71.4-robustez';
+window.__HARMONIA_BUILD__ = 'v1.71.5-foto';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -404,6 +404,47 @@ function normalizeSelfPosition(value) {
 
 function getPlayerPhoto(player) {
   return player?.photoDataUrl || '';
+}
+
+function openAvatarLightbox(src, alt) {
+  if (!src) return;
+  const previous = document.getElementById('avatar-lightbox');
+  if (previous) previous.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'avatar-lightbox';
+  overlay.className = 'avatar-lightbox';
+  overlay.innerHTML = `
+    <button class="avatar-lightbox-close" type="button" aria-label="Fechar">&times;</button>
+    <img class="avatar-lightbox-img" src="${src}" alt="${escapeHtml(alt || 'Foto')}" />
+  `;
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (event) => { if (event.key === 'Escape') close(); };
+
+  overlay.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+}
+
+// Listener único e delegado (capture): tocar numa foto de avatar abre a
+// ampliação. Não é registrado por render — sobrevive aos re-renders.
+function bindAvatarLightbox() {
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!target || typeof target.closest !== 'function') return;
+    const photoWrap = target.closest('.avatar-photo');
+    if (!photoWrap) return;
+    const img = photoWrap.querySelector('img');
+    if (!img || !img.getAttribute('src')) return;
+    // Evita disparar handlers de linha/card ao tocar na foto.
+    event.preventDefault();
+    event.stopPropagation();
+    openAvatarLightbox(img.getAttribute('src'), img.getAttribute('alt'));
+  }, true);
 }
 
 function renderAvatarForApp(player, extraClass = '') {
@@ -1756,6 +1797,8 @@ async function initInner() {
 }
 
 function bindGlobalSystemEvents() {
+  bindAvatarLightbox();
+
   window.addEventListener('harmonia:storage-full', () => {
     showToast('Armazenamento do aparelho cheio. Os dados seguem salvos no servidor; considere remover fotos grandes.', 'error');
   });
