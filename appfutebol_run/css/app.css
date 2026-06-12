@@ -6353,3 +6353,18 @@ body {
 @media (min-width: 520px) {
   .carne-rotation-add { grid-template-columns: 1fr 1fr auto; align-items: center; }
 }
+
+/* ---------- CARNÊ: barra de salvar rodízio (rascunho) ---------- */
+.carne-rotation-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+}
+.carne-rotation-save-actions { display: flex; gap: 8px; align-items: center; }
+.carne-rotation-dirty-note { color: var(--hfc-gold-200, #ffd980); font-weight: 800; font-size: 13px; }
+.carne-rotation-saved-note { color: var(--hfc-text-muted, #9fb0cc); font-size: 13px; }
+.carne-rotation-card.is-dirty { border-color: rgba(240,165,0,0.45); }

@@ -429,22 +429,19 @@ function renderCarneMemberRow(player) {
   `;
 }
 
-function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation) {
+function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation, dirty = false) {
   if (!isAdmin(currentPlayer)) return '';
   const playersById = new Map(orderedPlayers.map((player) => [String(player.id), player]));
   const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
 
   return `
-    <section class="card carne-rotation-card" id="carne-rotation-card">
+    <section class="card carne-rotation-card ${dirty ? 'is-dirty' : ''}" id="carne-rotation-card">
       <div class="card-title">Rodízio do carnê</div>
-      <p class="footer-note">Defina a ordem das duplas e a data de início. O calendário das próximas semanas é gerado sozinho e cicla: depois da última dupla, volta para a primeira.</p>
+      <p class="footer-note">Defina a ordem das duplas e a data de início. O calendário das próximas semanas é gerado sozinho e cicla: depois da última dupla, volta para a primeira. As alterações só valem ao tocar em <strong>Salvar rodízio</strong>.</p>
 
       <label class="field-label">
         Data de início (1ª dupla da lista)
-        <div class="carne-rotation-start-row">
-          <input id="carne-rotation-start" class="input" type="date" value="${rotation?.start_date || ''}" />
-          <button class="btn btn-secondary btn-sm" type="button" data-action="save-carne-rotation-date">Salvar data</button>
-        </div>
+        <input id="carne-rotation-start" class="input" type="date" value="${rotation?.start_date || ''}" />
       </label>
 
       <div class="carne-rotation-list">
@@ -465,6 +462,14 @@ function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation) {
         <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers)}</select>
         <select id="carne-rotation-player-2" class="input"><option value="">Responsável 2</option>${renderPlayerOptions(orderedPlayers)}</select>
         <button class="btn btn-primary" type="button" data-action="carne-rotation-add-pair">Adicionar dupla</button>
+      </div>
+
+      <div class="carne-rotation-save-bar">
+        ${dirty ? '<span class="carne-rotation-dirty-note">Alterações não salvas</span>' : '<span class="carne-rotation-saved-note">Tudo salvo ✓</span>'}
+        <span class="carne-rotation-save-actions">
+          ${dirty ? '<button class="btn btn-secondary btn-sm" type="button" data-action="discard-carne-rotation">Descartar</button>' : ''}
+          <button class="btn btn-primary" type="button" data-action="save-carne-rotation"${dirty ? '' : ' disabled'}>Salvar rodízio</button>
+        </span>
       </div>
     </section>
   `;
@@ -521,7 +526,7 @@ function renderCarneCalendar(calendar, orderedPlayers, rotation) {
   `;
 }
 
-export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, rotation = null, calendar = null) {
+export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, rotation = null, calendar = null, dirty = false) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
@@ -533,7 +538,7 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
 
   return `
     <section class="section-stack">
-      ${renderCarneRotationManager(currentPlayer, orderedPlayers, carneRotation)}
+      ${renderCarneRotationManager(currentPlayer, orderedPlayers, carneRotation, dirty)}
 
       <section class="card">
         <div class="card-title">Resumo do carne</div>
