@@ -39,6 +39,8 @@ let selfProfileEditOpen = false;
 // sync, que reverteria as alterações no meio da edição) e só persistido quando
 // o admin clica em "Salvar rodízio".
 let carneRotationDraft = null;
+// Índice da dupla em edição inline no rodízio (-1 = nenhuma).
+let editingCarnePairIndex = -1;
 
 
 let uiActionInFlight = false;
@@ -1007,12 +1009,40 @@ function getCarneRotationDraft(snapshot) {
   }
   return carneRotationDraft;
 }
-function resetCarneRotationDraft() { carneRotationDraft = null; }
+function resetCarneRotationDraft() { carneRotationDraft = null; editingCarnePairIndex = -1; }
 // Captura o valor do input de data para o rascunho (preserva o que foi digitado
 // através dos re-renders de outras edições).
 function carneDraftSyncDate() {
   const input = document.getElementById('carne-rotation-start');
   if (input && carneRotationDraft) carneRotationDraft.start_date = input.value || carneRotationDraft.start_date;
+}
+
+// Concorrência: um jogador não pode estar em duas duplas do rodízio.
+function carnePlayerUsedElsewhere(draft, playerId, exceptIndex = -1) {
+  const id = String(playerId);
+  return (draft.pairs || []).some((pair, i) => i !== exceptIndex
+    && (String(pair.player1_id) === id || String(pair.player2_id) === id));
+}
+// Conjunto de ids de jogadores que aparecem em mais de uma dupla (para alertar).
+function carneDuplicatePlayerIds(draft) {
+  const counts = new Map();
+  (draft?.pairs || []).forEach((pair) => {
+    [pair.player1_id, pair.player2_id].forEach((id) => {
+      const key = String(id);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+  });
+  return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+}
+
+// Move a dupla de uma posição para outra no rascunho (usado pelo drag-and-drop).
+function carneReorderDraftPairs(from, to) {
+  if (!carneRotationDraft) return;
+  const pairs = carneRotationDraft.pairs;
+  if (from < 0 || from >= pairs.length || to < 0 || to >= pairs.length || from === to) return;
+  const [moved] = pairs.splice(from, 1);
+  pairs.splice(to, 0, moved);
+  render(getState());
 }
 function isCarneRotationDirty(snapshot) {
   if (!carneRotationDraft) return false;
@@ -1224,6 +1254,12 @@ document.addEventListener("click", async (e) => {
     if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
     const draft = getCarneRotationDraft(snapshot);
     carneDraftSyncDate();
+    const dupId = carnePlayerUsedElsewhere(draft, p1) ? p1 : (carnePlayerUsedElsewhere(draft, p2) ? p2 : null);
+    if (dupId) {
+      const nm = snapshot.players.find((pl) => String(pl.id) === String(dupId))?.name || 'Esse jogador';
+      showToast(`${nm} já está em outra dupla do rodízio.`, 'error');
+      return;
+    }
     if (!draft.start_date) draft.start_date = carneTodayIso();
     draft.pairs.push({ player1_id: p1, player2_id: p2 });
     render(getState());
@@ -1237,20 +1273,43 @@ document.addEventListener("click", async (e) => {
     carneDraftSyncDate();
     if (!(idx >= 0 && idx < draft.pairs.length)) return;
     draft.pairs.splice(idx, 1);
+    editingCarnePairIndex = -1;
     render(getState());
     return;
   }
 
-  if (action === "carne-rotation-move-up" || action === "carne-rotation-move-down") {
+  if (action === "carne-pair-edit") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    carneDraftSyncDate();
+    editingCarnePairIndex = Number(id);
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-pair-cancel-edit") {
+    editingCarnePairIndex = -1;
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-pair-save") {
     if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
     const idx = Number(id);
     const draft = getCarneRotationDraft(snapshot);
     carneDraftSyncDate();
-    const j = action === "carne-rotation-move-up" ? idx - 1 : idx + 1;
-    if (idx < 0 || idx >= draft.pairs.length || j < 0 || j >= draft.pairs.length) return;
-    const tmp = draft.pairs[idx];
-    draft.pairs[idx] = draft.pairs[j];
-    draft.pairs[j] = tmp;
+    if (!(idx >= 0 && idx < draft.pairs.length)) return;
+    const p1 = document.getElementById('carne-pair-edit-1')?.value?.trim();
+    const p2 = document.getElementById('carne-pair-edit-2')?.value?.trim();
+    if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
+    if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
+    const dupId = carnePlayerUsedElsewhere(draft, p1, idx) ? p1 : (carnePlayerUsedElsewhere(draft, p2, idx) ? p2 : null);
+    if (dupId) {
+      const nm = snapshot.players.find((pl) => String(pl.id) === String(dupId))?.name || 'Esse jogador';
+      showToast(`${nm} já está em outra dupla do rodízio.`, 'error');
+      return;
+    }
+    draft.pairs[idx] = { player1_id: p1, player2_id: p2 };
+    editingCarnePairIndex = -1;
     render(getState());
     return;
   }
@@ -1271,6 +1330,7 @@ document.addEventListener("click", async (e) => {
 
   if (action === "discard-carne-rotation") {
     resetCarneRotationDraft();
+    editingCarnePairIndex = -1;
     render(getState());
     showToast('Alterações descartadas.', 'success');
     return;
@@ -2423,9 +2483,53 @@ async function bindPushOptin(currentPlayer) {
   }
 }
 
+function bindCarneRotationDrag() {
+  const list = appElement.querySelector('.carne-rotation-list');
+  if (!list) return;
+
+  list.querySelectorAll('.carne-drag-handle').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      const dragItem = handle.closest('.carne-rotation-item');
+      if (!dragItem) return;
+      event.preventDefault();
+
+      const fromIndex = Number(dragItem.dataset.pairIndex);
+      const startY = event.clientY;
+      // Centros originais de cada dupla, para calcular onde soltar.
+      const centers = [...list.querySelectorAll('.carne-rotation-item')].map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { index: Number(el.dataset.pairIndex), mid: rect.top + rect.height / 2 };
+      });
+      let dropTo = fromIndex;
+      dragItem.classList.add('is-dragging');
+      try { handle.setPointerCapture(event.pointerId); } catch (_) {}
+
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const dy = ev.clientY - startY;
+        dragItem.style.transform = `translateY(${dy}px)`;
+        const rect = dragItem.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+        dropTo = centers.filter((c) => c.index !== fromIndex && c.mid < center).length;
+      };
+      const onUp = (ev) => {
+        try { handle.releasePointerCapture(ev.pointerId); } catch (_) {}
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        dragItem.classList.remove('is-dragging');
+        dragItem.style.transform = '';
+        if (dropTo !== fromIndex) carneReorderDraftPairs(fromIndex, dropTo);
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  });
+}
+
 function bindAppEvents(currentPlayer) {
   appElement.querySelector('#logout-button')?.addEventListener('click', async () => { resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
+  bindCarneRotationDrag();
 
   appElement.querySelector('#change-own-password-button')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -2733,7 +2837,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
         const carneRotation = getCarneRotationDraft(snapshot);
         const carneCalendar = computeCarneCalendar(carneRotation, 8);
         const carneDirty = isCarneRotationDirty(snapshot);
-        return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneCalendar, carneDirty);
+        return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneCalendar, carneDirty, editingCarnePairIndex);
       }
     case 'championship':
       return renderChampionshipScreen(snapshot, currentPlayer);

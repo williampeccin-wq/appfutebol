@@ -6368,3 +6368,48 @@ body {
 .carne-rotation-dirty-note { color: var(--hfc-gold-200, #ffd980); font-weight: 800; font-size: 13px; }
 .carne-rotation-saved-note { color: var(--hfc-text-muted, #9fb0cc); font-size: 13px; }
 .carne-rotation-card.is-dirty { border-color: rgba(240,165,0,0.45); }
+
+/* ---------- CARNÊ: drag-and-drop + edição inline + conflito ---------- */
+.carne-drag-handle {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+  background: rgba(255,255,255,0.06);
+  color: var(--hfc-text, #e8eefc);
+  font-size: 18px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: grab;
+  touch-action: none; /* essencial: o gesto vira drag, não scroll */
+  user-select: none;
+}
+.carne-drag-handle:active { cursor: grabbing; }
+.carne-rotation-item {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.carne-rotation-item.is-dragging {
+  position: relative;
+  z-index: 5;
+  background: rgba(240,165,0,0.12);
+  border-color: var(--hfc-gold, #f0a500);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+}
+.carne-rotation-item.is-conflict { border-color: rgba(239,68,68,0.5); }
+.carne-conflict-flag { font-size: 13px; }
+.carne-rotation-edit-fields {
+  flex: 1 1 auto; min-width: 0;
+  display: grid; gap: 6px;
+}
+.carne-rotation-edit-fields .input { min-height: 40px; }
+.carne-rotation-item.is-editing { align-items: center; }
+.carne-rotation-item-actions .icon-action-button.is-ok {
+  color: #86efac; border-color: rgba(34,197,94,0.4);
+}
+.carne-rotation-warning {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(239,68,68,0.14);
+  border: 1px solid rgba(239,68,68,0.35);
+  color: #fecaca;
+  font-size: 13px; font-weight: 700;
+}
