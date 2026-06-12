@@ -12,13 +12,19 @@ self.addEventListener('activate', (event) => {
 });
 
 // Recibo de auditoria: avisa o servidor que a mensagem foi entregue/aberta.
-// Best-effort — nunca quebra a notificação se a rede falhar.
-function sendPushReceipt(receiptUrl, logId, type) {
+// Best-effort — nunca quebra a notificação se a rede falhar. O anon key (público)
+// vem no payload porque o gateway do Supabase exige credencial mesmo nesta rota.
+function sendPushReceipt(receiptUrl, anonKey, logId, type) {
   if (!receiptUrl || !logId) return Promise.resolve();
+  const headers = { 'Content-Type': 'application/json' };
+  if (anonKey) {
+    headers.apikey = anonKey;
+    headers.Authorization = `Bearer ${anonKey}`;
+  }
   return fetch(receiptUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ logId, type }),
+    headers,
+    body: JSON.stringify({ receipt: { logId, type } }),
     keepalive: true,
   }).catch(() => {});
 }
@@ -38,13 +44,13 @@ self.addEventListener('push', (event) => {
     badge: './assets/harmonia-crest.jpeg',
     tag: payload.tag || undefined,
     // Carrega referências de auditoria para o clique.
-    data: { url: payload.url || './', logId: payload.logId || null, receiptUrl: payload.receiptUrl || null },
+    data: { url: payload.url || './', logId: payload.logId || null, receiptUrl: payload.receiptUrl || null, anonKey: payload.anonKey || null },
   };
 
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, options),
-      sendPushReceipt(payload.receiptUrl, payload.logId, 'delivered'),
+      sendPushReceipt(payload.receiptUrl, payload.anonKey, payload.logId, 'delivered'),
     ])
   );
 });
@@ -56,7 +62,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     Promise.all([
-      sendPushReceipt(info.receiptUrl, info.logId, 'opened'),
+      sendPushReceipt(info.receiptUrl, info.anonKey, info.logId, 'opened'),
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         for (const client of clientList) {
           if ('focus' in client) return client.focus();

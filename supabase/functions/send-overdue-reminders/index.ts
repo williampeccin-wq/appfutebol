@@ -51,6 +51,26 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+  // Lê o corpo uma vez (cron manda vazio; teste do admin manda {force}; o service
+  // worker manda {receipt:{logId,type}}).
+  let payload: { force?: boolean; receipt?: { logId?: string; type?: string } } = {};
+  try { payload = await req.json(); } catch (_) { /* corpo vazio = cron */ }
+
+  // --- Recibo de auditoria do service worker (entregue/aberta) ---
+  // Chega com o anon key (que o gateway desta função aceita) e NÃO exige admin:
+  // apenas carimba delivered_at/opened_at no push_log. Tratado ANTES da
+  // autorização. logId é um UUID aleatório, então o risco de forja é baixo.
+  if (payload.receipt && payload.receipt.logId && payload.receipt.type) {
+    const logId = String(payload.receipt.logId);
+    const column = payload.receipt.type === "opened" ? "opened_at"
+      : payload.receipt.type === "delivered" ? "delivered_at" : null;
+    if (!column) return json({ error: "invalid_type" }, 400);
+    const { error: rErr } = await admin.from("push_log")
+      .update({ [column]: new Date().toISOString() }).eq("id", logId).is(column, null);
+    if (rErr) return json({ error: "receipt_failed", detail: rErr.message }, 500);
+    return json({ ok: true, receipt: payload.receipt.type });
+  }
+
   // --- Autorização: cron (x-cron-secret) OU admin logado (JWT -> players.is_admin) ---
   const cronSecret = req.headers.get("x-cron-secret") || "";
   let authorized = false;
@@ -71,11 +91,7 @@ Deno.serve(async (req) => {
   if (!authorized) return json({ error: "unauthorized" }, 401);
 
   // `force`: ignora a deduplicação do dia (usado no teste manual do admin).
-  let force = false;
-  try {
-    const payload = await req.json();
-    force = payload?.force === true;
-  } catch (_) { /* corpo vazio = cron */ }
+  const force = payload.force === true;
 
   // --- 1) Vencimento global ---
   const { data: metaRow, error: metaErr } = await admin
@@ -111,7 +127,8 @@ Deno.serve(async (req) => {
   }
 
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-  const receiptUrl = `${SUPABASE_URL}/functions/v1/push-receipt`;
+  // Os recibos voltam para ESTA própria função (cujo gateway aceita o anon key).
+  const receiptUrl = `${SUPABASE_URL}/functions/v1/send-overdue-reminders`;
 
   let sent = 0, failed = 0, removed = 0, targets = 0;
   for (const row of overdue) {
@@ -136,7 +153,7 @@ Deno.serve(async (req) => {
         .select("id").single();
       const logId = logRow?.id || null;
 
-      const notification = JSON.stringify({ title, body, url: "./", logId, receiptUrl });
+      const notification = JSON.stringify({ title, body, url: "./", logId, receiptUrl, anonKey: ANON });
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
