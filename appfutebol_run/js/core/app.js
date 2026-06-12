@@ -2216,11 +2216,15 @@ async function bindPushOptin(currentPlayer) {
 
   if (button) {
     button.onclick = async () => {
-      const current = await getPushState();
+      // IMPORTANTE: nada de `await` antes de pedir a permissão. Notification
+      // .requestPermission() exige o gesto do toque ainda "fresco"; um await
+      // aqui (ex.: getPushState) consome o gesto e o Chrome ignora o pedido.
+      // Por isso decidimos ativar/desativar pelo RÓTULO atual do botão.
+      const isCurrentlyOn = String(button.textContent || '').trim() === 'Desativar';
+      const original = isCurrentlyOn ? 'Desativar' : 'Ativar';
       button.disabled = true;
-      const original = button.textContent;
       button.textContent = '...';
-      if (current.subscribed) {
+      if (isCurrentlyOn) {
         await disablePush();
       } else {
         const result = await enablePush(currentPlayer?.id);
