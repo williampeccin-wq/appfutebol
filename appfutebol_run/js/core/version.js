@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.74.0-fila';
+export const APP_VERSION = 'v1.75.0-autoopen';

@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.74.0-fila';
+window.__HARMONIA_BUILD__ = 'v1.75.0-autoopen';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1983,6 +1983,28 @@ function notifyWaitlistPromotion(result) {
   triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
 }
 
+// Sugestão padrão de abertura automática: segunda-feira 21h da semana do jogo.
+// Formato datetime-local "YYYY-MM-DDTHH:mm" (hora local = Brasília).
+function computeDefaultAutoOpen(gameDate) {
+  const iso = String(gameDate || '').slice(0, 10);
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0); // meio-dia evita virada de fuso
+  const dow = d.getDay(); // 0=Dom, 1=Seg, ...
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow)); // recua até a segunda da semana
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}T21:00`;
+}
+
+// Resolve o auto_open_at a partir do formulário de jogo (vazio = manual).
+function readAutoOpenFromForm(formData) {
+  if (formData.get('auto_open_enabled') !== 'on') return '';
+  const raw = String(formData.get('auto_open_at') || '').trim();
+  return raw || computeDefaultAutoOpen(String(formData.get('game_date') || ''));
+}
+
 const appElement = document.getElementById('app');
 
 const REMOTE_SYNC_INTERVAL_MS = 4000;
@@ -2719,6 +2741,7 @@ function bindAppEvents(currentPlayer) {
         game_time: String(formData.get('game_time') || ''),
         max_players: maxPlayers,
         open: formData.get('open') === 'on',
+        auto_open_at: readAutoOpenFromForm(formData),
       };
 
       const activeGameKey = getGameKey(getActiveGameFromSnapshot(currentState));
@@ -2789,6 +2812,7 @@ function bindAppEvents(currentPlayer) {
         game_time: gameTime,
         max_players: maxPlayers,
         open: formData.get('open') === 'on',
+        auto_open_at: readAutoOpenFromForm(formData),
         sort_result: null,
         draw_history: [],
       };
@@ -3757,6 +3781,16 @@ function renderConfig(snapshot, currentPlayer) {
             Inscrições abertas neste jogo
           </label>
 
+          <label class="checkbox-line">
+            <input type="checkbox" name="auto_open_enabled" ${item.auto_open_at ? 'checked' : ''} />
+            Abrir inscrições automaticamente no horário
+          </label>
+          <label class="field-label">
+            Abrir automaticamente em
+            <input class="input" type="datetime-local" name="auto_open_at" value="${item.auto_open_at || computeDefaultAutoOpen(item.game_date)}" />
+            <small class="footer-note">Só vale se a opção acima estiver marcada. Padrão: segunda 21h da semana do jogo.</small>
+          </label>
+
           <div class="player-admin-actions game-config-actions">
             <button class="btn btn-primary" type="submit">Salvar alterações deste jogo</button>
           </div>
@@ -3843,6 +3877,16 @@ function renderConfig(snapshot, currentPlayer) {
             <label class="checkbox-line">
               <input type="checkbox" name="open" />
               Já criar com inscrições abertas
+            </label>
+
+            <label class="checkbox-line">
+              <input type="checkbox" name="auto_open_enabled" />
+              Abrir inscrições automaticamente no horário
+            </label>
+            <label class="field-label">
+              Abrir automaticamente em
+              <input class="input" type="datetime-local" name="auto_open_at" value="" />
+              <small class="footer-note">Só vale se a opção acima estiver marcada. Em branco usa segunda 21h da semana do jogo.</small>
             </label>
 
             <div class="player-admin-actions game-config-actions">
