@@ -1699,7 +1699,7 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
-import { registerServiceWorker, getPushState, enablePush, disablePush } from '../services/push.service.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush } from '../services/push.service.js';
 
 const appElement = document.getElementById('app');
 
@@ -2391,6 +2391,16 @@ function bindAppEvents(currentPlayer) {
         games: replaceGameInSnapshot(currentState, updatedGame),
         active_game_id: activeGameKey,
       });
+
+      // Gatilho de push: inscrições acabaram de ABRIR (fechado -> aberto).
+      if (!existingGame.open && updatedGame.open) {
+        triggerServerPush({
+          target: 'all',
+          title: 'Inscrições abertas ⚽',
+          body: `Já dá para confirmar presença no jogo de ${formatDate(updatedGame.game_date)}.`,
+          url: './',
+        });
+      }
 
       showToast(isActiveGame ? 'Jogo ativo atualizado.' : 'Jogo atualizado. O jogo ativo não foi alterado.');
     });

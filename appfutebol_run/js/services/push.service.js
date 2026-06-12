@@ -130,6 +130,30 @@ export async function enablePush(playerId) {
   }
 }
 
+// Dispara o envio de push pelo servidor (Edge Function send-push). Chamado por
+// ações de admin (ex.: abrir inscrições). Best-effort: nunca bloqueia a UI.
+export async function triggerServerPush({ target = 'all', title, body, url = './' }) {
+  const { url: base, anonKey } = getSupabase();
+  if (!base || !anonKey) return { ok: false, reason: 'not_configured' };
+  const token = getAccessToken();
+  try {
+    const response = await fetch(`${base}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${token || anonKey}`,
+      },
+      body: JSON.stringify({ target, title, body, url }),
+    });
+    if (!response.ok) return { ok: false, reason: `push_${response.status}` };
+    return { ok: true, data: await response.json().catch(() => ({})) };
+  } catch (error) {
+    console.warn('[push] Falha ao disparar push:', error);
+    return { ok: false, reason: 'network' };
+  }
+}
+
 export async function disablePush() {
   try {
     const reg = await navigator.serviceWorker.getRegistration();
