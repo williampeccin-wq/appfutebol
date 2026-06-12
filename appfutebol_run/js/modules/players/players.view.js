@@ -444,7 +444,7 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
   const dateCell = (index) => `
     <span class="carne-row-date ${index === 0 ? 'is-next' : ''}">
       <strong>${formatScheduleDate(dateFor(index))}</strong>
-      <small>${index === 0 ? 'Próxima' : 'Semana ' + (index + 1)}</small>
+      ${index === 0 ? '<small>Próxima</small>' : ''}
     </span>
   `;
 
