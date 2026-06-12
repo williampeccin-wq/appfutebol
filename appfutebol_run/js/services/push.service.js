@@ -78,29 +78,58 @@ async function saveSubscriptionToServer(playerId, subscription) {
   if (!url || !anonKey) return { ok: false, reason: 'supabase_not_configured' };
   const token = getAccessToken();
   const json = subscription.toJSON();
+  const headers = {
+    'Content-Type': 'application/json',
+    apikey: anonKey,
+    Authorization: `Bearer ${token || anonKey}`,
+  };
+  const row = {
+    player_id: playerId || null,
+    endpoint: subscription.endpoint,
+    p256dh: json.keys?.p256dh || '',
+    auth: json.keys?.auth || '',
+    user_agent: String(navigator.userAgent || '').slice(0, 300),
+  };
 
-  const response = await fetch(`${url}/rest/v1/push_subscriptions?on_conflict=endpoint`, {
+  // INSERT simples e, se já existir (409), PATCH por endpoint. Evitamos o upsert
+  // (on_conflict + merge-duplicates) de propósito: ele gera INSERT...ON CONFLICT
+  // DO UPDATE, que o Postgres exige policy de SELECT — que NÃO criamos, pra
+  // ninguém ler as inscrições alheias. Insert e update sozinhos não precisam.
+  const insertResp = await fetch(`${url}/rest/v1/push_subscriptions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: anonKey,
-      Authorization: `Bearer ${token || anonKey}`,
-      Prefer: 'resolution=merge-duplicates',
-    },
-    body: JSON.stringify({
-      player_id: playerId || null,
-      endpoint: subscription.endpoint,
-      p256dh: json.keys?.p256dh || '',
-      auth: json.keys?.auth || '',
-      user_agent: String(navigator.userAgent || '').slice(0, 300),
-    }),
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify(row),
   });
 
-  if (!response.ok && response.status !== 409) {
-    const body = await response.text().catch(() => '');
-    return { ok: false, reason: `save_failed_${response.status}`, body };
+  if (insertResp.ok) return { ok: true };
+
+  if (insertResp.status === 409) {
+    const patchResp = await fetch(
+      `${url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(subscription.endpoint)}`,
+      {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ p256dh: row.p256dh, auth: row.auth, player_id: row.player_id, user_agent: row.user_agent }),
+      },
+    );
+    if (patchResp.ok) return { ok: true };
+    const body = await patchResp.text().catch(() => '');
+    return { ok: false, reason: `update_failed_${patchResp.status}`, body };
   }
-  return { ok: true };
+
+  const body = await insertResp.text().catch(() => '');
+  return { ok: false, reason: `save_failed_${insertResp.status}`, body };
+}
+
+// Re-salva a inscrição existente do navegador no servidor (idempotente). Chamado
+// no boot para curar o caso "inscrito no navegador mas não salvo no banco".
+export async function syncExistingPushSubscription(playerId) {
+  try {
+    if (!isPushSupported() || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await saveSubscriptionToServer(playerId, sub);
+  } catch (_) {}
 }
 
 export async function enablePush(playerId) {

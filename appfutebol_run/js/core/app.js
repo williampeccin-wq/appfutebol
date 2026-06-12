@@ -1699,7 +1699,7 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
-import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush } from '../services/push.service.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, syncExistingPushSubscription } from '../services/push.service.js';
 
 const appElement = document.getElementById('app');
 
@@ -1796,8 +1796,13 @@ async function initInner() {
   bindGlobalSystemEvents();
   startRemoteSync();
 
-  // PWA / Web Push: registra o service worker em segundo plano (não bloqueia o boot).
-  registerServiceWorker();
+  // PWA / Web Push: registra o service worker em segundo plano (não bloqueia o
+  // boot) e re-salva a inscrição existente no servidor (cura "inscrito no
+  // navegador mas não salvo no banco").
+  registerServiceWorker().then(() => {
+    const current = getCurrentPlayer();
+    if (current) syncExistingPushSubscription(current.id);
+  });
 }
 
 function bindGlobalSystemEvents() {
