@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.71.5-foto';
+export const APP_VERSION = 'v1.72.0-push';
