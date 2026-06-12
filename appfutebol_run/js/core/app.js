@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.72.2-carne';
+window.__HARMONIA_BUILD__ = 'v1.73.1-overdue';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1362,6 +1362,21 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "test-overdue-reminders") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode enviar lembretes')) return;
+    showToast('Enviando lembretes de atraso…');
+    const result = await triggerOverdueReminders();
+    if (result.ok) {
+      const d = result.data || {};
+      if (d.skipped === 'sem_vencimento_definido') showToast('Defina a data de vencimento primeiro.', 'error');
+      else if (d.skipped === 'ainda_nao_venceu') showToast('Ainda não venceu — ninguém em atraso hoje.', 'info');
+      else showToast(`Lembretes: ${d.sent || 0} enviado(s) para ${d.overdue || 0} atrasado(s).`, 'success');
+    } else {
+      showToast(`Falha ao enviar lembretes (${result.reason}).`, 'error');
+    }
+    return;
+  }
+
 
   if (action === "save-championship-result") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
@@ -1956,7 +1971,7 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
-import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, syncExistingPushSubscription } from '../services/push.service.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, syncExistingPushSubscription } from '../services/push.service.js';
 
 const appElement = document.getElementById('app');
 
@@ -3780,6 +3795,12 @@ function renderConfig(snapshot, currentPlayer) {
             <button class="btn btn-primary" type="submit">Salvar mensalidade</button>
           </div>
         </form>
+
+        <div class="mens-reminder-block">
+          <div class="card-subtitle">Lembrete de atraso (push)</div>
+          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push. Use o botão para testar agora.</p>
+          <button class="btn btn-secondary btn-sm" type="button" data-action="test-overdue-reminders">Enviar lembrete de atraso agora (teste)</button>
+        </div>
       </section>
 
       <section class="card create-game-card">
