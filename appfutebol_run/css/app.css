@@ -6329,14 +6329,25 @@ body {
   background: var(--hfc-glass-2, rgba(255,255,255,0.05));
   border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
 }
-.carne-rotation-order {
+.carne-row-date {
   flex: 0 0 auto;
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 900; font-size: 13px;
-  background: rgba(240,165,0,0.16); color: var(--hfc-gold-200, #ffd980);
+  min-width: 58px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+  line-height: 1.15;
 }
+.carne-row-date strong { font-weight: 900; font-size: 15px; color: var(--hfc-text, #e8eefc); }
+.carne-row-date small { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; opacity: 0.7; }
+.carne-row-date.is-next {
+  background: rgba(240,165,0,0.16);
+  border-color: rgba(240,165,0,0.45);
+}
+.carne-row-date.is-next strong { color: var(--hfc-gold-200, #ffd980); }
+.carne-row-date.is-next small { color: var(--hfc-gold-200, #ffd980); opacity: 0.9; }
+.carne-rotation-item.is-next { border-color: rgba(240,165,0,0.3); }
 .carne-rotation-names { flex: 1 1 auto; min-width: 0; font-weight: 700; }
 .carne-rotation-names small { font-weight: 500; opacity: 0.6; }
 .carne-rotation-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }

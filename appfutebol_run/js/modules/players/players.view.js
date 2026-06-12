@@ -429,21 +429,30 @@ function renderCarneMemberRow(player) {
   `;
 }
 
-function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation, dirty = false, editingIndex = -1) {
-  if (!isAdmin(currentPlayer)) return '';
+function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dirty = false, editingIndex = -1) {
+  const admin = isAdmin(currentPlayer);
   const playersById = new Map(orderedPlayers.map((player) => [String(player.id), player]));
   const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
+  const isoDates = Array.isArray(dates) ? dates : [];
+  const dateFor = (index) => isoDates[index] || '';
 
   // Jogadores que aparecem em mais de uma dupla (concorrência) — para alertar.
   const counts = new Map();
   pairs.forEach((pair) => [pair.player1_id, pair.player2_id].forEach((idv) => counts.set(String(idv), (counts.get(String(idv)) || 0) + 1)));
   const dupIds = new Set([...counts.entries()].filter(([, n]) => n > 1).map(([idv]) => idv));
 
+  const dateCell = (index) => `
+    <span class="carne-row-date ${index === 0 ? 'is-next' : ''}">
+      <strong>${formatScheduleDate(dateFor(index))}</strong>
+      <small>${index === 0 ? 'Próxima' : 'Semana ' + (index + 1)}</small>
+    </span>
+  `;
+
   const pairRow = (pair, index) => {
-    if (index === editingIndex) {
+    if (admin && index === editingIndex) {
       return `
         <div class="carne-rotation-item is-editing" data-pair-index="${index}">
-          <span class="carne-rotation-order">${index + 1}</span>
+          ${dateCell(index)}
           <span class="carne-rotation-edit-fields">
             <select id="carne-pair-edit-1" class="input">${renderPlayerOptions(orderedPlayers, pair.player1_id)}</select>
             <select id="carne-pair-edit-2" class="input">${renderPlayerOptions(orderedPlayers, pair.player2_id)}</select>
@@ -458,32 +467,45 @@ function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation, dir
     }
     const dup = dupIds.has(String(pair.player1_id)) || dupIds.has(String(pair.player2_id));
     return `
-      <div class="carne-rotation-item ${dup ? 'is-conflict' : ''}" data-pair-index="${index}">
-        <span class="carne-rotation-order">${index + 1}</span>
+      <div class="carne-rotation-item ${index === 0 ? 'is-next' : ''} ${dup ? 'is-conflict' : ''} ${admin ? '' : 'no-actions'}" data-pair-index="${index}">
+        ${dateCell(index)}
         <span class="carne-rotation-names">${escapeHtml(getPlayerName(playersById, pair.player1_id))} <small>e</small> ${escapeHtml(getPlayerName(playersById, pair.player2_id))}${dup ? ' <span class="carne-conflict-flag" title="Jogador repetido no rodízio">⚠️</span>' : ''}</span>
+        ${admin ? `
         <span class="carne-rotation-item-actions">
           <button class="icon-action-button" type="button" data-action="carne-pair-edit" data-id="${index}" title="Editar dupla" aria-label="Editar dupla">✎</button>
           <button class="carne-drag-handle" type="button" title="Arraste para reordenar" aria-label="Arraste para reordenar">⠿</button>
-        </span>
+        </span>` : ''}
       </div>
     `;
   };
 
+  const listHtml = pairs.length
+    ? pairs.map((pair, index) => pairRow(pair, index)).join('')
+    : `<div class="empty-inline">${admin ? 'Nenhuma dupla no rodízio ainda. Adicione abaixo.' : 'Nenhuma dupla no rodízio ainda.'}</div>`;
+
+  if (!admin) {
+    return `
+      <section class="card carne-rotation-card">
+        <div class="card-title">Calendário da carne</div>
+        <p class="footer-note">Rodízio semanal automático. A dupla do topo é a próxima responsável.</p>
+        <div class="carne-rotation-list">${listHtml}</div>
+      </section>
+    `;
+  }
+
   return `
     <section class="card carne-rotation-card ${dirty ? 'is-dirty' : ''}" id="carne-rotation-card">
-      <div class="card-title">Rodízio do carnê</div>
-      <p class="footer-note">Arraste pelo ⠿ para reordenar, toque em ✎ para trocar os integrantes de uma dupla. O calendário cicla sozinho. As alterações só valem ao tocar em <strong>Salvar rodízio</strong>.</p>
+      <div class="card-title">Calendário da carne</div>
+      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. As alterações só valem ao tocar em <strong>Salvar rodízio</strong>.</p>
 
       ${dupIds.size ? '<div class="carne-rotation-warning">⚠️ Há jogador(es) em mais de uma dupla. Cada pessoa deve estar em só uma.</div>' : ''}
 
       <label class="field-label">
-        Data de início (1ª dupla da lista)
+        Próxima quarta (data da dupla do topo)
         <input id="carne-rotation-start" class="input" type="date" value="${rotation?.start_date || ''}" />
       </label>
 
-      <div class="carne-rotation-list">
-        ${pairs.length ? pairs.map((pair, index) => pairRow(pair, index)).join('') : '<div class="empty-inline">Nenhuma dupla no rodízio ainda. Adicione abaixo.</div>'}
-      </div>
+      <div class="carne-rotation-list">${listHtml}</div>
 
       <div class="carne-rotation-add">
         <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers)}</select>
@@ -502,57 +524,6 @@ function renderCarneRotationManager(currentPlayer, orderedPlayers, rotation, dir
   `;
 }
 
-function renderCarneCalendar(calendar, orderedPlayers, rotation) {
-  const playersById = new Map(orderedPlayers.map((player) => [String(player.id), player]));
-  const cycleLen = Array.isArray(rotation?.pairs) ? rotation.pairs.length : 0;
-
-  if (!calendar.length) {
-    return `
-      <section class="card carne-schedule-card">
-        <div class="card-title">Calendário da carne</div>
-        <div class="empty-inline">Defina a ordem das duplas e a data de início para gerar o calendário.</div>
-      </section>
-    `;
-  }
-
-  const next = calendar[0];
-  return `
-    <section class="card carne-schedule-card">
-      <div class="carne-schedule-header">
-        <div>
-          <div class="card-title carne-schedule-title">Calendário da carne</div>
-          <p class="carne-schedule-subtitle">Rodízio semanal automático · ${cycleLen} dupla${cycleLen === 1 ? '' : 's'} no ciclo.</p>
-        </div>
-        <div class="carne-next-pill">
-          <span>Próxima</span>
-          <strong>${formatScheduleDate(next.date)}</strong>
-        </div>
-      </div>
-
-      <div class="carne-schedule-list no-actions" role="table" aria-label="Calendário da carne">
-        <div class="carne-schedule-list-head" role="row">
-          <div role="columnheader">Data</div>
-          <div role="columnheader">Dupla responsável</div>
-        </div>
-        ${calendar.map((entry) => `
-          <div class="carne-schedule-item ${entry.isNext ? 'is-next' : ''} no-actions" role="row">
-            <div class="carne-date-box" role="cell">
-              <span>${formatScheduleDate(entry.date)}</span>
-              <small>${entry.isNext ? 'Próxima' : 'Dupla ' + (entry.cycleIndex + 1)}</small>
-            </div>
-            <div class="carne-pair-boxes" role="cell">
-              <div class="carne-player-box">${escapeHtml(getPlayerName(playersById, entry.player1_id))}</div>
-              <div class="carne-player-box">${escapeHtml(getPlayerName(playersById, entry.player2_id))}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-
-      <p class="footer-note carne-next-note">Próxima: ${formatScheduleDate(next.date)} · ${escapeHtml(getPlayerName(playersById, next.player1_id))} e ${escapeHtml(getPlayerName(playersById, next.player2_id))}.</p>
-    </section>
-  `;
-}
-
 export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, rotation = null, calendar = null, dirty = false, editingPairIndex = -1) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -560,12 +531,12 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
   const carneOnly = carneGroup.filter((player) => player.plays_football === false);
   const jogadoresNoCarne = carneGroup.filter((player) => player.plays_football !== false);
   const carneRotation = rotation || { pairs: [], start_date: '' };
-  const carneCalendar = Array.isArray(calendar) ? calendar : [];
+  const carneDates = Array.isArray(calendar) ? calendar : [];
   const cycleLength = Array.isArray(carneRotation.pairs) ? carneRotation.pairs.length : 0;
 
   return `
     <section class="section-stack">
-      ${renderCarneRotationManager(currentPlayer, orderedPlayers, carneRotation, dirty, editingPairIndex)}
+      ${renderCarneSchedule(currentPlayer, orderedPlayers, carneRotation, carneDates, dirty, editingPairIndex)}
 
       <section class="card">
         <div class="card-title">Resumo do carne</div>
@@ -588,8 +559,6 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
           </div>
         </div>
       </section>
-
-      ${renderCarneCalendar(carneCalendar, orderedPlayers, carneRotation)}
 
       <section class="card">
         <div class="card-title">Somente carne</div>

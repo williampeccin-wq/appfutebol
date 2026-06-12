@@ -39,6 +39,8 @@ let selfProfileEditOpen = false;
 // sync, que reverteria as alterações no meio da edição) e só persistido quando
 // o admin clica em "Salvar rodízio".
 let carneRotationDraft = null;
+// Cópia do rascunho no momento em que foi aberto/salvo, para detectar alterações.
+let carneRotationBaseline = null;
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma).
 let editingCarnePairIndex = -1;
 
@@ -1000,16 +1002,40 @@ function persistCarneRotation(snapshot, rotation) {
   ];
 }
 
-// Rascunho: inicializa do rodízio persistido na primeira vez. Edições mexem só
-// aqui (não no estado sincronizado), então o poll não as reverte.
+// Monta a visão das PRÓXIMAS semanas: gira o ciclo para que a dupla da próxima
+// quarta fique no topo, e ancora start_date nessa próxima data. Assim a lista
+// mostra sempre o futuro, e arrastar uma dupla muda a data dela (a data fica na
+// posição). Salvar persiste já nessa forma re-ancorada.
+function buildCarneUpcoming(persisted) {
+  const pairs = Array.isArray(persisted?.pairs) ? persisted.pairs : [];
+  const startIso = String(persisted?.start_date || '').slice(0, 10);
+  if (!pairs.length || !startIso) {
+    return { start_date: startIso, pairs: pairs.map((p) => ({ player1_id: p.player1_id, player2_id: p.player2_id })) };
+  }
+  const total = pairs.length;
+  const diffDays = carneDiffDays(carneTodayIso(), startIso);
+  let w0 = Math.ceil(diffDays / 7);
+  if (w0 < 0) w0 = 0;
+  const nextDate = carneAddDays(startIso, w0 * 7);
+  const currentIndex = ((w0 % total) + total) % total;
+  const rotated = [];
+  for (let i = 0; i < total; i += 1) {
+    const p = pairs[(currentIndex + i) % total];
+    rotated.push({ player1_id: p.player1_id, player2_id: p.player2_id });
+  }
+  return { start_date: nextDate, pairs: rotated };
+}
+
+// Rascunho: inicializa da visão "próximas semanas" na primeira vez. Edições
+// mexem só aqui (não no estado sincronizado), então o poll não as reverte.
 function getCarneRotationDraft(snapshot) {
   if (!carneRotationDraft) {
-    const r = getCarneRotation(snapshot);
-    carneRotationDraft = { start_date: r.start_date, pairs: r.pairs.map((p) => ({ player1_id: p.player1_id, player2_id: p.player2_id })) };
+    carneRotationDraft = buildCarneUpcoming(getCarneRotation(snapshot));
+    carneRotationBaseline = JSON.parse(JSON.stringify(carneRotationDraft));
   }
   return carneRotationDraft;
 }
-function resetCarneRotationDraft() { carneRotationDraft = null; editingCarnePairIndex = -1; }
+function resetCarneRotationDraft() { carneRotationDraft = null; carneRotationBaseline = null; editingCarnePairIndex = -1; }
 // Captura o valor do input de data para o rascunho (preserva o que foi digitado
 // através dos re-renders de outras edições).
 function carneDraftSyncDate() {
@@ -1044,10 +1070,9 @@ function carneReorderDraftPairs(from, to) {
   pairs.splice(to, 0, moved);
   render(getState());
 }
-function isCarneRotationDirty(snapshot) {
-  if (!carneRotationDraft) return false;
-  const persisted = getCarneRotation(snapshot);
-  return JSON.stringify([persisted.start_date, persisted.pairs]) !== JSON.stringify([carneRotationDraft.start_date, carneRotationDraft.pairs]);
+function isCarneRotationDirty() {
+  if (!carneRotationDraft || !carneRotationBaseline) return false;
+  return JSON.stringify(carneRotationDraft) !== JSON.stringify(carneRotationBaseline);
 }
 
 function resetCarneScheduleForm() {
@@ -1321,6 +1346,7 @@ document.addEventListener("click", async (e) => {
     if (!draft.start_date) { showToast('Informe a data de início do rodízio.', 'error'); return; }
     if (!draft.pairs.length) { showToast('Adicione pelo menos uma dupla ao rodízio.', 'error'); return; }
     persistCarneRotation(snapshot, draft);
+    carneRotationBaseline = JSON.parse(JSON.stringify(draft));
     const safe = repairManualSnapshot(snapshot);
     savePersistedState(safe);
     render(safe);
@@ -2530,6 +2556,11 @@ function bindAppEvents(currentPlayer) {
   appElement.querySelector('#logout-button')?.addEventListener('click', async () => { resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
   bindCarneRotationDrag();
+  appElement.querySelector('#carne-rotation-start')?.addEventListener('change', () => {
+    if (!carneRotationDraft) return;
+    carneDraftSyncDate();
+    render(getState());
+  });
 
   appElement.querySelector('#change-own-password-button')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -2835,9 +2866,9 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'carne':
       {
         const carneRotation = getCarneRotationDraft(snapshot);
-        const carneCalendar = computeCarneCalendar(carneRotation, 8);
-        const carneDirty = isCarneRotationDirty(snapshot);
-        return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneCalendar, carneDirty, editingCarnePairIndex);
+        const carneDates = (carneRotation.pairs || []).map((_, i) => (carneRotation.start_date ? carneAddDays(carneRotation.start_date, i * 7) : ''));
+        const carneDirty = isCarneRotationDirty();
+        return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, carneDirty, editingCarnePairIndex);
       }
     case 'championship':
       return renderChampionshipScreen(snapshot, currentPlayer);
