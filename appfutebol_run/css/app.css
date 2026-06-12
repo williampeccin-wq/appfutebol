@@ -4722,6 +4722,29 @@ button {
   background: linear-gradient(135deg, #eff6ff, #ffffff);
 }
 
+/* Card enxuto quando as inscrições estão fechadas (sem jogo ativo). */
+.home-v2-closed-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.home-v2-closed-main { min-width: 0; }
+.home-v2-closed-date {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 950;
+  letter-spacing: -.035em;
+}
+.home-v2-closed-sub {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+}
+.home-v2-closed-card .home-v2-secondary { flex: 0 0 auto; }
+
 .home-v2-card-head strong,
 .home-v2-profile strong {
   display: block;

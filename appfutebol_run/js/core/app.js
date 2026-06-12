@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.75.0-autoopen';
+window.__HARMONIA_BUILD__ = 'v1.75.1-homecollapse';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1998,6 +1998,15 @@ function computeDefaultAutoOpen(gameDate) {
   return `${y}-${mo}-${da}T21:00`;
 }
 
+// Rótulo curto da abertura automática, ex.: "seg 21:00".
+function formatAutoOpenLabel(at) {
+  const m = String(at || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+  const wd = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][d.getDay()];
+  return `${wd} ${m[4]}:${m[5]}`;
+}
+
 // Resolve o auto_open_at a partir do formulário de jogo (vazio = manual).
 function readAutoOpenFromForm(formData) {
   if (formData.get('auto_open_enabled') !== 'on') return '';
@@ -3079,6 +3088,9 @@ function renderHome(snapshot, currentPlayer) {
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
   const homeStatusText = game && game.open ? 'Aberto' : 'Fechado';
+  const homeClosedSubline = (game && game.auto_open_at)
+    ? `Abre automaticamente: ${formatAutoOpenLabel(game.auto_open_at)}`
+    : ((game && game.game_date) ? 'Abertura das inscrições em breve.' : 'Aguarde o próximo jogo ser marcado.');
   const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
   const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
@@ -3120,6 +3132,7 @@ function renderHome(snapshot, currentPlayer) {
 
   return `
     <section class="home-v2">
+      ${(game && game.open) ? `
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
           <div>
@@ -3199,6 +3212,16 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-goalie-names">${homeGoalkeeperNames}</div>
         </div>
       </section>
+      ` : `
+      <section class="home-v2-card home-v2-closed-card">
+        <div class="home-v2-closed-main">
+          <div class="home-v2-kicker">Próximo jogo</div>
+          <div class="home-v2-closed-date">${(game && game.game_date) ? formatDate(game.game_date) + (game.game_time ? ' · ' + game.game_time : '') : 'Nenhum jogo agendado'}</div>
+          <div class="home-v2-closed-sub">${homeClosedSubline}</div>
+        </div>
+        ${(game && game.game_date) ? '<button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>' : ''}
+      </section>
+      `}
 
       <section class="home-v2-card">
         <div class="home-v2-card-head">
