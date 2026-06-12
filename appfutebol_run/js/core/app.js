@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.72.0-push';
+window.__HARMONIA_BUILD__ = 'v1.72.1-carne';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -35,6 +35,14 @@ function showToast(msg, type='success') {
 
 let editingPlayerId = null;
 let selfProfileEditOpen = false;
+// Rascunho local do rodízio do carnê. Editado em memória (imune ao poll de
+// sync, que reverteria as alterações no meio da edição) e só persistido quando
+// o admin clica em "Salvar rodízio".
+let carneRotationDraft = null;
+// Cópia do rascunho no momento em que foi aberto/salvo, para detectar alterações.
+let carneRotationBaseline = null;
+// Índice da dupla em edição inline no rodízio (-1 = nenhuma).
+let editingCarnePairIndex = -1;
 
 
 let uiActionInFlight = false;
@@ -913,6 +921,160 @@ function persistCarneSchedule(snapshot, scheduleEntries) {
   ];
 }
 
+// ---------- Rodízio recorrente do carnê ----------
+function carneIsoToNoon(iso) { return new Date(`${String(iso).slice(0, 10)}T12:00:00`); }
+function carneTodayIso() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+}
+function carneAddDays(iso, days) {
+  const d = carneIsoToNoon(iso);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function carneDiffDays(aIso, bIso) {
+  return Math.round((carneIsoToNoon(aIso).getTime() - carneIsoToNoon(bIso).getTime()) / 86400000);
+}
+
+// Fonte de verdade do rodízio. Se ainda não foi salvo, MIGRA da tabela datada
+// atual (carne_schedule): duplas distintas na ordem das datas = um ciclo.
+function getCarneRotation(snapshot) {
+  const carne = Array.isArray(snapshot?.carne) ? snapshot.carne : [];
+  const existing = carne.find((entry) => entry?.type === 'carne_rotation');
+  if (existing && Array.isArray(existing.pairs) && existing.pairs.length && existing.start_date) {
+    return {
+      start_date: String(existing.start_date).slice(0, 10),
+      pairs: existing.pairs.map((p) => ({ player1_id: String(p.player1_id), player2_id: String(p.player2_id) })),
+      persisted: true,
+    };
+  }
+  const schedule = getCarneScheduleEntriesForApp(snapshot);
+  if (!schedule.length) return { start_date: '', pairs: [], persisted: false };
+  const seen = new Set();
+  const pairs = [];
+  for (const entry of schedule) {
+    const key = `${entry.player1_id}|${entry.player2_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({ player1_id: entry.player1_id, player2_id: entry.player2_id });
+  }
+  return { start_date: schedule[0].date, pairs, persisted: false };
+}
+
+// Gera o calendário das próximas semanas (calculado, não digitado): semana w ->
+// dupla pairs[w % N], a partir de start_date (+7 dias por semana).
+function computeCarneCalendar(rotation, weeksAhead = 8, refIso = carneTodayIso()) {
+  const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
+  const startIso = String(rotation?.start_date || '').slice(0, 10);
+  const total = pairs.length;
+  if (!total || !startIso) return [];
+  const diffDays = carneDiffDays(refIso, startIso);
+  let w0 = Math.ceil(diffDays / 7);
+  if (w0 < 0) w0 = 0;
+  const out = [];
+  for (let i = 0; i < weeksAhead; i += 1) {
+    const w = w0 + i;
+    const idx = ((w % total) + total) % total;
+    const pair = pairs[idx];
+    out.push({
+      date: carneAddDays(startIso, w * 7),
+      player1_id: pair.player1_id,
+      player2_id: pair.player2_id,
+      cycleIndex: idx,
+      isNext: i === 0,
+    });
+  }
+  return out;
+}
+
+// Salva o rodízio em snapshot.carne. PRESERVA as entradas antigas (carne_schedule)
+// como backup — a migração só as usa se o rodízio não existir, então elas ficam
+// dormentes, mas evitam perda de dados caso o rodízio seja zerado/corrompido.
+function persistCarneRotation(snapshot, rotation) {
+  const others = (Array.isArray(snapshot.carne) ? snapshot.carne : [])
+    .filter((entry) => entry?.type !== 'carne_rotation');
+  const pairs = (Array.isArray(rotation.pairs) ? rotation.pairs : [])
+    .filter((p) => p?.player1_id && p?.player2_id)
+    .map((p) => ({ player1_id: String(p.player1_id), player2_id: String(p.player2_id) }));
+  snapshot.carne = [
+    ...others,
+    { id: 'carne_rotation', type: 'carne_rotation', start_date: String(rotation.start_date || '').slice(0, 10), pairs },
+  ];
+}
+
+// Monta a visão das PRÓXIMAS semanas: gira o ciclo para que a dupla da próxima
+// quarta fique no topo, e ancora start_date nessa próxima data. Assim a lista
+// mostra sempre o futuro, e arrastar uma dupla muda a data dela (a data fica na
+// posição). Salvar persiste já nessa forma re-ancorada.
+function buildCarneUpcoming(persisted) {
+  const pairs = Array.isArray(persisted?.pairs) ? persisted.pairs : [];
+  const startIso = String(persisted?.start_date || '').slice(0, 10);
+  if (!pairs.length || !startIso) {
+    return { start_date: startIso, pairs: pairs.map((p) => ({ player1_id: p.player1_id, player2_id: p.player2_id })) };
+  }
+  const total = pairs.length;
+  const diffDays = carneDiffDays(carneTodayIso(), startIso);
+  let w0 = Math.ceil(diffDays / 7);
+  if (w0 < 0) w0 = 0;
+  const nextDate = carneAddDays(startIso, w0 * 7);
+  const currentIndex = ((w0 % total) + total) % total;
+  const rotated = [];
+  for (let i = 0; i < total; i += 1) {
+    const p = pairs[(currentIndex + i) % total];
+    rotated.push({ player1_id: p.player1_id, player2_id: p.player2_id });
+  }
+  return { start_date: nextDate, pairs: rotated };
+}
+
+// Rascunho: inicializa da visão "próximas semanas" na primeira vez. Edições
+// mexem só aqui (não no estado sincronizado), então o poll não as reverte.
+function getCarneRotationDraft(snapshot) {
+  if (!carneRotationDraft) {
+    carneRotationDraft = buildCarneUpcoming(getCarneRotation(snapshot));
+    carneRotationBaseline = JSON.parse(JSON.stringify(carneRotationDraft));
+  }
+  return carneRotationDraft;
+}
+function resetCarneRotationDraft() { carneRotationDraft = null; carneRotationBaseline = null; editingCarnePairIndex = -1; }
+// Captura o valor do input de data para o rascunho (preserva o que foi digitado
+// através dos re-renders de outras edições).
+function carneDraftSyncDate() {
+  const input = document.getElementById('carne-rotation-start');
+  if (input && carneRotationDraft) carneRotationDraft.start_date = input.value || carneRotationDraft.start_date;
+}
+
+// Concorrência: um jogador não pode estar em duas duplas do rodízio.
+function carnePlayerUsedElsewhere(draft, playerId, exceptIndex = -1) {
+  const id = String(playerId);
+  return (draft.pairs || []).some((pair, i) => i !== exceptIndex
+    && (String(pair.player1_id) === id || String(pair.player2_id) === id));
+}
+// Conjunto de ids de jogadores que aparecem em mais de uma dupla (para alertar).
+function carneDuplicatePlayerIds(draft) {
+  const counts = new Map();
+  (draft?.pairs || []).forEach((pair) => {
+    [pair.player1_id, pair.player2_id].forEach((id) => {
+      const key = String(id);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+  });
+  return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+}
+
+// Move a dupla de uma posição para outra no rascunho (usado pelo drag-and-drop).
+function carneReorderDraftPairs(from, to) {
+  if (!carneRotationDraft) return;
+  const pairs = carneRotationDraft.pairs;
+  if (from < 0 || from >= pairs.length || to < 0 || to >= pairs.length || from === to) return;
+  const [moved] = pairs.splice(from, 1);
+  pairs.splice(to, 0, moved);
+  render(getState());
+}
+function isCarneRotationDirty() {
+  if (!carneRotationDraft || !carneRotationBaseline) return false;
+  return JSON.stringify(carneRotationDraft) !== JSON.stringify(carneRotationBaseline);
+}
+
 function resetCarneScheduleForm() {
   const idInput = document.getElementById('carne-schedule-id');
   const dateInput = document.getElementById('carne-schedule-date');
@@ -1102,6 +1264,101 @@ document.addEventListener("click", async (e) => {
     render(safeSnapshot);
     uiActionInFlight = false;
     showToast("Dupla removida", "success");
+    return;
+  }
+
+  // ----- Rodízio recorrente do carnê -----
+  // Edições do rodízio mexem só no RASCUNHO local (não no estado sincronizado),
+  // re-renderizam, e só persistem em "Salvar rodízio". Assim o poll não reverte
+  // as alterações no meio de uma sequência de edições.
+  if (action === "carne-rotation-add-pair") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    const p1 = document.getElementById('carne-rotation-player-1')?.value?.trim();
+    const p2 = document.getElementById('carne-rotation-player-2')?.value?.trim();
+    if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
+    if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
+    const draft = getCarneRotationDraft(snapshot);
+    carneDraftSyncDate();
+    const dupId = carnePlayerUsedElsewhere(draft, p1) ? p1 : (carnePlayerUsedElsewhere(draft, p2) ? p2 : null);
+    if (dupId) {
+      const nm = snapshot.players.find((pl) => String(pl.id) === String(dupId))?.name || 'Esse jogador';
+      showToast(`${nm} já está em outra dupla do rodízio.`, 'error');
+      return;
+    }
+    if (!draft.start_date) draft.start_date = carneTodayIso();
+    draft.pairs.push({ player1_id: p1, player2_id: p2 });
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-rotation-remove-pair") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    const idx = Number(id);
+    const draft = getCarneRotationDraft(snapshot);
+    carneDraftSyncDate();
+    if (!(idx >= 0 && idx < draft.pairs.length)) return;
+    draft.pairs.splice(idx, 1);
+    editingCarnePairIndex = -1;
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-pair-edit") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    carneDraftSyncDate();
+    editingCarnePairIndex = Number(id);
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-pair-cancel-edit") {
+    editingCarnePairIndex = -1;
+    render(getState());
+    return;
+  }
+
+  if (action === "carne-pair-save") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    const idx = Number(id);
+    const draft = getCarneRotationDraft(snapshot);
+    carneDraftSyncDate();
+    if (!(idx >= 0 && idx < draft.pairs.length)) return;
+    const p1 = document.getElementById('carne-pair-edit-1')?.value?.trim();
+    const p2 = document.getElementById('carne-pair-edit-2')?.value?.trim();
+    if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
+    if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
+    const dupId = carnePlayerUsedElsewhere(draft, p1, idx) ? p1 : (carnePlayerUsedElsewhere(draft, p2, idx) ? p2 : null);
+    if (dupId) {
+      const nm = snapshot.players.find((pl) => String(pl.id) === String(dupId))?.name || 'Esse jogador';
+      showToast(`${nm} já está em outra dupla do rodízio.`, 'error');
+      return;
+    }
+    draft.pairs[idx] = { player1_id: p1, player2_id: p2 };
+    editingCarnePairIndex = -1;
+    render(getState());
+    return;
+  }
+
+  if (action === "save-carne-rotation") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    const draft = getCarneRotationDraft(snapshot);
+    carneDraftSyncDate();
+    if (!draft.start_date) { showToast('Informe a data de início do rodízio.', 'error'); return; }
+    if (!draft.pairs.length) { showToast('Adicione pelo menos uma dupla ao rodízio.', 'error'); return; }
+    persistCarneRotation(snapshot, draft);
+    carneRotationBaseline = JSON.parse(JSON.stringify(draft));
+    const safe = repairManualSnapshot(snapshot);
+    savePersistedState(safe);
+    render(safe);
+    showToast('Rodízio salvo.', 'success');
+    return;
+  }
+
+  if (action === "discard-carne-rotation") {
+    resetCarneRotationDraft();
+    editingCarnePairIndex = -1;
+    render(getState());
+    showToast('Alterações descartadas.', 'success');
     return;
   }
 
@@ -2252,9 +2509,58 @@ async function bindPushOptin(currentPlayer) {
   }
 }
 
+function bindCarneRotationDrag() {
+  const list = appElement.querySelector('.carne-rotation-list');
+  if (!list) return;
+
+  list.querySelectorAll('.carne-drag-handle').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      const dragItem = handle.closest('.carne-rotation-item');
+      if (!dragItem) return;
+      event.preventDefault();
+
+      const fromIndex = Number(dragItem.dataset.pairIndex);
+      const startY = event.clientY;
+      // Centros originais de cada dupla, para calcular onde soltar.
+      const centers = [...list.querySelectorAll('.carne-rotation-item')].map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { index: Number(el.dataset.pairIndex), mid: rect.top + rect.height / 2 };
+      });
+      let dropTo = fromIndex;
+      dragItem.classList.add('is-dragging');
+      try { handle.setPointerCapture(event.pointerId); } catch (_) {}
+
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const dy = ev.clientY - startY;
+        dragItem.style.transform = `translateY(${dy}px)`;
+        const rect = dragItem.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+        dropTo = centers.filter((c) => c.index !== fromIndex && c.mid < center).length;
+      };
+      const onUp = (ev) => {
+        try { handle.releasePointerCapture(ev.pointerId); } catch (_) {}
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        dragItem.classList.remove('is-dragging');
+        dragItem.style.transform = '';
+        if (dropTo !== fromIndex) carneReorderDraftPairs(fromIndex, dropTo);
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  });
+}
+
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
+  bindCarneRotationDrag();
+  appElement.querySelector('#carne-rotation-start')?.addEventListener('change', () => {
+    if (!carneRotationDraft) return;
+    carneDraftSyncDate();
+    render(getState());
+  });
 
   appElement.querySelector('#change-own-password-button')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -2558,7 +2864,12 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'players':
       return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'carne':
-      return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
+      {
+        const carneRotation = getCarneRotationDraft(snapshot);
+        const carneDates = (carneRotation.pairs || []).map((_, i) => (carneRotation.start_date ? carneAddDays(carneRotation.start_date, i * 7) : ''));
+        const carneDirty = isCarneRotationDirty();
+        return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, carneDirty, editingCarnePairIndex);
+      }
     case 'championship':
       return renderChampionshipScreen(snapshot, currentPlayer);
     case 'config':
@@ -2581,16 +2892,14 @@ function renderHome(snapshot, currentPlayer) {
   const waitlistCount = waitlistView.length;
   const fillPercent = maxPlayers ? Math.min(100, Math.round((confirmedCount / maxPlayers) * 100)) : 0;
   const mensalidade = buildMensalidadeMeta(game, activePlayer, getMensalidadeMode(workingSnapshot.settings));
-  const carneScheduleEntries = getCarneScheduleEntriesForApp(workingSnapshot);
+  const carneRotationForHome = getCarneRotation(workingSnapshot);
+  const carneCalendarForHome = computeCarneCalendar(carneRotationForHome, 1);
   const carneStatus =
     workingSnapshot.carne.some((entry) => String(entry?.player_id || '') === String(activePlayer.id) && entry?.active !== false) ||
-    carneScheduleEntries.some((entry) =>
-      entry?.active !== false &&
-      (
-        String(entry?.player1_id || '') === String(activePlayer.id) ||
-        String(entry?.player2_id || '') === String(activePlayer.id)
-      )
-    );
+    (Array.isArray(carneRotationForHome.pairs) && carneRotationForHome.pairs.some((pair) =>
+      String(pair?.player1_id || '') === String(activePlayer.id) ||
+      String(pair?.player2_id || '') === String(activePlayer.id)
+    ));
   const confirmed = gameView.isConfirmed;
   const waitlisted = gameView.isWaitlisted;
   const waitlistPosition = gameView.waitlistPosition;
@@ -2618,17 +2927,7 @@ function renderHome(snapshot, currentPlayer) {
   });
   const storedNotifications = Array.isArray(workingSnapshot.notifications) ? workingSnapshot.notifications : [];
   const playersByIdForCarneNotification = new Map(workingSnapshot.players.map((player) => [String(player.id), player]));
-  const nextCarneEntry = carneScheduleEntries
-    .filter((entry) => {
-      if (entry?.active === false || !entry?.date) return false;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const entryDate = new Date(`${entry.date}T00:00:00`);
-      return entryDate >= today;
-    })
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const nextCarneEntry = carneCalendarForHome[0];
   const carneNotification = nextCarneEntry
     ? {
         type: 'carne',

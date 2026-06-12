@@ -6314,3 +6314,113 @@ body {
 .push-optin-card #push-status-line { display: block; }
 .push-optin-hint { margin-top: 10px; }
 .push-optin-card #push-toggle-btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* ---------- CARNÊ: gerenciador do rodízio recorrente ---------- */
+.carne-rotation-start-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.carne-rotation-start-row .input { flex: 1 1 auto; min-width: 0; }
+.carne-rotation-start-row .btn { flex: 0 0 auto; }
+.carne-rotation-list { display: grid; gap: 8px; margin: 14px 0; }
+.carne-rotation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hfc-glass-2, rgba(255,255,255,0.05));
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+}
+.carne-row-date {
+  flex: 0 0 auto;
+  min-width: 58px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+  line-height: 1.15;
+}
+.carne-row-date strong { font-weight: 900; font-size: 15px; color: var(--hfc-text, #e8eefc); }
+.carne-row-date small { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; opacity: 0.7; }
+.carne-row-date.is-next {
+  background: rgba(240,165,0,0.16);
+  border-color: rgba(240,165,0,0.45);
+}
+.carne-row-date.is-next strong { color: var(--hfc-gold-200, #ffd980); }
+.carne-row-date.is-next small { color: var(--hfc-gold-200, #ffd980); opacity: 0.9; }
+.carne-rotation-item.is-next { border-color: rgba(240,165,0,0.3); }
+.carne-rotation-names { flex: 1 1 auto; min-width: 0; font-weight: 700; }
+.carne-rotation-names small { font-weight: 500; opacity: 0.6; }
+.carne-rotation-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+.carne-rotation-item-actions .icon-action-button {
+  width: 32px; height: 32px; font-size: 16px; font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+  color: var(--hfc-text, #e8eefc);
+  border-radius: 10px;
+}
+.carne-rotation-item-actions .icon-action-button[disabled] { opacity: 0.3; pointer-events: none; }
+.carne-rotation-item-actions .icon-action-button.is-danger { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
+.carne-rotation-add { display: grid; gap: 8px; margin-top: 6px; }
+@media (min-width: 520px) {
+  .carne-rotation-add { grid-template-columns: 1fr 1fr auto; align-items: center; }
+}
+
+/* ---------- CARNÊ: barra de salvar rodízio (rascunho) ---------- */
+.carne-rotation-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+}
+.carne-rotation-save-actions { display: flex; gap: 8px; align-items: center; }
+.carne-rotation-dirty-note { color: var(--hfc-gold-200, #ffd980); font-weight: 800; font-size: 13px; }
+.carne-rotation-saved-note { color: var(--hfc-text-muted, #9fb0cc); font-size: 13px; }
+.carne-rotation-card.is-dirty { border-color: rgba(240,165,0,0.45); }
+
+/* ---------- CARNÊ: drag-and-drop + edição inline + conflito ---------- */
+.carne-drag-handle {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+  background: rgba(255,255,255,0.06);
+  color: var(--hfc-text, #e8eefc);
+  font-size: 18px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: grab;
+  touch-action: none; /* essencial: o gesto vira drag, não scroll */
+  user-select: none;
+}
+.carne-drag-handle:active { cursor: grabbing; }
+.carne-rotation-item {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.carne-rotation-item.is-dragging {
+  position: relative;
+  z-index: 5;
+  background: rgba(240,165,0,0.12);
+  border-color: var(--hfc-gold, #f0a500);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+}
+.carne-rotation-item.is-conflict { border-color: rgba(239,68,68,0.5); }
+.carne-conflict-flag { font-size: 13px; }
+.carne-rotation-edit-fields {
+  flex: 1 1 auto; min-width: 0;
+  display: grid; gap: 6px;
+}
+.carne-rotation-edit-fields .input { min-height: 40px; }
+.carne-rotation-item.is-editing { align-items: center; }
+.carne-rotation-item-actions .icon-action-button.is-ok {
+  color: #86efac; border-color: rgba(34,197,94,0.4);
+}
+.carne-rotation-warning {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(239,68,68,0.14);
+  border: 1px solid rgba(239,68,68,0.35);
+  color: #fecaca;
+  font-size: 13px; font-weight: 700;
+}

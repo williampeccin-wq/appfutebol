@@ -429,17 +429,114 @@ function renderCarneMemberRow(player) {
   `;
 }
 
-export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
+function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dirty = false, editingIndex = -1) {
+  const admin = isAdmin(currentPlayer);
+  const playersById = new Map(orderedPlayers.map((player) => [String(player.id), player]));
+  const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
+  const isoDates = Array.isArray(dates) ? dates : [];
+  const dateFor = (index) => isoDates[index] || '';
+
+  // Jogadores que aparecem em mais de uma dupla (concorrência) — para alertar.
+  const counts = new Map();
+  pairs.forEach((pair) => [pair.player1_id, pair.player2_id].forEach((idv) => counts.set(String(idv), (counts.get(String(idv)) || 0) + 1)));
+  const dupIds = new Set([...counts.entries()].filter(([, n]) => n > 1).map(([idv]) => idv));
+
+  const dateCell = (index) => `
+    <span class="carne-row-date ${index === 0 ? 'is-next' : ''}">
+      <strong>${formatScheduleDate(dateFor(index))}</strong>
+      ${index === 0 ? '<small>Próxima</small>' : ''}
+    </span>
+  `;
+
+  const pairRow = (pair, index) => {
+    if (admin && index === editingIndex) {
+      return `
+        <div class="carne-rotation-item is-editing" data-pair-index="${index}">
+          ${dateCell(index)}
+          <span class="carne-rotation-edit-fields">
+            <select id="carne-pair-edit-1" class="input">${renderPlayerOptions(orderedPlayers, pair.player1_id)}</select>
+            <select id="carne-pair-edit-2" class="input">${renderPlayerOptions(orderedPlayers, pair.player2_id)}</select>
+          </span>
+          <span class="carne-rotation-item-actions">
+            <button class="icon-action-button is-ok" type="button" data-action="carne-pair-save" data-id="${index}" title="Salvar" aria-label="Salvar">✓</button>
+            <button class="icon-action-button" type="button" data-action="carne-pair-cancel-edit" title="Cancelar" aria-label="Cancelar">✕</button>
+            <button class="icon-action-button is-danger" type="button" data-action="carne-rotation-remove-pair" data-id="${index}" title="Remover dupla" aria-label="Remover dupla">🗑</button>
+          </span>
+        </div>
+      `;
+    }
+    const dup = dupIds.has(String(pair.player1_id)) || dupIds.has(String(pair.player2_id));
+    return `
+      <div class="carne-rotation-item ${index === 0 ? 'is-next' : ''} ${dup ? 'is-conflict' : ''} ${admin ? '' : 'no-actions'}" data-pair-index="${index}">
+        ${dateCell(index)}
+        <span class="carne-rotation-names">${escapeHtml(getPlayerName(playersById, pair.player1_id))} <small>e</small> ${escapeHtml(getPlayerName(playersById, pair.player2_id))}${dup ? ' <span class="carne-conflict-flag" title="Jogador repetido no rodízio">⚠️</span>' : ''}</span>
+        ${admin ? `
+        <span class="carne-rotation-item-actions">
+          <button class="icon-action-button" type="button" data-action="carne-pair-edit" data-id="${index}" title="Editar dupla" aria-label="Editar dupla">✎</button>
+          <button class="carne-drag-handle" type="button" title="Arraste para reordenar" aria-label="Arraste para reordenar">⠿</button>
+        </span>` : ''}
+      </div>
+    `;
+  };
+
+  const listHtml = pairs.length
+    ? pairs.map((pair, index) => pairRow(pair, index)).join('')
+    : `<div class="empty-inline">${admin ? 'Nenhuma dupla no rodízio ainda. Adicione abaixo.' : 'Nenhuma dupla no rodízio ainda.'}</div>`;
+
+  if (!admin) {
+    return `
+      <section class="card carne-rotation-card">
+        <div class="card-title">Calendário da carne</div>
+        <p class="footer-note">Rodízio semanal automático. A dupla do topo é a próxima responsável.</p>
+        <div class="carne-rotation-list">${listHtml}</div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="card carne-rotation-card ${dirty ? 'is-dirty' : ''}" id="carne-rotation-card">
+      <div class="card-title">Calendário da carne</div>
+      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. As alterações só valem ao tocar em <strong>Salvar rodízio</strong>.</p>
+
+      ${dupIds.size ? '<div class="carne-rotation-warning">⚠️ Há jogador(es) em mais de uma dupla. Cada pessoa deve estar em só uma.</div>' : ''}
+
+      <label class="field-label">
+        Próxima quarta (data da dupla do topo)
+        <input id="carne-rotation-start" class="input" type="date" value="${rotation?.start_date || ''}" />
+      </label>
+
+      <div class="carne-rotation-list">${listHtml}</div>
+
+      <div class="carne-rotation-add">
+        <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers)}</select>
+        <select id="carne-rotation-player-2" class="input"><option value="">Responsável 2</option>${renderPlayerOptions(orderedPlayers)}</select>
+        <button class="btn btn-primary" type="button" data-action="carne-rotation-add-pair">Adicionar dupla</button>
+      </div>
+
+      <div class="carne-rotation-save-bar">
+        ${dirty ? '<span class="carne-rotation-dirty-note">Alterações não salvas</span>' : '<span class="carne-rotation-saved-note">Tudo salvo ✓</span>'}
+        <span class="carne-rotation-save-actions">
+          ${dirty ? '<button class="btn btn-secondary btn-sm" type="button" data-action="discard-carne-rotation">Descartar</button>' : ''}
+          <button class="btn btn-primary" type="button" data-action="save-carne-rotation"${dirty ? '' : ' disabled'}>Salvar rodízio</button>
+        </span>
+      </div>
+    </section>
+  `;
+}
+
+export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, rotation = null, calendar = null, dirty = false, editingPairIndex = -1) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
   const carneOnly = carneGroup.filter((player) => player.plays_football === false);
   const jogadoresNoCarne = carneGroup.filter((player) => player.plays_football !== false);
-  const schedule = getCarneScheduleEntries(snapshot, orderedPlayers);
+  const carneRotation = rotation || { pairs: [], start_date: '' };
+  const carneDates = Array.isArray(calendar) ? calendar : [];
+  const cycleLength = Array.isArray(carneRotation.pairs) ? carneRotation.pairs.length : 0;
 
   return `
     <section class="section-stack">
-      ${renderCarneScheduleForm(currentPlayer, orderedPlayers)}
+      ${renderCarneSchedule(currentPlayer, orderedPlayers, carneRotation, carneDates, dirty, editingPairIndex)}
 
       <section class="card">
         <div class="card-title">Resumo do carne</div>
@@ -457,13 +554,11 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
             <div class="kpi-label">Jogadores também no carne</div>
           </div>
           <div class="kpi-box kpi-box--highlight">
-            <div class="kpi-value">${schedule.length}</div>
-            <div class="kpi-label">Duplas cadastradas</div>
+            <div class="kpi-value">${cycleLength}</div>
+            <div class="kpi-label">Duplas no rodízio</div>
           </div>
         </div>
       </section>
-
-      ${renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer)}
 
       <section class="card">
         <div class="card-title">Somente carne</div>
