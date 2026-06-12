@@ -168,6 +168,11 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     : [];
   const visibleCarne = Array.isArray(meta.carne)
     ? meta.carne.filter((entry) => {
+        // O rodízio recorrente (carne_rotation) NÃO tem player_id — guarda `pairs`.
+        // Mantemos sempre; a limpeza de jogadores removidos das duplas é feita no
+        // sanitizeCarne (state.guard). Sem isto, o filtro abaixo o descartava na
+        // leitura do servidor e o rodízio "voltava" ao seed a cada reload/sync.
+        if (entry?.type === 'carne_rotation') return true;
         if (entry?.type === 'carne_schedule') {
           return visiblePlayerIds.has(String(entry.player1_id)) && visiblePlayerIds.has(String(entry.player2_id));
         }
