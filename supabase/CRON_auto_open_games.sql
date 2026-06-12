@@ -8,15 +8,21 @@
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- SUBSTITUA <PROJECT_REF> (DEV=fjnelycvneutmyzjrozs, PROD=kpgghcrmbkrwpvtegcjh)
--- e <CRON_SECRET> (o MESMO secret CRON_SECRET das funções).
+-- SUBSTITUA <PROJECT_REF> (DEV=fjnelycvneutmyzjrozs, PROD=kpgghcrmbkrwpvtegcjh),
+-- <CRON_SECRET> (o MESMO secret CRON_SECRET das funções) e <ANON_KEY> (a anon
+-- key pública do projeto — Settings > API). O header Authorization é OBRIGATÓRIO:
+-- sem ele o gateway do Supabase rejeita com "Missing authorization header".
 select cron.schedule(
   'auto-open-games',
   '*/5 * * * *',
   $$
   select net.http_post(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/auto-open-games',
-    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret','<CRON_SECRET>'),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer <ANON_KEY>',
+      'x-cron-secret', '<CRON_SECRET>'
+    ),
     body    := '{}'::jsonb
   );
   $$

@@ -22,6 +22,7 @@ select cron.schedule(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/send-overdue-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
+      'Authorization', 'Bearer <ANON_KEY>',
       'x-cron-secret', '<CRON_SECRET>'
     ),
     body    := '{}'::jsonb
