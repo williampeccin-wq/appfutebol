@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.71.3-ui';
+export const APP_VERSION = 'v1.71.4-robustez';

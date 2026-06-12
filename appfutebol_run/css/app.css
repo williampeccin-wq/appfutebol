@@ -6242,3 +6242,27 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Tela de erro fatal (rede de segurança render/init) ---------- */
+.fatal-screen {
+  /* Fundo próprio: na falha de render o wrapper temático pode não existir,
+     então não dependemos do fundo escuro do app. */
+  min-height: 100vh;
+  background: var(--hfc-navy-900, #0a1428);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.fatal-card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  background: var(--hfc-glass-2, rgba(255,255,255,0.05));
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+  border-radius: 18px;
+  padding: 28px 24px;
+  color: var(--hfc-text, #e8eefc);
+}
+.fatal-title { font-size: 20px; font-weight: 900; margin-bottom: 10px; }
+.fatal-text { font-size: 14px; line-height: 1.5; color: var(--hfc-text-muted, #9fb0cc); margin-bottom: 20px; }

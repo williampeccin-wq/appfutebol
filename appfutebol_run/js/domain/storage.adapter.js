@@ -12,6 +12,14 @@ const DEFAULT_UI = {
 };
 
 let remoteSaveQueue = Promise.resolve();
+// Quantas escritas locais ainda não foram confirmadas no servidor. Enquanto > 0,
+// o poll de sync NÃO deve aplicar o estado remoto (ele seria mais antigo que a
+// edição local pendente e reverteria a alteração do usuário — lost update).
+let pendingRemoteWrites = 0;
+
+export function hasPendingRemoteWrites() {
+  return pendingRemoteWrites > 0;
+}
 
 function cloneSnapshot(snapshot) {
   return JSON.parse(JSON.stringify(snapshot));
@@ -136,10 +144,12 @@ function createHybridStorageAdapter() {
 
       if (isSupabaseConfigured() && hasStoredAccessToken()) {
         const snapshotToPersist = cloneSnapshot(safeState);
+        // Captura o "updated_at esperado" AGORA (no enqueue), não na hora de
+        // rodar — assim reflete o estado que o usuário viu ao editar.
+        const expectedUpdatedAt = getLastRemoteUpdatedAt();
 
+        pendingRemoteWrites += 1;
         remoteSaveQueue = remoteSaveQueue.then(async () => {
-          const expectedUpdatedAt = getLastRemoteUpdatedAt();
-
           const result = await saveRemoteState(
             createRemoteSnapshot(snapshotToPersist),
             { expectedUpdatedAt }
@@ -159,6 +169,8 @@ function createHybridStorageAdapter() {
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
           return { ok: false, reason: 'remote_save_queue_failed', error };
+        }).finally(() => {
+          pendingRemoteWrites = Math.max(0, pendingRemoteWrites - 1);
         });
 
         return remoteSaveQueue;

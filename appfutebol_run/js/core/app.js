@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.71.3-ui';
+window.__HARMONIA_BUILD__ = 'v1.71.4-robustez';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -182,7 +182,10 @@ function normalizePlayer(player) {
 }
 
 function repairManualSnapshot(snapshot) {
-  const repaired = validateAndRepairState(snapshot);
+  // enforceFinance: true -> a regra de bloqueio total (remover inadimplente
+  // confirmado) só roda em ações explícitas do admin (marcar inadimplente,
+  // salvar modo "total"), nunca no poll de sync. Ver state.guard.js.
+  const repaired = validateAndRepairState(snapshot, { enforceFinance: true });
   if (repaired.warnings.length) {
     console.warn('[app] Reparos aplicados antes do save manual:', repaired.warnings);
   }
@@ -1640,7 +1643,7 @@ import { validateAndRepairState } from "../domain/state.guard.js";
 import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
-import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
+import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
@@ -1661,6 +1664,33 @@ const appElement = document.getElementById('app');
 const REMOTE_SYNC_INTERVAL_MS = 4000;
 let isApplyingRemoteState = false;
 let lastDomainFingerprint = '';
+
+// Rede de segurança global: erros não tratados (síncronos ou de promessas) não
+// devem passar despercebidos. Apenas registram no console — a recuperação de
+// "tela branca" é feita pelos try/catch de init()/render() abaixo.
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[harmonia] Promessa não tratada:', event.reason);
+});
+window.addEventListener('error', (event) => {
+  console.error('[harmonia] Erro não tratado:', event.error || event.message);
+});
+
+// Tela de fallback quando init()/render() lançam: evita ficar preso no boot
+// screen ou com a tela em branco, e oferece recarregar.
+function renderFatalError() {
+  try {
+    appElement.innerHTML = `
+      <div class="fatal-screen">
+        <div class="fatal-card">
+          <div class="fatal-title">Ops, algo deu errado</div>
+          <p class="fatal-text">O app encontrou um erro inesperado ao desenhar a tela. Seus dados continuam salvos. Tente recarregar.</p>
+          <button class="btn btn-primary" type="button" onclick="window.location.reload()">Recarregar</button>
+        </div>
+      </div>`;
+  } catch (_) {
+    appElement.textContent = 'Erro ao carregar. Recarregue a página.';
+  }
+}
 
 init();
 
@@ -1687,6 +1717,15 @@ function requireCriticalOperationAllowed(operation, trigger = null) {
 }
 
 async function init() {
+  try {
+    await initInner();
+  } catch (err) {
+    console.error('[harmonia] Falha no boot do app:', err);
+    renderFatalError();
+  }
+}
+
+async function initInner() {
   displayEnvironmentSafetyBanner();
   await prepareStoredSession();
 
@@ -1717,6 +1756,10 @@ async function init() {
 }
 
 function bindGlobalSystemEvents() {
+  window.addEventListener('harmonia:storage-full', () => {
+    showToast('Armazenamento do aparelho cheio. Os dados seguem salvos no servidor; considere remover fotos grandes.', 'error');
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -1784,6 +1827,13 @@ function startRemoteSync() {
         return;
       }
 
+      // Há escrita local ainda não confirmada no servidor: aplicar o remoto
+      // agora reverteria a edição do usuário (lost update). Pula este ciclo;
+      // quando a escrita drenar, o próximo ciclo sincroniza normalmente.
+      if (hasPendingRemoteWrites()) {
+        return;
+      }
+
       const localSnapshot = getState();
       const remote = await loadRemoteState();
 
@@ -1821,6 +1871,12 @@ function startRemoteSync() {
         return;
       }
 
+      // Reverificação: durante o await acima o usuário pode ter disparado uma
+      // escrita. Não sobrepor a edição local pendente.
+      if (hasPendingRemoteWrites()) {
+        return;
+      }
+
       isApplyingRemoteState = true;
       replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
       lastDomainFingerprint = remoteFingerprint;
@@ -1837,6 +1893,17 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  // Qualquer throw aqui apagaria a tela (innerHTML) sem repintar. O try/catch
+  // garante uma tela de erro recuperável em vez de "tela branca" travada.
+  try {
+    renderInner(snapshot);
+  } catch (err) {
+    console.error('[harmonia] Falha ao renderizar a tela:', err);
+    renderFatalError();
+  }
+}
+
+function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
   // Antes este banner somava confirmações de TODOS os jogos e incluía
   // goleiros/carne, divergindo do resto da home e do banco.
