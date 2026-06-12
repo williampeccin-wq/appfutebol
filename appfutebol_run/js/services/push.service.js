@@ -183,6 +183,31 @@ export async function triggerServerPush({ target = 'all', title, body, url = './
   }
 }
 
+// Dispara o lembrete de mensalidade atrasada agora (Edge Function
+// send-overdue-reminders). Uso: botão de teste do admin. `force: true` ignora a
+// deduplicação do dia, para permitir reenvio durante o teste.
+export async function triggerOverdueReminders() {
+  const { url: base, anonKey } = getSupabase();
+  if (!base || !anonKey) return { ok: false, reason: 'not_configured' };
+  const token = getAccessToken();
+  try {
+    const response = await fetch(`${base}/functions/v1/send-overdue-reminders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${token || anonKey}`,
+      },
+      body: JSON.stringify({ force: true }),
+    });
+    if (!response.ok) return { ok: false, reason: `reminders_${response.status}` };
+    return { ok: true, data: await response.json().catch(() => ({})) };
+  } catch (error) {
+    console.warn('[push] Falha ao disparar lembretes de atraso:', error);
+    return { ok: false, reason: 'network' };
+  }
+}
+
 export async function disablePush() {
   try {
     const reg = await navigator.serviceWorker.getRegistration();

@@ -11,6 +11,18 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Recibo de auditoria: avisa o servidor que a mensagem foi entregue/aberta.
+// Best-effort — nunca quebra a notificação se a rede falhar.
+function sendPushReceipt(receiptUrl, logId, type) {
+  if (!receiptUrl || !logId) return Promise.resolve();
+  return fetch(receiptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ logId, type }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -25,23 +37,33 @@ self.addEventListener('push', (event) => {
     icon: payload.icon || './assets/harmonia-crest.jpeg',
     badge: './assets/harmonia-crest.jpeg',
     tag: payload.tag || undefined,
-    data: { url: payload.url || './' },
+    // Carrega referências de auditoria para o clique.
+    data: { url: payload.url || './', logId: payload.logId || null, receiptUrl: payload.receiptUrl || null },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      sendPushReceipt(payload.receiptUrl, payload.logId, 'delivered'),
+    ])
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  const info = event.notification.data || {};
+  const targetUrl = info.url || './';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) return client.focus();
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-      return undefined;
-    })
+    Promise.all([
+      sendPushReceipt(info.receiptUrl, info.logId, 'opened'),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if ('focus' in client) return client.focus();
+        }
+        if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+        return undefined;
+      }),
+    ])
   );
 });
