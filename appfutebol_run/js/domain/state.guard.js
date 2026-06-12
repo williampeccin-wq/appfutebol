@@ -228,6 +228,14 @@ export function sanitizeCarne(state) {
       return keep;
     }
 
+    // Configuração do rodízio recorrente: mantém a entrada e remove apenas as
+    // duplas cujos jogadores não existem mais.
+    if (entry.type === 'carne_rotation') {
+      entry.pairs = (Array.isArray(entry.pairs) ? entry.pairs : []).filter((pair) =>
+        validIds.has(String(pair?.player1_id || '')) && validIds.has(String(pair?.player2_id || '')));
+      return true;
+    }
+
     const keep = validIds.has(String(entry.player_id || ''));
     if (!keep) warnings.push(`Registro de carne órfão removido (${entry?.player_id || 'sem-id'}).`);
     return keep;

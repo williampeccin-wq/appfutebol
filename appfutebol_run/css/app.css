@@ -6314,3 +6314,42 @@ body {
 .push-optin-card #push-status-line { display: block; }
 .push-optin-hint { margin-top: 10px; }
 .push-optin-card #push-toggle-btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* ---------- CARNÊ: gerenciador do rodízio recorrente ---------- */
+.carne-rotation-start-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.carne-rotation-start-row .input { flex: 1 1 auto; min-width: 0; }
+.carne-rotation-start-row .btn { flex: 0 0 auto; }
+.carne-rotation-list { display: grid; gap: 8px; margin: 14px 0; }
+.carne-rotation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hfc-glass-2, rgba(255,255,255,0.05));
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
+}
+.carne-rotation-order {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px;
+  background: rgba(240,165,0,0.16); color: var(--hfc-gold-200, #ffd980);
+}
+.carne-rotation-names { flex: 1 1 auto; min-width: 0; font-weight: 700; }
+.carne-rotation-names small { font-weight: 500; opacity: 0.6; }
+.carne-rotation-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+.carne-rotation-item-actions .icon-action-button {
+  width: 32px; height: 32px; font-size: 16px; font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+  color: var(--hfc-text, #e8eefc);
+  border-radius: 10px;
+}
+.carne-rotation-item-actions .icon-action-button[disabled] { opacity: 0.3; pointer-events: none; }
+.carne-rotation-item-actions .icon-action-button.is-danger { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
+.carne-rotation-add { display: grid; gap: 8px; margin-top: 6px; }
+@media (min-width: 520px) {
+  .carne-rotation-add { grid-template-columns: 1fr 1fr auto; align-items: center; }
+}
