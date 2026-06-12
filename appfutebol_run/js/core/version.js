@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.73.1-overdue';
+export const APP_VERSION = 'v1.74.0-fila';

@@ -183,6 +183,34 @@ export async function triggerServerPush({ target = 'all', title, body, url = './
   }
 }
 
+// Avisa quem entrou no jogo ao sair da fila (Edge Function
+// notify-waitlist-promotion). Best-effort: o servidor verifica no banco que a
+// pessoa está mesmo confirmada e deduplica por (jogo + jogador), então pode ser
+// chamado de qualquer cliente sem risco de push duplicado.
+export async function triggerWaitlistPromotion(gameKey, playerIds) {
+  const ids = (Array.isArray(playerIds) ? playerIds : [playerIds]).map((id) => String(id || '')).filter(Boolean);
+  if (!ids.length) return { ok: false, reason: 'no_players' };
+  const { url: base, anonKey } = getSupabase();
+  if (!base || !anonKey) return { ok: false, reason: 'not_configured' };
+  const token = getAccessToken();
+  try {
+    const response = await fetch(`${base}/functions/v1/notify-waitlist-promotion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${token || anonKey}`,
+      },
+      body: JSON.stringify({ game_key: String(gameKey || ''), player_ids: ids }),
+    });
+    if (!response.ok) return { ok: false, reason: `promotion_${response.status}` };
+    return { ok: true, data: await response.json().catch(() => ({})) };
+  } catch (error) {
+    console.warn('[push] Falha ao avisar promoção da fila:', error);
+    return { ok: false, reason: 'network' };
+  }
+}
+
 // Dispara o lembrete de mensalidade atrasada agora (Edge Function
 // send-overdue-reminders). Uso: botão de teste do admin. `force: true` ignora a
 // deduplicação do dia, para permitir reenvio durante o teste.

@@ -314,7 +314,7 @@ export function toggleConfirmation(playerId, options = {}) {
       confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(promoted.confirmations)),
       ...buildDrawRemovalPatch(snapshot, playerId, now),
     });
-    return { ok: true, message: promoted.promoted ? 'Presença cancelada. Primeiro da fila entrou automaticamente.' : 'Presença cancelada.' };
+    return { ok: true, message: promoted.promoted ? 'Presença cancelada. Primeiro da fila entrou automaticamente.' : 'Presença cancelada.', promotedPlayerId: promoted.promoted || null, gameKey };
   }
 
   if (currentlyWaitlisted) {
@@ -438,6 +438,8 @@ export function adminRemovePlayerFromGame(playerId) {
       : (scrub.changed
           ? 'Jogador removido do jogo e dos pontos deste jogo no campeonato.'
           : 'Jogador removido do jogo pelo admin.'),
+    promotedPlayerId: promoted.promoted || null,
+    gameKey,
   };
 }
 
