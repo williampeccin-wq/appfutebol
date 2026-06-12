@@ -649,6 +649,21 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   return operations;
 }
 
+// Lê o updated_at mais recente das LINHAS ÚNICAS compartilhadas (game/meta) —
+// os objetos gravados "inteiros" e, portanto, o alvo de sobrescrita cega entre
+// admins. players/presence usam chave por linha e não sofrem esse problema.
+async function fetchSharedUpdatedAt(config) {
+  const [gameRes, metaRes] = await Promise.all([
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+  ]);
+  const values = [];
+  if (gameRes?.ok && Array.isArray(gameRes.data) && gameRes.data[0]?.updated_at) values.push(gameRes.data[0].updated_at);
+  if (metaRes?.ok && Array.isArray(metaRes.data) && metaRes.data[0]?.updated_at) values.push(metaRes.data[0].updated_at);
+  values.sort();
+  return values.length ? values[values.length - 1] : null;
+}
+
 async function saveSplitState(config, state) {
   const parts = splitState(state);
 
@@ -671,6 +686,26 @@ async function saveSplitState(config, state) {
     return { ok: true, conflict: false, reason: 'split_no_changes', updatedAt: lastRemoteUpdatedAt };
   }
 
+  // Concorrência otimista para os objetos compartilhados (game/meta): se vamos
+  // sobrescrever um deles e o remoto avançou além do que conhecemos (outro admin
+  // gravou), ABORTA e sinaliza conflito em vez de apagar a alteração do outro.
+  // Nossas próprias gravações avançam lastRemoteUpdatedAt, então saves
+  // sequenciais do mesmo usuário não geram falso-positivo.
+  const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
+  if (touchesShared && lastRemoteUpdatedAt) {
+    const freshShared = await fetchSharedUpdatedAt(config);
+    // Compara por timestamp numérico (robusto a diferenças de formato/precisão
+    // entre o que gravamos e o que o Postgres devolve). Só conflita se o remoto
+    // for MAIS NOVO que o último estado que conhecíamos — ou seja, outro cliente
+    // gravou. Margem de 1s evita ruído de precisão.
+    const freshMs = freshShared ? new Date(freshShared).getTime() : 0;
+    const baseMs = new Date(lastRemoteUpdatedAt).getTime() || 0;
+    if (freshMs && baseMs && freshMs - baseMs > 1000) {
+      console.warn('[storage.supabase] remoto avançou desde a última sync; abortando para não sobrescrever (conflito).');
+      return { ok: false, conflict: true, reason: 'remote_advanced' };
+    }
+  }
+
   const results = await Promise.all(operations.map((operation) => operation.run()));
   const failed = results.find((result) => !result.ok);
 
@@ -681,11 +716,21 @@ async function saveSplitState(config, state) {
   rememberSplitSnapshot(state, now);
   gameStateHadVolatileDraw = false;
 
+  // Re-ancora o baseline ao updated_at REAL do servidor (que pode diferir do
+  // nosso `now` por trigger/precisão). Sem isso, o próximo save poderia
+  // falso-conflitar consigo mesmo. Falha de leitura não é crítica: mantém `now`.
+  if (touchesShared) {
+    try {
+      const serverUpdatedAt = await fetchSharedUpdatedAt(config);
+      if (serverUpdatedAt) lastRemoteUpdatedAt = serverUpdatedAt;
+    } catch (_) {}
+  }
+
   return {
     ok: true,
     conflict: false,
     reason: 'split_granular_saved',
-    updatedAt: now,
+    updatedAt: lastRemoteUpdatedAt,
     operations: operations.map((operation) => operation.type),
   };
 }

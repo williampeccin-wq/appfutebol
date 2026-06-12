@@ -60,9 +60,31 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
     }
     delete normalized.password;
 
-    const list = groups.get(phone) || [];
+    // Agrupa por telefone E nome. Antes era só por telefone: dois cadastros
+    // DISTINTOS com o mesmo telefone (família, placeholder repetido, erro de
+    // digitação) eram fundidos num só, e as confirmações/pontos do eliminado
+    // migravam para o outro — perda silenciosa de jogador. Agora só funde quem
+    // tem o MESMO telefone e o MESMO nome (duplicata real).
+    const nameKey = String(player.name || '').trim().toLowerCase();
+    const groupKey = `${phone}|${nameKey}`;
+    const list = groups.get(groupKey) || [];
     list.push(normalized);
-    groups.set(phone, list);
+    groups.set(groupKey, list);
+  }
+
+  // Telefones compartilhados por nomes distintos: mantidos separados, mas avisa.
+  const namesByPhone = new Map();
+  for (const groupKey of groups.keys()) {
+    const sep = groupKey.indexOf('|');
+    const phone = groupKey.slice(0, sep);
+    const set = namesByPhone.get(phone) || new Set();
+    set.add(groupKey.slice(sep + 1));
+    namesByPhone.set(phone, set);
+  }
+  for (const [phone, names] of namesByPhone.entries()) {
+    if (names.size > 1) {
+      warnings.push(`Telefone ${phone} compartilhado por ${names.size} nomes distintos — mantidos separados.`);
+    }
   }
 
   const deduped = [];
@@ -79,9 +101,11 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
     return score;
   };
 
-  for (const [phone, group] of groups.entries()) {
+  for (const [, group] of groups.entries()) {
+    const phone = group[0]?.phone || '';
     const preferred = [...group].sort((left, right) => scorePlayer(right) - scorePlayer(left))[0] || null;
-    const seedPlayer = seedByPhone.get(phone) || null;
+    // Seed só é aplicado quando aquele telefone tem um ÚNICO nome (sem ambiguidade).
+    const seedPlayer = (namesByPhone.get(phone)?.size === 1) ? (seedByPhone.get(phone) || null) : null;
 
     let canonical = preferred ? clone(preferred) : null;
     if (seedPlayer) {

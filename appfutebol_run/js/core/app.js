@@ -1643,7 +1643,7 @@ import { validateAndRepairState } from "../domain/state.guard.js";
 import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
-import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta } from '../domain/storage.adapter.js';
+import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
@@ -1827,6 +1827,13 @@ function startRemoteSync() {
         return;
       }
 
+      // Há escrita local ainda não confirmada no servidor: aplicar o remoto
+      // agora reverteria a edição do usuário (lost update). Pula este ciclo;
+      // quando a escrita drenar, o próximo ciclo sincroniza normalmente.
+      if (hasPendingRemoteWrites()) {
+        return;
+      }
+
       const localSnapshot = getState();
       const remote = await loadRemoteState();
 
@@ -1861,6 +1868,12 @@ function startRemoteSync() {
 
       if (!remoteFingerprint || remoteFingerprint === currentFingerprint) {
         lastDomainFingerprint = currentFingerprint;
+        return;
+      }
+
+      // Reverificação: durante o await acima o usuário pode ter disparado uma
+      // escrita. Não sobrepor a edição local pendente.
+      if (hasPendingRemoteWrites()) {
         return;
       }
 
