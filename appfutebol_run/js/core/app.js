@@ -1699,6 +1699,7 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush } from '../services/push.service.js';
 
 const appElement = document.getElementById('app');
 
@@ -1794,6 +1795,9 @@ async function initInner() {
   render(getState());
   bindGlobalSystemEvents();
   startRemoteSync();
+
+  // PWA / Web Push: registra o service worker em segundo plano (não bloqueia o boot).
+  registerServiceWorker();
 }
 
 function bindGlobalSystemEvents() {
@@ -2168,8 +2172,80 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 }
 
 
+async function bindPushOptin(currentPlayer) {
+  const card = appElement.querySelector('#push-optin-card');
+  if (!card) return;
+  const statusLine = card.querySelector('#push-status-line');
+  const button = card.querySelector('#push-toggle-btn');
+  const hint = card.querySelector('#push-hint');
+
+  const showHint = (text) => { if (hint) { hint.textContent = text; hint.style.display = text ? '' : 'none'; } };
+  const showButton = (label) => { if (button) { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; } };
+
+  const state = await getPushState();
+
+  if (!state.supported) {
+    if (state.iosNeedsInstall) {
+      statusLine.textContent = 'Disponível ao instalar o app';
+      showButton('');
+      showHint('No iPhone: toque em Compartilhar → "Adicionar à Tela de Início". Depois abra o app por esse ícone para ativar os avisos.');
+    } else {
+      statusLine.textContent = 'Não suportado neste navegador';
+      showButton('');
+      showHint('');
+    }
+    return;
+  }
+
+  const refresh = (s) => {
+    if (s.permission === 'denied') {
+      statusLine.textContent = 'Bloqueado nas configurações do navegador';
+      showButton('');
+      showHint('Você bloqueou as notificações. Reative nas permissões do site no navegador.');
+    } else if (s.subscribed && s.permission === 'granted') {
+      statusLine.textContent = 'Ativado ✓';
+      showButton('Desativar');
+      showHint('Você receberá um aviso quando as inscrições de um jogo abrirem.');
+    } else {
+      statusLine.textContent = 'Desativado';
+      showButton('Ativar');
+      showHint(state.iosNeedsInstall ? 'No iPhone, ative com o app aberto pela Tela de Início.' : 'Receba um aviso quando as inscrições abrirem.');
+    }
+  };
+  refresh(state);
+
+  if (button) {
+    button.onclick = async () => {
+      const current = await getPushState();
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = '...';
+      if (current.subscribed) {
+        await disablePush();
+      } else {
+        const result = await enablePush(currentPlayer?.id);
+        if (!result.ok) {
+          const messages = {
+            denied: 'Permissão negada. Libere as notificações nas configurações do site.',
+            ios_needs_install: 'No iPhone, instale o app (Adicionar à Tela de Início) e abra por ele para ativar.',
+            unsupported: 'Este navegador não suporta notificações.',
+            subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
+          };
+          showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
+        } else {
+          showToast('Notificações ativadas.', 'success');
+        }
+      }
+      button.disabled = false;
+      button.textContent = original;
+      refresh(await getPushState());
+    };
+  }
+}
+
 function bindAppEvents(currentPlayer) {
   appElement.querySelector('#logout-button')?.addEventListener('click', async () => { await logout(); });
+  bindPushOptin(currentPlayer);
 
   appElement.querySelector('#change-own-password-button')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -2766,6 +2842,17 @@ function renderHome(snapshot, currentPlayer) {
         <div class="home-v2-notices">
           ${homeNoticeItems.length ? homeNoticeItems.map((item) => '<div class="home-v2-notice"><span>' + item.icon + '</span><div><strong>' + escapeHtml(item.title) + '</strong><small>' + (item.html || escapeHtml(item.text || '')) + '</small></div></div>').join('') : '<span class="home-v2-empty">Sem notificações por enquanto.</span>'}
         </div>
+      </section>
+
+      <section class="home-v2-card push-optin-card" id="push-optin-card">
+        <div class="home-v2-card-head">
+          <div>
+            <strong>Avisos no celular</strong>
+            <span id="push-status-line">Verificando…</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="push-toggle-btn" style="display:none;"></button>
+        </div>
+        <p class="footer-note push-optin-hint" id="push-hint" style="display:none;"></p>
       </section>
 
       <section class="home-v2-profile">

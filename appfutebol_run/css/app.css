@@ -6308,3 +6308,9 @@ body {
   line-height: 1;
   cursor: pointer;
 }
+
+/* ---------- Card de opt-in de notificações push (home) ---------- */
+.push-optin-card .home-v2-card-head { align-items: center; }
+.push-optin-card #push-status-line { display: block; }
+.push-optin-hint { margin-top: 10px; }
+.push-optin-card #push-toggle-btn { flex: 0 0 auto; white-space: nowrap; }
