@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.73.1-overdue';
+window.__HARMONIA_BUILD__ = 'v1.74.0-fila';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -1869,6 +1869,7 @@ if (action === "admin-remove-from-game") {
 
   uiActionInFlight = false;
   showToast(result.message, result.ok ? "success" : "error");
+  notifyWaitlistPromotion(result);
   return;
 }
 
@@ -1971,7 +1972,16 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
-import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, syncExistingPushSubscription } from '../services/push.service.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
+
+// Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
+// o servidor deduplica por (jogo + jogador), então é seguro chamar de qualquer
+// cliente que tenha detectado a promoção.
+function notifyWaitlistPromotion(result) {
+  const promotedId = result?.promotedPlayerId;
+  if (!promotedId) return;
+  triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
+}
 
 const appElement = document.getElementById('app');
 
@@ -2612,6 +2622,7 @@ function bindAppEvents(currentPlayer) {
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
     const result = toggleConfirmation(currentPlayer.id);
     if (result?.message) showToast(result.message, result.ok ? 'success' : 'error');
+    notifyWaitlistPromotion(result);
   });
 
   appElement.querySelector('#draw-teams-btn')?.addEventListener('click', () => {
