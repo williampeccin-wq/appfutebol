@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.75.1-homecollapse';
+window.__HARMONIA_BUILD__ = 'v1.75.2-homepolish';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -821,6 +821,10 @@ function renderSelfProfileEditCardForHome(activePlayer) {
               Salvar nova senha
             </button>
           </div>
+
+          <section class="home-v2-card push-optin-card self-push-card">
+            ${renderPushOptinInner()}
+          </section>
 
           <div class="self-profile-actions">
             <button class="btn btn-primary" type="button" data-action="update-self-profile">Salvar</button>
@@ -1998,6 +2002,28 @@ function computeDefaultAutoOpen(gameDate) {
   return `${y}-${mo}-${da}T21:00`;
 }
 
+// Controle de "Avisos no celular" (push). Markup com seletores por CLASSE para
+// poder existir em dois lugares: na home (onboarding, até a 1ª ativação) e
+// dentro da edição do perfil (gestão permanente).
+function renderPushOptinInner() {
+  return `
+    <div class="home-v2-card-head">
+      <div>
+        <strong>Avisos no celular</strong>
+        <span class="push-status-line">Verificando…</span>
+      </div>
+      <button class="btn btn-secondary btn-sm push-toggle-btn" type="button" style="display:none;"></button>
+    </div>
+    <p class="footer-note push-optin-hint push-hint" style="display:none;"></p>
+  `;
+}
+function isPushOnboarded() {
+  try { return localStorage.getItem('harmonia_push_onboarded') === '1'; } catch (_) { return false; }
+}
+function setPushOnboarded() {
+  try { localStorage.setItem('harmonia_push_onboarded', '1'); } catch (_) {}
+}
+
 // Rótulo curto da abertura automática, ex.: "seg 21:00".
 function formatAutoOpenLabel(at) {
   const m = String(at || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
@@ -2491,14 +2517,24 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
 
 async function bindPushOptin(currentPlayer) {
-  const card = appElement.querySelector('#push-optin-card');
-  if (!card) return;
-  const statusLine = card.querySelector('#push-status-line');
-  const button = card.querySelector('#push-toggle-btn');
-  const hint = card.querySelector('#push-hint');
+  const cards = [...appElement.querySelectorAll('.push-optin-card')];
+  for (const card of cards) {
+    // eslint-disable-next-line no-await-in-loop
+    await bindPushControl(card, currentPlayer);
+  }
+}
+
+async function bindPushControl(card, currentPlayer) {
+  const statusLine = card.querySelector('.push-status-line');
+  const button = card.querySelector('.push-toggle-btn');
+  const hint = card.querySelector('.push-hint');
+  if (!statusLine || !button) return;
+  // O card da home (id push-optin-card) é só onboarding: some assim que o push
+  // está ativo. A gestão permanente fica no card dentro da edição do perfil.
+  const isHomeCard = card.id === 'push-optin-card';
 
   const showHint = (text) => { if (hint) { hint.textContent = text; hint.style.display = text ? '' : 'none'; } };
-  const showButton = (label) => { if (button) { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; } };
+  const showButton = (label) => { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; };
 
   const state = await getPushState();
 
@@ -2521,9 +2557,12 @@ async function bindPushOptin(currentPlayer) {
       showButton('');
       showHint('Você bloqueou as notificações. Reative nas permissões do site no navegador.');
     } else if (s.subscribed && s.permission === 'granted') {
+      setPushOnboarded();
+      // Já ativado: na home o card desaparece (gestão migra para o perfil).
+      if (isHomeCard) { card.style.display = 'none'; return; }
       statusLine.textContent = 'Ativado ✓';
       showButton('Desativar');
-      showHint('Você receberá um aviso quando as inscrições de um jogo abrirem.');
+      showHint('Você receberá os avisos do Harmonia neste aparelho. Pode desativar aqui quando quiser.');
     } else {
       statusLine.textContent = 'Desativado';
       showButton('Ativar');
@@ -2532,37 +2571,40 @@ async function bindPushOptin(currentPlayer) {
   };
   refresh(state);
 
-  if (button) {
-    button.onclick = async () => {
-      // IMPORTANTE: nada de `await` antes de pedir a permissão. Notification
-      // .requestPermission() exige o gesto do toque ainda "fresco"; um await
-      // aqui (ex.: getPushState) consome o gesto e o Chrome ignora o pedido.
-      // Por isso decidimos ativar/desativar pelo RÓTULO atual do botão.
-      const isCurrentlyOn = String(button.textContent || '').trim() === 'Desativar';
-      const original = isCurrentlyOn ? 'Desativar' : 'Ativar';
-      button.disabled = true;
-      button.textContent = '...';
-      if (isCurrentlyOn) {
-        await disablePush();
+  button.onclick = async () => {
+    // IMPORTANTE: nada de `await` antes de pedir a permissão. Notification
+    // .requestPermission() exige o gesto do toque ainda "fresco"; um await
+    // aqui (ex.: getPushState) consome o gesto e o Chrome ignora o pedido.
+    // Por isso decidimos ativar/desativar pelo RÓTULO atual do botão.
+    const isCurrentlyOn = String(button.textContent || '').trim() === 'Desativar';
+    const original = isCurrentlyOn ? 'Desativar' : 'Ativar';
+    button.disabled = true;
+    button.textContent = '...';
+    let activated = false;
+    if (isCurrentlyOn) {
+      await disablePush();
+    } else {
+      const result = await enablePush(currentPlayer?.id);
+      if (!result.ok) {
+        const messages = {
+          denied: 'Permissão negada. Libere as notificações nas configurações do site.',
+          ios_needs_install: 'No iPhone, instale o app (Adicionar à Tela de Início) e abra por ele para ativar.',
+          unsupported: 'Este navegador não suporta notificações.',
+          subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
+        };
+        showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
       } else {
-        const result = await enablePush(currentPlayer?.id);
-        if (!result.ok) {
-          const messages = {
-            denied: 'Permissão negada. Libere as notificações nas configurações do site.',
-            ios_needs_install: 'No iPhone, instale o app (Adicionar à Tela de Início) e abra por ele para ativar.',
-            unsupported: 'Este navegador não suporta notificações.',
-            subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
-          };
-          showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
-        } else {
-          showToast('Notificações ativadas.', 'success');
-        }
+        activated = true;
+        setPushOnboarded();
+        showToast('Notificações ativadas.', 'success');
       }
-      button.disabled = false;
-      button.textContent = original;
-      refresh(await getPushState());
-    };
-  }
+    }
+    button.disabled = false;
+    button.textContent = original;
+    // Ao ativar pela 1ª vez, re-renderiza para tirar o card de onboarding da home.
+    if (activated && isHomeCard) { render(getState()); return; }
+    refresh(await getPushState());
+  };
 }
 
 function bindCarneRotationDrag() {
@@ -3235,16 +3277,10 @@ function renderHome(snapshot, currentPlayer) {
         </div>
       </section>
 
+      ${isPushOnboarded() ? '' : `
       <section class="home-v2-card push-optin-card" id="push-optin-card">
-        <div class="home-v2-card-head">
-          <div>
-            <strong>Avisos no celular</strong>
-            <span id="push-status-line">Verificando…</span>
-          </div>
-          <button class="btn btn-secondary btn-sm" type="button" id="push-toggle-btn" style="display:none;"></button>
-        </div>
-        <p class="footer-note push-optin-hint" id="push-hint" style="display:none;"></p>
-      </section>
+        ${renderPushOptinInner()}
+      </section>`}
 
       <section class="home-v2-profile">
         ${renderAvatarForApp(activePlayer, 'home-v2-profile-avatar')}

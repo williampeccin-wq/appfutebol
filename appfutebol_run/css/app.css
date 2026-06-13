@@ -4727,23 +4727,27 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
+  padding: 20px 18px;
 }
 .home-v2-closed-main { min-width: 0; }
 .home-v2-closed-date {
-  margin-top: 2px;
-  color: #0f172a;
-  font-size: 17px;
+  margin-top: 4px;
+  color: var(--hfc-text, #0f172a);
+  font-size: 21px;
   font-weight: 950;
   letter-spacing: -.035em;
 }
 .home-v2-closed-sub {
-  margin-top: 4px;
-  color: #64748b;
+  margin-top: 5px;
+  color: var(--hfc-text-muted, #64748b);
   font-size: 13px;
   font-weight: 750;
 }
 .home-v2-closed-card .home-v2-secondary { flex: 0 0 auto; }
+/* Tema escuro da home. */
+.content--home .home-v2-closed-date { color: var(--hfc-text); }
+.content--home .home-v2-closed-sub { color: var(--hfc-text-muted); }
 
 .home-v2-card-head strong,
 .home-v2-profile strong {
