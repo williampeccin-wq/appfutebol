@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.77.1-splash';
+window.__HARMONIA_BUILD__ = 'v1.77.2-cleanup';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -3998,8 +3998,7 @@ function renderConfig(snapshot, currentPlayer) {
 
         <div class="mens-reminder-block">
           <div class="card-subtitle">Lembrete de atraso (push)</div>
-          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push. Use o botão para testar agora.</p>
-          <button class="btn btn-secondary btn-sm" type="button" data-action="test-overdue-reminders">Enviar lembrete de atraso agora (teste)</button>
+          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push, automaticamente.</p>
         </div>
       </section>
 

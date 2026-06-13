@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.77.1-splash';
+export const APP_VERSION = 'v1.77.2-cleanup';
