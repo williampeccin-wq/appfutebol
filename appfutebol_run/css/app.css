@@ -300,6 +300,25 @@ button {
   font-weight: 700;
 }
 
+.header-avatar-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.header-avatar-btn:active { transform: scale(0.94); }
+.avatar.header-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-size: 15px;
+}
+
 .nav {
   position: sticky;
   top: 76px;
@@ -5498,6 +5517,59 @@ body {
 .content--home .self-profile-actions .btn-primary {
   background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
   color: #1a1200;
+}
+
+/* Painel de perfil — modo VER (aberto pelo avatar do header). */
+.profile-view-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.avatar.profile-view-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 20px;
+}
+.profile-view-id { flex: 1 1 auto; min-width: 0; }
+.profile-view-id strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: var(--hfc-text);
+}
+.profile-view-id span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--hfc-text-muted);
+}
+.profile-view-rows { display: grid; gap: 10px; margin-bottom: 16px; }
+.profile-view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.profile-view-row > span { color: var(--hfc-text-muted); font-size: 13px; font-weight: 700; }
+.profile-view-row > strong { color: var(--hfc-text); font-weight: 800; }
+.profile-view-actions { display: flex; gap: 10px; }
+.profile-view-actions .btn { flex: 1 1 0; min-width: 0; }
+.content--home .profile-view-actions .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+}
+.content--home .profile-view-actions .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
 }
 
 /* ---------- JOGO DA SEMANA (Stadium Glass) ---------- */

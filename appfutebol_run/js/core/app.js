@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.75.3-editdark';
+window.__HARMONIA_BUILD__ = 'v1.76.0-profileavatar';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -34,7 +34,8 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
-let selfProfileEditOpen = false;
+let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
+let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 // Rascunho local do rodízio do carnê. Editado em memória (imune ao poll de
 // sync, que reverteria as alterações no meio da edição) e só persistido quando
 // o admin clica em "Salvar rodízio".
@@ -446,6 +447,8 @@ function bindAvatarLightbox() {
     if (!target || typeof target.closest !== 'function') return;
     const photoWrap = target.closest('.avatar-photo');
     if (!photoWrap) return;
+    // O avatar do header é um botão que abre o perfil — não deve ampliar a foto.
+    if (photoWrap.closest('.header-avatar-btn')) return;
     const img = photoWrap.querySelector('img');
     if (!img || !img.getAttribute('src')) return;
     // Evita disparar handlers de linha/card ao tocar na foto.
@@ -1123,6 +1126,27 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "open-profile") {
+    const currentPlayer = getCurrentSnapshotPlayer(snapshot);
+    if (!currentPlayer) { showToast("Sessão inválida. Faça login novamente.", "error"); return; }
+    selfProfileOpen = true;
+    selfProfileEditOpen = false;
+    if (snapshot.ui?.currentTab !== 'home') {
+      patchState({ ui: { ...(snapshot.ui || {}), currentTab: 'home' } });
+    } else {
+      render(snapshot);
+    }
+    setTimeout(() => document.getElementById('self-profile-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    return;
+  }
+
+  if (action === "close-profile") {
+    selfProfileOpen = false;
+    selfProfileEditOpen = false;
+    render(snapshot);
+    return;
+  }
+
   if (action === "toggle-self-profile-edit") {
     const currentPlayer = getCurrentSnapshotPlayer(snapshot);
     if (!currentPlayer) {
@@ -1130,6 +1154,7 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
+    selfProfileOpen = true;
     selfProfileEditOpen = !selfProfileEditOpen;
     render(snapshot);
 
@@ -2325,12 +2350,13 @@ function renderInner(snapshot) {
           <img class="brand-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
           <div>
             <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
-            <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
+            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
           </div>
         </div>
         <div class="header-actions">
-          <div class="header-badge">${authzIsAdmin(currentPlayer) ? 'Admin' : getPlayerRole(currentPlayer) === 'carne' ? 'Carne' : 'Jogador'}</div>
-          <button class="header-logout" type="button" id="logout-button">Sair</button>
+          <button class="header-avatar-btn" type="button" data-action="open-profile" aria-label="Meu perfil">
+            ${renderAvatarForApp(currentPlayer, 'header-avatar')}
+          </button>
         </div>
       </div>
     </div>
@@ -2651,7 +2677,7 @@ function bindCarneRotationDrag() {
 }
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { resetCarneRotationDraft(); await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
   bindCarneRotationDrag();
   appElement.querySelector('#carne-rotation-start')?.addEventListener('change', () => {
@@ -3282,16 +3308,43 @@ function renderHome(snapshot, currentPlayer) {
         ${renderPushOptinInner()}
       </section>`}
 
-      <section class="home-v2-profile">
-        ${renderAvatarForApp(activePlayer, 'home-v2-profile-avatar')}
-        <div>
-          <strong>${activePlayer.name}</strong>
-          <span>${authzIsAdmin(activePlayer) ? 'Administrador · ' + getPositionLabel(activePlayer.position) : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</span>
-        </div>
-        <button class="home-v2-link" type="button" data-action="toggle-self-profile-edit">${selfProfileEditOpen ? 'Fechar' : 'Editar'}</button>
-      </section>
+      ${renderProfilePanel(activePlayer)}
+    </section>
+  `;
+}
 
-      ${renderSelfProfileEditCardForHome(activePlayer)}
+// Painel de perfil (abre pelo avatar do header). Modo VER por padrão; o botão
+// "Editar cadastro" abre o formulário (renderSelfProfileEditCardForHome).
+function renderProfilePanel(activePlayer) {
+  if (!selfProfileOpen) return '';
+  if (selfProfileEditOpen) return renderSelfProfileEditCardForHome(activePlayer);
+
+  const carneOnly = activePlayer.plays_football === false;
+  const roleLabel = authzIsAdmin(activePlayer)
+    ? 'Administrador · ' + getPositionLabel(activePlayer.position)
+    : (getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position));
+
+  return `
+    <section class="card self-profile-card profile-view-card" id="self-profile-card">
+      <div class="profile-view-head">
+        ${renderAvatarForApp(activePlayer, 'profile-view-avatar')}
+        <div class="profile-view-id">
+          <strong>${escapeHtml(activePlayer.name || '')}</strong>
+          <span>${roleLabel}</span>
+        </div>
+        <button class="home-v2-link" type="button" data-action="close-profile">Fechar</button>
+      </div>
+
+      <div class="profile-view-rows">
+        <div class="profile-view-row"><span>Telefone</span><strong>${escapeHtml(formatPhone(activePlayer.phone || '')) || '—'}</strong></div>
+        <div class="profile-view-row"><span>Nascimento</span><strong>${(() => { const m = String(activePlayer.birthDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : (escapeHtml(activePlayer.birthDate || '') || '—'); })()}</strong></div>
+        ${carneOnly ? '' : `<div class="profile-view-row"><span>Mensalidade</span><strong class="tag ${activePlayer.mens_ok ? 'is-ok' : 'is-warn'}">${activePlayer.mens_ok ? 'Em dia' : 'Pendente'}</strong></div>`}
+      </div>
+
+      <div class="profile-view-actions">
+        <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
+        <button class="btn btn-secondary" type="button" id="logout-button">Sair</button>
+      </div>
     </section>
   `;
 }

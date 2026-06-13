@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.75.3-editdark';
+export const APP_VERSION = 'v1.76.0-profileavatar';
