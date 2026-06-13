@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.75.0-autoopen';
+window.__HARMONIA_BUILD__ = 'v1.76.2-audit';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -34,7 +34,8 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
-let selfProfileEditOpen = false;
+let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
+let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 // Rascunho local do rodízio do carnê. Editado em memória (imune ao poll de
 // sync, que reverteria as alterações no meio da edição) e só persistido quando
 // o admin clica em "Salvar rodízio".
@@ -446,6 +447,8 @@ function bindAvatarLightbox() {
     if (!target || typeof target.closest !== 'function') return;
     const photoWrap = target.closest('.avatar-photo');
     if (!photoWrap) return;
+    // O avatar do header é um botão que abre o perfil — não deve ampliar a foto.
+    if (photoWrap.closest('.header-avatar-btn')) return;
     const img = photoWrap.querySelector('img');
     if (!img || !img.getAttribute('src')) return;
     // Evita disparar handlers de linha/card ao tocar na foto.
@@ -822,6 +825,10 @@ function renderSelfProfileEditCardForHome(activePlayer) {
             </button>
           </div>
 
+          <section class="home-v2-card push-optin-card self-push-card">
+            ${renderPushOptinInner()}
+          </section>
+
           <div class="self-profile-actions">
             <button class="btn btn-primary" type="button" data-action="update-self-profile">Salvar</button>
             <button class="btn btn-secondary" type="button" data-action="toggle-self-profile-edit">Cancelar</button>
@@ -1119,6 +1126,27 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "open-profile") {
+    const currentPlayer = getCurrentSnapshotPlayer(snapshot);
+    if (!currentPlayer) { showToast("Sessão inválida. Faça login novamente.", "error"); return; }
+    selfProfileOpen = true;
+    selfProfileEditOpen = false;
+    if (snapshot.ui?.currentTab !== 'home') {
+      patchState({ ui: { ...(snapshot.ui || {}), currentTab: 'home' } });
+    } else {
+      render(snapshot);
+    }
+    setTimeout(() => document.getElementById('self-profile-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    return;
+  }
+
+  if (action === "close-profile") {
+    selfProfileOpen = false;
+    selfProfileEditOpen = false;
+    render(snapshot);
+    return;
+  }
+
   if (action === "toggle-self-profile-edit") {
     const currentPlayer = getCurrentSnapshotPlayer(snapshot);
     if (!currentPlayer) {
@@ -1126,6 +1154,7 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
+    selfProfileOpen = true;
     selfProfileEditOpen = !selfProfileEditOpen;
     render(snapshot);
 
@@ -1998,6 +2027,37 @@ function computeDefaultAutoOpen(gameDate) {
   return `${y}-${mo}-${da}T21:00`;
 }
 
+// Controle de "Avisos no celular" (push). Markup com seletores por CLASSE para
+// poder existir em dois lugares: na home (onboarding, até a 1ª ativação) e
+// dentro da edição do perfil (gestão permanente).
+function renderPushOptinInner() {
+  return `
+    <div class="home-v2-card-head">
+      <div>
+        <strong>Avisos no celular</strong>
+        <span class="push-status-line">Verificando…</span>
+      </div>
+      <button class="btn btn-secondary btn-sm push-toggle-btn" type="button" style="display:none;"></button>
+    </div>
+    <p class="footer-note push-optin-hint push-hint" style="display:none;"></p>
+  `;
+}
+function isPushOnboarded() {
+  try { return localStorage.getItem('harmonia_push_onboarded') === '1'; } catch (_) { return false; }
+}
+function setPushOnboarded() {
+  try { localStorage.setItem('harmonia_push_onboarded', '1'); } catch (_) {}
+}
+
+// Rótulo curto da abertura automática, ex.: "seg 21:00".
+function formatAutoOpenLabel(at) {
+  const m = String(at || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+  const wd = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][d.getDay()];
+  return `${wd} ${m[4]}:${m[5]}`;
+}
+
 // Resolve o auto_open_at a partir do formulário de jogo (vazio = manual).
 function readAutoOpenFromForm(formData) {
   if (formData.get('auto_open_enabled') !== 'on') return '';
@@ -2290,12 +2350,13 @@ function renderInner(snapshot) {
           <img class="brand-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
           <div>
             <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
-            <div class="header-subtitle">${buildHeaderSubtitle(currentPlayer)}</div>
+            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
           </div>
         </div>
         <div class="header-actions">
-          <div class="header-badge">${authzIsAdmin(currentPlayer) ? 'Admin' : getPlayerRole(currentPlayer) === 'carne' ? 'Carne' : 'Jogador'}</div>
-          <button class="header-logout" type="button" id="logout-button">Sair</button>
+          <button class="header-avatar-btn" type="button" data-action="open-profile" aria-label="Meu perfil">
+            ${renderAvatarForApp(currentPlayer, 'header-avatar')}
+          </button>
         </div>
       </div>
     </div>
@@ -2482,14 +2543,24 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
 
 
 async function bindPushOptin(currentPlayer) {
-  const card = appElement.querySelector('#push-optin-card');
-  if (!card) return;
-  const statusLine = card.querySelector('#push-status-line');
-  const button = card.querySelector('#push-toggle-btn');
-  const hint = card.querySelector('#push-hint');
+  const cards = [...appElement.querySelectorAll('.push-optin-card')];
+  for (const card of cards) {
+    // eslint-disable-next-line no-await-in-loop
+    await bindPushControl(card, currentPlayer);
+  }
+}
+
+async function bindPushControl(card, currentPlayer) {
+  const statusLine = card.querySelector('.push-status-line');
+  const button = card.querySelector('.push-toggle-btn');
+  const hint = card.querySelector('.push-hint');
+  if (!statusLine || !button) return;
+  // O card da home (id push-optin-card) é só onboarding: some assim que o push
+  // está ativo. A gestão permanente fica no card dentro da edição do perfil.
+  const isHomeCard = card.id === 'push-optin-card';
 
   const showHint = (text) => { if (hint) { hint.textContent = text; hint.style.display = text ? '' : 'none'; } };
-  const showButton = (label) => { if (button) { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; } };
+  const showButton = (label) => { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; };
 
   const state = await getPushState();
 
@@ -2512,9 +2583,12 @@ async function bindPushOptin(currentPlayer) {
       showButton('');
       showHint('Você bloqueou as notificações. Reative nas permissões do site no navegador.');
     } else if (s.subscribed && s.permission === 'granted') {
+      setPushOnboarded();
+      // Já ativado: na home o card desaparece (gestão migra para o perfil).
+      if (isHomeCard) { card.style.display = 'none'; return; }
       statusLine.textContent = 'Ativado ✓';
       showButton('Desativar');
-      showHint('Você receberá um aviso quando as inscrições de um jogo abrirem.');
+      showHint('Você receberá os avisos do Harmonia neste aparelho. Pode desativar aqui quando quiser.');
     } else {
       statusLine.textContent = 'Desativado';
       showButton('Ativar');
@@ -2523,37 +2597,40 @@ async function bindPushOptin(currentPlayer) {
   };
   refresh(state);
 
-  if (button) {
-    button.onclick = async () => {
-      // IMPORTANTE: nada de `await` antes de pedir a permissão. Notification
-      // .requestPermission() exige o gesto do toque ainda "fresco"; um await
-      // aqui (ex.: getPushState) consome o gesto e o Chrome ignora o pedido.
-      // Por isso decidimos ativar/desativar pelo RÓTULO atual do botão.
-      const isCurrentlyOn = String(button.textContent || '').trim() === 'Desativar';
-      const original = isCurrentlyOn ? 'Desativar' : 'Ativar';
-      button.disabled = true;
-      button.textContent = '...';
-      if (isCurrentlyOn) {
-        await disablePush();
+  button.onclick = async () => {
+    // IMPORTANTE: nada de `await` antes de pedir a permissão. Notification
+    // .requestPermission() exige o gesto do toque ainda "fresco"; um await
+    // aqui (ex.: getPushState) consome o gesto e o Chrome ignora o pedido.
+    // Por isso decidimos ativar/desativar pelo RÓTULO atual do botão.
+    const isCurrentlyOn = String(button.textContent || '').trim() === 'Desativar';
+    const original = isCurrentlyOn ? 'Desativar' : 'Ativar';
+    button.disabled = true;
+    button.textContent = '...';
+    let activated = false;
+    if (isCurrentlyOn) {
+      await disablePush();
+    } else {
+      const result = await enablePush(currentPlayer?.id);
+      if (!result.ok) {
+        const messages = {
+          denied: 'Permissão negada. Libere as notificações nas configurações do site.',
+          ios_needs_install: 'No iPhone, instale o app (Adicionar à Tela de Início) e abra por ele para ativar.',
+          unsupported: 'Este navegador não suporta notificações.',
+          subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
+        };
+        showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
       } else {
-        const result = await enablePush(currentPlayer?.id);
-        if (!result.ok) {
-          const messages = {
-            denied: 'Permissão negada. Libere as notificações nas configurações do site.',
-            ios_needs_install: 'No iPhone, instale o app (Adicionar à Tela de Início) e abra por ele para ativar.',
-            unsupported: 'Este navegador não suporta notificações.',
-            subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
-          };
-          showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
-        } else {
-          showToast('Notificações ativadas.', 'success');
-        }
+        activated = true;
+        setPushOnboarded();
+        showToast('Notificações ativadas.', 'success');
       }
-      button.disabled = false;
-      button.textContent = original;
-      refresh(await getPushState());
-    };
-  }
+    }
+    button.disabled = false;
+    button.textContent = original;
+    // Ao ativar pela 1ª vez, re-renderiza para tirar o card de onboarding da home.
+    if (activated && isHomeCard) { render(getState()); return; }
+    refresh(await getPushState());
+  };
 }
 
 function bindCarneRotationDrag() {
@@ -2600,7 +2677,7 @@ function bindCarneRotationDrag() {
 }
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { resetCarneRotationDraft(); await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
   bindCarneRotationDrag();
   appElement.querySelector('#carne-rotation-start')?.addEventListener('change', () => {
@@ -3079,6 +3156,9 @@ function renderHome(snapshot, currentPlayer) {
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
   const homeStatusText = game && game.open ? 'Aberto' : 'Fechado';
+  const homeClosedSubline = (game && game.auto_open_at)
+    ? `Abre automaticamente: ${formatAutoOpenLabel(game.auto_open_at)}`
+    : ((game && game.game_date) ? 'Abertura das inscrições em breve.' : 'Aguarde o próximo jogo ser marcado.');
   const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
   const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
@@ -3120,6 +3200,7 @@ function renderHome(snapshot, currentPlayer) {
 
   return `
     <section class="home-v2">
+      ${(game && game.open) ? `
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
           <div>
@@ -3199,6 +3280,16 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-goalie-names">${homeGoalkeeperNames}</div>
         </div>
       </section>
+      ` : `
+      <section class="home-v2-card home-v2-closed-card">
+        <div class="home-v2-closed-main">
+          <div class="home-v2-kicker">Próximo jogo</div>
+          <div class="home-v2-closed-date">${(game && game.game_date) ? formatDate(game.game_date) + (game.game_time ? ' · ' + game.game_time : '') : 'Nenhum jogo agendado'}</div>
+          <div class="home-v2-closed-sub">${homeClosedSubline}</div>
+        </div>
+        ${(game && game.game_date) ? '<button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>' : ''}
+      </section>
+      `}
 
       <section class="home-v2-card">
         <div class="home-v2-card-head">
@@ -3212,27 +3303,48 @@ function renderHome(snapshot, currentPlayer) {
         </div>
       </section>
 
+      ${isPushOnboarded() ? '' : `
       <section class="home-v2-card push-optin-card" id="push-optin-card">
-        <div class="home-v2-card-head">
-          <div>
-            <strong>Avisos no celular</strong>
-            <span id="push-status-line">Verificando…</span>
-          </div>
-          <button class="btn btn-secondary btn-sm" type="button" id="push-toggle-btn" style="display:none;"></button>
-        </div>
-        <p class="footer-note push-optin-hint" id="push-hint" style="display:none;"></p>
-      </section>
+        ${renderPushOptinInner()}
+      </section>`}
 
-      <section class="home-v2-profile">
-        ${renderAvatarForApp(activePlayer, 'home-v2-profile-avatar')}
-        <div>
-          <strong>${activePlayer.name}</strong>
-          <span>${authzIsAdmin(activePlayer) ? 'Administrador · ' + getPositionLabel(activePlayer.position) : getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position)}</span>
-        </div>
-        <button class="home-v2-link" type="button" data-action="toggle-self-profile-edit">${selfProfileEditOpen ? 'Fechar' : 'Editar'}</button>
-      </section>
+      ${renderProfilePanel(activePlayer)}
+    </section>
+  `;
+}
 
-      ${renderSelfProfileEditCardForHome(activePlayer)}
+// Painel de perfil (abre pelo avatar do header). Modo VER por padrão; o botão
+// "Editar cadastro" abre o formulário (renderSelfProfileEditCardForHome).
+function renderProfilePanel(activePlayer) {
+  if (!selfProfileOpen) return '';
+  if (selfProfileEditOpen) return renderSelfProfileEditCardForHome(activePlayer);
+
+  const carneOnly = activePlayer.plays_football === false;
+  const roleLabel = authzIsAdmin(activePlayer)
+    ? 'Administrador · ' + getPositionLabel(activePlayer.position)
+    : (getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position));
+
+  return `
+    <section class="card self-profile-card profile-view-card" id="self-profile-card">
+      <div class="profile-view-head">
+        ${renderAvatarForApp(activePlayer, 'profile-view-avatar')}
+        <div class="profile-view-id">
+          <strong>${escapeHtml(activePlayer.name || '')}</strong>
+          <span>${roleLabel}</span>
+        </div>
+        <button class="home-v2-link" type="button" data-action="close-profile">Fechar</button>
+      </div>
+
+      <div class="profile-view-rows">
+        <div class="profile-view-row"><span>Telefone</span><strong>${escapeHtml(formatPhone(activePlayer.phone || '')) || '—'}</strong></div>
+        <div class="profile-view-row"><span>Nascimento</span><strong>${(() => { const m = String(activePlayer.birthDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : (escapeHtml(activePlayer.birthDate || '') || '—'); })()}</strong></div>
+        ${carneOnly ? '' : `<div class="profile-view-row"><span>Mensalidade</span><strong class="tag ${activePlayer.mens_ok ? 'is-ok' : 'is-warn'}">${activePlayer.mens_ok ? 'Em dia' : 'Pendente'}</strong></div>`}
+      </div>
+
+      <div class="profile-view-actions">
+        <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
+        <button class="btn btn-secondary" type="button" id="logout-button">Sair</button>
+      </div>
     </section>
   `;
 }
@@ -3787,7 +3899,7 @@ function renderConfig(snapshot, currentPlayer) {
           </label>
           <label class="field-label">
             Abrir automaticamente em
-            <input class="input" type="datetime-local" name="auto_open_at" value="${item.auto_open_at || computeDefaultAutoOpen(item.game_date)}" />
+            <input class="input" type="datetime-local" name="auto_open_at" value="${escapeHtml(item.auto_open_at || computeDefaultAutoOpen(item.game_date))}" />
             <small class="footer-note">Só vale se a opção acima estiver marcada. Padrão: segunda 21h da semana do jogo.</small>
           </label>
 

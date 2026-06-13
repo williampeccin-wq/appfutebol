@@ -300,6 +300,25 @@ button {
   font-weight: 700;
 }
 
+.header-avatar-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.header-avatar-btn:active { transform: scale(0.94); }
+.avatar.header-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-size: 15px;
+}
+
 .nav {
   position: sticky;
   top: 76px;
@@ -4722,6 +4741,33 @@ button {
   background: linear-gradient(135deg, #eff6ff, #ffffff);
 }
 
+/* Card enxuto quando as inscrições estão fechadas (sem jogo ativo). */
+.home-v2-closed-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 18px;
+}
+.home-v2-closed-main { min-width: 0; }
+.home-v2-closed-date {
+  margin-top: 4px;
+  color: var(--hfc-text, #0f172a);
+  font-size: 21px;
+  font-weight: 950;
+  letter-spacing: -.035em;
+}
+.home-v2-closed-sub {
+  margin-top: 5px;
+  color: var(--hfc-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 750;
+}
+.home-v2-closed-card .home-v2-secondary { flex: 0 0 auto; }
+/* Tema escuro da home. */
+.content--home .home-v2-closed-date { color: var(--hfc-text); }
+.content--home .home-v2-closed-sub { color: var(--hfc-text-muted); }
+
 .home-v2-card-head strong,
 .home-v2-profile strong {
   display: block;
@@ -5318,7 +5364,15 @@ body {
 
 /* ---------- HOME (Stadium Glass) ---------- */
 .content--home {
-  background: radial-gradient(130% 60% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  /* Camadas: (1) grande área + entrada da área ("D") no rodapé, em proporção
+     com o círculo central (raio do D = raio do círculo, 150px); (2) o gradiente
+     de fundo. Tamanho fixo em px = não estica, mantém a proporção. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='403' height='220' viewBox='0 0 403 220'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.13' stroke-width='1.8'%3E%3Cpath d='M0,220 L0,55 L403,55 L403,220'/%3E%3Cpath d='M110,220 L110,165 L293,165 L293,220'/%3E%3Cpath d='M128.5,55 A91.5,91.5 0 0 1 274.5,55'/%3E%3C/g%3E%3Ccircle cx='201.5' cy='110' r='2.6' fill='%23ffffff' fill-opacity='0.16'/%3E%3C/svg%3E"),
+    radial-gradient(130% 60% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center bottom 24px, center top;
+  background-size: 340px auto, 100% 100%;
   position: relative;
   overflow: hidden;
 }
@@ -5428,6 +5482,103 @@ body {
 .content--home .home-v2-notice > span { color: var(--hfc-text-muted); }
 .content--home .home-v2-empty { color: var(--hfc-text-muted); }
 .content--home .home-carne-text { color: var(--hfc-text-muted); }
+
+/* Edição do próprio cadastro na home: alinhar ao tema escuro (Stadium Glass).
+   Antes herdava .card branco do tema claro e ficava toda branca. */
+.content--home .self-profile-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+}
+.content--home .self-profile-card .card-title { color: var(--hfc-text-muted); }
+.content--home .self-profile-form .form-label { color: var(--hfc-text); }
+.content--home .self-profile-form .input,
+.content--home .password-change-card .input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--home .self-profile-form .input::placeholder,
+.content--home .password-change-card .input::placeholder { color: #6b7691; }
+.content--home .self-profile-form .input:focus,
+.content--home .password-change-card .input:focus { border-color: var(--hfc-gold); outline: none; }
+.content--home .self-profile-note { color: var(--hfc-text-muted); }
+.content--home .self-photo-upload {
+  background: var(--hfc-glass-2);
+  border: 1px dashed var(--hfc-glass-border);
+}
+.content--home .self-photo-upload .player-photo-upload-copy strong { color: var(--hfc-text); }
+.content--home .self-photo-upload .player-photo-upload-copy small { color: var(--hfc-text-muted); }
+.content--home .password-change-card {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .password-change-title { color: var(--hfc-text); }
+.content--home .self-profile-actions .btn-secondary,
+.content--home .password-change-card .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .self-profile-actions .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+}
+
+/* Painel de perfil — modo VER (aberto pelo avatar do header). */
+.profile-view-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.avatar.profile-view-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 20px;
+}
+.profile-view-id { flex: 1 1 auto; min-width: 0; }
+.profile-view-id strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  color: var(--hfc-text);
+}
+.profile-view-id span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--hfc-text-muted);
+}
+.profile-view-rows { display: grid; gap: 10px; margin-bottom: 16px; }
+.profile-view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.profile-view-row > span { color: var(--hfc-text-muted); font-size: 13px; font-weight: 700; }
+.profile-view-row > strong { color: var(--hfc-text); font-weight: 800; }
+.profile-view-actions { display: flex; gap: 10px; }
+.profile-view-actions .btn { flex: 1 1 0; min-width: 0; }
+.content--home .profile-view-actions .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+}
+.content--home .profile-view-actions .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
 
 /* ---------- JOGO DA SEMANA (Stadium Glass) ---------- */
 .content--weekly_game {
