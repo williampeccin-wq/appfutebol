@@ -6643,3 +6643,61 @@ body {
   color: #fecaca;
   font-size: 13px; font-weight: 700;
 }
+
+/* ===================== Votação de desempenho (modal bloqueante) ===================== */
+body.perf-vote-open { overflow: hidden; }
+#perf-vote-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.perf-vote-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 24, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.perf-vote-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(150deg, rgba(27, 58, 115, 0.65), rgba(10, 18, 38, 0.92));
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.14));
+  border-radius: 24px;
+  padding: 22px 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  color: var(--hfc-text, #e8eefc);
+  animation: avatar-lightbox-in 0.18s ease;
+}
+.perf-vote-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.perf-vote-kicker { font-size: 12px; font-weight: 950; letter-spacing: .12em; text-transform: uppercase; color: var(--hfc-gold-200, #ffd980); }
+.perf-vote-progress { font-size: 12px; font-weight: 800; color: var(--hfc-text-muted, #9fb0cc); }
+.perf-vote-player { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; }
+.avatar.perf-vote-avatar { width: 84px; height: 84px; border-radius: 999px; font-size: 28px; border: 2px solid rgba(255, 255, 255, 0.18); }
+.perf-vote-name { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+.perf-vote-pos { font-size: 13px; font-weight: 700; color: var(--hfc-text-muted, #9fb0cc); }
+.perf-vote-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px; }
+.perf-vote-score {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.14));
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--hfc-text, #e8eefc);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.perf-vote-score.is-sel {
+  background: linear-gradient(180deg, var(--hfc-gold-200, #ffd980), var(--hfc-gold, #f0a500));
+  color: #1a1200;
+  border-color: transparent;
+}
+.perf-vote-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
+.perf-vote-actions .btn { flex: 1 1 0; }
+.perf-vote-actions > span { flex: 1 1 0; }
+.perf-vote-hint { margin-top: 12px; text-align: center; font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); }

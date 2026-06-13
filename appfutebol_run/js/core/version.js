@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.77.2-cleanup';
+export const APP_VERSION = 'v1.78.0-ratings-f1';
