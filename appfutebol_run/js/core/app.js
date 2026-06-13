@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.76.2-audit';
+window.__HARMONIA_BUILD__ = 'v1.77.0-splash';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -3915,58 +3915,14 @@ function renderConfig(snapshot, currentPlayer) {
     <section class="section-stack">
       <section class="card games-config-card">
         <div class="card-title">Jogos</div>
-        
+
         <div class="games-list-config">
           ${games.map(renderGameEditForm).join('')}
         </div>
-      </section>
 
-      <section class="card mensalidade-config-card">
-        <div class="card-title">Mensalidade</div>
-        <p class="footer-note">Vencimento único, válido para todos os jogos do clube. A regra abaixo só passa a valer depois do vencimento.</p>
-        <form id="mensalidade-config-form" class="player-admin-form game-config-form">
-          <label class="field-label">
-            Data de vencimento
-            <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
-          </label>
-
-          <fieldset class="mens-mode-fieldset">
-            <legend class="field-label">Regra para inadimplentes</legend>
-            ${[
-              { value: 'none', title: 'Sem bloqueio', desc: 'Inadimplência é só informativa. Ninguém é bloqueado nem removido.' },
-              { value: 'partial', title: 'Bloqueio parcial', desc: 'Inadimplente não pode confirmar, mas quem já está confirmado permanece na escalação.' },
-              { value: 'total', title: 'Bloqueio total', desc: 'Inadimplente não pode confirmar e quem já está confirmado é removido — a vaga vai para a fila.' },
-            ].map((opt) => `
-              <label class="mens-mode-option${mensEnforcementMode === opt.value ? ' is-selected' : ''}">
-                <input type="radio" name="mens_enforcement_mode" value="${opt.value}" ${mensEnforcementMode === opt.value ? 'checked' : ''} />
-                <span class="mens-mode-text">
-                  <strong>${opt.title}</strong>
-                  <small>${opt.desc}</small>
-                </span>
-              </label>
-            `).join('')}
-          </fieldset>
-          <p class="footer-note">O administrador sempre pode confirmar e remover qualquer jogador, mesmo inadimplente.</p>
-
-          <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-primary" type="submit">Salvar mensalidade</button>
-          </div>
-        </form>
-
-        <div class="mens-reminder-block">
-          <div class="card-subtitle">Lembrete de atraso (push)</div>
-          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push. Use o botão para testar agora.</p>
-          <button class="btn btn-secondary btn-sm" type="button" data-action="test-overdue-reminders">Enviar lembrete de atraso agora (teste)</button>
-        </div>
-      </section>
-
-      <section class="card create-game-card">
-        <details class="create-game-details">
+        <details class="create-game-details games-create-inline">
           <summary class="create-game-summary">
-            <span>
-              <strong>Novo jogo</strong>
-              
-            </span>
+            <span><strong>Novo jogo</strong></span>
             <span class="btn btn-secondary btn-sm create-game-open-indicator">Criar novo jogo</span>
           </summary>
 
@@ -4006,6 +3962,45 @@ function renderConfig(snapshot, currentPlayer) {
             </div>
           </form>
         </details>
+      </section>
+
+      <section class="card mensalidade-config-card">
+        <div class="card-title">Mensalidade</div>
+        <p class="footer-note">Vencimento único, válido para todos os jogos do clube. A regra abaixo só passa a valer depois do vencimento.</p>
+        <form id="mensalidade-config-form" class="player-admin-form game-config-form">
+          <label class="field-label">
+            Data de vencimento
+            <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
+          </label>
+
+          <fieldset class="mens-mode-fieldset">
+            <legend class="field-label">Regra para inadimplentes</legend>
+            ${[
+              { value: 'none', title: 'Sem bloqueio', desc: 'Inadimplência é só informativa. Ninguém é bloqueado nem removido.' },
+              { value: 'partial', title: 'Bloqueio parcial', desc: 'Inadimplente não pode confirmar, mas quem já está confirmado permanece na escalação.' },
+              { value: 'total', title: 'Bloqueio total', desc: 'Inadimplente não pode confirmar e quem já está confirmado é removido — a vaga vai para a fila.' },
+            ].map((opt) => `
+              <label class="mens-mode-option${mensEnforcementMode === opt.value ? ' is-selected' : ''}">
+                <input type="radio" name="mens_enforcement_mode" value="${opt.value}" ${mensEnforcementMode === opt.value ? 'checked' : ''} />
+                <span class="mens-mode-text">
+                  <strong>${opt.title}</strong>
+                  <small>${opt.desc}</small>
+                </span>
+              </label>
+            `).join('')}
+          </fieldset>
+          <p class="footer-note">O administrador sempre pode confirmar e remover qualquer jogador, mesmo inadimplente.</p>
+
+          <div class="player-admin-actions game-config-actions">
+            <button class="btn btn-primary" type="submit">Salvar mensalidade</button>
+          </div>
+        </form>
+
+        <div class="mens-reminder-block">
+          <div class="card-subtitle">Lembrete de atraso (push)</div>
+          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push. Use o botão para testar agora.</p>
+          <button class="btn btn-secondary btn-sm" type="button" data-action="test-overdue-reminders">Enviar lembrete de atraso agora (teste)</button>
+        </div>
       </section>
 
       <section class="card notifications-config-card">
