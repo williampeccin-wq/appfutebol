@@ -5456,6 +5456,50 @@ body {
 .content--home .home-v2-empty { color: var(--hfc-text-muted); }
 .content--home .home-carne-text { color: var(--hfc-text-muted); }
 
+/* Edição do próprio cadastro na home: alinhar ao tema escuro (Stadium Glass).
+   Antes herdava .card branco do tema claro e ficava toda branca. */
+.content--home .self-profile-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+}
+.content--home .self-profile-card .card-title { color: var(--hfc-text-muted); }
+.content--home .self-profile-form .form-label { color: var(--hfc-text); }
+.content--home .self-profile-form .input,
+.content--home .password-change-card .input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--home .self-profile-form .input::placeholder,
+.content--home .password-change-card .input::placeholder { color: #6b7691; }
+.content--home .self-profile-form .input:focus,
+.content--home .password-change-card .input:focus { border-color: var(--hfc-gold); outline: none; }
+.content--home .self-profile-note { color: var(--hfc-text-muted); }
+.content--home .self-photo-upload {
+  background: var(--hfc-glass-2);
+  border: 1px dashed var(--hfc-glass-border);
+}
+.content--home .self-photo-upload .player-photo-upload-copy strong { color: var(--hfc-text); }
+.content--home .self-photo-upload .player-photo-upload-copy small { color: var(--hfc-text-muted); }
+.content--home .password-change-card {
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .password-change-title { color: var(--hfc-text); }
+.content--home .self-profile-actions .btn-secondary,
+.content--home .password-change-card .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
+.content--home .self-profile-actions .btn-primary {
+  background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+  color: #1a1200;
+}
+
 /* ---------- JOGO DA SEMANA (Stadium Glass) ---------- */
 .content--weekly_game {
   background: radial-gradient(130% 55% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
