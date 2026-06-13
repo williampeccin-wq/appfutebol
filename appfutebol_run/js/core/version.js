@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.77.0-splash';
+export const APP_VERSION = 'v1.77.1-splash';

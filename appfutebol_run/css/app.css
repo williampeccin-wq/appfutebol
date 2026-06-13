@@ -4247,6 +4247,13 @@ button {
   display: block;
 }
 
+/* "Novo jogo" agora vive dentro do card Jogos — separa da lista acima. */
+.games-create-inline {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+}
+
 .create-game-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
