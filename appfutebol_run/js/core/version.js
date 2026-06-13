@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.76.0-profileavatar';
+export const APP_VERSION = 'v1.76.1-pitcharea';

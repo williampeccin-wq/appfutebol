@@ -5364,7 +5364,15 @@ body {
 
 /* ---------- HOME (Stadium Glass) ---------- */
 .content--home {
-  background: radial-gradient(130% 60% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  /* Camadas: (1) grande área + entrada da área ("D") no rodapé, em proporção
+     com o círculo central (raio do D = raio do círculo, 150px); (2) o gradiente
+     de fundo. Tamanho fixo em px = não estica, mantém a proporção. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='403' height='220' viewBox='0 0 403 220'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.13' stroke-width='1.8'%3E%3Cpath d='M0,220 L0,55 L403,55 L403,220'/%3E%3Cpath d='M110,220 L110,165 L293,165 L293,220'/%3E%3Cpath d='M128.5,55 A91.5,91.5 0 0 1 274.5,55'/%3E%3C/g%3E%3Ccircle cx='201.5' cy='110' r='2.6' fill='%23ffffff' fill-opacity='0.16'/%3E%3C/svg%3E"),
+    radial-gradient(130% 60% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center bottom 24px, center top;
+  background-size: 340px auto, 100% 100%;
   position: relative;
   overflow: hidden;
 }
