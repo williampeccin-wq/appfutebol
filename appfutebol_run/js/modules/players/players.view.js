@@ -145,23 +145,6 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 
   return `
     <section class="section-stack">
-      <section class="card">
-        <div class="card-title">Sessão atual</div>
-        <div class="session-card">
-          <div class="session-main">
-            ${getAvatarHtml(currentPlayer, "avatar-lg")}
-            <div>
-              <div class="row-title">${currentPlayer.name}</div>
-              <div class="row-subtitle">${getRoleLabel(currentPlayer)} · ${formatPhone(currentPlayer.phone)}${currentPlayer.birthDate ? ` · Nasc. ${formatBirthDate(currentPlayer.birthDate)}` : ''}</div>
-            </div>
-          </div>
-          <div class="chip-row">
-            <span class="tag is-neutral">${currentPlayer.plays_football === false ? 'Somente carne' : getPositionLabel(currentPlayer.position)}</span>
-            <span class="tag ${currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'is-ok' : 'is-warn'}">${currentPlayer.plays_football === false || currentPlayer.mens_ok ? 'Mensalidade ok' : 'Mensalidade pendente'}</span>
-          </div>
-        </div>
-      </section>
-
       ${renderPlayerManagementCard(currentPlayer)}
       ${renderSelfProfileCard(currentPlayer)}
       <section class="players-admin-panel">

@@ -83,6 +83,52 @@ button {
   animation: spin 0.8s linear infinite;
 }
 
+/* ---------- Tela de abertura (splash) ---------- */
+.boot-screen {
+  gap: 24px;
+  background: radial-gradient(120% 80% at 50% 0%, #143768 0%, #0a1c3a 46%, #060f22 100%);
+}
+.boot-crest-wrap { position: relative; display: grid; place-items: center; }
+.boot-crest {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+  animation: boot-pulse 1.9s ease-in-out infinite;
+}
+.boot-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-weight: 950;
+  font-size: 23px;
+  letter-spacing: -.02em;
+  color: #ffffff;
+}
+.boot-title span {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--hfc-gold, #f0a500);
+}
+.boot-loader {
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-top-color: var(--hfc-gold, #f0a500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes boot-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 165, 0, 0.32), 0 16px 44px rgba(0, 0, 0, 0.55); }
+  50% { transform: scale(1.045); box-shadow: 0 0 0 16px rgba(240, 165, 0, 0), 0 16px 44px rgba(0, 0, 0, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-crest { animation: none; }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -4199,6 +4245,13 @@ button {
 
 .create-game-details {
   display: block;
+}
+
+/* "Novo jogo" agora vive dentro do card Jogos — separa da lista acima. */
+.games-create-inline {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
 }
 
 .create-game-summary {
