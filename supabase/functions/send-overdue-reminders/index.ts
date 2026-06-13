@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     if (!column) return json({ error: "invalid_type" }, 400);
     const { error: rErr } = await admin.from("push_log")
       .update({ [column]: new Date().toISOString() }).eq("id", logId).is(column, null);
-    if (rErr) return json({ error: "receipt_failed", detail: rErr.message }, 500);
+    if (rErr) { console.error("[overdue] receipt:", rErr.message); return json({ error: "receipt_failed" }, 500); }
     return json({ ok: true, receipt: payload.receipt.type });
   }
 
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
   // --- 1) Vencimento global ---
   const { data: metaRow, error: metaErr } = await admin
     .from("app_meta").select("data").eq("key", "default").maybeSingle();
-  if (metaErr) return json({ error: "meta_query_failed", detail: metaErr.message }, 500);
+  if (metaErr) { console.error("[overdue] meta:", metaErr.message); return json({ error: "meta_query_failed" }, 500); }
   const settings = (metaRow?.data as Record<string, unknown> | null)?.settings as Record<string, unknown> | undefined;
   const dueDate = String(settings?.mens_expire_date || "").slice(0, 10);
   const today = todayBrtIso();
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
 
   // --- 2) Jogadores em atraso ---
   const { data: players, error: playersErr } = await admin.from("players").select("id, data");
-  if (playersErr) return json({ error: "players_query_failed", detail: playersErr.message }, 500);
+  if (playersErr) { console.error("[overdue] players:", playersErr.message); return json({ error: "players_query_failed" }, 500); }
 
   const overdue = (players || []).filter((row) => {
     const d = (row.data || {}) as Record<string, unknown>;

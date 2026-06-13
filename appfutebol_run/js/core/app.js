@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.76.1-pitcharea';
+window.__HARMONIA_BUILD__ = 'v1.76.2-audit';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -3899,7 +3899,7 @@ function renderConfig(snapshot, currentPlayer) {
           </label>
           <label class="field-label">
             Abrir automaticamente em
-            <input class="input" type="datetime-local" name="auto_open_at" value="${item.auto_open_at || computeDefaultAutoOpen(item.game_date)}" />
+            <input class="input" type="datetime-local" name="auto_open_at" value="${escapeHtml(item.auto_open_at || computeDefaultAutoOpen(item.game_date))}" />
             <small class="footer-note">Só vale se a opção acima estiver marcada. Padrão: segunda 21h da semana do jogo.</small>
           </label>
 

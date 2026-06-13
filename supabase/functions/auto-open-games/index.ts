@@ -55,12 +55,14 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // 1) Lê os jogos e decide quais abrir.
+  // 1) Lê os jogos e decide quais abrir. Guarda o updated_at para a escrita
+  //    condicional (concorrência otimista).
   const { data: metaRow, error: metaErr } = await admin
-    .from("app_meta").select("data").eq("key", "default").maybeSingle();
-  if (metaErr) return json({ error: "meta_query_failed", detail: metaErr.message }, 500);
+    .from("app_meta").select("data, updated_at").eq("key", "default").maybeSingle();
+  if (metaErr) { console.error("[auto-open] meta read:", metaErr.message); return json({ error: "meta_query_failed" }, 500); }
 
   const data = (metaRow?.data || {}) as Record<string, unknown>;
+  const prevUpdatedAt = metaRow?.updated_at;
   const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
   const nowBrt = nowBrtMinute();
 
@@ -76,12 +78,18 @@ Deno.serve(async (req) => {
 
   if (!toOpen.length) return json({ ok: true, now: nowBrt, opened: 0 });
 
-  // 2) Persiste a abertura (read-modify-write curto; janela mínima).
-  const { error: upErr } = await admin
+  // 2) Persiste a abertura com CONCORRÊNCIA OTIMISTA: só grava se o updated_at
+  //    ainda for o mesmo que lemos. Se um cliente (admin editando settings,
+  //    carnê, etc.) gravou nesse meio-tempo, 0 linhas afetadas → não sobrescreve;
+  //    o próximo tick do cron (5 min) reabre. Evita clobber do blob app_meta.
+  const { data: upd, error: upErr } = await admin
     .from("app_meta")
     .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
-    .eq("key", "default");
-  if (upErr) return json({ error: "meta_update_failed", detail: upErr.message }, 500);
+    .eq("key", "default")
+    .eq("updated_at", prevUpdatedAt)
+    .select("key");
+  if (upErr) { console.error("[auto-open] meta write:", upErr.message); return json({ error: "meta_update_failed" }, 500); }
+  if (!upd || !upd.length) return json({ ok: true, now: nowBrt, opened: 0, skipped: "concurrent_write" });
 
   // 3) Push para todos, com dedup por jogo.
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);

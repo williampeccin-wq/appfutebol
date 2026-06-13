@@ -56,9 +56,19 @@ Deno.serve(async (req) => {
 
   const gameKey = String(payload.game_key || "").trim();
   const playerIds = Array.isArray(payload.player_ids)
-    ? [...new Set(payload.player_ids.map((id) => String(id || "")).filter(Boolean))]
+    ? [...new Set(payload.player_ids.map((id) => String(id || "")).filter(Boolean))].slice(0, 10)
     : [];
   if (!gameKey || !playerIds.length) return json({ error: "missing_game_or_players" }, 400);
+
+  // Autorização: precisa ser um usuário logado (JWT válido) — só o anon key não
+  // basta. Fecha o uso anônimo como oráculo de presença/spam. Qualquer membro
+  // serve (a promoção é disparada por quem cancela, que pode não ser admin); a
+  // verificação "está confirmado" abaixo + a dedup por índice único protegem.
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader || authHeader === `Bearer ${ANON}`) return json({ error: "unauthorized" }, 401);
+  const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: authHeader } } });
+  const { data: userData } = await userClient.auth.getUser();
+  if (!userData?.user) return json({ error: "unauthorized" }, 401);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
