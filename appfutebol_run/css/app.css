@@ -6716,8 +6716,9 @@ body.perf-vote-open { overflow: hidden; }
   margin-bottom: 10px;
 }
 .players-subhead strong { color: var(--hfc-gold-200, #ffd980); margin-left: 4px; }
-.carne-edit-list { display: flex; flex-direction: column; }
-.carne-edit-row {
+/* Linha compacta unificada de jogadores (lista principal + somente carne). */
+.player-compact-list { display: flex; flex-direction: column; }
+.player-compact-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6725,9 +6726,12 @@ body.perf-vote-open { overflow: hidden; }
   padding: 10px 12px;
   border-bottom: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.10));
 }
-.carne-edit-row:last-child { border-bottom: 0; }
-.carne-edit-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
-.carne-edit-text { min-width: 0; }
-.carne-edit-text .row-title { font-weight: 800; }
-.carne-edit-text .row-subtitle { font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); }
+.player-compact-row:last-child { border-bottom: 0; }
+.player-compact-row.is-current { background: rgba(143, 180, 255, 0.07); border-radius: 12px; }
+.player-compact-row.is-editing { background: rgba(240, 165, 0, 0.10); border-radius: 12px; }
+.player-compact-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.player-compact-text { min-width: 0; }
+.player-compact-text .row-title { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-compact-text .row-subtitle { font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-compact-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .carne-edit-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
