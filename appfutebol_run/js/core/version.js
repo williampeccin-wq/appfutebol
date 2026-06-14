@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.78.0-ratings-f1';
+export const APP_VERSION = 'v1.78.1-carneedit';

@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.78.0-ratings-f1';
+window.__HARMONIA_BUILD__ = 'v1.78.1-carneedit';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2330,6 +2330,7 @@ function render(snapshot) {
 let perfVote = null;          // { gameKey, voterId, targets:[player], index, scores:{id:score} }
 let perfVoteGameKey = null;   // jogo cujo status já foi avaliado
 let perfVoteStatus = 'idle';  // idle | checking | active | voted
+let ratingsUnavailable = false; // tabela ratings indisponível (ex.: ainda não migrada) → não bloqueia
 
 function parseGameDateTimeMs(game) {
   const d = String(game?.game_date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2368,12 +2369,19 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
 
   if (perfVoteGameKey !== key) { perfVoteGameKey = key; perfVoteStatus = 'idle'; }
 
-  if (!active || !inGame) { unmountPerfVote(); return; }
+  if (!active || !inGame || ratingsUnavailable) { unmountPerfVote(); return; }
   if (perfVoteStatus === 'voted' || perfVoteStatus === 'active' || perfVoteStatus === 'checking') return;
 
   perfVoteStatus = 'checking';
   const res = await fetchRatings({ kind: 'desempenho', gameKey: key });
-  if (res.ok && res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) {
+  if (!res.ok) {
+    // Tabela indisponível (ex.: migração ainda não aplicada). NUNCA bloquear o
+    // app por uma votação que não tem onde gravar.
+    ratingsUnavailable = true;
+    perfVoteStatus = 'idle';
+    return;
+  }
+  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) {
     perfVoteStatus = 'voted';
     return;
   }

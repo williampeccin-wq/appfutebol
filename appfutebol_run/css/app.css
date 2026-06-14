@@ -6701,3 +6701,18 @@ body.perf-vote-open { overflow: hidden; }
 .perf-vote-actions .btn { flex: 1 1 0; }
 .perf-vote-actions > span { flex: 1 1 0; }
 .perf-vote-hint { margin-top: 12px; text-align: center; font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); }
+
+/* Seção "Somente carne" na aba Jogadores (perfis que não jogam, editáveis). */
+.players-carne-only {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+}
+.players-subhead {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  color: var(--hfc-text, #e8eefc);
+  margin-bottom: 10px;
+}
+.players-subhead strong { color: var(--hfc-gold-200, #ffd980); margin-left: 4px; }
