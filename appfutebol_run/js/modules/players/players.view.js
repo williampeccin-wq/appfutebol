@@ -170,27 +170,20 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
           </div>
         ` : ''}
 
-        <div class="players-switch-table" role="table" aria-label="Jogadores">
-          <div class="players-switch-head" role="row">
-            <div role="columnheader">Jogador</div>
-            <div role="columnheader">Posição</div>
-            <div role="columnheader">Pago</div>
-            <div role="columnheader">No jogo</div>
-            <div role="columnheader">Ações</div>
-          </div>
+        <div class="player-compact-list" role="table" aria-label="Jogadores">
           ${jogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
         </div>
 
         <div class="switch-legend">
-          <span><span class="legend-switch is-on"></span> Pago / dentro do jogo</span>
-          <span><span class="legend-switch is-off"></span> Pendente / fora do jogo</span>
+          <span><span class="legend-switch is-on"></span> Pago</span>
+          <span><span class="legend-switch is-off"></span> Pendente</span>
         </div>
 
         ${carneOnly.length ? `
           <div class="players-carne-only">
             <div class="players-subhead">Somente carne <strong>${carneOnly.length}</strong></div>
-            <div class="carne-edit-list" role="table" aria-label="Somente carne">
-              ${carneOnly.map((player) => renderCarneOnlyRow(player, currentPlayer)).join('')}
+            <div class="player-compact-list" role="table" aria-label="Somente carne">
+              ${carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
             </div>
           </div>
         ` : ''}
@@ -571,57 +564,37 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
   `;
 }
 
-// Linha compacta para perfis "somente carne": avatar + nome à esquerda, ações
-// distribuídas à direita (linha curta, ocupa melhor a largura).
-function renderCarneOnlyRow(player, currentPlayer) {
-  const admin = isAdmin(currentPlayer);
-  const editing = '';
-  return `
-    <div class="carne-edit-row" role="row">
-      <div class="carne-edit-main">
-        ${getAvatarHtml(player)}
-        <div class="carne-edit-text">
-          <div class="row-title">${escapeHtml(player.name || '')}</div>
-          <div class="row-subtitle">Somente carne${admin ? ` · ${player.auth_user_id ? 'Acesso criado' : 'Sem acesso'}` : ''}</div>
-        </div>
-      </div>
-      ${admin ? `
-        <div class="carne-edit-actions">
-          <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar perfil" aria-label="Editar perfil"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-          ${player.auth_user_id
-            ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
-            : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
-          <button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir perfil" aria-label="Excluir perfil"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
+// Linha compacta unificada (jogadores e somente-carne): avatar + nome/subtítulo
+// à esquerda; à direita, o controle de mensalidade (quando jogador) e as ações,
+// distribuídos. Linha curta, ocupa melhor a largura em vez do grid de 5 colunas.
 function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null) {
-  const isEditing = player.id === editingPlayerId;
+  const admin = isAdmin(currentPlayer);
   const currentFlag = isCurrentPlayer(player, currentPlayer);
+  const isEditing = player.id === editingPlayerId;
+  const carneOnly = isCarneOnly(player);
+  const access = admin ? (player.auth_user_id ? 'Acesso criado' : 'Sem acesso') : '';
+  const subtitle = `${carneOnly ? 'Somente carne' : getPositionLabel(player.position)}${access ? ` · ${access}` : ''}`;
 
   return `
-    <div class="players-switch-row player-row-card ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
-      <div class="players-switch-player player-row-identity" role="cell">
+    <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
+      <div class="player-compact-main">
         ${getAvatarHtml(player)}
-        <div class="players-switch-player-text">
-          <div class="row-title">${player.name}${currentFlag ? ' · você' : ''}</div>
-          ${isAdmin(currentPlayer) ? `<div class="access-status ${player.auth_user_id ? 'has-access' : 'no-access'}">${player.auth_user_id ? 'Acesso criado' : 'Sem acesso'}</div>` : ''}
+        <div class="player-compact-text">
+          <div class="row-title">${escapeHtml(player.name || '')}${currentFlag ? ' · você' : ''}</div>
+          <div class="row-subtitle">${subtitle}</div>
         </div>
       </div>
-
-      <div class="player-row-status" role="cell">
-        <span class="position-pill">${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)}</span>
-        ${renderFinanceControls(player, currentPlayer)}
-      </div>
-
-      <div class="player-row-actions" role="cell">
-        ${isAdmin(currentPlayer) ? `<button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar jogador" aria-label="Editar jogador"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>` : ''}
-        ${isAdmin(currentPlayer) && player.auth_user_id ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>` : ''}
-        ${isAdmin(currentPlayer) && !player.auth_user_id ? `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}" title="Criar acesso" aria-label="Criar acesso">Criar acesso</button>` : ''}
-        ${isAdmin(currentPlayer) && !isCurrentPlayer(player, currentPlayer) ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir jogador" aria-label="Excluir jogador"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
+      <div class="player-compact-right">
+        ${carneOnly ? '' : renderFinanceControls(player, currentPlayer)}
+        ${admin ? `
+          <div class="carne-edit-actions">
+            <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar" aria-label="Editar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+            ${player.auth_user_id
+              ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
+              : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
+            ${!currentFlag ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
