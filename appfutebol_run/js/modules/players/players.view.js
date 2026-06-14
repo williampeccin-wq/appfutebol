@@ -135,7 +135,9 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const allPlayers = orderedPlayers;
   const jogadores = orderedPlayers.filter((player) => player.plays_football !== false);
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
-  const carneOnly = carneGroup.filter((player) => player.plays_football === false);
+  // "Somente carne" = qualquer perfil que não joga (independente do grupo), para
+  // garantir que todos sejam editáveis aqui na aba Jogadores.
+  const carneOnly = orderedPlayers.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isCarneOnly(player));
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
@@ -183,6 +185,20 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
           <span><span class="legend-switch is-on"></span> Pago / dentro do jogo</span>
           <span><span class="legend-switch is-off"></span> Pendente / fora do jogo</span>
         </div>
+
+        ${carneOnly.length ? `
+          <div class="players-carne-only">
+            <div class="players-subhead">Somente carne <strong>${carneOnly.length}</strong></div>
+            <div class="players-switch-table" role="table" aria-label="Somente carne">
+              <div class="players-switch-head" role="row">
+                <div role="columnheader">Perfil</div>
+                <div role="columnheader">Tipo</div>
+                <div role="columnheader">Ações</div>
+              </div>
+              ${carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
+            </div>
+          </div>
+        ` : ''}
       </section>
     </section>
   `;

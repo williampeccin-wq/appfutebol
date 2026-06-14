@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.77.1-splash';
+window.__HARMONIA_BUILD__ = 'v1.78.1-carneedit';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2002,6 +2002,7 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
+import { submitRatings, fetchRatings } from '../services/ratings.service.js';
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
 // o servidor deduplica por (jogo + jogador), então é seguro chamar de qualquer
@@ -2313,11 +2314,172 @@ function render(snapshot) {
   // garante uma tela de erro recuperável em vez de "tela branca" travada.
   try {
     renderInner(snapshot);
+    // Votação de desempenho (modal bloqueante) — fora do #app, não é apagado
+    // pelo re-render. Best-effort/async.
+    maybeShowPerfVote(snapshot, getCurrentPlayer());
   } catch (err) {
     console.error('[harmonia] Falha ao renderizar a tela:', err);
     renderFatalError();
   }
 }
+
+// ===================== Votação de desempenho (modal bloqueante) =====================
+// Abre 1h após o início do jogo e dura settings.ratings_perf_window_hours. Só para
+// quem esteve dentro do jogo e ainda não votou. Cada votante dá nota 1–10 em cada
+// OUTRO jogador. O overlay vive fora de #app, então o re-render (poll 4s) não o apaga.
+let perfVote = null;          // { gameKey, voterId, targets:[player], index, scores:{id:score} }
+let perfVoteGameKey = null;   // jogo cujo status já foi avaliado
+let perfVoteStatus = 'idle';  // idle | checking | active | voted
+let ratingsUnavailable = false; // tabela ratings indisponível (ex.: ainda não migrada) → não bloqueia
+
+function parseGameDateTimeMs(game) {
+  const d = String(game?.game_date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!d) return null;
+  const t = String(game?.game_time || '').match(/^(\d{2}):(\d{2})/);
+  const hh = t ? Number(t[1]) : 20;
+  const mm = t ? Number(t[2]) : 0;
+  return new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), hh, mm, 0).getTime();
+}
+
+function getPerfWindow(snapshot, game) {
+  const hours = Number(snapshot?.settings?.ratings_perf_window_hours) || 0;
+  if (hours <= 0) return null;
+  const startMs = parseGameDateTimeMs(game);
+  if (!startMs) return null;
+  const openMs = startMs + 60 * 60 * 1000; // 1h após o início
+  return { openMs, closeMs: openMs + hours * 60 * 60 * 1000 };
+}
+
+function getInGamePlayers(snapshot, game) {
+  const key = getGameKey(game);
+  const ids = new Set((snapshot.confirmations || [])
+    .filter((e) => e?.confirmed && String(e?.game_key || '') === String(key))
+    .map((e) => String(e.player_id)));
+  return (snapshot.players || []).filter((p) => ids.has(String(p.id)));
+}
+
+async function maybeShowPerfVote(snapshot, currentPlayer) {
+  if (!currentPlayer) { unmountPerfVote(); return; }
+  const game = getActiveGameFromSnapshot(snapshot);
+  const key = getGameKey(game);
+  const win = getPerfWindow(snapshot, game);
+  const now = Date.now();
+  const active = !!win && now >= win.openMs && now <= win.closeMs;
+  const inGame = active && getInGamePlayers(snapshot, game).some((p) => String(p.id) === String(currentPlayer.id));
+
+  if (perfVoteGameKey !== key) { perfVoteGameKey = key; perfVoteStatus = 'idle'; }
+
+  if (!active || !inGame || ratingsUnavailable) { unmountPerfVote(); return; }
+  if (perfVoteStatus === 'voted' || perfVoteStatus === 'active' || perfVoteStatus === 'checking') return;
+
+  perfVoteStatus = 'checking';
+  const res = await fetchRatings({ kind: 'desempenho', gameKey: key });
+  if (!res.ok) {
+    // Tabela indisponível (ex.: migração ainda não aplicada). NUNCA bloquear o
+    // app por uma votação que não tem onde gravar.
+    ratingsUnavailable = true;
+    perfVoteStatus = 'idle';
+    return;
+  }
+  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) {
+    perfVoteStatus = 'voted';
+    return;
+  }
+  const targets = getInGamePlayers(snapshot, game).filter((p) => String(p.id) !== String(currentPlayer.id));
+  if (!targets.length) { perfVoteStatus = 'voted'; return; }
+  perfVote = { gameKey: key, voterId: String(currentPlayer.id), targets, index: 0, scores: {} };
+  perfVoteStatus = 'active';
+  mountPerfVote();
+}
+
+function unmountPerfVote() {
+  const el = document.getElementById('perf-vote-overlay');
+  if (el) el.remove();
+  document.body.classList.remove('perf-vote-open');
+}
+
+function mountPerfVote() {
+  let el = document.getElementById('perf-vote-overlay');
+  if (!el) { el = document.createElement('div'); el.id = 'perf-vote-overlay'; document.body.appendChild(el); }
+  document.body.classList.add('perf-vote-open');
+  el.onclick = (ev) => {
+    if (!perfVote) return;
+    const scoreBtn = ev.target.closest('[data-perf-score]');
+    if (scoreBtn) {
+      perfVote.scores[String(perfVote.targets[perfVote.index].id)] = Number(scoreBtn.dataset.perfScore);
+      renderPerfVoteCard();
+      return;
+    }
+    const nav = ev.target.closest('[data-perf-nav]');
+    if (nav) {
+      const dir = nav.dataset.perfNav === 'next' ? 1 : -1;
+      perfVote.index = Math.max(0, Math.min(perfVote.targets.length - 1, perfVote.index + dir));
+      renderPerfVoteCard();
+      return;
+    }
+    if (ev.target.closest('[data-perf-submit]')) submitPerfVote();
+  };
+  renderPerfVoteCard();
+}
+
+function renderPerfVoteCard() {
+  const el = document.getElementById('perf-vote-overlay');
+  if (!el || !perfVote) return;
+  const total = perfVote.targets.length;
+  const i = perfVote.index;
+  const target = perfVote.targets[i];
+  const current = perfVote.scores[String(target.id)];
+  const isLast = i === total - 1;
+  const allRated = perfVote.targets.every((t) => perfVote.scores[String(t.id)] != null);
+  el.innerHTML = `
+    <div class="perf-vote-backdrop"></div>
+    <div class="perf-vote-modal" role="dialog" aria-modal="true">
+      <div class="perf-vote-head">
+        <div class="perf-vote-kicker">Avalie o jogo</div>
+        <div class="perf-vote-progress">${i + 1} de ${total}</div>
+      </div>
+      <div class="perf-vote-player">
+        ${renderAvatarForApp(target, 'perf-vote-avatar')}
+        <div class="perf-vote-name">${escapeHtml(target.name || '')}</div>
+        <div class="perf-vote-pos">${getPositionLabel(target.position)}</div>
+      </div>
+      <div class="perf-vote-scale">
+        ${Array.from({ length: 10 }, (_, n) => n + 1).map((n) => `<button type="button" class="perf-vote-score ${current === n ? 'is-sel' : ''}" data-perf-score="${n}">${n}</button>`).join('')}
+      </div>
+      <div class="perf-vote-actions">
+        ${i > 0 ? '<button type="button" class="btn btn-secondary" data-perf-nav="prev">Voltar</button>' : '<span></span>'}
+        ${isLast
+          ? `<button type="button" class="btn btn-primary" data-perf-submit ${allRated ? '' : 'disabled'}>Enviar notas</button>`
+          : `<button type="button" class="btn btn-primary" data-perf-nav="next" ${current != null ? '' : 'disabled'}>Próximo</button>`}
+      </div>
+      <p class="perf-vote-hint">Nota de 1 a 10 · sua nota é anônima. Avalie todos para liberar o app.</p>
+    </div>
+  `;
+}
+
+async function submitPerfVote() {
+  if (!perfVote) return;
+  const rows = perfVote.targets.map((t) => ({
+    kind: 'desempenho',
+    game_key: perfVote.gameKey,
+    voter_id: perfVote.voterId,
+    target_id: String(t.id),
+    score: perfVote.scores[String(t.id)],
+  }));
+  const btn = document.querySelector('[data-perf-submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  const res = await submitRatings(rows);
+  if (!res.ok) {
+    showToast('Não foi possível enviar as notas. Tente de novo.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar notas'; }
+    return;
+  }
+  perfVoteStatus = 'voted';
+  perfVote = null;
+  unmountPerfVote();
+  showToast('Notas enviadas. Valeu! ⚽', 'success');
+}
+// =================== fim votação de desempenho ===================
 
 function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
@@ -2925,6 +3087,20 @@ function bindAppEvents(currentPlayer) {
     });
   }
 
+
+  const ratingsForm = appElement.querySelector('#ratings-config-form');
+  if (ratingsForm) {
+    ratingsForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!requireAdmin(getState(), 'Apenas administrador pode alterar a votação')) return;
+      const hours = Math.max(0, Math.round(Number(new FormData(ratingsForm).get('ratings_perf_window_hours')) || 0));
+      patchState({ settings: { ...(getState().settings || {}), ratings_perf_window_hours: hours } });
+      const safeSnapshot = repairManualSnapshot(getState());
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
+      showToast(hours ? `Votação de desempenho: janela de ${hours}h.` : 'Votação de desempenho desativada (janela 0).');
+    });
+  }
 
   const notificationsForm = appElement.querySelector('#notifications-config-form');
   if (notificationsForm) {
@@ -3998,9 +4174,22 @@ function renderConfig(snapshot, currentPlayer) {
 
         <div class="mens-reminder-block">
           <div class="card-subtitle">Lembrete de atraso (push)</div>
-          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push. Use o botão para testar agora.</p>
-          <button class="btn btn-secondary btn-sm" type="button" data-action="test-overdue-reminders">Enviar lembrete de atraso agora (teste)</button>
+          <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push, automaticamente.</p>
         </div>
+      </section>
+
+      <section class="card ratings-config-card">
+        <div class="card-title">Votação de desempenho</div>
+        <p class="footer-note">A votação abre automaticamente 1h após o início do jogo e dura a quantidade de horas abaixo. Aparece como aviso obrigatório só para quem esteve dentro do jogo. 0 = desativada.</p>
+        <form id="ratings-config-form" class="player-admin-form game-config-form">
+          <label class="field-label">
+            Janela de votação (horas)
+            <input class="input" type="number" min="0" max="48" step="1" name="ratings_perf_window_hours" value="${Number(snapshot.settings?.ratings_perf_window_hours) || 0}" />
+          </label>
+          <div class="player-admin-actions game-config-actions">
+            <button class="btn btn-primary" type="submit">Salvar votação</button>
+          </div>
+        </form>
       </section>
 
       <section class="card notifications-config-card">
