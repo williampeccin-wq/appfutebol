@@ -189,13 +189,8 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
         ${carneOnly.length ? `
           <div class="players-carne-only">
             <div class="players-subhead">Somente carne <strong>${carneOnly.length}</strong></div>
-            <div class="players-switch-table" role="table" aria-label="Somente carne">
-              <div class="players-switch-head" role="row">
-                <div role="columnheader">Perfil</div>
-                <div role="columnheader">Tipo</div>
-                <div role="columnheader">Ações</div>
-              </div>
-              ${carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
+            <div class="carne-edit-list" role="table" aria-label="Somente carne">
+              ${carneOnly.map((player) => renderCarneOnlyRow(player, currentPlayer)).join('')}
             </div>
           </div>
         ` : ''}
@@ -573,6 +568,33 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
         </div>
       </section>
     </section>
+  `;
+}
+
+// Linha compacta para perfis "somente carne": avatar + nome à esquerda, ações
+// distribuídas à direita (linha curta, ocupa melhor a largura).
+function renderCarneOnlyRow(player, currentPlayer) {
+  const admin = isAdmin(currentPlayer);
+  const editing = '';
+  return `
+    <div class="carne-edit-row" role="row">
+      <div class="carne-edit-main">
+        ${getAvatarHtml(player)}
+        <div class="carne-edit-text">
+          <div class="row-title">${escapeHtml(player.name || '')}</div>
+          <div class="row-subtitle">Somente carne${admin ? ` · ${player.auth_user_id ? 'Acesso criado' : 'Sem acesso'}` : ''}</div>
+        </div>
+      </div>
+      ${admin ? `
+        <div class="carne-edit-actions">
+          <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar perfil" aria-label="Editar perfil"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          ${player.auth_user_id
+            ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
+            : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
+          <button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir perfil" aria-label="Excluir perfil"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
+        </div>
+      ` : ''}
+    </div>
   `;
 }
 
