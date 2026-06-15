@@ -482,6 +482,28 @@ button {
   margin-bottom: 12px;
 }
 
+/* Cards colapsáveis (aba Campeonato) */
+.champ-collapse > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.champ-collapse > summary::-webkit-details-marker { display: none; }
+.champ-collapse > summary .card-title { margin-bottom: 0; flex: 1 1 auto; }
+.champ-collapse-chevron {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--gray-500);
+  border-bottom: 2px solid var(--gray-500);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+}
+.champ-collapse[open] > summary .champ-collapse-chevron { transform: rotate(45deg); }
+.champ-collapse-body { margin-top: 14px; }
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -6645,8 +6667,8 @@ body {
 }
 
 /* ===================== Votação de desempenho (modal bloqueante) ===================== */
-body.perf-vote-open { overflow: hidden; }
-#perf-vote-overlay {
+body.vote-open { overflow: hidden; }
+.vote-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
@@ -6655,6 +6677,8 @@ body.perf-vote-open { overflow: hidden; }
   justify-content: center;
   padding: 20px;
 }
+/* Dupla do churrasco: dois avatares lado a lado. */
+.carne-vote-duo { display: flex; justify-content: center; gap: 14px; margin-bottom: 8px; }
 .perf-vote-backdrop {
   position: absolute;
   inset: 0;
@@ -6681,21 +6705,62 @@ body.perf-vote-open { overflow: hidden; }
 .avatar.perf-vote-avatar { width: 84px; height: 84px; border-radius: 999px; font-size: 28px; border: 2px solid rgba(255, 255, 255, 0.18); }
 .perf-vote-name { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
 .perf-vote-pos { font-size: 13px; font-weight: 700; color: var(--hfc-text-muted, #9fb0cc); }
-.perf-vote-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px; }
-.perf-vote-score {
-  height: 46px;
-  border-radius: 12px;
-  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.14));
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--hfc-text, #e8eefc);
-  font-size: 16px;
-  font-weight: 900;
+/* Nota: número grande colorido + slider com trilha colorida (arrasta pra avaliar). */
+.perf-vote-rate { margin-bottom: 20px; }
+.perf-vote-value {
+  text-align: center;
+  font-size: 64px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -.04em;
+  margin-bottom: 14px;
+  transition: color .12s ease;
+}
+.perf-vote-value.is-empty { color: rgba(255, 255, 255, 0.30); }
+.perf-vote-value.is-low { color: #f87171; }
+.perf-vote-value.is-mid { color: #fbbf24; }
+.perf-vote-value.is-good { color: #a3e635; }
+.perf-vote-value.is-top { color: #34d399; }
+
+.perf-vote-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  outline: none;
+  background: linear-gradient(90deg, #ef4444 0%, #f59e0b 45%, #a3e635 75%, #22c55e 100%);
   cursor: pointer;
 }
-.perf-vote-score.is-sel {
-  background: linear-gradient(180deg, var(--hfc-gold-200, #ffd980), var(--hfc-gold, #f0a500));
-  color: #1a1200;
-  border-color: transparent;
+.perf-vote-slider[data-untouched="1"] { filter: saturate(0.45) opacity(0.6); }
+.perf-vote-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid rgba(10, 18, 38, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+.perf-vote-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+.perf-vote-slider::-moz-range-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid rgba(10, 18, 38, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+.perf-vote-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hfc-text-muted, #9fb0cc);
 }
 .perf-vote-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
 .perf-vote-actions .btn { flex: 1 1 0; }
@@ -6735,3 +6800,67 @@ body.perf-vote-open { overflow: hidden; }
 .player-compact-text .row-subtitle { font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-compact-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .carne-edit-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* ===== Identidade visual distinta das votações (jogo x churrasco) ===== */
+/* Marca d'água atrás do conteúdo nos dois modais. */
+.game-vote-modal, .carne-vote-modal { overflow: hidden; }
+.game-vote-modal > *, .carne-vote-modal > * { position: relative; z-index: 1; }
+.game-vote-modal::before, .carne-vote-modal::before, .carne-vote-modal::after {
+  position: absolute; line-height: 1; pointer-events: none; z-index: 0;
+}
+
+/* Jogo: mantém o azul, com uma bola d'água sutil. */
+.game-vote-modal::before {
+  content: '⚽';
+  right: -14px; top: -18px;
+  font-size: 130px; opacity: 0.07; transform: rotate(-12deg);
+}
+
+/* Churrasco: fundo quente (brasa) + espetinho e fogo d'água. */
+.carne-vote-modal {
+  background: linear-gradient(155deg, rgba(124, 45, 18, 0.80), rgba(35, 14, 8, 0.95));
+  border-color: rgba(245, 158, 11, 0.38);
+}
+.carne-vote-modal::before {
+  content: '🥩';
+  right: -8px; top: -24px;
+  font-size: 142px; opacity: 0.12; transform: rotate(-15deg);
+}
+.carne-vote-modal::after {
+  content: '🔥';
+  left: -16px; bottom: -26px;
+  font-size: 100px; opacity: 0.10;
+}
+.carne-vote-modal .perf-vote-kicker { color: #fdba74; }
+
+/* Nota média de desempenho na classificação + ranking dos churrascos. */
+.championship-nota-cell { text-align: center; }
+.championship-nota { font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.championship-nota.is-empty { color: var(--hfc-text-muted, #9fb0cc); font-weight: 600; }
+.churrasco-rank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.churrasco-rank-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--hfc-glass-2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+}
+.churrasco-rank-pos {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px;
+  background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200, #ffd980);
+}
+.churrasco-rank-name { flex: 1 1 auto; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.churrasco-rank-avg { flex: 0 0 auto; font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.churrasco-rank-avg small { font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); margin-left: 4px; }
+
+/* Áurea no avatar do jogador melhor votado (aparece em todo lugar). */
+.avatar.avatar-aura {
+  box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 14px 3px rgba(240, 165, 0, 0.55);
+  animation: avatar-aura-pulse 2.1s ease-in-out infinite;
+}
+@keyframes avatar-aura-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 10px 2px rgba(240, 165, 0, 0.45); }
+  50% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 20px 6px rgba(240, 165, 0, 0.72); }
+}
+@media (prefers-reduced-motion: reduce) { .avatar.avatar-aura { animation: none; } }

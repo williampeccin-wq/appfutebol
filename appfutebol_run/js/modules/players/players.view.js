@@ -12,6 +12,8 @@ import {
   listJogadores,
   listPlayers,
 } from './players.service.js';
+import { getCachedRatings, duoRatingAverages } from '../../services/ratings.service.js';
+import { isVotingEnabled } from '../../core/flags.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
@@ -525,6 +527,8 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
     <section class="section-stack">
       ${renderCarneSchedule(currentPlayer, orderedPlayers, carneRotation, carneDates, dirty, editingPairIndex)}
 
+      ${renderChurrascoRanking(snapshot)}
+
       <section class="card">
         <div class="card-title">Resumo do carne</div>
         <div class="kpi-grid">
@@ -560,6 +564,48 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
           ${jogadoresNoCarne.length ? jogadoresNoCarne.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum jogador vinculado ao grupo da carne.</div>'}
         </div>
       </section>
+    </section>
+  `;
+}
+
+// Ranking dos churrascos do CICLO atual do rodízio (N duplas = N semanas).
+// Vive na aba Carne (lar natural do rodízio de duplas).
+function renderChurrascoRanking(snapshot) {
+  if (!isVotingEnabled()) return '';
+  const churras = getCachedRatings().filter((r) => r.kind === 'churrasco');
+  if (!churras.length) {
+    return `
+      <section class="card">
+        <div class="card-title">Ranking dos churrascos 🥩</div>
+        <div class="empty-inline">Ainda não há notas de churrasco.</div>
+      </section>`;
+  }
+  const n = ((snapshot.carne || []).find((e) => e.type === 'carne_rotation')?.pairs || []).length;
+  // Jogos com churrasco, mais recentes primeiro → recorta o ciclo atual (N jogos).
+  const lastByGame = {};
+  for (const r of churras) {
+    const g = String(r.game_key);
+    if (!lastByGame[g] || String(r.created_at) > String(lastByGame[g])) lastByGame[g] = r.created_at;
+  }
+  const recentGames = Object.keys(lastByGame).sort((a, b) => String(lastByGame[b]).localeCompare(String(lastByGame[a])));
+  const cycleGames = n ? recentGames.slice(0, n) : recentGames;
+  const duos = duoRatingAverages(churras, cycleGames);
+  const name = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id))?.name || 'Jogador';
+  const list = Object.entries(duos)
+    .map(([key, agg]) => { const [a, b] = String(key).split('|'); return { names: `${name(a)} e ${name(b)}`, avg: agg.avg, votes: agg.votes }; })
+    .sort((x, y) => y.avg - x.avg);
+  return `
+    <section class="card">
+      <div class="card-title">Ranking dos churrascos 🥩</div>
+      <p class="footer-note">Média da dupla no ciclo atual do rodízio${n ? ` (${n} duplas)` : ''}.</p>
+      <div class="churrasco-rank-list">
+        ${list.map((d, i) => `
+          <div class="churrasco-rank-row">
+            <span class="churrasco-rank-pos">${i + 1}</span>
+            <span class="churrasco-rank-name">${escapeHtml(d.names)}</span>
+            <span class="churrasco-rank-avg">${d.avg.toFixed(1)} <small>${d.votes} voto${d.votes === 1 ? '' : 's'}</small></span>
+          </div>`).join('')}
+      </div>
     </section>
   `;
 }

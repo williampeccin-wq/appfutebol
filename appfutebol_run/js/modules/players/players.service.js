@@ -1,5 +1,6 @@
 import { getState } from '../../core/state.js';
 import { isAdmin as authzIsAdmin, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
+import { getTopRatedPlayerId } from '../../services/ratings.service.js';
 
 function normalizeParticipation(player) {
   const playsFootball = authzPlaysFootball(player);
@@ -98,10 +99,11 @@ export function getAvatarHtml(player, extraClass = '') {
   const photo = getPlayerPhoto(player);
   const initials = getInitials(player?.name);
   const safeName = String(player?.name || 'jogador').replaceAll('"', '&quot;');
+  const aura = (player?.id && String(player.id) === String(getTopRatedPlayerId())) ? ' avatar-aura' : '';
 
   if (photo) {
-    return `<div class="avatar avatar-photo ${extraClass}"><img src="${photo}" alt="Foto de ${safeName}" loading="lazy" /></div>`;
+    return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${photo}" alt="Foto de ${safeName}" loading="lazy" /></div>`;
   }
 
-  return `<div class="avatar ${extraClass}">${initials}</div>`;
+  return `<div class="avatar ${extraClass}${aura}">${initials}</div>`;
 }

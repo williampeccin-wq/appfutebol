@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.78.3-playerrows';
+window.__HARMONIA_BUILD__ = 'v1.82.0-aura';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -461,12 +461,13 @@ function bindAvatarLightbox() {
 function renderAvatarForApp(player, extraClass = '') {
   const photo = getPlayerPhoto(player);
   const initials = getInitials(player?.name);
+  const aura = (player?.id && String(player.id) === String(getTopRatedPlayerId())) ? ' avatar-aura' : '';
 
   if (photo) {
-    return `<div class="avatar avatar-photo ${extraClass}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
+    return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
   }
 
-  return `<div class="avatar ${extraClass}">${initials}</div>`;
+  return `<div class="avatar ${extraClass}${aura}">${initials}</div>`;
 }
 
 
@@ -2002,7 +2003,18 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
-import { submitRatings, fetchRatings } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
+import { isVotingEnabled } from './flags.js';
+
+// Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
+// re-renderiza quando chegarem.
+let _ratingsLoadStarted = false;
+function ensureRatingsLoaded() {
+  if (!isVotingEnabled()) return;
+  if (_ratingsLoadStarted) return;
+  _ratingsLoadStarted = true;
+  loadRatingsCache().then(() => render(getState())).catch(() => {});
+}
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
 // o servidor deduplica por (jogo + jogador), então é seguro chamar de qualquer
@@ -2317,6 +2329,7 @@ function render(snapshot) {
     // Votação de desempenho (modal bloqueante) — fora do #app, não é apagado
     // pelo re-render. Best-effort/async.
     maybeShowPerfVote(snapshot, getCurrentPlayer());
+    maybeShowCarneVote(snapshot, getCurrentPlayer());
   } catch (err) {
     console.error('[harmonia] Falha ao renderizar a tela:', err);
     renderFatalError();
@@ -2359,6 +2372,7 @@ function getInGamePlayers(snapshot, game) {
 }
 
 async function maybeShowPerfVote(snapshot, currentPlayer) {
+  if (!isVotingEnabled()) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
   const game = getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
@@ -2392,24 +2406,23 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
   mountPerfVote();
 }
 
+// Trava o scroll do body enquanto QUALQUER modal de votação estiver aberto.
+function syncVoteBodyLock() {
+  document.body.classList.toggle('vote-open', !!document.querySelector('.vote-overlay'));
+}
+
 function unmountPerfVote() {
   const el = document.getElementById('perf-vote-overlay');
   if (el) el.remove();
-  document.body.classList.remove('perf-vote-open');
+  syncVoteBodyLock();
 }
 
 function mountPerfVote() {
   let el = document.getElementById('perf-vote-overlay');
-  if (!el) { el = document.createElement('div'); el.id = 'perf-vote-overlay'; document.body.appendChild(el); }
-  document.body.classList.add('perf-vote-open');
+  if (!el) { el = document.createElement('div'); el.id = 'perf-vote-overlay'; el.className = 'vote-overlay'; document.body.appendChild(el); }
+  syncVoteBodyLock();
   el.onclick = (ev) => {
     if (!perfVote) return;
-    const scoreBtn = ev.target.closest('[data-perf-score]');
-    if (scoreBtn) {
-      perfVote.scores[String(perfVote.targets[perfVote.index].id)] = Number(scoreBtn.dataset.perfScore);
-      renderPerfVoteCard();
-      return;
-    }
     const nav = ev.target.closest('[data-perf-nav]');
     if (nav) {
       const dir = nav.dataset.perfNav === 'next' ? 1 : -1;
@@ -2419,7 +2432,33 @@ function mountPerfVote() {
     }
     if (ev.target.closest('[data-perf-submit]')) submitPerfVote();
   };
+  // Slider de nota: atualiza o valor sem re-renderizar (não interrompe o arraste).
+  el.oninput = (ev) => {
+    const slider = ev.target.closest('[data-perf-slider]');
+    if (!slider || !perfVote) return;
+    const v = Number(slider.value);
+    perfVote.scores[String(perfVote.targets[perfVote.index].id)] = v;
+    slider.removeAttribute('data-untouched');
+    const cls = perfScoreClass(v);
+    slider.className = `perf-vote-slider ${cls}`;
+    const badge = el.querySelector('[data-score-badge]');
+    if (badge) { badge.textContent = v; badge.className = `perf-vote-value ${cls}`; }
+    const next = el.querySelector('[data-perf-nav="next"]');
+    if (next) next.disabled = false;
+    const submit = el.querySelector('[data-perf-submit]');
+    if (submit) submit.disabled = !perfVote.targets.every((t) => perfVote.scores[String(t.id)] != null);
+    const hint = el.querySelector('.perf-vote-hint');
+    if (hint) hint.textContent = 'Sua nota é anônima. Avalie todos para liberar o app.';
+  };
   renderPerfVoteCard();
+}
+
+function perfScoreClass(v) {
+  if (v == null) return 'is-empty';
+  if (v <= 3) return 'is-low';
+  if (v <= 6) return 'is-mid';
+  if (v <= 8) return 'is-good';
+  return 'is-top';
 }
 
 function renderPerfVoteCard() {
@@ -2433,9 +2472,9 @@ function renderPerfVoteCard() {
   const allRated = perfVote.targets.every((t) => perfVote.scores[String(t.id)] != null);
   el.innerHTML = `
     <div class="perf-vote-backdrop"></div>
-    <div class="perf-vote-modal" role="dialog" aria-modal="true">
+    <div class="perf-vote-modal game-vote-modal" role="dialog" aria-modal="true">
       <div class="perf-vote-head">
-        <div class="perf-vote-kicker">Avalie o jogo</div>
+        <div class="perf-vote-kicker">Avalie o jogo ⚽</div>
         <div class="perf-vote-progress">${i + 1} de ${total}</div>
       </div>
       <div class="perf-vote-player">
@@ -2443,16 +2482,22 @@ function renderPerfVoteCard() {
         <div class="perf-vote-name">${escapeHtml(target.name || '')}</div>
         <div class="perf-vote-pos">${getPositionLabel(target.position)}</div>
       </div>
-      <div class="perf-vote-scale">
-        ${Array.from({ length: 10 }, (_, n) => n + 1).map((n) => `<button type="button" class="perf-vote-score ${current === n ? 'is-sel' : ''}" data-perf-score="${n}">${n}</button>`).join('')}
+
+      <div class="perf-vote-rate">
+        <div class="perf-vote-value ${perfScoreClass(current)}" data-score-badge>${current != null ? current : '–'}</div>
+        <input class="perf-vote-slider ${perfScoreClass(current)}" type="range" min="1" max="10" step="1"
+               value="${current != null ? current : 5}" ${current == null ? 'data-untouched="1"' : ''} data-perf-slider
+               aria-label="Nota de ${escapeHtml(target.name || '')}" />
+        <div class="perf-vote-scale-labels"><span>1</span><span>5</span><span>10</span></div>
       </div>
+
       <div class="perf-vote-actions">
         ${i > 0 ? '<button type="button" class="btn btn-secondary" data-perf-nav="prev">Voltar</button>' : '<span></span>'}
         ${isLast
           ? `<button type="button" class="btn btn-primary" data-perf-submit ${allRated ? '' : 'disabled'}>Enviar notas</button>`
           : `<button type="button" class="btn btn-primary" data-perf-nav="next" ${current != null ? '' : 'disabled'}>Próximo</button>`}
       </div>
-      <p class="perf-vote-hint">Nota de 1 a 10 · sua nota é anônima. Avalie todos para liberar o app.</p>
+      <p class="perf-vote-hint">${current == null ? 'Arraste para dar a nota (1 a 10).' : 'Sua nota é anônima.'} Avalie todos para liberar o app.</p>
     </div>
   `;
 }
@@ -2481,6 +2526,155 @@ async function submitPerfVote() {
 }
 // =================== fim votação de desempenho ===================
 
+// ===================== Votação do churrasco (modal bloqueante) =====================
+// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Todos os membros votam UMA
+// nota 1–10 na dupla responsável (do rodízio). O modal de desempenho tem prioridade.
+let carneVote = null;          // { gameKey, voterId, duo, score }
+let carneVoteGameKey = null;
+let carneVoteStatus = 'idle';
+
+function getCarneWindow(game) {
+  const m = String(game?.game_date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+  const openMs = new Date(y, mo, d, 23, 0, 0).getTime();      // 23h do dia do jogo
+  const closeMs = new Date(y, mo, d + 1, 12, 0, 0).getTime(); // 12h do dia seguinte
+  return { openMs, closeMs };
+}
+
+// Dupla responsável pelo churrasco do jogo, a partir do rodízio.
+function getChurrascoDuo(snapshot, game) {
+  const rotation = getCarneRotation(snapshot);
+  const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
+  const startIso = String(rotation?.start_date || '').slice(0, 10);
+  const gameIso = String(game?.game_date || '').slice(0, 10);
+  if (!pairs.length || !startIso || !gameIso) return null;
+  const week = Math.round(carneDiffDays(gameIso, startIso) / 7);
+  const idx = ((week % pairs.length) + pairs.length) % pairs.length;
+  const pair = pairs[idx];
+  if (!pair) return null;
+  const find = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id)) || { id, name: 'Jogador' };
+  const key = [String(pair.player1_id), String(pair.player2_id)].sort().join('|');
+  return { player1: find(pair.player1_id), player2: find(pair.player2_id), key };
+}
+
+async function maybeShowCarneVote(snapshot, currentPlayer) {
+  if (!isVotingEnabled()) { unmountCarneVote(); return; }
+  if (!currentPlayer) { unmountCarneVote(); return; }
+  // Desempenho tem prioridade: se o modal dele está aberto, espera.
+  if (document.getElementById('perf-vote-overlay')) return;
+
+  const game = getActiveGameFromSnapshot(snapshot);
+  const key = getGameKey(game);
+  const win = getCarneWindow(game);
+  const now = Date.now();
+  const active = !!win && now >= win.openMs && now <= win.closeMs;
+
+  if (carneVoteGameKey !== key) { carneVoteGameKey = key; carneVoteStatus = 'idle'; }
+  if (!active || ratingsUnavailable) { unmountCarneVote(); return; }
+  if (carneVoteStatus === 'voted' || carneVoteStatus === 'active' || carneVoteStatus === 'checking') return;
+
+  const duo = getChurrascoDuo(snapshot, game);
+  if (!duo) { carneVoteStatus = 'voted'; return; } // sem rodízio/dupla → nada a votar
+
+  carneVoteStatus = 'checking';
+  const res = await fetchRatings({ kind: 'churrasco', gameKey: key });
+  if (!res.ok) { ratingsUnavailable = true; carneVoteStatus = 'idle'; return; }
+  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) { carneVoteStatus = 'voted'; return; }
+
+  carneVote = { gameKey: key, voterId: String(currentPlayer.id), duo, score: null };
+  carneVoteStatus = 'active';
+  mountCarneVote();
+}
+
+function unmountCarneVote() {
+  const el = document.getElementById('carne-vote-overlay');
+  if (el) el.remove();
+  syncVoteBodyLock();
+}
+
+function mountCarneVote() {
+  let el = document.getElementById('carne-vote-overlay');
+  if (!el) { el = document.createElement('div'); el.id = 'carne-vote-overlay'; el.className = 'vote-overlay'; document.body.appendChild(el); }
+  syncVoteBodyLock();
+  el.onclick = (ev) => {
+    if (ev.target.closest('[data-carne-submit]')) submitCarneVote();
+  };
+  el.oninput = (ev) => {
+    const slider = ev.target.closest('[data-carne-slider]');
+    if (!slider || !carneVote) return;
+    const v = Number(slider.value);
+    carneVote.score = v;
+    slider.removeAttribute('data-untouched');
+    const cls = perfScoreClass(v);
+    slider.className = `perf-vote-slider ${cls}`;
+    const badge = el.querySelector('[data-score-badge]');
+    if (badge) { badge.textContent = v; badge.className = `perf-vote-value ${cls}`; }
+    const submit = el.querySelector('[data-carne-submit]');
+    if (submit) submit.disabled = false;
+    const hint = el.querySelector('.perf-vote-hint');
+    if (hint) hint.textContent = 'Sua nota é anônima. Nota do churrasco da dupla.';
+  };
+  renderCarneVoteCard();
+}
+
+function renderCarneVoteCard() {
+  const el = document.getElementById('carne-vote-overlay');
+  if (!el || !carneVote) return;
+  const v = carneVote.score;
+  const duo = carneVote.duo;
+  el.innerHTML = `
+    <div class="perf-vote-backdrop"></div>
+    <div class="perf-vote-modal carne-vote-modal" role="dialog" aria-modal="true">
+      <div class="perf-vote-head">
+        <div class="perf-vote-kicker">Avalie o churrasco 🥩</div>
+      </div>
+      <div class="carne-vote-duo">
+        ${renderAvatarForApp(duo.player1, 'perf-vote-avatar')}
+        ${renderAvatarForApp(duo.player2, 'perf-vote-avatar')}
+      </div>
+      <div class="perf-vote-name">${escapeHtml(duo.player1?.name || '?')} e ${escapeHtml(duo.player2?.name || '?')}</div>
+
+      <div class="perf-vote-rate">
+        <div class="perf-vote-value ${perfScoreClass(v)}" data-score-badge>${v != null ? v : '–'}</div>
+        <input class="perf-vote-slider ${perfScoreClass(v)}" type="range" min="1" max="10" step="1"
+               value="${v != null ? v : 5}" ${v == null ? 'data-untouched="1"' : ''} data-carne-slider aria-label="Nota do churrasco" />
+        <div class="perf-vote-scale-labels"><span>1</span><span>5</span><span>10</span></div>
+      </div>
+
+      <div class="perf-vote-actions">
+        <span></span>
+        <button type="button" class="btn btn-primary" data-carne-submit ${v != null ? '' : 'disabled'}>Enviar nota</button>
+      </div>
+      <p class="perf-vote-hint">${v == null ? 'Arraste para dar a nota (1 a 10).' : 'Sua nota é anônima.'} Nota do churrasco da dupla.</p>
+    </div>
+  `;
+}
+
+async function submitCarneVote() {
+  if (!carneVote || carneVote.score == null) return;
+  const row = {
+    kind: 'churrasco',
+    game_key: carneVote.gameKey,
+    voter_id: carneVote.voterId,
+    target_id: carneVote.duo.key,
+    score: carneVote.score,
+  };
+  const btn = document.querySelector('[data-carne-submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  const res = await submitRatings([row]);
+  if (!res.ok) {
+    showToast('Não foi possível enviar a nota. Tente de novo.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar nota'; }
+    return;
+  }
+  carneVoteStatus = 'voted';
+  carneVote = null;
+  unmountCarneVote();
+  showToast('Nota do churrasco enviada. Valeu! 🥩', 'success');
+}
+// =================== fim votação do churrasco ===================
+
 function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
   // Antes este banner somava confirmações de TODOS os jogos e incluía
@@ -2500,6 +2694,7 @@ function renderInner(snapshot) {
 
   const requestedTab = snapshot.ui.currentTab || 'home';
   const activeTab = !canAccessConfig(currentPlayer) && requestedTab === 'config' ? 'home' : requestedTab;
+  ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
@@ -3132,11 +3327,11 @@ function renderNavButton(tab, label, activeTab) {
 
 const BOTTOM_NAV_ICONS = {
   home: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>',
-  weekly_game: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.7h-5L8 10z"/></svg>',
+  weekly_game: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="12,8.8 15,11 13.9,14.6 10.1,14.6 9,11" fill="currentColor" stroke="currentColor"/><path d="M12 8.8V3"/><path d="M15 11l5.6-1.8"/><path d="M13.9 14.6l3.4 4.7"/><path d="M10.1 14.6l-3.4 4.7"/><path d="M9 11 3.4 9.2"/></svg>',
   players: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 13.7a5.5 5.5 0 0 1 3.5 6.3"/></svg>',
-  carne: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v6a2 2 0 0 0 2 2v10"/><path d="M8 3v5"/><path d="M16 3c-1.6 0-2.6 2-2.6 5s1 4 2.6 4v9"/></svg>',
+  carne: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="translate(6.9 0.4) scale(0.42)"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></g><path d="M16.5 21.5 8 11"/><path d="M8 11 5.4 9.8M8 11 6.4 9M8 11 7.4 8.2"/><path d="M7.5 21.5 16 11"/><path d="M16 11 18.2 8.4 16.7 12 Z"/></svg>',
   championship: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9 21h6"/><path d="M12 14v7"/></svg>',
-  config: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>',
+  config: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
 };
 
 function renderBottomNav(activeTab, currentPlayer) {
@@ -3350,7 +3545,7 @@ function renderHome(snapshot, currentPlayer) {
   ].filter(Boolean).join(', ') || 'Nenhum goleiro confirmado';
   const homeNoticeItems = [
     carneNotification ? {
-      icon: '🍢',
+      icon: '🥩',
       title: 'Dupla da carne',
       text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-'),
       html: '<div class="notification-content-carne">'
