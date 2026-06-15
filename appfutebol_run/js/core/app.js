@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.78.3-playerrows';
+window.__HARMONIA_BUILD__ = 'v1.79.0-votingui';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2404,12 +2404,6 @@ function mountPerfVote() {
   document.body.classList.add('perf-vote-open');
   el.onclick = (ev) => {
     if (!perfVote) return;
-    const scoreBtn = ev.target.closest('[data-perf-score]');
-    if (scoreBtn) {
-      perfVote.scores[String(perfVote.targets[perfVote.index].id)] = Number(scoreBtn.dataset.perfScore);
-      renderPerfVoteCard();
-      return;
-    }
     const nav = ev.target.closest('[data-perf-nav]');
     if (nav) {
       const dir = nav.dataset.perfNav === 'next' ? 1 : -1;
@@ -2419,7 +2413,33 @@ function mountPerfVote() {
     }
     if (ev.target.closest('[data-perf-submit]')) submitPerfVote();
   };
+  // Slider de nota: atualiza o valor sem re-renderizar (não interrompe o arraste).
+  el.oninput = (ev) => {
+    const slider = ev.target.closest('[data-perf-slider]');
+    if (!slider || !perfVote) return;
+    const v = Number(slider.value);
+    perfVote.scores[String(perfVote.targets[perfVote.index].id)] = v;
+    slider.removeAttribute('data-untouched');
+    const cls = perfScoreClass(v);
+    slider.className = `perf-vote-slider ${cls}`;
+    const badge = el.querySelector('[data-score-badge]');
+    if (badge) { badge.textContent = v; badge.className = `perf-vote-value ${cls}`; }
+    const next = el.querySelector('[data-perf-nav="next"]');
+    if (next) next.disabled = false;
+    const submit = el.querySelector('[data-perf-submit]');
+    if (submit) submit.disabled = !perfVote.targets.every((t) => perfVote.scores[String(t.id)] != null);
+    const hint = el.querySelector('.perf-vote-hint');
+    if (hint) hint.textContent = 'Sua nota é anônima. Avalie todos para liberar o app.';
+  };
   renderPerfVoteCard();
+}
+
+function perfScoreClass(v) {
+  if (v == null) return 'is-empty';
+  if (v <= 3) return 'is-low';
+  if (v <= 6) return 'is-mid';
+  if (v <= 8) return 'is-good';
+  return 'is-top';
 }
 
 function renderPerfVoteCard() {
@@ -2443,16 +2463,22 @@ function renderPerfVoteCard() {
         <div class="perf-vote-name">${escapeHtml(target.name || '')}</div>
         <div class="perf-vote-pos">${getPositionLabel(target.position)}</div>
       </div>
-      <div class="perf-vote-scale">
-        ${Array.from({ length: 10 }, (_, n) => n + 1).map((n) => `<button type="button" class="perf-vote-score ${current === n ? 'is-sel' : ''}" data-perf-score="${n}">${n}</button>`).join('')}
+
+      <div class="perf-vote-rate">
+        <div class="perf-vote-value ${perfScoreClass(current)}" data-score-badge>${current != null ? current : '–'}</div>
+        <input class="perf-vote-slider ${perfScoreClass(current)}" type="range" min="1" max="10" step="1"
+               value="${current != null ? current : 5}" ${current == null ? 'data-untouched="1"' : ''} data-perf-slider
+               aria-label="Nota de ${escapeHtml(target.name || '')}" />
+        <div class="perf-vote-scale-labels"><span>1</span><span>5</span><span>10</span></div>
       </div>
+
       <div class="perf-vote-actions">
         ${i > 0 ? '<button type="button" class="btn btn-secondary" data-perf-nav="prev">Voltar</button>' : '<span></span>'}
         ${isLast
           ? `<button type="button" class="btn btn-primary" data-perf-submit ${allRated ? '' : 'disabled'}>Enviar notas</button>`
           : `<button type="button" class="btn btn-primary" data-perf-nav="next" ${current != null ? '' : 'disabled'}>Próximo</button>`}
       </div>
-      <p class="perf-vote-hint">Nota de 1 a 10 · sua nota é anônima. Avalie todos para liberar o app.</p>
+      <p class="perf-vote-hint">${current == null ? 'Arraste para dar a nota (1 a 10).' : 'Sua nota é anônima.'} Avalie todos para liberar o app.</p>
     </div>
   `;
 }
