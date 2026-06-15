@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.84.2-espetinho';
+export const APP_VERSION = 'v1.84.3-churrasco-icon';
