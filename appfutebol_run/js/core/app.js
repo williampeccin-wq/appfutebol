@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.79.0-votingui';
+window.__HARMONIA_BUILD__ = 'v1.80.0-churrasco';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2317,6 +2317,7 @@ function render(snapshot) {
     // Votação de desempenho (modal bloqueante) — fora do #app, não é apagado
     // pelo re-render. Best-effort/async.
     maybeShowPerfVote(snapshot, getCurrentPlayer());
+    maybeShowCarneVote(snapshot, getCurrentPlayer());
   } catch (err) {
     console.error('[harmonia] Falha ao renderizar a tela:', err);
     renderFatalError();
@@ -2392,16 +2393,21 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
   mountPerfVote();
 }
 
+// Trava o scroll do body enquanto QUALQUER modal de votação estiver aberto.
+function syncVoteBodyLock() {
+  document.body.classList.toggle('vote-open', !!document.querySelector('.vote-overlay'));
+}
+
 function unmountPerfVote() {
   const el = document.getElementById('perf-vote-overlay');
   if (el) el.remove();
-  document.body.classList.remove('perf-vote-open');
+  syncVoteBodyLock();
 }
 
 function mountPerfVote() {
   let el = document.getElementById('perf-vote-overlay');
-  if (!el) { el = document.createElement('div'); el.id = 'perf-vote-overlay'; document.body.appendChild(el); }
-  document.body.classList.add('perf-vote-open');
+  if (!el) { el = document.createElement('div'); el.id = 'perf-vote-overlay'; el.className = 'vote-overlay'; document.body.appendChild(el); }
+  syncVoteBodyLock();
   el.onclick = (ev) => {
     if (!perfVote) return;
     const nav = ev.target.closest('[data-perf-nav]');
@@ -2506,6 +2512,154 @@ async function submitPerfVote() {
   showToast('Notas enviadas. Valeu! ⚽', 'success');
 }
 // =================== fim votação de desempenho ===================
+
+// ===================== Votação do churrasco (modal bloqueante) =====================
+// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Todos os membros votam UMA
+// nota 1–10 na dupla responsável (do rodízio). O modal de desempenho tem prioridade.
+let carneVote = null;          // { gameKey, voterId, duo, score }
+let carneVoteGameKey = null;
+let carneVoteStatus = 'idle';
+
+function getCarneWindow(game) {
+  const m = String(game?.game_date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+  const openMs = new Date(y, mo, d, 23, 0, 0).getTime();      // 23h do dia do jogo
+  const closeMs = new Date(y, mo, d + 1, 12, 0, 0).getTime(); // 12h do dia seguinte
+  return { openMs, closeMs };
+}
+
+// Dupla responsável pelo churrasco do jogo, a partir do rodízio.
+function getChurrascoDuo(snapshot, game) {
+  const rotation = getCarneRotation(snapshot);
+  const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
+  const startIso = String(rotation?.start_date || '').slice(0, 10);
+  const gameIso = String(game?.game_date || '').slice(0, 10);
+  if (!pairs.length || !startIso || !gameIso) return null;
+  const week = Math.round(carneDiffDays(gameIso, startIso) / 7);
+  const idx = ((week % pairs.length) + pairs.length) % pairs.length;
+  const pair = pairs[idx];
+  if (!pair) return null;
+  const find = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id)) || { id, name: 'Jogador' };
+  const key = [String(pair.player1_id), String(pair.player2_id)].sort().join('|');
+  return { player1: find(pair.player1_id), player2: find(pair.player2_id), key };
+}
+
+async function maybeShowCarneVote(snapshot, currentPlayer) {
+  if (!currentPlayer) { unmountCarneVote(); return; }
+  // Desempenho tem prioridade: se o modal dele está aberto, espera.
+  if (document.getElementById('perf-vote-overlay')) return;
+
+  const game = getActiveGameFromSnapshot(snapshot);
+  const key = getGameKey(game);
+  const win = getCarneWindow(game);
+  const now = Date.now();
+  const active = !!win && now >= win.openMs && now <= win.closeMs;
+
+  if (carneVoteGameKey !== key) { carneVoteGameKey = key; carneVoteStatus = 'idle'; }
+  if (!active || ratingsUnavailable) { unmountCarneVote(); return; }
+  if (carneVoteStatus === 'voted' || carneVoteStatus === 'active' || carneVoteStatus === 'checking') return;
+
+  const duo = getChurrascoDuo(snapshot, game);
+  if (!duo) { carneVoteStatus = 'voted'; return; } // sem rodízio/dupla → nada a votar
+
+  carneVoteStatus = 'checking';
+  const res = await fetchRatings({ kind: 'churrasco', gameKey: key });
+  if (!res.ok) { ratingsUnavailable = true; carneVoteStatus = 'idle'; return; }
+  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) { carneVoteStatus = 'voted'; return; }
+
+  carneVote = { gameKey: key, voterId: String(currentPlayer.id), duo, score: null };
+  carneVoteStatus = 'active';
+  mountCarneVote();
+}
+
+function unmountCarneVote() {
+  const el = document.getElementById('carne-vote-overlay');
+  if (el) el.remove();
+  syncVoteBodyLock();
+}
+
+function mountCarneVote() {
+  let el = document.getElementById('carne-vote-overlay');
+  if (!el) { el = document.createElement('div'); el.id = 'carne-vote-overlay'; el.className = 'vote-overlay'; document.body.appendChild(el); }
+  syncVoteBodyLock();
+  el.onclick = (ev) => {
+    if (ev.target.closest('[data-carne-submit]')) submitCarneVote();
+  };
+  el.oninput = (ev) => {
+    const slider = ev.target.closest('[data-carne-slider]');
+    if (!slider || !carneVote) return;
+    const v = Number(slider.value);
+    carneVote.score = v;
+    slider.removeAttribute('data-untouched');
+    const cls = perfScoreClass(v);
+    slider.className = `perf-vote-slider ${cls}`;
+    const badge = el.querySelector('[data-score-badge]');
+    if (badge) { badge.textContent = v; badge.className = `perf-vote-value ${cls}`; }
+    const submit = el.querySelector('[data-carne-submit]');
+    if (submit) submit.disabled = false;
+    const hint = el.querySelector('.perf-vote-hint');
+    if (hint) hint.textContent = 'Sua nota é anônima. Nota do churrasco da dupla.';
+  };
+  renderCarneVoteCard();
+}
+
+function renderCarneVoteCard() {
+  const el = document.getElementById('carne-vote-overlay');
+  if (!el || !carneVote) return;
+  const v = carneVote.score;
+  const duo = carneVote.duo;
+  el.innerHTML = `
+    <div class="perf-vote-backdrop"></div>
+    <div class="perf-vote-modal" role="dialog" aria-modal="true">
+      <div class="perf-vote-head">
+        <div class="perf-vote-kicker">Avalie o churrasco 🍢</div>
+      </div>
+      <div class="carne-vote-duo">
+        ${renderAvatarForApp(duo.player1, 'perf-vote-avatar')}
+        ${renderAvatarForApp(duo.player2, 'perf-vote-avatar')}
+      </div>
+      <div class="perf-vote-name">${escapeHtml(duo.player1?.name || '?')} e ${escapeHtml(duo.player2?.name || '?')}</div>
+
+      <div class="perf-vote-rate">
+        <div class="perf-vote-value ${perfScoreClass(v)}" data-score-badge>${v != null ? v : '–'}</div>
+        <input class="perf-vote-slider ${perfScoreClass(v)}" type="range" min="1" max="10" step="1"
+               value="${v != null ? v : 5}" ${v == null ? 'data-untouched="1"' : ''} data-carne-slider aria-label="Nota do churrasco" />
+        <div class="perf-vote-scale-labels"><span>1</span><span>5</span><span>10</span></div>
+      </div>
+
+      <div class="perf-vote-actions">
+        <span></span>
+        <button type="button" class="btn btn-primary" data-carne-submit ${v != null ? '' : 'disabled'}>Enviar nota</button>
+      </div>
+      <p class="perf-vote-hint">${v == null ? 'Arraste para dar a nota (1 a 10).' : 'Sua nota é anônima.'} Nota do churrasco da dupla.</p>
+    </div>
+  `;
+}
+
+async function submitCarneVote() {
+  if (!carneVote || carneVote.score == null) return;
+  const row = {
+    kind: 'churrasco',
+    game_key: carneVote.gameKey,
+    voter_id: carneVote.voterId,
+    target_id: carneVote.duo.key,
+    score: carneVote.score,
+  };
+  const btn = document.querySelector('[data-carne-submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  const res = await submitRatings([row]);
+  if (!res.ok) {
+    showToast('Não foi possível enviar a nota. Tente de novo.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar nota'; }
+    return;
+  }
+  carneVoteStatus = 'voted';
+  carneVote = null;
+  unmountCarneVote();
+  showToast('Nota do churrasco enviada. Valeu! 🍢', 'success');
+}
+// =================== fim votação do churrasco ===================
 
 function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
