@@ -6800,7 +6800,7 @@ body.vote-open { overflow: hidden; }
   border-color: rgba(245, 158, 11, 0.38);
 }
 .carne-vote-modal::before {
-  content: '🍢';
+  content: '🥩';
   right: -8px; top: -24px;
   font-size: 142px; opacity: 0.12; transform: rotate(-15deg);
 }

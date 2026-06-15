@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.80.1-votecolors';
+window.__HARMONIA_BUILD__ = 'v1.80.2-meaticon';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2613,7 +2613,7 @@ function renderCarneVoteCard() {
     <div class="perf-vote-backdrop"></div>
     <div class="perf-vote-modal carne-vote-modal" role="dialog" aria-modal="true">
       <div class="perf-vote-head">
-        <div class="perf-vote-kicker">Avalie o churrasco 🍢</div>
+        <div class="perf-vote-kicker">Avalie o churrasco 🥩</div>
       </div>
       <div class="carne-vote-duo">
         ${renderAvatarForApp(duo.player1, 'perf-vote-avatar')}
@@ -2657,7 +2657,7 @@ async function submitCarneVote() {
   carneVoteStatus = 'voted';
   carneVote = null;
   unmountCarneVote();
-  showToast('Nota do churrasco enviada. Valeu! 🍢', 'success');
+  showToast('Nota do churrasco enviada. Valeu! 🥩', 'success');
 }
 // =================== fim votação do churrasco ===================
 
@@ -3530,7 +3530,7 @@ function renderHome(snapshot, currentPlayer) {
   ].filter(Boolean).join(', ') || 'Nenhum goleiro confirmado';
   const homeNoticeItems = [
     carneNotification ? {
-      icon: '🍢',
+      icon: '🥩',
       title: 'Dupla da carne',
       text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-'),
       html: '<div class="notification-content-carne">'
