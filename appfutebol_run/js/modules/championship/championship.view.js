@@ -19,6 +19,7 @@ import {
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml } from '../players/players.service.js';
+import { getCachedRatings, playerRatingAverages, duoRatingAverages } from '../../services/ratings.service.js';
 
 function normalizeChampionshipPlayerName(value) {
   return String(value || '')
@@ -148,6 +149,11 @@ function renderRoundMatrix(snapshot) {
   const rounds = getEffectiveChampionshipResults(snapshot);
   const removedByGameKey = buildRemovedByGameKey(snapshot);
   const pointsByStatus = { win: 3, draw: 2, loss: 1, no_play: 0 };
+  // Nota média de desempenho por jogador (todas as notas do campeonato vigente).
+  // Sem filtrar por rodada lançada — a votação acontece logo após o jogo, antes
+  // do resultado ser lançado, então restringir aos game_keys com resultado
+  // esconderia as notas recém-dadas.
+  const playerAvg = playerRatingAverages(getCachedRatings());
 
   return `
     <div class="championship-table-wrap championship-matrix-wrap">
@@ -157,6 +163,7 @@ function renderRoundMatrix(snapshot) {
             <th class="cm-freeze cm-c1">Pos.</th>
             <th class="cm-freeze cm-c2 championship-matrix-name-col">Jogador</th>
             <th class="cm-freeze cm-c3">Pts</th>
+            <th title="Nota média de desempenho (votação)">★</th>
             <th>V</th><th>E</th><th>D</th><th>WO</th><th>Ap</th>
             ${rounds.map((round) => `<th title="${escapeHtml(round.date)}">${shortRoundLabel(round.date)}</th>`).join('')}
           </tr>
@@ -169,6 +176,7 @@ function renderRoundMatrix(snapshot) {
                 <td class="cm-freeze cm-c1"><span class="rank-badge">${row.rank}</span></td>
                 <td class="cm-freeze cm-c2 championship-player-name championship-matrix-name-col"><div class="cm-name">${renderChampionshipPlayerAvatar(snapshot, row)}<span>${escapeHtml(row.name)}</span></div></td>
                 <td class="cm-freeze cm-c3"><strong>${row.points}</strong></td>
+                <td class="championship-nota-cell">${playerAvg[String(row.player_id)] ? `<span class="championship-nota" title="${playerAvg[String(row.player_id)].votes} voto(s)">${playerAvg[String(row.player_id)].avg.toFixed(1)}</span>` : '<span class="championship-nota is-empty">–</span>'}</td>
                 <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
                 <td>${ap === null ? '–' : `${ap}%`}</td>
                 ${rounds.map((round) => {
@@ -393,6 +401,46 @@ function renderHistoricalBlock(snapshot, ) {
   `;
 }
 
+// Ranking dos churrascos do CICLO atual do rodízio (N duplas = N semanas).
+function renderChurrascoRanking(snapshot) {
+  const churras = getCachedRatings().filter((r) => r.kind === 'churrasco');
+  if (!churras.length) {
+    return `
+      <section class="card">
+        <div class="card-title">Ranking dos churrascos 🥩</div>
+        <div class="empty-inline">Ainda não há notas de churrasco.</div>
+      </section>`;
+  }
+  const n = ((snapshot.carne || []).find((e) => e.type === 'carne_rotation')?.pairs || []).length;
+  // Jogos com churrasco, mais recentes primeiro → recorta o ciclo atual (N jogos).
+  const lastByGame = {};
+  for (const r of churras) {
+    const g = String(r.game_key);
+    if (!lastByGame[g] || String(r.created_at) > String(lastByGame[g])) lastByGame[g] = r.created_at;
+  }
+  const recentGames = Object.keys(lastByGame).sort((a, b) => String(lastByGame[b]).localeCompare(String(lastByGame[a])));
+  const cycleGames = n ? recentGames.slice(0, n) : recentGames;
+  const duos = duoRatingAverages(churras, cycleGames);
+  const name = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id))?.name || 'Jogador';
+  const list = Object.entries(duos)
+    .map(([key, agg]) => { const [a, b] = String(key).split('|'); return { names: `${name(a)} e ${name(b)}`, avg: agg.avg, votes: agg.votes }; })
+    .sort((x, y) => y.avg - x.avg);
+  return `
+    <section class="card">
+      <div class="card-title">Ranking dos churrascos 🥩</div>
+      <p class="footer-note">Média da dupla no ciclo atual do rodízio${n ? ` (${n} duplas)` : ''}.</p>
+      <div class="churrasco-rank-list">
+        ${list.map((d, i) => `
+          <div class="churrasco-rank-row">
+            <span class="churrasco-rank-pos">${i + 1}</span>
+            <span class="churrasco-rank-name">${escapeHtml(d.names)}</span>
+            <span class="churrasco-rank-avg">${d.avg.toFixed(1)} <small>${d.votes} voto${d.votes === 1 ? '' : 's'}</small></span>
+          </div>`).join('')}
+      </div>
+    </section>
+  `;
+}
+
 export function renderChampionshipScreen(snapshot, currentPlayer) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const currentRanking = calculateCurrentRanking(snapshot);
@@ -413,6 +461,8 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
         <p class="footer-note">Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.</p>
         ${renderRoundMatrix(snapshot)}
       </section>
+
+      ${renderChurrascoRanking(snapshot)}
 
       ${renderResultForm(snapshot, currentPlayer)}
 

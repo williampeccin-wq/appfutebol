@@ -57,6 +57,48 @@ export async function submitRatings(rows) {
   }
 }
 
+// ---- Cache em memória (para os rankings na aba Campeonato) ----
+const _cache = { rows: [], loaded: false, loading: false };
+
+export function getCachedRatings() { return _cache.rows; }
+
+export async function loadRatingsCache(force = false) {
+  if (_cache.loading) return _cache;
+  if (_cache.loaded && !force) return _cache;
+  _cache.loading = true;
+  const res = await fetchRatings({});
+  _cache.loading = false;
+  if (res.ok) { _cache.rows = res.rows; _cache.loaded = true; }
+  return _cache;
+}
+
+// Média/qtde por ALVO de um tipo, restrito (opcionalmente) a um conjunto de jogos.
+function aggregateByTarget(rows, kind, gameKeys) {
+  const set = gameKeys && gameKeys.length ? new Set(gameKeys.map(String)) : null;
+  const agg = {};
+  for (const r of (rows || [])) {
+    if (r.kind !== kind) continue;
+    if (set && !set.has(String(r.game_key))) continue;
+    const id = String(r.target_id);
+    if (!agg[id]) agg[id] = { sum: 0, n: 0 };
+    agg[id].sum += Number(r.score) || 0;
+    agg[id].n += 1;
+  }
+  const out = {};
+  for (const id in agg) out[id] = { avg: agg[id].sum / agg[id].n, votes: agg[id].n };
+  return out;
+}
+
+// Média por jogador (desempenho). gameKeys = jogos do campeonato (ou vazio = tudo).
+export function playerRatingAverages(rows, gameKeys = null) {
+  return aggregateByTarget(rows, 'desempenho', gameKeys);
+}
+
+// Média por dupla (churrasco). gameKeys = jogos do ciclo (ou vazio = tudo).
+export function duoRatingAverages(rows, gameKeys = null) {
+  return aggregateByTarget(rows, 'churrasco', gameKeys);
+}
+
 // Lê votos (filtra por kind e/ou game_key). Sem filtro, traz tudo.
 export async function fetchRatings({ kind = null, gameKey = null } = {}) {
   const { url, anonKey } = getSupabase();

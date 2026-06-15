@@ -6810,3 +6810,24 @@ body.vote-open { overflow: hidden; }
   font-size: 100px; opacity: 0.10;
 }
 .carne-vote-modal .perf-vote-kicker { color: #fdba74; }
+
+/* Nota média de desempenho na classificação + ranking dos churrascos. */
+.championship-nota-cell { text-align: center; }
+.championship-nota { font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.championship-nota.is-empty { color: var(--hfc-text-muted, #9fb0cc); font-weight: 600; }
+.churrasco-rank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.churrasco-rank-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--hfc-glass-2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+}
+.churrasco-rank-pos {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px;
+  background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200, #ffd980);
+}
+.churrasco-rank-name { flex: 1 1 auto; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.churrasco-rank-avg { flex: 0 0 auto; font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.churrasco-rank-avg small { font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); margin-left: 4px; }

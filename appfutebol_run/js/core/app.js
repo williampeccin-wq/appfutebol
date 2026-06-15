@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.80.2-meaticon';
+window.__HARMONIA_BUILD__ = 'v1.81.0-ranking';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2002,7 +2002,16 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
-import { submitRatings, fetchRatings } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache } from '../services/ratings.service.js';
+
+// Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
+// re-renderiza quando chegarem.
+let _ratingsLoadStarted = false;
+function ensureRatingsLoaded() {
+  if (_ratingsLoadStarted) return;
+  _ratingsLoadStarted = true;
+  loadRatingsCache().then(() => render(getState())).catch(() => {});
+}
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
 // o servidor deduplica por (jogo + jogador), então é seguro chamar de qualquer
@@ -2680,6 +2689,7 @@ function renderInner(snapshot) {
 
   const requestedTab = snapshot.ui.currentTab || 'home';
   const activeTab = !canAccessConfig(currentPlayer) && requestedTab === 'config' ? 'home' : requestedTab;
+  if (activeTab === 'championship') ensureRatingsLoaded();
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
