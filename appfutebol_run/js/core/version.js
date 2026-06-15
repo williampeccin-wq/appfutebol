@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.82.0-aura';
+export const APP_VERSION = 'v1.83.0-historico';
