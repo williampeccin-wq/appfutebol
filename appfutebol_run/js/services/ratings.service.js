@@ -68,9 +68,25 @@ export async function loadRatingsCache(force = false) {
   _cache.loading = true;
   const res = await fetchRatings({});
   _cache.loading = false;
-  if (res.ok) { _cache.rows = res.rows; _cache.loaded = true; }
+  if (res.ok) { _cache.rows = res.rows; _cache.loaded = true; recomputeTopRated(); }
   return _cache;
 }
+
+// Jogador melhor votado (maior média de desempenho com um mínimo de votos).
+// Computado quando o cache carrega; lido barato por cada avatar (áurea).
+const TOP_MIN_VOTES = 3;
+let _topRatedId = null;
+function recomputeTopRated() {
+  const avgs = playerRatingAverages(_cache.rows);
+  let bestId = null, bestAvg = -1, bestVotes = 0;
+  for (const id in avgs) {
+    const { avg, votes } = avgs[id];
+    if (votes < TOP_MIN_VOTES) continue;
+    if (avg > bestAvg || (avg === bestAvg && votes > bestVotes)) { bestId = id; bestAvg = avg; bestVotes = votes; }
+  }
+  _topRatedId = bestId;
+}
+export function getTopRatedPlayerId() { return _topRatedId; }
 
 // Média/qtde por ALVO de um tipo, restrito (opcionalmente) a um conjunto de jogos.
 function aggregateByTarget(rows, kind, gameKeys) {

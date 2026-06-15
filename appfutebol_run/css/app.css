@@ -6831,3 +6831,14 @@ body.vote-open { overflow: hidden; }
 .churrasco-rank-name { flex: 1 1 auto; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .churrasco-rank-avg { flex: 0 0 auto; font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
 .churrasco-rank-avg small { font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); margin-left: 4px; }
+
+/* Áurea no avatar do jogador melhor votado (aparece em todo lugar). */
+.avatar.avatar-aura {
+  box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 14px 3px rgba(240, 165, 0, 0.55);
+  animation: avatar-aura-pulse 2.1s ease-in-out infinite;
+}
+@keyframes avatar-aura-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 10px 2px rgba(240, 165, 0, 0.45); }
+  50% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 20px 6px rgba(240, 165, 0, 0.72); }
+}
+@media (prefers-reduced-motion: reduce) { .avatar.avatar-aura { animation: none; } }

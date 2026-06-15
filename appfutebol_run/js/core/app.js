@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.81.0-ranking';
+window.__HARMONIA_BUILD__ = 'v1.82.0-aura';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -461,12 +461,13 @@ function bindAvatarLightbox() {
 function renderAvatarForApp(player, extraClass = '') {
   const photo = getPlayerPhoto(player);
   const initials = getInitials(player?.name);
+  const aura = (player?.id && String(player.id) === String(getTopRatedPlayerId())) ? ' avatar-aura' : '';
 
   if (photo) {
-    return `<div class="avatar avatar-photo ${extraClass}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
+    return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
   }
 
-  return `<div class="avatar ${extraClass}">${initials}</div>`;
+  return `<div class="avatar ${extraClass}${aura}">${initials}</div>`;
 }
 
 
@@ -2002,7 +2003,7 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
 // re-renderiza quando chegarem.
@@ -2689,7 +2690,7 @@ function renderInner(snapshot) {
 
   const requestedTab = snapshot.ui.currentTab || 'home';
   const activeTab = !canAccessConfig(currentPlayer) && requestedTab === 'config' ? 'home' : requestedTab;
-  if (activeTab === 'championship') ensureRatingsLoaded();
+  ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
