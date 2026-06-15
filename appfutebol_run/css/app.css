@@ -6778,3 +6778,35 @@ body.vote-open { overflow: hidden; }
 .player-compact-text .row-subtitle { font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-compact-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .carne-edit-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* ===== Identidade visual distinta das votações (jogo x churrasco) ===== */
+/* Marca d'água atrás do conteúdo nos dois modais. */
+.game-vote-modal, .carne-vote-modal { overflow: hidden; }
+.game-vote-modal > *, .carne-vote-modal > * { position: relative; z-index: 1; }
+.game-vote-modal::before, .carne-vote-modal::before, .carne-vote-modal::after {
+  position: absolute; line-height: 1; pointer-events: none; z-index: 0;
+}
+
+/* Jogo: mantém o azul, com uma bola d'água sutil. */
+.game-vote-modal::before {
+  content: '⚽';
+  right: -14px; top: -18px;
+  font-size: 130px; opacity: 0.07; transform: rotate(-12deg);
+}
+
+/* Churrasco: fundo quente (brasa) + espetinho e fogo d'água. */
+.carne-vote-modal {
+  background: linear-gradient(155deg, rgba(124, 45, 18, 0.80), rgba(35, 14, 8, 0.95));
+  border-color: rgba(245, 158, 11, 0.38);
+}
+.carne-vote-modal::before {
+  content: '🍢';
+  right: -8px; top: -24px;
+  font-size: 142px; opacity: 0.12; transform: rotate(-15deg);
+}
+.carne-vote-modal::after {
+  content: '🔥';
+  left: -16px; bottom: -26px;
+  font-size: 100px; opacity: 0.10;
+}
+.carne-vote-modal .perf-vote-kicker { color: #fdba74; }

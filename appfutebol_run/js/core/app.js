@@ -2,7 +2,7 @@ import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js'
 import { auditPresenceProjection } from '../domain/presence.audit.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
-window.__HARMONIA_BUILD__ = 'v1.80.0-churrasco';
+window.__HARMONIA_BUILD__ = 'v1.80.1-votecolors';
 
 function getDisplayVersion() {
   return String(APP_VERSION || '').replace(/^v/, '').split('-')[0];
@@ -2459,9 +2459,9 @@ function renderPerfVoteCard() {
   const allRated = perfVote.targets.every((t) => perfVote.scores[String(t.id)] != null);
   el.innerHTML = `
     <div class="perf-vote-backdrop"></div>
-    <div class="perf-vote-modal" role="dialog" aria-modal="true">
+    <div class="perf-vote-modal game-vote-modal" role="dialog" aria-modal="true">
       <div class="perf-vote-head">
-        <div class="perf-vote-kicker">Avalie o jogo</div>
+        <div class="perf-vote-kicker">Avalie o jogo ⚽</div>
         <div class="perf-vote-progress">${i + 1} de ${total}</div>
       </div>
       <div class="perf-vote-player">
@@ -2611,7 +2611,7 @@ function renderCarneVoteCard() {
   const duo = carneVote.duo;
   el.innerHTML = `
     <div class="perf-vote-backdrop"></div>
-    <div class="perf-vote-modal" role="dialog" aria-modal="true">
+    <div class="perf-vote-modal carne-vote-modal" role="dialog" aria-modal="true">
       <div class="perf-vote-head">
         <div class="perf-vote-kicker">Avalie o churrasco 🍢</div>
       </div>

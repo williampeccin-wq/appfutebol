@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.80.0-churrasco';
+export const APP_VERSION = 'v1.80.1-votecolors';
