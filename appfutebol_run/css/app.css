@@ -6060,12 +6060,6 @@ body {
   color: #1a1200;
   background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
 }
-.bnav-emoji {
-  font-size: 21px;
-  line-height: 1;
-  display: inline-flex;
-  filter: saturate(1.05);
-}
 
 /* Campeonato: congelar cabeçalho da matriz (scroll box + thead sticky) */
 .content--championship .championship-matrix-wrap {

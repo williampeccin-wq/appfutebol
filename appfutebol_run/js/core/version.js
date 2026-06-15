@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.84.0-campeonato-nav';
+export const APP_VERSION = 'v1.84.1-carne-icon';
