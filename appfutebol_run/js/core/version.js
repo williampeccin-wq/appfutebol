@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.83.1-churrasco-carne';
+export const APP_VERSION = 'v1.84.0-campeonato-nav';

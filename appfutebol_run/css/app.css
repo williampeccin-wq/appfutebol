@@ -482,6 +482,28 @@ button {
   margin-bottom: 12px;
 }
 
+/* Cards colapsáveis (aba Campeonato) */
+.champ-collapse > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.champ-collapse > summary::-webkit-details-marker { display: none; }
+.champ-collapse > summary .card-title { margin-bottom: 0; flex: 1 1 auto; }
+.champ-collapse-chevron {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--gray-500);
+  border-bottom: 2px solid var(--gray-500);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+}
+.champ-collapse[open] > summary .champ-collapse-chevron { transform: rotate(45deg); }
+.champ-collapse-body { margin-top: 14px; }
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -6037,6 +6059,12 @@ body {
 .bnav-btn.is-active {
   color: #1a1200;
   background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
+}
+.bnav-emoji {
+  font-size: 21px;
+  line-height: 1;
+  display: inline-flex;
+  filter: saturate(1.05);
 }
 
 /* Campeonato: congelar cabeçalho da matriz (scroll box + thead sticky) */

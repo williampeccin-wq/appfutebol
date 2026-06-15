@@ -226,14 +226,12 @@ function renderResultForm(snapshot, currentPlayer) {
   }).join('');
 
   return `
-    <section class="card championship-result-card championship-result-card-v2">
-      <div class="championship-result-header-v2">
-        <div class="championship-result-icon-v2">🏆</div>
-        <div>
-          <div class="card-title">Lançar resultado do jogo</div>
-          <p class="championship-result-subtitle-v2">Selecione o sorteio correto. O lançamento fica auditável e vinculado ao sorteio, não apenas ao último jogo aberto.</p>
-        </div>
-      </div>
+    <details class="card championship-result-card championship-result-card-v2 champ-collapse">
+      <summary class="champ-collapse-summary">
+        <span class="card-title">🏆 Lançar resultado do jogo</span>
+        <span class="champ-collapse-chevron" aria-hidden="true"></span>
+      </summary>
+      <p class="championship-result-subtitle-v2">Selecione o sorteio correto. O lançamento fica auditável e vinculado ao sorteio, não apenas ao último jogo aberto.</p>
 
       <div class="championship-result-badges-v2">
         <span class="championship-pill-v2 is-blue">Sorteios disponíveis: ${draws.length}</span>
@@ -279,15 +277,19 @@ function renderResultForm(snapshot, currentPlayer) {
       <button class="btn btn-primary championship-save-result-btn-v2" type="button" data-action="save-championship-result">Salvar resultado</button>
 
       <div class="championship-result-info-v2"><strong>i</strong><span>Se este sorteio já tiver resultado, salvar novamente substitui o lançamento anterior.</span></div>
-    </section>`;
+    </details>`;
 }
 function renderResultsHistory(snapshot, currentPlayer) {
   const results = getEffectiveChampionshipResults(snapshot);
   const players = getFootballPlayers(snapshot);
 
   return `
-    <section class="card">
-      <div class="card-title">Auditoria dos jogos lançados</div>
+    <details class="card champ-collapse">
+      <summary class="champ-collapse-summary">
+        <span class="card-title">Auditoria dos jogos lançados</span>
+        <span class="champ-collapse-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="champ-collapse-body">
       <p class="footer-note">Cada rodada abaixo é usada para calcular a classificação. A importação inicial veio da planilha Rei da Quadra.</p>
       ${results.length ? `
         <div class="championship-audit-list">
@@ -339,7 +341,8 @@ function renderResultsHistory(snapshot, currentPlayer) {
           }).join('')}
         </div>
       ` : '<div class="empty-state">Nenhum resultado lançado para o Inverno 26.</div>'}
-    </section>
+      </div>
+    </details>
   `;
 }
 
@@ -401,12 +404,25 @@ function renderHistoricalBlock(snapshot, ) {
   `;
 }
 
+// Card colapsável (details/summary) com visual de card padrão + chevron.
+function collapsibleCard({ title, note = '', body = '', open = false, extraClass = '' }) {
+  return `
+    <details class="card champ-collapse ${extraClass}"${open ? ' open' : ''}>
+      <summary class="champ-collapse-summary">
+        <span class="card-title">${title}</span>
+        <span class="champ-collapse-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="champ-collapse-body">
+        ${note ? `<p class="footer-note">${note}</p>` : ''}
+        ${body}
+      </div>
+    </details>`;
+}
+
 export function renderChampionshipScreen(snapshot, currentPlayer) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
-  const currentRanking = calculateCurrentRanking(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
-  const manualResults = getManualChampionshipResults(snapshot);
 
   return `
     <section class="section-stack championship-screen">
@@ -416,32 +432,23 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      <section class="card championship-current-ranking-card">
-        <div class="card-title">Classificação atual · Inverno 26</div>
-        <p class="footer-note">Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.</p>
-        ${renderRoundMatrix(snapshot)}
-      </section>
-
       ${renderResultForm(snapshot, currentPlayer)}
 
-      <section class="card championship-launch-summary-card">
-        <div class="card-title">Controle de lançamentos</div>
-        <p class="footer-note">Cada resultado fica vinculado ao sorteio escolhido, permitindo auditar jogo por jogo.</p>
-        <div class="championship-launch-summary-grid">
-          <div><strong>${manualResults.length}</strong><span>lançamentos manuais</span></div>
-          <div><strong>${Math.max(resultCount - manualResults.length, 0)}</strong><span>rodadas importadas</span></div>
-          <div><strong>${currentRanking.length}</strong><span>jogadores elegíveis</span></div>
-        </div>
-      </section>
+      ${collapsibleCard({
+        title: 'Classificação atual · Inverno 26',
+        note: 'Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.',
+        body: renderRoundMatrix(snapshot),
+        open: true,
+      })}
 
-      <section class="card">
-        <div class="card-title">Classificação anual · 2026</div>
-        <p class="footer-note">Soma do Abertura 26 importado do histórico com o Inverno 26 calculado pelo app.</p>
-        ${renderRankingTable(annualRanking, { annual: true, snapshot })}
-      </section>
+      ${collapsibleCard({
+        title: 'Classificação anual · 2026',
+        note: 'Soma do Abertura 26 importado do histórico com o Inverno 26 calculado pelo app.',
+        body: renderRankingTable(annualRanking, { annual: true, snapshot }),
+      })}
 
-      ${renderResultsHistory(snapshot, currentPlayer)}
       ${renderHistoricalBlock(snapshot, )}
+      ${renderResultsHistory(snapshot, currentPlayer)}
     </section>
   `;
 }
