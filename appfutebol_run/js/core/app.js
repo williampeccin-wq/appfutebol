@@ -2004,11 +2004,13 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
+import { isVotingEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
 // re-renderiza quando chegarem.
 let _ratingsLoadStarted = false;
 function ensureRatingsLoaded() {
+  if (!isVotingEnabled()) return;
   if (_ratingsLoadStarted) return;
   _ratingsLoadStarted = true;
   loadRatingsCache().then(() => render(getState())).catch(() => {});
@@ -2370,6 +2372,7 @@ function getInGamePlayers(snapshot, game) {
 }
 
 async function maybeShowPerfVote(snapshot, currentPlayer) {
+  if (!isVotingEnabled()) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
   const game = getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
@@ -2556,6 +2559,7 @@ function getChurrascoDuo(snapshot, game) {
 }
 
 async function maybeShowCarneVote(snapshot, currentPlayer) {
+  if (!isVotingEnabled()) { unmountCarneVote(); return; }
   if (!currentPlayer) { unmountCarneVote(); return; }
   // Desempenho tem prioridade: se o modal dele está aberto, espera.
   if (document.getElementById('perf-vote-overlay')) return;

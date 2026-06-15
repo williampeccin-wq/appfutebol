@@ -20,6 +20,7 @@ import {
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml } from '../players/players.service.js';
 import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
+import { isVotingEnabled } from '../../core/flags.js';
 
 function normalizeChampionshipPlayerName(value) {
   return String(value || '')
@@ -153,7 +154,8 @@ function renderRoundMatrix(snapshot) {
   // Sem filtrar por rodada lançada — a votação acontece logo após o jogo, antes
   // do resultado ser lançado, então restringir aos game_keys com resultado
   // esconderia as notas recém-dadas.
-  const playerAvg = playerRatingAverages(getCachedRatings());
+  const showNota = isVotingEnabled();
+  const playerAvg = showNota ? playerRatingAverages(getCachedRatings()) : {};
 
   return `
     <div class="championship-table-wrap championship-matrix-wrap">
@@ -163,7 +165,7 @@ function renderRoundMatrix(snapshot) {
             <th class="cm-freeze cm-c1">Pos.</th>
             <th class="cm-freeze cm-c2 championship-matrix-name-col">Jogador</th>
             <th class="cm-freeze cm-c3">Pts</th>
-            <th title="Nota média de desempenho (votação)">★</th>
+            ${showNota ? '<th title="Nota média de desempenho (votação)">★</th>' : ''}
             <th>V</th><th>E</th><th>D</th><th>WO</th><th>Ap</th>
             ${rounds.map((round) => `<th title="${escapeHtml(round.date)}">${shortRoundLabel(round.date)}</th>`).join('')}
           </tr>
@@ -176,7 +178,7 @@ function renderRoundMatrix(snapshot) {
                 <td class="cm-freeze cm-c1"><span class="rank-badge">${row.rank}</span></td>
                 <td class="cm-freeze cm-c2 championship-player-name championship-matrix-name-col"><div class="cm-name">${renderChampionshipPlayerAvatar(snapshot, row)}<span>${escapeHtml(row.name)}</span></div></td>
                 <td class="cm-freeze cm-c3"><strong>${row.points}</strong></td>
-                <td class="championship-nota-cell">${playerAvg[String(row.player_id)] ? `<span class="championship-nota" title="${playerAvg[String(row.player_id)].votes} voto(s)">${playerAvg[String(row.player_id)].avg.toFixed(1)}</span>` : '<span class="championship-nota is-empty">–</span>'}</td>
+                ${showNota ? `<td class="championship-nota-cell">${playerAvg[String(row.player_id)] ? `<span class="championship-nota" title="${playerAvg[String(row.player_id)].votes} voto(s)">${playerAvg[String(row.player_id)].avg.toFixed(1)}</span>` : '<span class="championship-nota is-empty">–</span>'}</td>` : ''}
                 <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
                 <td>${ap === null ? '–' : `${ap}%`}</td>
                 ${rounds.map((round) => {

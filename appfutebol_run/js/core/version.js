@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.84.3-churrasco-icon';
+export const APP_VERSION = 'v1.85.0-voting-flag';

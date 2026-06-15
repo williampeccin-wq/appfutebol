@@ -13,6 +13,7 @@ import {
   listPlayers,
 } from './players.service.js';
 import { getCachedRatings, duoRatingAverages } from '../../services/ratings.service.js';
+import { isVotingEnabled } from '../../core/flags.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
@@ -570,6 +571,7 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
 // Ranking dos churrascos do CICLO atual do rodízio (N duplas = N semanas).
 // Vive na aba Carne (lar natural do rodízio de duplas).
 function renderChurrascoRanking(snapshot) {
+  if (!isVotingEnabled()) return '';
   const churras = getCachedRatings().filter((r) => r.kind === 'churrasco');
   if (!churras.length) {
     return `
