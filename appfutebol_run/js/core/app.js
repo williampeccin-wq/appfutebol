@@ -1176,11 +1176,7 @@ document.addEventListener("click", async (e) => {
     if (!isPasskeyEnabled()) return;
     showToast('Siga as instruções do aparelho para criar a passkey…', 'info');
     const res = await registerPasskeyForCurrentUser();
-    if (res.ok) {
-      // Marca que ESTE aparelho tem passkey → habilita o auto-disparo no boot.
-      try { localStorage.setItem(PASSKEY_HINT_KEY, '1'); } catch (_) {}
-    }
-    showToast(res.ok ? 'Passkey ativada neste aparelho! Da próxima vez que abrir, já entra pela biometria.' : res.message, res.ok ? 'success' : 'error');
+    showToast(res.ok ? 'Passkey ativada! Na próxima vez, é só tocar no campo de telefone e escolher a passkey.' : res.message, res.ok ? 'success' : 'error');
     return;
   }
 
@@ -2025,7 +2021,7 @@ import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
-import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported } from '../services/passkey.service.js';
+import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -2169,20 +2165,22 @@ function requireCriticalOperationAllowed(operation, trigger = null) {
   return false;
 }
 
-const PASSKEY_HINT_KEY = 'harmonia_passkey_hint';
-
-// Dispara o login por passkey no boot, só quando: sem sessão + flag ligada +
-// device suporta + ESTE aparelho já registrou uma passkey (dica local). Assim
-// só auto-dispara em quem tem passkey — não incomoda os demais. Fire-and-forget:
-// roda por cima da tela de login já pintada; cancelar/erro fica no formulário.
-async function maybeAutoPasskeyLogin() {
+// Conditional UI (autofill) de passkey na tela de login: inicia uma requisição
+// "conditional" que NÃO mostra modal — fica pendente até o usuário tocar no
+// campo de telefone e escolher a passkey no autofill (Face ID/digital) → loga.
+// Sem botão e sem gesto de boot (que o navegador bloqueia). Só uma vez por boot.
+let _passkeyConditionalStarted = false;
+async function startPasskeyAutofill() {
   try {
+    if (_passkeyConditionalStarted) return;
     if (getCurrentPlayer()) return;
     if (!isPasskeyEnabled() || !passkeySupported()) return;
-    if (localStorage.getItem(PASSKEY_HINT_KEY) !== '1') return;
-    const res = await signInWithPasskey();
+    if (!(await conditionalMediationAvailable())) return;
+    _passkeyConditionalStarted = true;
+    const res = await signInWithPasskey({ conditional: true });
     if (res.ok) await loginWithPasskeySession(res.session); // replaceState -> re-render
-  } catch (_) { /* cancelado/sem passkey: permanece na tela de login */ }
+    else _passkeyConditionalStarted = false; // libera nova tentativa se falhou
+  } catch (_) { _passkeyConditionalStarted = false; }
 }
 
 async function init() {
@@ -2223,10 +2221,9 @@ async function initInner() {
   bindGlobalSystemEvents();
   startRemoteSync();
 
-  // Login por passkey "embutido": se não há sessão e ESTE aparelho já registrou
-  // uma passkey (dica local), dispara a cerimônia no boot (Face ID/digital) e
-  // loga direto — sem botão extra. Cancelar mantém o telefone+senha à mostra.
-  maybeAutoPasskeyLogin();
+  // Passkey "embutida": prepara o autofill (Conditional UI). A passkey aparece
+  // ao tocar no campo de telefone — sem botão. Não bloqueia o boot.
+  startPasskeyAutofill();
 
   // PWA / Web Push: registra o service worker em segundo plano (não bloqueia o
   // boot) e re-salva a inscrição existente no servidor (cura "inscrito no

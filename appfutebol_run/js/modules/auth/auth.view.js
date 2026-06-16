@@ -42,7 +42,7 @@ function renderLoginForm() {
           name="phone"
           type="tel"
           inputmode="numeric"
-          autocomplete="username"
+          autocomplete="username webauthn"
           autocapitalize="none"
           autocorrect="off"
           spellcheck="false"
