@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.87.1-cleanup';
+export const APP_VERSION = 'v1.88.0-convidado';
