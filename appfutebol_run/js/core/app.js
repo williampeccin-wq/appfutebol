@@ -1172,6 +1172,14 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "register-passkey") {
+    if (!isPasskeyEnabled()) return;
+    showToast('Siga as instruções do aparelho para criar a passkey…', 'info');
+    const res = await registerPasskeyForCurrentUser();
+    showToast(res.ok ? 'Passkey ativada neste aparelho! Já dá pra entrar com ela.' : res.message, res.ok ? 'success' : 'error');
+    return;
+  }
+
   if (action === "save-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
     if (!authzIsAdmin(current)) {
@@ -2012,7 +2020,8 @@ import { getState as loadPersistedState, saveState as savePersistedState, getSto
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
+import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -2025,7 +2034,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
-import { isVotingEnabled } from './flags.js';
+import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
 // re-renderiza quando chegarem.
@@ -2842,6 +2851,26 @@ function bindAuthEvents() {
           },
         });
       }
+    });
+  }
+
+  const passkeyLoginBtn = appElement.querySelector('#passkey-login-btn');
+  if (passkeyLoginBtn && !passkeySupported()) { passkeyLoginBtn.closest('.auth-passkey')?.remove(); }
+  if (passkeyLoginBtn && passkeySupported()) {
+    passkeyLoginBtn.addEventListener('click', async () => {
+      const original = passkeyLoginBtn.textContent;
+      passkeyLoginBtn.disabled = true;
+      passkeyLoginBtn.textContent = 'Entrando...';
+      const res = await signInWithPasskey();
+      if (res.ok) {
+        const adopted = await loginWithPasskeySession(res.session);
+        if (adopted.ok) return; // replaceState dentro de loginWithPasskeySession re-renderiza
+        patchState({ ui: { authMode: 'login', authMessage: { type: 'error', text: adopted.message } } });
+      } else {
+        patchState({ ui: { authMode: 'login', authMessage: { type: 'error', text: res.message } } });
+      }
+      passkeyLoginBtn.disabled = false;
+      passkeyLoginBtn.textContent = original;
     });
   }
 
@@ -3814,6 +3843,7 @@ function renderProfilePanel(activePlayer) {
 
       <div class="profile-view-actions">
         <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
+        ${isPasskeyEnabled() && authzIsAdmin(activePlayer) && passkeySupported() ? `<button class="btn btn-secondary" type="button" data-action="register-passkey">🔑 Ativar passkey neste aparelho</button>` : ''}
         <button class="btn btn-secondary" type="button" id="logout-button">Sair</button>
       </div>
     </section>

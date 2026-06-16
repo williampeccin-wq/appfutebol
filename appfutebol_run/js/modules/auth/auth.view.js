@@ -1,4 +1,5 @@
 import { APP_VERSION } from "../../core/version.js";
+import { isPasskeyEnabled } from "../../core/flags.js";
 
 export function renderAuthScreen(uiState = {}) {
   const mode = 'login';
@@ -74,6 +75,13 @@ function renderLoginForm() {
         <button class="btn btn-primary" type="submit">Entrar</button>
       </div>
     </form>
+    ${isPasskeyEnabled() ? `
+      <div class="auth-passkey">
+        <div class="auth-divider"><span>ou</span></div>
+        <button class="btn btn-secondary" type="button" id="passkey-login-btn">🔑 Entrar com passkey</button>
+        <small class="field-hint">Use a biometria/PIN do aparelho (se você já registrou uma passkey aqui).</small>
+      </div>
+    ` : ''}
   `;
 }
 
