@@ -204,6 +204,43 @@ function repairManualSnapshot(snapshot) {
   return reconciled.state;
 }
 
+// Fase 3a: sobe as fotos base64 existentes para o Storage e grava photo_url,
+// MANTENDO o base64 (fallback) até a verificação. Idempotente (pula quem já
+// tem photo_url ou cujo valor não é data:).
+async function migratePhotosToStorage(snapshot) {
+  const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+  const targets = players.filter((p) => typeof p?.photoDataUrl === 'string'
+    && p.photoDataUrl.startsWith('data:') && !p.photo_url);
+  if (!targets.length) { showToast('Nenhuma foto base64 pendente para migrar.', 'success'); return; }
+  let ok = 0, fail = 0;
+  for (const p of targets) {
+    const up = await uploadPlayerPhoto(p.photoDataUrl, p.id);
+    if (up.ok) { p.photo_url = up.url; ok += 1; } else { fail += 1; }
+  }
+  if (ok > 0) {
+    const safe = repairManualSnapshot(snapshot);
+    replaceState(safe);
+    savePersistedState(safe);
+    render(getState());
+  }
+  showToast(`Migração: ${ok} foto(s) no Storage${fail ? `, ${fail} falha(s)` : ''}.`, fail ? 'error' : 'success');
+}
+
+// Fase 3b: remove o base64 dos jogadores que JÁ têm photo_url. É aqui que o
+// payload do poll encolhe (o egress cai). Rodar só após conferir as fotos.
+function purgeBase64Photos(snapshot) {
+  const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+  const targets = players.filter((p) => p?.photo_url
+    && typeof p?.photoDataUrl === 'string' && p.photoDataUrl.startsWith('data:'));
+  if (!targets.length) { showToast('Nada a limpar (nenhum base64 sobre foto já migrada).', 'success'); return; }
+  targets.forEach((p) => { delete p.photoDataUrl; });
+  const safe = repairManualSnapshot(snapshot);
+  replaceState(safe);
+  savePersistedState(safe);
+  render(getState());
+  showToast(`Base64 removido de ${targets.length} foto(s). Payload reduzido.`, 'success');
+}
+
 
 function makeGameKeyFromForm(date, time) {
   const safeDate = String(date || '').replace(/[^0-9-]/g, '') || new Date().toISOString().slice(0, 10);
@@ -412,7 +449,7 @@ function normalizeSelfPosition(value) {
 
 
 function getPlayerPhoto(player) {
-  return player?.photoDataUrl || '';
+  return player?.photo_url || player?.photoDataUrl || '';
 }
 
 function openAvatarLightbox(src, alt) {
@@ -1392,6 +1429,18 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "migrate-photos-to-storage") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode migrar fotos')) return;
+    await migratePhotosToStorage(snapshot);
+    return;
+  }
+
+  if (action === "purge-base64-photos") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode limpar fotos')) return;
+    purgeBase64Photos(snapshot);
+    return;
+  }
+
   if (action === "test-overdue-reminders") {
     if (!requireAdmin(snapshot, 'Apenas administrador pode enviar lembretes')) return;
     showToast('Enviando lembretes de atraso…');
@@ -1591,11 +1640,19 @@ document.addEventListener("click", async (e) => {
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
-      playerToEdit.photoDataUrl = photoDataUrl;
+      const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
+      if (up.ok) { playerToEdit.photo_url = up.url; delete playerToEdit.photoDataUrl; }
+      else { playerToEdit.photoDataUrl = photoDataUrl; } // fallback: mantém base64
     }
   } else {
+    const newId = "p_" + Date.now();
+    let photoFields = {};
+    if (photoDataUrl) {
+      const up = await uploadPlayerPhoto(photoDataUrl, newId);
+      photoFields = up.ok ? { photo_url: up.url } : { photoDataUrl }; // fallback base64
+    }
     snapshot.players.push({
-      id: "p_" + Date.now(),
+      id: newId,
       name,
       phone,
       birthDate,
@@ -1604,7 +1661,7 @@ document.addEventListener("click", async (e) => {
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
       is_admin: !!is_admin,
-      photoDataUrl,
+      ...photoFields,
       active: true,
       deleted: false
     });
@@ -1702,6 +1759,14 @@ if (action === "update-self-profile") {
     return;
   }
 
+  // Só mexe na foto se houver uma nova selecionada. Sobe pro Storage; em falha,
+  // mantém base64 como fallback. Sem foto nova, preserva o que já existe.
+  let selfPhotoFields = null;
+  if (selfPhotoDataUrl) {
+    const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
+    selfPhotoFields = up.ok ? { photo_url: up.url, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
+  }
+
   snapshot.players = snapshot.players.map((player) => {
     if (player.id !== currentPlayer.id) return player;
     return {
@@ -1710,7 +1775,7 @@ if (action === "update-self-profile") {
       phone,
       birthDate,
       position: player.plays_football === false ? player.position : position,
-      photoDataUrl: selfPhotoDataUrl || player.photoDataUrl || '',
+      ...(selfPhotoFields || {}),
     };
   });
 
@@ -1989,7 +2054,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
@@ -4457,6 +4522,16 @@ function renderConfig(snapshot, currentPlayer) {
             <button class="btn btn-primary" type="submit">Salvar notificação</button>
           </div>
         </form>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Manutenção · Fotos no Storage</div>
+        <p class="footer-note">Mover as fotos (base64) dos registros para o Storage reduz o tráfego de dados (egress). Faça em 2 passos: migrar e, depois de conferir que as fotos aparecem, remover o base64.</p>
+        <p class="footer-note">Base64 pendente: <strong>${(snapshot.players || []).filter((p) => typeof p?.photoDataUrl === 'string' && p.photoDataUrl.startsWith('data:')).length}</strong> · Com URL no Storage: <strong>${(snapshot.players || []).filter((p) => p?.photo_url).length}</strong></p>
+        <div class="player-admin-actions game-config-actions">
+          <button class="btn btn-primary" type="button" data-action="migrate-photos-to-storage">1) Migrar fotos p/ Storage</button>
+          <button class="btn btn-secondary" type="button" data-action="purge-base64-photos">2) Remover base64 (após conferir)</button>
+        </div>
       </section>
     </section>
   `;

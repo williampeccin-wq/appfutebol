@@ -92,7 +92,9 @@ export function formatBirthDate(value) {
 
 
 export function getPlayerPhoto(player) {
-  return player?.photoDataUrl || '';
+  // Preferir a URL no Storage (cacheável, fora do payload do poll); base64 é
+  // fallback para fotos ainda não migradas.
+  return player?.photo_url || player?.photoDataUrl || '';
 }
 
 export function getAvatarHtml(player, extraClass = '') {
