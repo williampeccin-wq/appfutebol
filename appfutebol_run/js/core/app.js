@@ -1989,9 +1989,9 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, updateOwnPassword } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
@@ -2080,7 +2080,7 @@ function readAutoOpenFromForm(formData) {
 
 const appElement = document.getElementById('app');
 
-const REMOTE_SYNC_INTERVAL_MS = 4000;
+const REMOTE_SYNC_INTERVAL_MS = 6000;
 let isApplyingRemoteState = false;
 let lastDomainFingerprint = '';
 
@@ -2247,34 +2247,61 @@ async function handleExpiredSession() {
   patchState({ ui: { authMode: 'login', authMessage: { type: 'info', text: 'Sua sessão expirou por segurança. Faça login novamente para continuar.' } } });
 }
 
-function startRemoteSync() {
-  window.setInterval(async () => {
-    try {
-      // Never poll Supabase REST while the user is not operationally authenticated.
-      // With RLS closed, polling on the login screen correctly produces 401.
-      if (!getCurrentPlayer()) {
-        return;
+// Sonda de mudança barata + recuperação de sessão. Em 401/403, tenta renovar a
+// sessão UMA vez antes de declarar morta (evita logout por blip transitório).
+async function probeRemoteHeartbeat(activeGameKey) {
+  let hb = await fetchRemoteHeartbeat(activeGameKey);
+  if (!hb.ok && (hb.status === 401 || hb.status === 403)) {
+    const recovered = await refreshSession();
+    if (recovered) hb = await fetchRemoteHeartbeat(activeGameKey);
+  }
+  return hb;
+}
+
+let syncInFlight = false;
+async function syncRemoteOnce() {
+  // Guardas baratas ANTES de marcar "em andamento".
+  if (syncInFlight) return; // evita ciclos sobrepostos (e corrida de refresh de token)
+  // Nunca consulta a REST sem usuário autenticado (RLS fechada -> 401 no login).
+  if (!getCurrentPlayer()) return;
+  // Não sincroniza com a aba em segundo plano: corta requisições inúteis e
+  // alivia o banco no pico. Ao voltar ao foco, um sync imediato é disparado.
+  if (typeof document !== 'undefined' && document.hidden) return;
+  // Há escrita local ainda não confirmada no servidor: aplicar o remoto agora
+  // reverteria a edição do usuário (lost update). Pula este ciclo.
+  if (hasPendingRemoteWrites()) return;
+
+  syncInFlight = true;
+  try {
+    // Renova o token ANTES de expirar (só vai à rede perto do vencimento), para
+    // que a 1ª chamada após o vencimento não volte 401 e force logout.
+    await prepareStoredSession();
+
+    // Heartbeat barato: só faz a leitura completa quando algo realmente mudou.
+    // Passa o jogo ativo para o filtro de presença casar com o baseline do load.
+    const activeGameKey = getState()?.game?.game_key || getState()?.active_game_id || null;
+    const hb = await probeRemoteHeartbeat(activeGameKey);
+    if (!hb.ok) {
+      if (hb.status === 401 || hb.status === 403) await handleExpiredSession();
+      return; // demais falhas (rede/5xx/timeout): ignora o ciclo, sem deslogar.
+    }
+    const lastKnown = getLastRemoteUpdatedAt();
+    const changed = !lastKnown || !hb.updatedAt
+      || new Date(hb.updatedAt).getTime() > new Date(lastKnown).getTime();
+    if (!changed) return; // nada mudou no servidor — ciclo barato, sem full read.
+
+    // Algo mudou: aí sim faz a leitura completa.
+    const localSnapshot = getState();
+    const remote = await loadRemoteState();
+
+    if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
+      if (remote.status === 401 || remote.status === 403) {
+        await handleExpiredSession();
       }
+      return;
+    }
 
-      // Há escrita local ainda não confirmada no servidor: aplicar o remoto
-      // agora reverteria a edição do usuário (lost update). Pula este ciclo;
-      // quando a escrita drenar, o próximo ciclo sincroniza normalmente.
-      if (hasPendingRemoteWrites()) {
-        return;
-      }
-
-      const localSnapshot = getState();
-      const remote = await loadRemoteState();
-
-      if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
-        // Sessão do Supabase morta (token expirado/refresh inválido): em vez de
-        // ficar batendo 401 a cada ciclo, encerra a sessão e volta ao login.
-        if (remote.status === 401 || remote.status === 403) {
-          await handleExpiredSession();
-        }
-        return;
-      }
-
+    {
       const repairedRemote = validateAndRepairState(remote.state);
       let safeRemoteState = repairedRemote.state;
 
@@ -2310,11 +2337,23 @@ function startRemoteSync() {
       replaceState(mergeRemoteDomainWithLocalSession(safeRemoteState, localSnapshot));
       lastDomainFingerprint = remoteFingerprint;
       isApplyingRemoteState = false;
-    } catch (error) {
-      isApplyingRemoteState = false;
-      console.warn('[remote-sync] failed to sync remote state', error);
     }
-  }, REMOTE_SYNC_INTERVAL_MS);
+  } catch (error) {
+    isApplyingRemoteState = false;
+    console.warn('[remote-sync] failed to sync remote state', error);
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+function startRemoteSync() {
+  window.setInterval(syncRemoteOnce, REMOTE_SYNC_INTERVAL_MS);
+  // Ao voltar o foco à aba, sincroniza na hora (o poll pausa em segundo plano).
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) syncRemoteOnce();
+    });
+  }
 }
 
 function persist(snapshot) {
