@@ -480,6 +480,11 @@ function getActiveRentalGoalkeepersForApp(snapshot) {
   return Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [];
 }
 
+function getActiveGuestPlayersForApp(snapshot) {
+  const game = getActiveGameFromSnapshot(snapshot);
+  return Array.isArray(game?.guest_players) ? game.guest_players : [];
+}
+
 function buildConfirmedPresenceShareText(snapshot) {
   const game = getActiveGameFromSnapshot(snapshot);
   const confirmedIds = new Set(
@@ -2012,7 +2017,7 @@ import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
@@ -3196,6 +3201,26 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
+  appElement.querySelector('#add-guest-player-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('guest-player-name');
+    const result = addGuestPlayer(input?.value || '');
+    if (result.ok && input) input.value = '';
+    const safeSnapshot = repairManualSnapshot(getState());
+    savePersistedState(safeSnapshot);
+    render(safeSnapshot);
+    showToast(result.message, result.ok ? 'success' : 'error');
+  });
+
+  appElement.querySelectorAll('[data-action="remove-guest-player"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const result = removeGuestPlayer(button.dataset.id);
+      const safeSnapshot = repairManualSnapshot(getState());
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
+      showToast(result.message, result.ok ? 'success' : 'error');
+    });
+  });
+
   appElement.querySelectorAll('[data-action="move-drawn-player"]').forEach((button) => {
     button.addEventListener('click', () => {
       const result = moveDrawnPlayer(button.dataset.playerId, button.dataset.fromTeam);
@@ -3594,7 +3619,9 @@ function renderHome(snapshot, currentPlayer) {
   // Fonte única: usa diretamente o gameView (mesma regra do banner e da tela
   // de jogo). Removido o recálculo local que divergia do resto e do banco.
   const sortByName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR');
-  const homeLinePlayers = [...gameView.confirmed].sort(sortByName);
+  const homeGuestPlayers = Array.isArray(game && game.guest_players) ? game.guest_players : [];
+  // Convidados ocupam vaga de linha → entram na contagem e nas vagas restantes.
+  const homeLinePlayers = [...gameView.confirmed, ...homeGuestPlayers].sort(sortByName);
   const homeGoalkeepers = [...gameView.confirmedGoalkeepers].sort(sortByName);
   const homeRentalGoalkeepers = Array.isArray(game && game.rental_goalkeepers) ? game.rental_goalkeepers : [];
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
@@ -3797,7 +3824,11 @@ function renderWeeklyGame(snapshot, currentPlayer) {
   const confirmed = isConfirmed(currentPlayer?.id);
   const activeGame = view.game || getActiveGameFromSnapshot(snapshot);
   const capacity = activeGame?.max_players || 8;
-  const remaining = Math.max(capacity - view.confirmedCount, 0);
+  // Convidados ocupam vaga de linha → entram na contagem e nas vagas restantes,
+  // igual à lista de presença e à home.
+  const guestCount = (Array.isArray(activeGame?.guest_players) ? activeGame.guest_players : []).length;
+  const confirmedWithGuests = view.confirmedCount + guestCount;
+  const remaining = Math.max(capacity - confirmedWithGuests, 0);
   const canAct = currentPlayer && currentPlayer.plays_football !== false;
 
   return `
@@ -3807,10 +3838,10 @@ function renderWeeklyGame(snapshot, currentPlayer) {
           <div class="hero-label">Próximo jogo</div>
           <div class="hero-date">${formatDate(activeGame?.game_date)}</div>
           <div class="hero-meta">${activeGame?.game_time || '--:--'} · ${activeGame?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
-          <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
+          <div class="weekly-progress"><div style="width:${Math.min((confirmedWithGuests / capacity) * 100, 100)}%"></div></div>
           <div class="weekly-game-stats">
-            <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
-            <span>${remaining} vagas restantes</span>
+            <strong>${confirmedWithGuests} / ${capacity}</strong> confirmados
+            <span>${remaining} vaga${remaining === 1 ? '' : 's'} restante${remaining === 1 ? '' : 's'}</span>
           </div>
         </div>
       </section>
@@ -3955,6 +3986,10 @@ function renderPresenceList(snapshot, currentPlayer) {
   const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
   const totalGoalkeepers = goalkeeperPlayers.length + rentalGoalkeepers.length;
+  const guestPlayers = getActiveGuestPlayersForApp(snapshot);
+  const lineMax = Number(game?.max_players || 0);
+  const lineUsed = confirmedPlayers.length + guestPlayers.length;
+  const lineFull = lineMax > 0 && lineUsed >= lineMax;
   const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
   const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(String(player.id)) && !waitlistedIds.has(String(player.id)));
   const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayerForApp);
@@ -4032,6 +4067,22 @@ function renderPresenceList(snapshot, currentPlayer) {
     </div>
   `;
 
+  const renderGuestRow = (entry) => `
+    <div class="weekly-player-row guest-player-row">
+      <div class="players-switch-player">
+        <div class="avatar guest-avatar">👤</div>
+        <div>
+          <div class="row-title">${escapeHtml(entry.name)}</div>
+          <div class="row-subtitle">Convidado · temporário deste jogo</div>
+        </div>
+      </div>
+      <div class="weekly-player-meta">
+        <span class="tag is-warn">Convidado</span>
+        ${adminMode ? `<button class="btn btn-secondary btn-sm" type="button" data-action="remove-guest-player" data-id="${escapeHtml(entry.id)}">Remover</button>` : ''}
+      </div>
+    </div>
+  `;
+
   return `
     <section class="weekly-presence-card">
       <div class="card-title weekly-presence-main-title">Lista de presença</div>
@@ -4067,6 +4118,21 @@ function renderPresenceList(snapshot, currentPlayer) {
         <div class="weekly-copy-presence-actions">
           <button class="btn btn-secondary btn-sm" type="button" id="copy-confirmed-btn">Copiar presença para WhatsApp</button>
         </div>
+      </div>
+
+      <div class="weekly-presence-section guest-section">
+        <div class="weekly-presence-title">👤 Convidados (${guestPlayers.length})${lineMax ? ` · linha ${lineUsed}/${lineMax}` : ''}</div>
+        <div class="weekly-presence-stack">
+          ${guestPlayers.length
+            ? guestPlayers.map(renderGuestRow).join('')
+            : '<div class="empty-inline">Nenhum convidado adicionado.</div>'}
+        </div>
+        ${adminMode ? (lineFull
+          ? `<p class="footer-note">Linha completa (${lineUsed}/${lineMax}). ${guestPlayers.length ? 'O(s) convidado(s) acima já está(ão) dentro. ' : ''}Para adicionar outro, remova um jogador ou convidado.</p>`
+          : `<div class="rental-goalkeeper-form">
+              <input id="guest-player-name" class="input" type="text" placeholder="Nome do convidado" />
+              <button id="add-guest-player-btn" class="btn btn-secondary" type="button">Adicionar convidado</button>
+            </div>`) : ''}
       </div>
 
       <div class="weekly-presence-section waitlist-section">
@@ -4165,7 +4231,16 @@ function renderTeamDraw(snapshot, currentPlayer) {
       rental_goalkeeper: true,
     }));
 
-  const outsideDraw = [...confirmedPlayersOutsideDraw, ...rentalGoalkeepersOutsideDraw];
+  const guestPlayersOutsideDraw = (Array.isArray(game?.guest_players) ? game.guest_players : [])
+    .filter((entry) => !sortEntryIds.has(String(entry.id)))
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      position: 'meia',
+      guest: true,
+    }));
+
+  const outsideDraw = [...confirmedPlayersOutsideDraw, ...rentalGoalkeepersOutsideDraw, ...guestPlayersOutsideDraw];
 
   if (!sortResult) {
     return `
@@ -4202,8 +4277,8 @@ function renderTeamDraw(snapshot, currentPlayer) {
               <div class="placeholder-main team-draw-player-main">
                 ${renderAvatarForApp(player)}
                 <div class="team-draw-player-text">
-                  <div class="row-title">${(player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : ''}${player?.name || 'Jogador removido'}</div>
-                  <div class="row-subtitle">${getPositionLabel(player?.position)}</div>
+                  <div class="row-title">${player?.guest ? '👤 ' : ((player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : '')}${player?.name || 'Jogador removido'}</div>
+                  <div class="row-subtitle">${player?.guest ? 'Convidado' : getPositionLabel(player?.position)}</div>
                 </div>
               </div>
               ${isAdmin && id && player ? `
@@ -4246,10 +4321,10 @@ function renderTeamDraw(snapshot, currentPlayer) {
             ${outsideDraw.map((player) => `
               <div class="weekly-player-row draw-outside-row">
                 <div class="players-switch-player">
-                  ${player.rental_goalkeeper ? `<div class="avatar rental-goalkeeper-avatar">🧤</div>` : renderAvatarForApp(player)}
+                  ${player.rental_goalkeeper ? `<div class="avatar rental-goalkeeper-avatar">🧤</div>` : (player.guest ? `<div class="avatar guest-avatar">👤</div>` : renderAvatarForApp(player))}
                   <div>
                     <div class="row-title">${player.name}</div>
-                    <div class="row-subtitle">${player.rental_goalkeeper ? 'Goleiro de aluguel' : getPositionLabel(player.position)}</div>
+                    <div class="row-subtitle">${player.rental_goalkeeper ? 'Goleiro de aluguel' : (player.guest ? 'Convidado' : getPositionLabel(player.position))}</div>
                   </div>
                 </div>
                 <div class="weekly-player-meta draw-add-actions">

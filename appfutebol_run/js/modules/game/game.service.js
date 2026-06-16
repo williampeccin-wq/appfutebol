@@ -159,6 +159,55 @@ export function removeRentalGoalkeeper(id) {
   return { ok: true, message: 'Goleiro de aluguel removido.' };
 }
 
+// Convidados: jogadores de linha temporários adicionados pelo admin (só nome),
+// nos mesmos moldes do goleiro de aluguel. Ocupam vaga de linha e respeitam o
+// máximo do jogo (a checagem de lotação já conta os convidados via isGameFull).
+function getGuestPlayers(game = activeGame()) {
+  return Array.isArray(game?.guest_players) ? game.guest_players : [];
+}
+
+export function getActiveGuestPlayers() {
+  return getGuestPlayers(activeGame(getState()));
+}
+
+export function addGuestPlayer(name = '') {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return { ok: false, message: 'Informe o nome do convidado.' };
+
+  const confirmations = normalizeConfirmationSegments(scopedConfirmations(snapshot), snapshot.players || []);
+  if (isGameFull(game, confirmations)) {
+    return { ok: false, message: 'Jogo lotado: limite de jogadores de linha atingido.' };
+  }
+
+  const current = getGuestPlayers(game);
+  const entry = {
+    id: `guest_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    name: cleanName,
+    guest: true,
+    temporary: true,
+    created_at: new Date().toISOString(),
+  };
+
+  patchActiveGame(snapshot, { ...game, guest_players: [...current, entry] });
+
+  return { ok: true, message: `${cleanName} adicionado como convidado.`, guest: entry };
+}
+
+export function removeGuestPlayer(id) {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const current = getGuestPlayers(game);
+
+  patchActiveGame(snapshot, {
+    ...game,
+    guest_players: current.filter((entry) => String(entry.id) !== String(id)),
+  });
+
+  return { ok: true, message: 'Convidado removido.' };
+}
+
 
 export function hasCapacity() {
   const snapshot = getState();
@@ -558,7 +607,17 @@ export function drawTeams() {
     rental_goalkeeper: true,
   }));
 
-  const eligiblePlayers = [...confirmedPlayers, ...rentalGoalkeepers];
+  const guestPlayers = getGuestPlayers(game).map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    position: 'meia',
+    plays_football: true,
+    role: 'player',
+    temporary: true,
+    guest: true,
+  }));
+
+  const eligiblePlayers = [...confirmedPlayers, ...rentalGoalkeepers, ...guestPlayers];
 
   if (eligiblePlayers.length < 2) {
     return {
@@ -578,8 +637,8 @@ export function drawTeams() {
     game_time: game.game_time || '',
     created_at: createdAt,
     total_players: eligiblePlayers.length,
-    team_a: teamA.map((player) => player.rental_goalkeeper ? player : player.id),
-    team_b: teamB.map((player) => player.rental_goalkeeper ? player : player.id),
+    team_a: teamA.map((player) => (player.rental_goalkeeper || player.guest) ? player : player.id),
+    team_b: teamB.map((player) => (player.rental_goalkeeper || player.guest) ? player : player.id),
   };
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
