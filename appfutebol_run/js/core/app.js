@@ -2259,6 +2259,22 @@ async function probeRemoteHeartbeat(activeGameKey) {
 }
 
 let syncInFlight = false;
+let authFailureStreak = 0;
+const AUTH_FAILURE_LOGOUT_THRESHOLD = 3;
+
+// Só desloga em 401/403 quando, ESTANDO online, a falha de auth persiste por
+// ciclos consecutivos. Blip de rede (offline / troca wifi<->4G no campo) NÃO
+// desloga — era a causa real de "sessão caindo" no pico de confirmação.
+function shouldLogoutOnAuthFailure() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  authFailureStreak += 1;
+  if (authFailureStreak >= AUTH_FAILURE_LOGOUT_THRESHOLD) {
+    authFailureStreak = 0;
+    return true;
+  }
+  return false;
+}
+
 async function syncRemoteOnce() {
   // Guardas baratas ANTES de marcar "em andamento".
   if (syncInFlight) return; // evita ciclos sobrepostos (e corrida de refresh de token)
@@ -2282,9 +2298,10 @@ async function syncRemoteOnce() {
     const activeGameKey = getState()?.game?.game_key || getState()?.active_game_id || null;
     const hb = await probeRemoteHeartbeat(activeGameKey);
     if (!hb.ok) {
-      if (hb.status === 401 || hb.status === 403) await handleExpiredSession();
-      return; // demais falhas (rede/5xx/timeout): ignora o ciclo, sem deslogar.
+      if ((hb.status === 401 || hb.status === 403) && shouldLogoutOnAuthFailure()) await handleExpiredSession();
+      return; // rede/5xx/timeout ou blip transitório: ignora o ciclo, sem deslogar.
     }
+    authFailureStreak = 0; // heartbeat OK -> sessão viva; zera o contador de falhas.
     const lastKnown = getLastRemoteUpdatedAt();
     const changed = !lastKnown || !hb.updatedAt
       || new Date(hb.updatedAt).getTime() > new Date(lastKnown).getTime();
@@ -2295,11 +2312,12 @@ async function syncRemoteOnce() {
     const remote = await loadRemoteState();
 
     if (!remote.ok || !isValidRemoteDomainSnapshot(remote.state)) {
-      if (remote.status === 401 || remote.status === 403) {
+      if ((remote.status === 401 || remote.status === 403) && shouldLogoutOnAuthFailure()) {
         await handleExpiredSession();
       }
       return;
     }
+    authFailureStreak = 0; // leitura completa OK -> sessão viva.
 
     {
       const repairedRemote = validateAndRepairState(remote.state);
