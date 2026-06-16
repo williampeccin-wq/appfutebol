@@ -5,7 +5,7 @@
 // demanda (lazy) via CDN ESM, então não pesa no boot de quem não usa passkey.
 // Recurso BETA do Supabase: isolado aqui para reduzir o impacto se a API mudar.
 
-const SDK_URL = 'https://esm.sh/@supabase/supabase-js@2.105.0';
+const SDK_URL = 'https://esm.sh/@supabase/supabase-js@2';
 let _clientPromise = null;
 
 async function getPasskeyClient() {
@@ -32,6 +32,19 @@ export function passkeySupported() {
     && !!(navigator.credentials && navigator.credentials.create);
 }
 
+// Conditional UI (autofill) disponível? É o que permite a passkey aparecer no
+// autofill do campo, sem botão e sem gesto — o navegador exige isto para o
+// fluxo "abriu e a passkey aparece".
+export async function conditionalMediationAvailable() {
+  try {
+    return passkeySupported()
+      && typeof window.PublicKeyCredential.isConditionalMediationAvailable === 'function'
+      && await window.PublicKeyCredential.isConditionalMediationAvailable();
+  } catch (_) {
+    return false;
+  }
+}
+
 // Registra uma passkey para o usuário JÁ logado (associa ao usuário do Supabase
 // Auth da sessão atual). Injeta a sessão atual no SDK antes da cerimônia.
 export async function registerPasskeyForCurrentUser() {
@@ -54,11 +67,13 @@ export async function registerPasskeyForCurrentUser() {
 // Login passwordless: a cerimônia de credencial descoberta deixa o usuário
 // escolher a conta no próprio autenticador. Retorna a sessão (tokens) para o
 // auth.service adotar.
-export async function signInWithPasskey() {
+export async function signInWithPasskey({ conditional = false } = {}) {
   try {
     if (!passkeySupported()) return { ok: false, message: 'Este aparelho/navegador não suporta passkey.' };
     const client = await getPasskeyClient();
-    const { data, error } = await client.auth.signInWithPasskey();
+    // mediation:'conditional' = autofill (espera o usuário tocar no campo).
+    const opts = conditional ? { mediation: 'conditional' } : undefined;
+    const { data, error } = await client.auth.signInWithPasskey(opts);
     if (error) return { ok: false, message: error.message || 'Falha ao entrar com passkey.' };
     const session = data?.session || data;
     if (!session?.access_token || !session?.user?.id) {
