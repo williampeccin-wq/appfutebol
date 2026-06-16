@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.86.1-sync';
+export const APP_VERSION = 'v1.87.0-photos-storage';

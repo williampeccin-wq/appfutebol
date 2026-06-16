@@ -412,7 +412,7 @@ function normalizeSelfPosition(value) {
 
 
 function getPlayerPhoto(player) {
-  return player?.photoDataUrl || '';
+  return player?.photo_url || player?.photoDataUrl || '';
 }
 
 function openAvatarLightbox(src, alt) {
@@ -1591,11 +1591,19 @@ document.addEventListener("click", async (e) => {
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
-      playerToEdit.photoDataUrl = photoDataUrl;
+      const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
+      if (up.ok) { playerToEdit.photo_url = up.url; delete playerToEdit.photoDataUrl; }
+      else { playerToEdit.photoDataUrl = photoDataUrl; } // fallback: mantém base64
     }
   } else {
+    const newId = "p_" + Date.now();
+    let photoFields = {};
+    if (photoDataUrl) {
+      const up = await uploadPlayerPhoto(photoDataUrl, newId);
+      photoFields = up.ok ? { photo_url: up.url } : { photoDataUrl }; // fallback base64
+    }
     snapshot.players.push({
-      id: "p_" + Date.now(),
+      id: newId,
       name,
       phone,
       birthDate,
@@ -1604,7 +1612,7 @@ document.addEventListener("click", async (e) => {
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
       is_admin: !!is_admin,
-      photoDataUrl,
+      ...photoFields,
       active: true,
       deleted: false
     });
@@ -1702,6 +1710,14 @@ if (action === "update-self-profile") {
     return;
   }
 
+  // Só mexe na foto se houver uma nova selecionada. Sobe pro Storage; em falha,
+  // mantém base64 como fallback. Sem foto nova, preserva o que já existe.
+  let selfPhotoFields = null;
+  if (selfPhotoDataUrl) {
+    const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
+    selfPhotoFields = up.ok ? { photo_url: up.url, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
+  }
+
   snapshot.players = snapshot.players.map((player) => {
     if (player.id !== currentPlayer.id) return player;
     return {
@@ -1710,7 +1726,7 @@ if (action === "update-self-profile") {
       phone,
       birthDate,
       position: player.plays_football === false ? player.position : position,
-      photoDataUrl: selfPhotoDataUrl || player.photoDataUrl || '',
+      ...(selfPhotoFields || {}),
     };
   });
 
@@ -1989,7 +2005,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword } from '../services/auth.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';

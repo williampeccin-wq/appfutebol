@@ -808,6 +808,40 @@ export async function fetchRemoteHeartbeat(activeGameKey = null) {
   return { ok: true, status: 200, updatedAt: values.length ? values[values.length - 1] : null };
 }
 
+// Faz upload de uma foto (data URL base64) para o bucket público `player-photos`
+// e retorna a URL pública (com cache-busting). Mantém o caminho por jogador
+// (sobrescreve via x-upsert). Em qualquer falha retorna { ok:false } — o
+// chamador então mantém o base64 como fallback (não quebra nada).
+export async function uploadPlayerPhoto(dataUrl, playerId) {
+  const config = getConfig();
+  if (!isSupabaseConfigured() || !dataUrl || !playerId) return { ok: false };
+  if (!String(dataUrl).startsWith('data:')) return { ok: false }; // já é URL? nada a fazer
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const path = `${encodeURIComponent(String(playerId))}.jpg`;
+    const token = getAccessToken();
+    const resp = await fetch(`${baseUrl(config)}/storage/v1/object/player-photos/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${token || config.anonKey}`,
+        'Content-Type': blob.type || 'image/jpeg',
+        'cache-control': 'max-age=31536000',
+        'x-upsert': 'true',
+      },
+      body: blob,
+    });
+    if (!resp.ok) {
+      console.warn('[storage] upload de foto falhou:', resp.status, await resp.text().catch(() => ''));
+      return { ok: false, status: resp.status };
+    }
+    return { ok: true, url: `${baseUrl(config)}/storage/v1/object/public/player-photos/${path}?v=${Date.now()}` };
+  } catch (error) {
+    console.warn('[storage] erro no upload de foto:', error);
+    return { ok: false };
+  }
+}
+
 export async function loadRemoteState() {
   const config = getConfig();
 
