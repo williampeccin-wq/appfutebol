@@ -259,6 +259,34 @@ export async function login(phone, password) {
   return { ok: true, player };
 }
 
+// Adota uma sessão obtida fora do fluxo de senha (ex.: passkey/WebAuthn via SDK).
+// Recebe o objeto de sessão {access_token, refresh_token, expires_at, user} e
+// segue exatamente o mesmo caminho do login por senha (guarda no nosso modelo,
+// carrega o estado remoto e resolve o jogador). Mantém o poll/refresh próprios.
+export async function loginWithPasskeySession(session) {
+  const saved = saveSession(session);
+  if (!saved) {
+    return { ok: false, message: 'Sessão de passkey inválida.' };
+  }
+
+  const remote = await loadRemoteState().catch(() => null);
+  if (remote?.ok && remote.state) {
+    const current = getState();
+    replaceState({
+      ...remote.state,
+      session: { playerId: null, authUserId: session.user.id },
+      ui: current.ui,
+    });
+  }
+
+  const player = ensureLoggedPlayer(session);
+  if (!player) {
+    return { ok: false, message: 'Passkey autenticada, mas sem jogador vinculado a esta conta.' };
+  }
+
+  return { ok: true, player };
+}
+
 export async function register(payload) {
   const snapshot = getState();
   const name = String(payload.name || '').trim();

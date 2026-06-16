@@ -5437,6 +5437,31 @@ body {
   box-shadow: 0 8px 20px rgba(240, 165, 0, 0.32);
 }
 
+/* Login por passkey */
+.auth-passkey {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.auth-passkey .btn { width: 100%; }
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--hfc-text-dim);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hfc-border, rgba(255,255,255,0.12));
+}
+
 /* ---------- HOME (Stadium Glass) ---------- */
 .content--home {
   /* Camadas: (1) grande área + entrada da área ("D") no rodapé, em proporção
