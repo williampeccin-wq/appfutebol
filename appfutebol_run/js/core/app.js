@@ -1176,7 +1176,11 @@ document.addEventListener("click", async (e) => {
     if (!isPasskeyEnabled()) return;
     showToast('Siga as instruções do aparelho para criar a passkey…', 'info');
     const res = await registerPasskeyForCurrentUser();
-    showToast(res.ok ? 'Passkey ativada neste aparelho! Já dá pra entrar com ela.' : res.message, res.ok ? 'success' : 'error');
+    if (res.ok) {
+      // Marca que ESTE aparelho tem passkey → habilita o auto-disparo no boot.
+      try { localStorage.setItem(PASSKEY_HINT_KEY, '1'); } catch (_) {}
+    }
+    showToast(res.ok ? 'Passkey ativada neste aparelho! Da próxima vez que abrir, já entra pela biometria.' : res.message, res.ok ? 'success' : 'error');
     return;
   }
 
@@ -2165,6 +2169,22 @@ function requireCriticalOperationAllowed(operation, trigger = null) {
   return false;
 }
 
+const PASSKEY_HINT_KEY = 'harmonia_passkey_hint';
+
+// Dispara o login por passkey no boot, só quando: sem sessão + flag ligada +
+// device suporta + ESTE aparelho já registrou uma passkey (dica local). Assim
+// só auto-dispara em quem tem passkey — não incomoda os demais. Fire-and-forget:
+// roda por cima da tela de login já pintada; cancelar/erro fica no formulário.
+async function maybeAutoPasskeyLogin() {
+  try {
+    if (getCurrentPlayer()) return;
+    if (!isPasskeyEnabled() || !passkeySupported()) return;
+    if (localStorage.getItem(PASSKEY_HINT_KEY) !== '1') return;
+    const res = await signInWithPasskey();
+    if (res.ok) await loginWithPasskeySession(res.session); // replaceState -> re-render
+  } catch (_) { /* cancelado/sem passkey: permanece na tela de login */ }
+}
+
 async function init() {
   try {
     await initInner();
@@ -2202,6 +2222,11 @@ async function initInner() {
   render(getState());
   bindGlobalSystemEvents();
   startRemoteSync();
+
+  // Login por passkey "embutido": se não há sessão e ESTE aparelho já registrou
+  // uma passkey (dica local), dispara a cerimônia no boot (Face ID/digital) e
+  // loga direto — sem botão extra. Cancelar mantém o telefone+senha à mostra.
+  maybeAutoPasskeyLogin();
 
   // PWA / Web Push: registra o service worker em segundo plano (não bloqueia o
   // boot) e re-salva a inscrição existente no servidor (cura "inscrito no
@@ -2851,26 +2876,6 @@ function bindAuthEvents() {
           },
         });
       }
-    });
-  }
-
-  const passkeyLoginBtn = appElement.querySelector('#passkey-login-btn');
-  if (passkeyLoginBtn && !passkeySupported()) { passkeyLoginBtn.closest('.auth-passkey')?.remove(); }
-  if (passkeyLoginBtn && passkeySupported()) {
-    passkeyLoginBtn.addEventListener('click', async () => {
-      const original = passkeyLoginBtn.textContent;
-      passkeyLoginBtn.disabled = true;
-      passkeyLoginBtn.textContent = 'Entrando...';
-      const res = await signInWithPasskey();
-      if (res.ok) {
-        const adopted = await loginWithPasskeySession(res.session);
-        if (adopted.ok) return; // replaceState dentro de loginWithPasskeySession re-renderiza
-        patchState({ ui: { authMode: 'login', authMessage: { type: 'error', text: adopted.message } } });
-      } else {
-        patchState({ ui: { authMode: 'login', authMessage: { type: 'error', text: res.message } } });
-      }
-      passkeyLoginBtn.disabled = false;
-      passkeyLoginBtn.textContent = original;
     });
   }
 
