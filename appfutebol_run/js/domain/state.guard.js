@@ -216,6 +216,14 @@ export function sanitizeCarne(state) {
   const warnings = [];
   const validIds = new Set((Array.isArray(nextState.players) ? nextState.players : []).map((player) => String(player.id)));
 
+  // Guard anti-degradação: sem NENHUM jogador válido (leitura/sync degradada),
+  // todas as duplas pareceriam "órfãs" e a carne/rodízio seria zerada — o que,
+  // persistido em seguida, apaga os dados bons do servidor. Nesse caso devolve a
+  // carne intacta em vez de podar contra uma lista de jogadores vazia.
+  if (validIds.size === 0) {
+    return { state: nextState, warnings: [] };
+  }
+
   nextState.carne = (Array.isArray(nextState.carne) ? nextState.carne : []).filter((entry) => {
     if (!entry || typeof entry !== 'object') {
       warnings.push('Registro de carne inválido removido.');
