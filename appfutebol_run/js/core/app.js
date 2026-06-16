@@ -2013,6 +2013,7 @@ document.addEventListener("change", (e) => {
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
+import { runIntegrityAudit } from "../domain/audit.service.js";
 import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
@@ -4399,6 +4400,10 @@ function renderConfig(snapshot, currentPlayer) {
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
   const mensEnforcementMode = getMensalidadeMode(snapshot.settings);
 
+  const audit = runIntegrityAudit(snapshot);
+  const auditLevelTag = { high: 'is-warn', warn: 'is-warn', info: 'is-neutral' };
+  const auditLevelLabel = { high: 'Crítico', warn: 'Atenção', info: 'Info' };
+
   const renderGameEditForm = (item) => {
     const key = getGameKey(item);
     const active = key === getGameKey(game);
@@ -4464,6 +4469,29 @@ function renderConfig(snapshot, currentPlayer) {
 
   return `
     <section class="section-stack">
+      <details class="card champ-collapse"${audit.high ? ' open' : ''}>
+        <summary class="champ-collapse-summary">
+          <span class="card-title">Saúde dos dados ${audit.findings.length ? `· ${audit.findings.length}` : '✅'}</span>
+          <span class="champ-collapse-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="champ-collapse-body">
+          ${audit.findings.length ? `
+            <p class="footer-note">Verificação automática (somente leitura). ${audit.high ? `<strong>${audit.high} crítico(s)</strong> · ` : ''}${audit.warn} atenção · ${audit.info} info.</p>
+            <div class="placeholder-list">
+              ${audit.findings.map((f) => `
+                <div class="player-compact-row">
+                  <div class="player-compact-text">
+                    <div class="row-title">${escapeHtml(f.title)}</div>
+                    <div class="row-subtitle">${escapeHtml(f.detail)}</div>
+                  </div>
+                  <span class="tag ${auditLevelTag[f.level] || 'is-neutral'}">${auditLevelLabel[f.level] || f.level}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div class="empty-inline">Nenhum problema encontrado. ✅</div>'}
+        </div>
+      </details>
+
       <section class="card games-config-card">
         <div class="card-title">Jogos</div>
 
