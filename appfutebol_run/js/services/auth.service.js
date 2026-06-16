@@ -78,6 +78,20 @@ export async function prepareStoredSession() {
   return saveSession(refreshed.data);
 }
 
+// Força a renovação via refresh_token, independe de isSessionExpired. Usado
+// como RETRY quando uma chamada REST volta 401/403 antes de declarar a sessão
+// morta — evita logout por blip transitório. Retorna a sessão nova ou null
+// (mas NÃO limpa a sessão local: a decisão de deslogar fica com o chamador).
+export async function refreshSession() {
+  const stored = loadStoredSession();
+  if (!stored?.refresh_token) return null;
+  const refreshed = await requestAuth('token?grant_type=refresh_token', {
+    refresh_token: stored.refresh_token,
+  });
+  if (!refreshed.ok || !refreshed.data?.access_token) return null;
+  return saveSession(refreshed.data);
+}
+
 async function requestAuth(path, payload, options = {}) {
   const response = await fetch(authUrl(path), {
     method: options.method || 'POST',

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.85.1-carne-guard';
+export const APP_VERSION = 'v1.86.0-sync';

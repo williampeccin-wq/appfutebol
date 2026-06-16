@@ -777,6 +777,37 @@ export function setLastRemoteUpdatedAt(value) {
   lastRemoteUpdatedAt = value || null;
 }
 
+// Heartbeat barato: lê só o `updated_at` mais recente de cada tabela (1 linha,
+// 1 coluna) para detectar SE algo mudou no servidor — sem reler a tabela inteira
+// de jogadores a cada ciclo. O poll usa isto e só faz a leitura completa quando
+// o timestamp avança. Retorna { ok, status, updatedAt }; em falha de auth
+// (401/403) propaga o status para o chamador decidir refresh/logout.
+export async function fetchRemoteHeartbeat(activeGameKey = null) {
+  const config = getConfig();
+  if (!isSupabaseConfigured()) return { ok: false, status: null, updatedAt: null };
+  const requests = [
+    requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=updated_at&order=updated_at.desc&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+  ];
+  // Presença só do jogo ATIVO — espelha o que loadSplitState usa para compor o
+  // lastRemoteUpdatedAt. Filtrar por outro jogo (ou todos) faria o heartbeat
+  // divergir do baseline e disparar full-load a cada ciclo.
+  if (activeGameKey) {
+    requests.push(requestJson(config, tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(activeGameKey)}&select=updated_at&order=updated_at.desc&limit=1`), { method: 'GET' }));
+  }
+  const reqs = await Promise.all(requests);
+  const bad = reqs.find((r) => !r.ok);
+  if (bad) return { ok: false, status: bad.status || null, updatedAt: null };
+  const values = [];
+  for (const r of reqs) {
+    const row = Array.isArray(r.data) ? r.data[0] : null;
+    if (row?.updated_at) values.push(row.updated_at);
+  }
+  values.sort();
+  return { ok: true, status: 200, updatedAt: values.length ? values[values.length - 1] : null };
+}
+
 export async function loadRemoteState() {
   const config = getConfig();
 
