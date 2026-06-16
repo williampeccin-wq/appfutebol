@@ -4124,7 +4124,7 @@ function renderPresenceList(snapshot, currentPlayer) {
             : '<div class="empty-inline">Nenhum convidado adicionado.</div>'}
         </div>
         ${adminMode ? (lineFull
-          ? '<p class="footer-note">Limite de jogadores de linha atingido — remova alguém para adicionar um convidado.</p>'
+          ? `<p class="footer-note">Linha completa (${lineUsed}/${lineMax}). ${guestPlayers.length ? 'O(s) convidado(s) acima já está(ão) dentro. ' : ''}Para adicionar outro, remova um jogador ou convidado.</p>`
           : `<div class="rental-goalkeeper-form">
               <input id="guest-player-name" class="input" type="text" placeholder="Nome do convidado" />
               <button id="add-guest-player-btn" class="btn btn-secondary" type="button">Adicionar convidado</button>
