@@ -7,5 +7,5 @@ window.HARMONIA_SUPABASE = {
   stateTable: 'app_state',
   stateKey: 'default',
   environment: 'prod-supabase',
-  votingEnabled: false
+  votingEnabled: true
 };
