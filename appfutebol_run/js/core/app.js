@@ -3824,7 +3824,11 @@ function renderWeeklyGame(snapshot, currentPlayer) {
   const confirmed = isConfirmed(currentPlayer?.id);
   const activeGame = view.game || getActiveGameFromSnapshot(snapshot);
   const capacity = activeGame?.max_players || 8;
-  const remaining = Math.max(capacity - view.confirmedCount, 0);
+  // Convidados ocupam vaga de linha → entram na contagem e nas vagas restantes,
+  // igual à lista de presença e à home.
+  const guestCount = (Array.isArray(activeGame?.guest_players) ? activeGame.guest_players : []).length;
+  const confirmedWithGuests = view.confirmedCount + guestCount;
+  const remaining = Math.max(capacity - confirmedWithGuests, 0);
   const canAct = currentPlayer && currentPlayer.plays_football !== false;
 
   return `
@@ -3834,10 +3838,10 @@ function renderWeeklyGame(snapshot, currentPlayer) {
           <div class="hero-label">Próximo jogo</div>
           <div class="hero-date">${formatDate(activeGame?.game_date)}</div>
           <div class="hero-meta">${activeGame?.game_time || '--:--'} · ${activeGame?.open ? 'Inscrições abertas' : 'Inscrições fechadas'}</div>
-          <div class="weekly-progress"><div style="width:${Math.min((view.confirmedCount / capacity) * 100, 100)}%"></div></div>
+          <div class="weekly-progress"><div style="width:${Math.min((confirmedWithGuests / capacity) * 100, 100)}%"></div></div>
           <div class="weekly-game-stats">
-            <strong>${view.confirmedCount} / ${capacity}</strong> confirmados
-            <span>${remaining} vagas restantes</span>
+            <strong>${confirmedWithGuests} / ${capacity}</strong> confirmados
+            <span>${remaining} vaga${remaining === 1 ? '' : 's'} restante${remaining === 1 ? '' : 's'}</span>
           </div>
         </div>
       </section>
