@@ -481,6 +481,20 @@ async function loadSplitState(config) {
 
   const metaRow = Array.isArray(metaResult.data) ? metaResult.data[0] : null;
 
+  // Guard anti-degradação: num clube populado a linha app_meta 'default' SEMPRE
+  // existe (carne, campeonato, settings, games). Se a leitura voltou OK mas sem
+  // meta (linha ausente/filtrada por sessão degradada) enquanto HÁ jogadores,
+  // NÃO componha um estado com esses campos vazios — persistido por um save
+  // seguinte, isso apagaria os dados bons. Trata como leitura indisponível.
+  if (!metaRow && players.length) {
+    return {
+      ok: false,
+      state: null,
+      updatedAt: null,
+      reason: 'single_source_meta_missing_for_populated_club',
+    };
+  }
+
   const state = composeState({
     players,
     game: normalizedGame,
@@ -686,6 +700,19 @@ async function saveSplitState(config, state) {
 
   const now = new Date().toISOString();
   const previousParts = lastSplitSnapshot || { players: [], game: null, confirmations: [], meta: {} };
+
+  // Guard anti-apagão: nunca persista um meta que ZERA a carne quando o último
+  // estado conhecido a tinha preenchida. Carne só vai a vazio por estado em
+  // memória degradado (leitura falha/sessão expirada), nunca por ação real (não
+  // há UI para limpar o rodízio inteiro; "Salvar rodízio" bloqueia vazio). Já
+  // causou perda do rodízio em produção. Aborta sem gravar nada.
+  const prevCarne = Array.isArray(previousParts?.meta?.carne) ? previousParts.meta.carne : [];
+  const nextCarne = Array.isArray(parts?.meta?.carne) ? parts.meta.carne : [];
+  if (prevCarne.length > 0 && nextCarne.length === 0) {
+    console.warn('[storage.supabase] save abortado: tentativa de zerar a carne a partir de estado preenchido (degradado?). Nada foi gravado.');
+    return { ok: false, conflict: false, reason: 'meta_carne_wipe_blocked' };
+  }
+
   const operations = buildGranularOperations(config, previousParts, parts, now);
 
   if (!operations.length) {
