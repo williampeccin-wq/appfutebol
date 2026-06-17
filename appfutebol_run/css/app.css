@@ -5891,6 +5891,46 @@ body {
 .content--players .players-pay-due { color: var(--hfc-text-muted); font-size: 13px; }
 .content--players .players-pay-due strong { color: var(--hfc-text); }
 
+/* Conciliação PIX (comprovante por IA) */
+.pix-receipt-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pix-receipt-card .pix-ok { color: var(--hfc-accent-green, #46c46a); font-weight: 600; }
+
+/* Bloco de envio no perfil do jogador */
+.self-pix-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--hfc-glass-border);
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.self-pix-block .footer-note { margin: 0; }
+.self-pix-submit-btn { width: 100%; }
+.self-pix-result { margin-top: 4px; }
+
+/* Chip "revisar comprovante" / "PIX" no painel do admin */
+.pix-review-chip { white-space: nowrap; }
+
+/* Linhas do modal de detalhes do pagamento PIX */
+.pix-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.pix-info-row:last-child { border-bottom: 0; }
+.pix-info-row > span { color: var(--hfc-text-muted); }
+
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {
   background: var(--hfc-glass) !important;

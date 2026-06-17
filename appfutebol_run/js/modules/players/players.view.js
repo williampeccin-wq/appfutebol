@@ -38,7 +38,33 @@ function renderFinanceControls(player, currentPlayer) {
     `;
   }
 
+  // Comprovante PIX enviado pelo jogador, mas sem E2E legível → aguarda revisão.
+  const review = (!isPaid && player.mens_review && typeof player.mens_review === 'object') ? player.mens_review : null;
+  const reviewChip = review ? `
+    <button
+      class="btn btn-secondary btn-sm pix-review-chip"
+      type="button"
+      data-action="open-pix-review"
+      data-id="${player.id}"
+      title="Comprovante enviado: ${escapeAttr(review.beneficiary || '')} · ${review.amount ? `R$ ${Number(review.amount).toFixed(2).replace('.', ',')}` : 's/ valor'} · ${review.date || 's/ data'}"
+    >📷 Revisar</button>
+  ` : '';
+
+  // Pago via PIX (comprovante do próprio jogador) → selo clicável com detalhes.
+  const payment = (isPaid && player.mens_payment && typeof player.mens_payment === 'object') ? player.mens_payment : null;
+  const paidChip = payment ? `
+    <button
+      class="btn btn-secondary btn-sm pix-review-chip"
+      type="button"
+      data-action="open-pix-info"
+      data-id="${player.id}"
+      title="Pago via PIX — toque para ver detalhes"
+    >📷 PIX</button>
+  ` : '';
+
   return `
+    ${reviewChip}
+    ${paidChip}
     <button
       class="switch-control ${isPaid ? 'is-on' : 'is-off'}"
       type="button"
@@ -51,6 +77,10 @@ function renderFinanceControls(player, currentPlayer) {
       <span class="switch-label ${isPaid ? 'is-ok' : 'is-warn'}">${label}</span>
     </button>
   `;
+}
+
+function escapeAttr(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 
