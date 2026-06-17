@@ -231,6 +231,8 @@ Deno.serve(async (req) => {
   delete newData.mens_review;
   const upd = await admin.from("players").update({ data: newData }).eq("id", playerRow.id);
   if (upd.error) {
+    // Desfaz o E2E recém-inserido para não travar uma nova tentativa do jogador.
+    await admin.from("pix_receipts").delete().eq("e2e_id", e2e);
     console.warn("[pix] update players erro:", upd.error);
     return json({ ok: false, error: "persist_failed" }, 500);
   }
