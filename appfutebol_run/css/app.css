@@ -5891,6 +5891,32 @@ body {
 .content--players .players-pay-due { color: var(--hfc-text-muted); font-size: 13px; }
 .content--players .players-pay-due strong { color: var(--hfc-text); }
 
+/* Conciliação PIX (comprovante por IA) */
+.pix-receipt-card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pix-receipt-card .pix-ok { color: var(--hfc-accent-green, #46c46a); font-weight: 600; }
+
+/* Bloco de envio no perfil do jogador */
+.self-pix-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hfc-glass-border);
+}
+.self-pix-result { margin-top: 4px; }
+
+/* Chip "revisar comprovante" no painel do admin */
+.pix-review-chip { white-space: nowrap; }
+
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {
   background: var(--hfc-glass) !important;

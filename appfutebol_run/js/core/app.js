@@ -1966,6 +1966,32 @@ if (action === "admin-add-to-game") {
 
 
 
+  if (action === "open-pix-review") {
+    if (!requireAdmin(snapshot, 'Apenas administrador pode revisar comprovantes')) return;
+    const reviewPlayer = (snapshot.players || []).find((p) => String(p.id) === String(id));
+    const review = reviewPlayer?.mens_review;
+    if (!reviewPlayer || !review) return;
+    const amountLabel = review.amount ? `R$ ${Number(review.amount).toFixed(2).replace('.', ',')}` : '—';
+    const dateLabel = review.date ? formatDate(review.date) : '—';
+    const confirmedReview = await showConfirmModal({
+      title: `Comprovante de ${reviewPlayer.name}`,
+      message: `Beneficiário lido: ${review.beneficiary || '—'}\nValor: ${amountLabel}\nData: ${dateLabel}${review.bank ? `\nBanco: ${review.bank}` : ''}\n\nO identificador da transação (E2E) não foi lido no print, então não deu para confirmar automaticamente. Marcar a mensalidade como paga?`,
+      confirmText: 'Marcar pago',
+      cancelText: 'Fechar',
+    });
+    if (!confirmedReview) return;
+    const reviewSnapshot = structuredClone(getState());
+    if (Array.isArray(reviewSnapshot.players)) reviewSnapshot.players = reviewSnapshot.players.map(normalizePlayer);
+    const target = reviewSnapshot.players.find((p) => String(p.id) === String(id));
+    if (!target) return;
+    target.mens_ok = true;
+    if (target.mens_review) delete target.mens_review;
+    const safeSnapshot = repairManualSnapshot(reviewSnapshot);
+    replaceState(safeSnapshot);
+    showToast(`Mensalidade de ${target.name} marcada como paga.`, 'success');
+    return;
+  }
+
   if (action === "mark-paid" || action === "mark-debt") {
     if (!requireAdmin(snapshot, 'Apenas administrador pode alterar mensalidade')) return;
     const currentSnapshot = structuredClone(getState());
@@ -1980,6 +2006,8 @@ if (action === "admin-add-to-game") {
     setActionBusy(trigger, action === "mark-paid" ? "Salvando..." : "Atualizando...");
 
     player.mens_ok = action === "mark-paid";
+    // Aprovou ou descartou: limpa o aviso de comprovante a revisar.
+    if (player.mens_review) delete player.mens_review;
 
     const safeSnapshot = repairManualSnapshot(currentSnapshot);
 
@@ -2034,6 +2062,7 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
+import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
@@ -3209,6 +3238,8 @@ function bindAppEvents(currentPlayer) {
     copyPaymentsToClipboard();
   });
 
+  wireSelfPixReceipt(appElement);
+
   appElement.querySelector('#copy-confirmed-btn')?.addEventListener('click', () => {
     copyConfirmedPresenceToClipboard();
   });
@@ -3401,7 +3432,9 @@ function bindAppEvents(currentPlayer) {
       const mensExpireDate = String(formData.get('mens_expire_date') || '').slice(0, 10);
       const rawMode = String(formData.get('mens_enforcement_mode') || '');
       const mensMode = [MENSALIDADE_MODES.PARTIAL, MENSALIDADE_MODES.TOTAL].includes(rawMode) ? rawMode : MENSALIDADE_MODES.NONE;
-      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode } });
+      const mensAmount = Math.max(0, Number(formData.get('mens_amount')) || 0);
+      const mensBeneficiary = String(formData.get('mens_beneficiary') || '').trim();
+      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary } });
       // Aplica imediatamente a regra (no "total" pode remover inadimplentes e
       // promover a fila) e persiste/renderiza no padrão das demais ações admin.
       const safeSnapshot = repairManualSnapshot(getState());
@@ -3844,6 +3877,19 @@ function renderProfilePanel(activePlayer) {
         ${carneOnly ? '' : `<div class="profile-view-row"><span>Mensalidade</span><strong class="tag ${activePlayer.mens_ok ? 'is-ok' : 'is-warn'}">${activePlayer.mens_ok ? 'Em dia' : 'Pendente'}</strong></div>`}
       </div>
 
+      ${(!carneOnly && activePlayer.mens_ok !== true) ? `
+        <div class="self-pix-block">
+          ${activePlayer.mens_review ? `
+            <p class="footer-note">📨 Comprovante enviado — aguardando o administrador confirmar.</p>
+          ` : `
+            <p class="footer-note">Pague o PIX e envie o comprovante: a confirmação é automática.</p>
+          `}
+          <button class="btn btn-primary btn-sm" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
+          <input id="self-pix-file" type="file" accept="image/*" capture="environment" hidden />
+          <div id="self-pix-result" class="self-pix-result" hidden></div>
+        </div>
+      ` : ''}
+
       <div class="profile-view-actions">
         <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
         ${isPasskeyEnabled() && authzIsAdmin(activePlayer) && passkeySupported() ? `<button class="btn btn-secondary" type="button" data-action="register-passkey">🔑 Ativar passkey neste aparelho</button>` : ''}
@@ -3994,6 +4040,100 @@ async function copyPaymentsToClipboard() {
     console.error(error);
     showToast('Não foi possível copiar automaticamente.', 'error');
   }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+const PIX_ERROR_MESSAGES = {
+  not_configured: 'Pagamento por PIX indisponível neste ambiente.',
+  not_logged_in: 'Faça login novamente para enviar o comprovante.',
+  bad_image: 'Não consegui ler o arquivo de imagem.',
+  api_key_not_configured: 'A leitura por IA ainda não está ativada (falta configuração no servidor).',
+  service_role_not_configured: 'Recurso ainda não configurado no servidor.',
+  unauthorized: 'Sessão inválida — faça login novamente.',
+  unsupported_media_type: 'Formato não suportado. Envie um print em JPG ou PNG.',
+  image_too_large: 'Imagem muito grande. Tente um print menor.',
+  config_missing: 'O administrador ainda não configurou o valor e o beneficiário da mensalidade.',
+  player_not_found: 'Seu cadastro não foi encontrado. Avise o administrador.',
+  vision_failed: 'Não consegui ler o comprovante. Tente um print mais nítido.',
+  persist_failed: 'Falha ao salvar. Tente de novo em instantes.',
+  network: 'Falha de rede ao enviar o comprovante.',
+};
+
+// Motivos de recusa (result:'rejected') — mensagens para o jogador.
+const PIX_REJECT_MESSAGES = {
+  not_receipt: 'A imagem não parece um comprovante de pagamento. Envie o print do PIX.',
+  beneficiary_mismatch: 'O beneficiário do comprovante não confere com o do clube. Confira para quem você pagou.',
+  amount_mismatch: 'O valor do comprovante não bate com o valor da mensalidade.',
+  date_not_current_month: 'O comprovante não é deste mês. Envie o pagamento do mês corrente.',
+  duplicate_e2e: 'Este comprovante já foi usado antes.',
+};
+
+function renderPixSubmitResult(container, res) {
+  let html;
+  if (!res.ok) {
+    const msg = PIX_ERROR_MESSAGES[res.reason] || 'Não foi possível enviar o comprovante.';
+    html = `<p class="footer-note">${escapeHtml(msg)}</p>`;
+  } else if (res.result === 'marked') {
+    html = `<p class="pix-ok">✅ Pagamento confirmado! Sua mensalidade está em dia.</p>`;
+  } else if (res.result === 'review') {
+    html = `<p class="footer-note">📨 Recebido! Não consegui ler o identificador da transação no print, então o administrador vai revisar e confirmar. Você não precisa fazer mais nada.</p>`;
+  } else {
+    const msg = PIX_REJECT_MESSAGES[res.reason] || 'Não consegui validar o comprovante.';
+    html = `<p class="footer-note">⚠️ ${escapeHtml(msg)}</p>`;
+  }
+  container.innerHTML = `<div class="pix-receipt-card">${html}</div>`;
+  container.hidden = false;
+}
+
+// Jogador envia o próprio comprovante. Servidor valida e grava (ou marca p/ revisão).
+function wireSelfPixReceipt(appElement) {
+  const btn = appElement.querySelector('#self-pix-btn');
+  const fileInput = appElement.querySelector('#self-pix-file');
+  const result = appElement.querySelector('#self-pix-result');
+  if (!btn || !fileInput || !result) return;
+
+  btn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+
+    btn.disabled = true;
+    result.hidden = false;
+    result.innerHTML = '<div class="pix-receipt-card"><p class="footer-note">Enviando e lendo o comprovante…</p></div>';
+
+    let dataUrl;
+    try {
+      dataUrl = await readFileAsDataUrl(file);
+    } catch (_) {
+      result.innerHTML = '<div class="pix-receipt-card"><p class="footer-note">Não consegui abrir a imagem.</p></div>';
+      btn.disabled = false;
+      return;
+    }
+
+    const res = await submitPixReceipt(dataUrl);
+    renderPixSubmitResult(result, res);
+    btn.disabled = false;
+
+    // Marcou pago ou caiu p/ revisão → recarrega do servidor (re-renderiza e
+    // some o painel inline); o toast garante o feedback após o re-render.
+    if (res.ok && res.result === 'marked') {
+      showToast('Pagamento confirmado! Mensalidade em dia.', 'success');
+      await reloadRemoteStateAfterCriticalOperation(getState());
+    } else if (res.ok && res.result === 'review') {
+      showToast('Comprovante recebido. O administrador vai revisar.', 'success');
+      await reloadRemoteStateAfterCriticalOperation(getState());
+    }
+  });
 }
 
 function renderPresenceList(snapshot, currentPlayer) {
@@ -4550,6 +4690,17 @@ function renderConfig(snapshot, currentPlayer) {
           <label class="field-label">
             Data de vencimento
             <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
+          </label>
+
+          <label class="field-label">
+            Valor da mensalidade (R$)
+            <input class="input" type="number" min="0" step="0.01" name="mens_amount" value="${Number(snapshot.settings?.mens_amount) || ''}" placeholder="Ex.: 50.00" />
+          </label>
+
+          <label class="field-label">
+            Nome do beneficiário (PIX)
+            <input class="input" type="text" name="mens_beneficiary" value="${escapeHtml(snapshot.settings?.mens_beneficiary || '')}" placeholder="Como aparece no comprovante (quem recebe)" />
+            <small class="footer-note">Usado para validar o comprovante PIX que o jogador envia. Valor e beneficiário precisam bater exatamente.</small>
           </label>
 
           <fieldset class="mens-mode-fieldset">

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.91.0-auditoria';
+export const APP_VERSION = 'v1.92.0-pix';
