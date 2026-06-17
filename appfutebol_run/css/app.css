@@ -5907,10 +5907,11 @@ body {
 .self-pix-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
+  gap: 10px;
+  margin: 16px 0 20px;
+  padding: 16px 0;
   border-top: 1px solid var(--hfc-glass-border);
+  border-bottom: 1px solid var(--hfc-glass-border);
 }
 .self-pix-block .footer-note { margin: 0; }
 .self-pix-submit-btn { width: 100%; }
