@@ -3884,8 +3884,8 @@ function renderProfilePanel(activePlayer) {
           ` : `
             <p class="footer-note">Pague o PIX e envie o comprovante: a confirmação é automática.</p>
           `}
-          <button class="btn btn-primary btn-sm" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
-          <input id="self-pix-file" type="file" accept="image/*" capture="environment" hidden />
+          <button class="btn btn-primary self-pix-submit-btn" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
+          <input id="self-pix-file" type="file" accept="image/*" hidden />
           <div id="self-pix-result" class="self-pix-result" hidden></div>
         </div>
       ` : ''}
