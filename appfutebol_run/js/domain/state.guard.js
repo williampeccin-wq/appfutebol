@@ -55,10 +55,11 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
     }
 
     const normalized = { ...clone(player), phone };
-    if (!normalized.password_hash && normalized.password) {
-      normalized.password_hash = String(normalized.password);
-    }
+    // Segurança: credenciais NUNCA ficam no estado. Login real é via Supabase
+    // Auth (bcrypt); password/password_hash são resíduos do modelo antigo e são
+    // removidos do objeto do jogador (não persistem, não trafegam ao cliente).
     delete normalized.password;
+    delete normalized.password_hash;
 
     // Agrupa por telefone E nome. Antes era só por telefone: dois cadastros
     // DISTINTOS com o mesmo telefone (família, placeholder repetido, erro de
@@ -92,7 +93,7 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
 
   const scorePlayer = (player) => {
     let score = 0;
-    if (player?.password_hash) score += 100;
+    if (player?.auth_user_id) score += 100;
     if (player?.is_admin) score += 20;
     if (player?.mens_ok) score += 10;
     if (player?.birthDate) score += 5;
@@ -114,12 +115,12 @@ export function dedupePlayers(players, seedPlayers = [], tombstones = { ids: [],
         ...(preferred || {}),
         id: seedPlayer.id,
         phone: seedPlayer.phone,
-        password_hash: preferred?.password_hash || seedPlayer.password_hash,
       };
     }
 
     if (!canonical) continue;
     delete canonical.password;
+    delete canonical.password_hash;
     deduped.push(canonical);
 
     if (group.length > 1) {
