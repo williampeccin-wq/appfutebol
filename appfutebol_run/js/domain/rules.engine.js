@@ -73,23 +73,6 @@ export function isGameFull(game, confirmations = []) {
   return maxPlayers > 0 && (lineConfirmedCount + guestCount) >= maxPlayers;
 }
 
-export function canLogin(player, password) {
-  const normalizedPassword = String(password || '').trim();
-
-  if (!player) {
-    return { ok: false, message: 'Telefone não cadastrado.' };
-  }
-
-  if (!normalizedPassword) {
-    return { ok: false, message: 'Informe telefone e senha.' };
-  }
-
-  if (String(player.password_hash || '') !== normalizedPassword) {
-    return { ok: false, message: 'Senha inválida.' };
-  }
-
-  return { ok: true, message: '', player };
-}
 
 export function getPlayerBlockReasons(player, game, mode = MENSALIDADE_MODES.NONE) {
   const reasons = [];

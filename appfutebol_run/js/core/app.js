@@ -3951,7 +3951,7 @@ function renderProfilePanel(activePlayer) {
 
       <div class="profile-view-actions">
         <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
-        ${isPasskeyEnabled() && authzIsAdmin(activePlayer) && passkeySupported() ? `<button class="btn btn-secondary" type="button" data-action="register-passkey">🔑 Ativar passkey neste aparelho</button>` : ''}
+        ${isPasskeyEnabled() && passkeySupported() ? `<button class="btn btn-secondary" type="button" data-action="register-passkey">🔑 Ativar passkey neste aparelho</button>` : ''}
         <button class="btn btn-secondary" type="button" id="logout-button">Sair</button>
       </div>
     </section>

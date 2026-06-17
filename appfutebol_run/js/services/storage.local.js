@@ -90,11 +90,9 @@ function normalizePlayer(player) {
 
   nextPlayer.phone = normalizedPhone;
 
-  if (!nextPlayer.password_hash && nextPlayer.password) {
-    nextPlayer.password_hash = String(nextPlayer.password);
-  }
-
+  // Segurança: credenciais não ficam no estado (login real é Supabase Auth).
   delete nextPlayer.password;
+  delete nextPlayer.password_hash;
 
   return nextPlayer;
 }
@@ -102,7 +100,7 @@ function normalizePlayer(player) {
 function scorePlayer(player) {
   let score = 0;
 
-  if (player?.password_hash) score += 100;
+  if (player?.auth_user_id) score += 100;
   if (player?.is_admin) score += 20;
   if (player?.mens_ok) score += 10;
   if (player?.birthDate) score += 5;
@@ -146,11 +144,12 @@ function dedupePlayers(players, tombstones = { ids: [], phones: [] }) {
         ...preferred,
         id: seedPlayer.id,
         phone: seedPlayer.phone,
-        password_hash: preferred?.password_hash || seedPlayer.password_hash,
       };
     } else {
       canonical = { ...preferred, phone };
     }
+    delete canonical.password;
+    delete canonical.password_hash;
 
     delete canonical.password;
     deduped.push(canonical);
