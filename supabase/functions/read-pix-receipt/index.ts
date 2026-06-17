@@ -45,32 +45,31 @@ function currentMonthBrt(): string {
   return brt.toISOString().slice(0, 7);
 }
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    is_receipt: { type: "boolean" },
-    beneficiary_name: { type: "string" }, // quem RECEBEU (recebedor/para/destino)
-    amount: { type: "number" }, // valor em BRL; 0 se ilegível
-    date: { type: "string" }, // YYYY-MM-DD; "" se ilegível
-    e2e_id: { type: "string" }, // identificador da transação (E2E); "" se não aparecer
-    bank: { type: "string" }, // instituição de origem; "" se ilegível
-  },
-  required: ["is_receipt", "beneficiary_name", "amount", "date", "e2e_id", "bank"],
-  additionalProperties: false,
-};
-
 const PROMPT = [
   "Esta imagem é um comprovante de pagamento PIX brasileiro (print de app de banco).",
   "Extraia com precisão:",
-  "- beneficiary_name: nome de quem RECEBEU o PIX (recebedor/beneficiário/para/destino/creditado). NÃO o pagador.",
-  "- amount: valor transferido em reais (número, ex.: 50.00). 0 se ilegível.",
+  "- beneficiary_name: nome de quem RECEBEU o PIX (recebedor/beneficiário/para/destino/creditado). NÃO o pagador/origem.",
+  "- amount: valor transferido em reais como número (ex.: 50.00). 0 se ilegível.",
   "- date: data do pagamento no formato YYYY-MM-DD. \"\" se ilegível.",
   "- e2e_id: o identificador único da transação PIX. Procure por rótulos como",
   "  \"ID da transação\", \"Identificador\", \"Código de autenticação\", \"Identificação\",",
   "  \"Controle\" ou \"E2E\" — costuma ter ~32 caracteres começando com E. \"\" se não aparecer.",
   "- bank: instituição de origem (ex.: Nubank, Itaú). \"\" se não aparecer.",
   "Se a imagem NÃO for um comprovante de pagamento, is_receipt=false e o resto vazio/0.",
+  "",
+  "Responda APENAS com um objeto JSON válido, sem texto antes ou depois, sem markdown,",
+  "com EXATAMENTE estas chaves: is_receipt (boolean), beneficiary_name (string),",
+  "amount (number), date (string), e2e_id (string), bank (string).",
 ].join("\n");
+
+// Extrai o primeiro objeto JSON de um texto (tolera cercas ``` ou texto extra).
+function parseJsonObject(text: string): Record<string, unknown> {
+  const cleaned = String(text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) throw new Error("no_json");
+  return JSON.parse(cleaned.slice(start, end + 1));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -134,7 +133,6 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 512,
-        output_config: { format: { type: "json_schema", schema: SCHEMA } },
         messages: [{
           role: "user",
           content: [
@@ -151,7 +149,7 @@ Deno.serve(async (req) => {
     }
     const data = await resp.json();
     const text = (data?.content || []).find((b: { type?: string }) => b?.type === "text")?.text || "";
-    const parsed = JSON.parse(text);
+    const parsed = parseJsonObject(text);
     extracted = {
       is_receipt: !!parsed.is_receipt,
       beneficiary_name: String(parsed.beneficiary_name || ""),
