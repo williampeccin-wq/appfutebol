@@ -229,6 +229,16 @@ Deno.serve(async (req) => {
   const newData = { ...(playerRow.data || {}) };
   newData.mens_ok = true;
   delete newData.mens_review;
+  // Carimbo para o admin ver que foi pago via PIX (sem guardar a imagem).
+  newData.mens_payment = {
+    method: "pix",
+    amount: extracted.amount,
+    date: extracted.date,
+    beneficiary: extracted.beneficiary_name,
+    bank: extracted.bank,
+    e2e_tail: e2e.slice(-6),
+    at: new Date().toISOString(),
+  };
   const upd = await admin.from("players").update({ data: newData }).eq("id", playerRow.id);
   if (upd.error) {
     // Desfaz o E2E recém-inserido para não travar uma nova tentativa do jogador.

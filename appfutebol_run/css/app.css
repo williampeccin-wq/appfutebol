@@ -5917,8 +5917,19 @@ body {
 .self-pix-submit-btn { width: 100%; }
 .self-pix-result { margin-top: 4px; }
 
-/* Chip "revisar comprovante" no painel do admin */
+/* Chip "revisar comprovante" / "PIX" no painel do admin */
 .pix-review-chip { white-space: nowrap; }
+
+/* Linhas do modal de detalhes do pagamento PIX */
+.pix-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hfc-glass-border);
+}
+.pix-info-row:last-child { border-bottom: 0; }
+.pix-info-row > span { color: var(--hfc-text-muted); }
 
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {

@@ -136,6 +136,28 @@ function showConfirmModal({
   });
 }
 
+function showInfoModal({ title = 'Detalhes', html = '' } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-modal-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-modal" role="dialog" aria-modal="true">
+        <div class="confirm-modal-title">${title}</div>
+        <div class="confirm-modal-message">${html}</div>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-primary" data-confirm-modal="close">Fechar</button>
+        </div>
+      </div>`;
+    const cleanup = () => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(); };
+    const onKey = (event) => { if (event.key === 'Escape') cleanup(); };
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay || event.target.closest('[data-confirm-modal]')) cleanup();
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+  });
+}
+
 function setPlayerFormMode(isEditing) {
   const submitButton = document.querySelector('[data-action="add-player"]');
   const cancelButton = document.getElementById('cancel-edit-button');
@@ -1966,6 +1988,30 @@ if (action === "admin-add-to-game") {
 
 
 
+  if (action === "open-pix-info") {
+    if (!requireAdmin(snapshot, 'Apenas administrador')) return;
+    const payPlayer = (snapshot.players || []).find((p) => String(p.id) === String(id));
+    const pay = payPlayer?.mens_payment;
+    if (!payPlayer || !pay) return;
+    const amountLabel = pay.amount ? `R$ ${Number(pay.amount).toFixed(2).replace('.', ',')}` : '—';
+    const dateLabel = pay.date ? formatDate(pay.date) : '—';
+    const atLabel = pay.at ? new Date(pay.at).toLocaleString('pt-BR') : '—';
+    const rows = [
+      ['Forma', pay.reviewed ? 'PIX (confirmado na revisão)' : 'PIX (comprovante automático)'],
+      ['Valor', amountLabel],
+      ['Data do pagamento', dateLabel],
+      pay.beneficiary ? ['Beneficiário', escapeHtml(pay.beneficiary)] : null,
+      pay.bank ? ['Banco', escapeHtml(pay.bank)] : null,
+      pay.e2e_tail ? ['ID transação', `…${escapeHtml(pay.e2e_tail)}`] : null,
+      ['Recebido em', atLabel],
+    ].filter(Boolean);
+    await showInfoModal({
+      title: `Pagamento de ${escapeHtml(payPlayer.name || '')}`,
+      html: rows.map(([k, v]) => `<div class="pix-info-row"><span>${k}</span><strong>${v}</strong></div>`).join(''),
+    });
+    return;
+  }
+
   if (action === "open-pix-review") {
     if (!requireAdmin(snapshot, 'Apenas administrador pode revisar comprovantes')) return;
     const reviewPlayer = (snapshot.players || []).find((p) => String(p.id) === String(id));
@@ -1985,7 +2031,18 @@ if (action === "admin-add-to-game") {
     const target = reviewSnapshot.players.find((p) => String(p.id) === String(id));
     if (!target) return;
     target.mens_ok = true;
-    if (target.mens_review) delete target.mens_review;
+    if (target.mens_review) {
+      target.mens_payment = {
+        method: 'pix',
+        amount: target.mens_review.amount,
+        date: target.mens_review.date,
+        beneficiary: target.mens_review.beneficiary,
+        bank: target.mens_review.bank,
+        at: new Date().toISOString(),
+        reviewed: true,
+      };
+      delete target.mens_review;
+    }
     const safeSnapshot = repairManualSnapshot(reviewSnapshot);
     replaceState(safeSnapshot);
     showToast(`Mensalidade de ${target.name} marcada como paga.`, 'success');
@@ -2006,8 +2063,10 @@ if (action === "admin-add-to-game") {
     setActionBusy(trigger, action === "mark-paid" ? "Salvando..." : "Atualizando...");
 
     player.mens_ok = action === "mark-paid";
-    // Aprovou ou descartou: limpa o aviso de comprovante a revisar.
+    // Toggle manual do admin: limpa avisos/carimbos de PIX (o selo "📷 PIX" fica
+    // só para pagamentos confirmados por comprovante).
     if (player.mens_review) delete player.mens_review;
+    if (player.mens_payment) delete player.mens_payment;
 
     const safeSnapshot = repairManualSnapshot(currentSnapshot);
 
