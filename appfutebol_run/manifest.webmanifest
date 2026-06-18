@@ -1,17 +1,19 @@
 {
-  "name": "Convocados",
-  "short_name": "Convocados",
-  "description": "Convoca, joga, resenha: presença, times, mensalidade e campeonato do seu futebol num app só.",
+  "name": "Harmonia FC",
+  "short_name": "Harmonia",
+  "description": "Gestão do time Harmonia FC: presença, sorteio, campeonato e carnê.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0C1A38",
-  "theme_color": "#0C1A38",
+  "background_color": "#0a1428",
+  "theme_color": "#0a1428",
   "icons": [
-    { "src": "./img/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "./img/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "./img/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
-    { "src": "./img/icon-1024.png", "type": "image/png", "sizes": "1024x1024", "purpose": "any" }
+    {
+      "src": "./assets/harmonia-crest.jpeg",
+      "type": "image/jpeg",
+      "sizes": "640x640",
+      "purpose": "any"
+    }
   ]
 }
