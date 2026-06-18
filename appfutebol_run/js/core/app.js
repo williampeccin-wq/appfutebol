@@ -3268,8 +3268,31 @@ function bindAppEvents(currentPlayer) {
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      patchState({ ui: { currentTab: button.dataset.tab } });
+    button.addEventListener('click', async () => {
+      const target = button.dataset.tab;
+      const current = getState().ui?.currentTab || 'home';
+      // Rede de segurança: sair da aba Carne com troca de duplas não salva
+      // (rascunho do drag/edição) perderia a alteração. Avisa e salva.
+      if (current === 'carne' && target !== 'carne' && isCarneRotationDirty()) {
+        const saveAndLeave = await showConfirmModal({
+          title: 'Rodízio com alterações não salvas',
+          message: 'Você mexeu nas duplas do rodízio e ainda não tocou em "Salvar rodízio". Salvar antes de sair?',
+          confirmText: 'Salvar e sair',
+          cancelText: 'Continuar editando',
+        });
+        if (!saveAndLeave) return; // fica na aba pra revisar/descartar
+        const snap = getState();
+        const draft = getCarneRotationDraft(snap);
+        carneDraftSyncDate();
+        if (draft.start_date && (draft.pairs || []).length) {
+          persistCarneRotation(snap, draft);
+          carneRotationBaseline = JSON.parse(JSON.stringify(draft));
+          const safe = repairManualSnapshot(snap);
+          savePersistedState(safe);
+          showToast('Rodízio salvo.', 'success');
+        }
+      }
+      patchState({ ui: { currentTab: target } });
     });
   });
 
