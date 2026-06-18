@@ -513,9 +513,9 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
   }
 
   return `
-    <section class="card carne-rotation-card ${dirty ? 'is-dirty' : ''}" id="carne-rotation-card">
+    <section class="card carne-rotation-card" id="carne-rotation-card">
       <div class="card-title">Calendário da carne</div>
-      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. As alterações só valem ao tocar em <strong>Salvar rodízio</strong>.</p>
+      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. <strong>Tudo salva automaticamente.</strong></p>
 
       ${dupIds.size ? '<div class="carne-rotation-warning">⚠️ Há jogador(es) em mais de uma dupla. Cada pessoa deve estar em só uma.</div>' : ''}
 
@@ -530,14 +530,6 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
         <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers)}</select>
         <select id="carne-rotation-player-2" class="input"><option value="">Responsável 2</option>${renderPlayerOptions(orderedPlayers)}</select>
         <button class="btn btn-primary" type="button" data-action="carne-rotation-add-pair">Adicionar dupla</button>
-      </div>
-
-      <div class="carne-rotation-save-bar">
-        ${dirty ? '<span class="carne-rotation-dirty-note">Alterações não salvas</span>' : '<span class="carne-rotation-saved-note">Tudo salvo ✓</span>'}
-        <span class="carne-rotation-save-actions">
-          ${dirty ? '<button class="btn btn-secondary btn-sm" type="button" data-action="discard-carne-rotation">Descartar</button>' : ''}
-          <button class="btn btn-primary" type="button" data-action="save-carne-rotation"${dirty ? '' : ' disabled'}>Salvar rodízio</button>
-        </span>
       </div>
     </section>
   `;
