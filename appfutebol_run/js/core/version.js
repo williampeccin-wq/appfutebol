@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.96.0-notif-center';
+export const APP_VERSION = 'v1.96.1-notif-center';

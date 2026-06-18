@@ -4800,7 +4800,9 @@ function renderConfig(snapshot, currentPlayer) {
 
       <section class="card notif-center-card">
         <div class="card-title">Central de notificações</div>
-        <p class="footer-note">Ligue ou desligue cada aviso por push (celular). Salva sozinho.</p>
+
+        <div class="card-subtitle">Avisos por push (celular)</div>
+        <p class="footer-note">Ligue ou desligue cada aviso. Salva sozinho.</p>
         <div class="notif-center-list">
           ${NOTIF_TYPES.map((t) => `
             <label class="notif-center-row">
@@ -4812,21 +4814,19 @@ function renderConfig(snapshot, currentPlayer) {
             </label>
           `).join('')}
         </div>
-      </section>
 
-      <section class="card notifications-config-card">
-        <div class="card-title">Notificações gerais</div>
-
-        <form id="notifications-config-form" class="player-admin-form notifications-config-form">
-          <label class="field-label config-notifications-field">
-            Recado para todos
-            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
-          </label>
-          <p class="footer-note config-notifications-help"></p>
-          <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-primary" type="submit">Salvar notificação</button>
-          </div>
-        </form>
+        <div class="notif-center-recado">
+          <div class="card-subtitle">Recado para todos</div>
+          <p class="footer-note">Mensagem fixa que aparece na home de todos (não é push).</p>
+          <form id="notifications-config-form" class="player-admin-form notifications-config-form">
+            <label class="field-label config-notifications-field">
+              <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
+            </label>
+            <div class="player-admin-actions game-config-actions">
+              <button class="btn btn-primary" type="submit">Salvar recado</button>
+            </div>
+          </form>
+        </div>
       </section>
     </section>
   `;
