@@ -98,6 +98,10 @@ Deno.serve(async (req) => {
     .from("app_meta").select("data").eq("key", "default").maybeSingle();
   if (metaErr) { console.error("[overdue] meta:", metaErr.message); return json({ error: "meta_query_failed" }, 500); }
   const settings = (metaRow?.data as Record<string, unknown> | null)?.settings as Record<string, unknown> | undefined;
+  // Central de notificações: respeita o liga/desliga deste aviso.
+  if ((settings?.notifications as Record<string, boolean> | undefined)?.mensalidade_atrasada === false) {
+    return json({ ok: true, skipped: "notificacao_desligada" });
+  }
   const dueDate = String(settings?.mens_expire_date || "").slice(0, 10);
   const today = todayBrtIso();
 

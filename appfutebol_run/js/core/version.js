@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.95.2-favicon-crest';
+export const APP_VERSION = 'v1.96.0-notif-center';

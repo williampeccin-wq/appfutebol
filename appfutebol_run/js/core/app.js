@@ -2105,6 +2105,7 @@ function ensureRatingsLoaded() {
 function notifyWaitlistPromotion(result) {
   const promotedId = result?.promotedPlayerId;
   if (!promotedId) return;
+  if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
   triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
 }
 
@@ -3375,7 +3376,7 @@ function bindAppEvents(currentPlayer) {
       });
 
       // Gatilho de push: inscrições acabaram de ABRIR (fechado -> aberto).
-      if (!existingGame.open && updatedGame.open) {
+      if (!existingGame.open && updatedGame.open && isNotifEnabled(getState(), 'inscricoes_abertas')) {
         triggerServerPush({
           target: 'all',
           title: 'Inscrições abertas ⚽',
@@ -3482,6 +3483,21 @@ function bindAppEvents(currentPlayer) {
       showToast(hours ? `Votação de desempenho: janela de ${hours}h.` : 'Votação de desempenho desativada (janela 0).');
     });
   }
+
+  // Central de notificações: cada toggle auto-salva (replaceState = persiste no remoto).
+  appElement.querySelectorAll('.notif-center-toggle').forEach((toggle) => {
+    toggle.addEventListener('change', () => {
+      if (!requireAdmin(getState(), 'Apenas administrador pode mudar notificações')) return;
+      const key = toggle.dataset.notifKey;
+      const next = structuredClone(getState());
+      const notifications = { ...((next.settings && next.settings.notifications) || {}) };
+      notifications[key] = toggle.checked;
+      next.settings = { ...(next.settings || {}), notifications };
+      replaceState(repairManualSnapshot(next));
+      const label = (NOTIF_TYPES.find((t) => t.key === key) || {}).label || 'Aviso';
+      showToast(`${label}: ${toggle.checked ? 'ligado' : 'desligado'}.`, 'success');
+    });
+  });
 
   const notificationsForm = appElement.querySelector('#notifications-config-form');
   if (notificationsForm) {
@@ -4543,6 +4559,20 @@ function renderTeamDraw(snapshot, currentPlayer) {
   `;
 }
 
+// Central de notificações: tipos controláveis e leitura do flag (default LIGADO).
+const NOTIF_TYPES = [
+  { key: 'inscricoes_abertas', label: 'Inscrições abertas', desc: 'Quando um jogo abre para confirmação (manual ou automático). Para todos.' },
+  { key: 'mensalidade_atrasada', label: 'Mensalidade atrasada', desc: 'Aviso diário (7h) para quem está em atraso.' },
+  { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
+  { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
+  { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla da carne (23h do dia do jogo). Para todos.' },
+];
+function isNotifEnabled(snapshot, key) {
+  const n = snapshot?.settings?.notifications;
+  if (!n || typeof n !== 'object' || !(key in n)) return true; // ausente = ligado
+  return n[key] !== false;
+}
+
 function renderConfig(snapshot, currentPlayer) {
   if (!authzIsAdmin(currentPlayer)) {
     return `
@@ -4768,9 +4798,25 @@ function renderConfig(snapshot, currentPlayer) {
         </form>
       </section>
 
+      <section class="card notif-center-card">
+        <div class="card-title">Central de notificações</div>
+        <p class="footer-note">Ligue ou desligue cada aviso por push (celular). Salva sozinho.</p>
+        <div class="notif-center-list">
+          ${NOTIF_TYPES.map((t) => `
+            <label class="notif-center-row">
+              <span class="notif-center-text">
+                <strong>${t.label}</strong>
+                <small>${t.desc}</small>
+              </span>
+              <input type="checkbox" class="notif-center-toggle" data-notif-key="${t.key}" ${isNotifEnabled(snapshot, t.key) ? 'checked' : ''} />
+            </label>
+          `).join('')}
+        </div>
+      </section>
+
       <section class="card notifications-config-card">
         <div class="card-title">Notificações gerais</div>
-        
+
         <form id="notifications-config-form" class="player-admin-form notifications-config-form">
           <label class="field-label config-notifications-field">
             Recado para todos

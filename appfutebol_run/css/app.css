@@ -5931,6 +5931,18 @@ body {
 .pix-info-row:last-child { border-bottom: 0; }
 .pix-info-row > span { color: var(--hfc-text-muted); }
 
+/* Central de notificações */
+.notif-center-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.notif-center-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 10px 2px; border-bottom: 0.5px solid var(--hfc-glass-border); cursor: pointer;
+}
+.notif-center-row:last-child { border-bottom: 0; }
+.notif-center-text { display: flex; flex-direction: column; gap: 2px; }
+.notif-center-text strong { font-weight: 600; }
+.notif-center-text small { color: var(--hfc-text-muted); font-size: 12px; line-height: 1.4; }
+.notif-center-toggle { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--hfc-gold); }
+
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {
   background: var(--hfc-glass) !important;
