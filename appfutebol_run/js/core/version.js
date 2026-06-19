@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.96.7-boot-convocados';
+export const APP_VERSION = 'v1.97.0-sorteio-por-nota';

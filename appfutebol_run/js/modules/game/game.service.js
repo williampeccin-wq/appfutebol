@@ -2,6 +2,7 @@ import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/a
 import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
+import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -544,9 +545,32 @@ function sortPlayersForDisplay(players = []) {
 }
 
 
-function balanceTeams(players) {
+// Monta uma função nota(jogador) a partir das médias da votação de desempenho.
+// Jogador sem votos recebe a média do plantel elegível (neutro, não puxa o
+// equilíbrio para nenhum lado); se ninguém tem nota, todos valem o mesmo.
+function buildRatingResolver(players = []) {
+  const avgs = playerRatingAverages(getCachedRatings());
+  const rated = players
+    .map((p) => avgs[String(p?.id)])
+    .filter((r) => r && r.votes > 0)
+    .map((r) => r.avg);
+  const fallback = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : 6;
+  return (player) => {
+    const r = avgs[String(player?.id)];
+    return (r && r.votes > 0) ? r.avg : fallback;
+  };
+}
+
+// Divide os confirmados em dois times equilibrados POR NOTA, mantendo a
+// PARIDADE DE POSIÇÃO como restrição rígida (cada posição é dividida o mais
+// igual possível entre os times). Dentro de cada posição, os jogadores entram
+// do mais forte para o mais fraco — com um leve "tremor" aleatório (±0.4) para
+// que jogadores de nota parecida possam trocar de lado entre um sorteio e
+// outro (os times não saem idênticos toda semana), sem quebrar o equilíbrio.
+function balanceTeams(players, ratingOf = () => 0) {
   const teamA = [];
   const teamB = [];
+  const totals = { A: 0, B: 0 };
 
   const buckets = {
     gol: [],
@@ -559,19 +583,26 @@ function balanceTeams(players) {
     buckets[getPositionBucket(player)].push(player);
   });
 
-  Object.values(buckets).forEach((bucket) => {
-    const shuffled = [...bucket].sort(() => Math.random() - 0.5);
+  const countPos = (team, pos) => team.filter((p) => getPositionBucket(p) === pos).length;
 
-    shuffled.forEach((player) => {
-      const currentPosition = getPositionBucket(player);
-      const countA = teamA.filter((p) => getPositionBucket(p) === currentPosition).length;
-      const countB = teamB.filter((p) => getPositionBucket(p) === currentPosition).length;
+  Object.keys(buckets).forEach((pos) => {
+    const ordered = [...buckets[pos]].sort((a, b) => {
+      const ja = ratingOf(a) + (Math.random() - 0.5) * 0.8;
+      const jb = ratingOf(b) + (Math.random() - 0.5) * 0.8;
+      return jb - ja;
+    });
 
-      if (countA < countB) return teamA.push(player);
-      if (countB < countA) return teamB.push(player);
+    ordered.forEach((player) => {
+      const cA = countPos(teamA, pos);
+      const cB = countPos(teamB, pos);
 
-      if (teamA.length <= teamB.length) teamA.push(player);
-      else teamB.push(player);
+      let target;
+      if (cA !== cB) target = cA < cB ? 'A' : 'B';                          // 1º: paridade de posição
+      else if (totals.A !== totals.B) target = totals.A <= totals.B ? 'A' : 'B'; // 2º: equilíbrio de nota
+      else target = teamA.length <= teamB.length ? 'A' : 'B';              // 3º: menor time
+
+      if (target === 'A') { teamA.push(player); totals.A += ratingOf(player); }
+      else { teamB.push(player); totals.B += ratingOf(player); }
     });
   });
 
@@ -626,7 +657,8 @@ export function drawTeams() {
     };
   }
 
-  const { teamA, teamB } = balanceTeams(eligiblePlayers);
+  const ratingOf = buildRatingResolver(eligiblePlayers);
+  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf);
   const createdAt = new Date().toISOString();
   
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');

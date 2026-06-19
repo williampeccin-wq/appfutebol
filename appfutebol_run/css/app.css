@@ -854,6 +854,21 @@ button {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.team-strength-badge {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--hfc-gold, #f0a500);
+  background: rgba(240, 165, 0, 0.12);
+  border: 1px solid rgba(240, 165, 0, 0.28);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
 }
 
 @media (min-width: 720px) {

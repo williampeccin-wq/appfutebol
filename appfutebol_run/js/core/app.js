@@ -2086,7 +2086,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
@@ -3975,6 +3975,15 @@ function buildTeamDrawShareText(snapshot) {
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
   const game = getActiveGameFromSnapshot(snapshot);
+  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  const teamStrengthText = (ids = []) => {
+    const vals = ids
+      .map((entry) => ratingAvgs[String((entry && typeof entry === 'object') ? entry.id : entry)])
+      .filter((r) => r && r.votes > 0)
+      .map((r) => r.avg);
+    if (!vals.length) return '';
+    return ` (força ${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)})`;
+  };
   const formatTeam = (label, ids = []) => {
     const players = ids.map((id) => ((id && typeof id === 'object') ? id : playerById.get(id)));
     const goalkeepers = players.filter((p) => p && (p.rental_goalkeeper || ['gol','goleiro'].includes(String(p.position || '').toLowerCase())));
@@ -3988,7 +3997,7 @@ function buildTeamDrawShareText(snapshot) {
       return `${index + 1}. ${prefix}${player?.name || 'Jogador removido'}`;
     });
 
-    return [`${label}:`, ...lines].join('\n');
+    return [`${label}${teamStrengthText(ids)}:`, ...lines].join('\n');
   };
 
   return [
@@ -4455,7 +4464,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
         <div class="card-title">Sorteio de times</div>
         <div class="info-block">
           <div class="info-line">• Confirmados disponíveis: ${confirmedCount}</div>
-          <div class="info-line">• O sorteio usa apenas jogadores confirmados.</div>
+          <div class="info-line">• Equilibra os times pelas notas de desempenho, mantendo as posições divididas.</div>
         </div>
         ${canManagePresenceAuthz(currentPlayer) ? `
           <div class="actions" style="margin-top:12px;">
@@ -4472,9 +4481,23 @@ function renderTeamDraw(snapshot, currentPlayer) {
     return { id, player };
   };
 
+  // Força do time = média das notas de desempenho dos jogadores que já têm voto
+  // (convidados/goleiros de aluguel e quem ainda não foi votado ficam de fora da média).
+  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  const teamStrength = (entries = []) => {
+    const vals = (entries || [])
+      .map((entry) => ratingAvgs[String(getEntryId(entry))])
+      .filter((r) => r && r.votes > 0)
+      .map((r) => r.avg);
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+  const strengthA = teamStrength(sortResult.team_a);
+  const strengthB = teamStrength(sortResult.team_b);
+
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
-      <div class="team-draw-title">${title}</div>
+      <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<span class="team-strength-badge">⚡ ${s.toFixed(1)}</span>` : ''; })()}</div>
       <div class="placeholder-list">
         ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
@@ -4515,6 +4538,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
       <div class="info-block">
         <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
         <div class="info-line">• Jogadores sorteados: ${[...(sortResult.team_a || []), ...(sortResult.team_b || [])].length}</div>
+        ${(strengthA !== null && strengthB !== null) ? `<div class="info-line">• Equilíbrio por nota: Time A <b>${strengthA.toFixed(1)}</b> × <b>${strengthB.toFixed(1)}</b> Time B (diferença ${Math.abs(strengthA - strengthB).toFixed(1)})</div>` : ''}
       </div>
       <div class="team-draw-grid">
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
