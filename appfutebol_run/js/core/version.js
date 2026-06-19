@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.94.0-carne-autosave';
+export const APP_VERSION = 'v1.97.2-sorteio-card-limpo';

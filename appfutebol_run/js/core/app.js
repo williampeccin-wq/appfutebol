@@ -1952,6 +1952,18 @@ if (action === "admin-add-to-game") {
 
 
 
+  if (action === "open-strength-info") {
+    await showInfoModal({
+      title: '⚡ Força do time',
+      html: `
+        <p>É a <strong>nota média dos jogadores do time</strong>, segundo as notas da <strong>votação de desempenho</strong> (de 1 a 10) que cada um recebeu nos jogos anteriores.</p>
+        <p>O sorteio usa essas notas para deixar os dois times o mais <strong>equilibrados</strong> possível — sempre respeitando as posições (goleiro, zaga, meio e ataque ficam divididos entre os times).</p>
+        <p style="opacity:.75;font-size:13px;">Quem ainda não recebeu nenhuma nota, convidados e goleiros de aluguel não entram nesse cálculo da média.</p>
+      `,
+    });
+    return;
+  }
+
   if (action === "open-pix-info") {
     if (!requireAdmin(snapshot, 'Apenas administrador')) return;
     const payPlayer = (snapshot.players || []).find((p) => String(p.id) === String(id));
@@ -2086,7 +2098,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
@@ -2105,6 +2117,7 @@ function ensureRatingsLoaded() {
 function notifyWaitlistPromotion(result) {
   const promotedId = result?.promotedPlayerId;
   if (!promotedId) return;
+  if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
   triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
 }
 
@@ -3375,7 +3388,7 @@ function bindAppEvents(currentPlayer) {
       });
 
       // Gatilho de push: inscrições acabaram de ABRIR (fechado -> aberto).
-      if (!existingGame.open && updatedGame.open) {
+      if (!existingGame.open && updatedGame.open && isNotifEnabled(getState(), 'inscricoes_abertas')) {
         triggerServerPush({
           target: 'all',
           title: 'Inscrições abertas ⚽',
@@ -3482,6 +3495,21 @@ function bindAppEvents(currentPlayer) {
       showToast(hours ? `Votação de desempenho: janela de ${hours}h.` : 'Votação de desempenho desativada (janela 0).');
     });
   }
+
+  // Central de notificações: cada toggle auto-salva (replaceState = persiste no remoto).
+  appElement.querySelectorAll('.notif-center-toggle').forEach((toggle) => {
+    toggle.addEventListener('change', () => {
+      if (!requireAdmin(getState(), 'Apenas administrador pode mudar notificações')) return;
+      const key = toggle.dataset.notifKey;
+      const next = structuredClone(getState());
+      const notifications = { ...((next.settings && next.settings.notifications) || {}) };
+      notifications[key] = toggle.checked;
+      next.settings = { ...(next.settings || {}), notifications };
+      replaceState(repairManualSnapshot(next));
+      const label = (NOTIF_TYPES.find((t) => t.key === key) || {}).label || 'Aviso';
+      showToast(`${label}: ${toggle.checked ? 'ligado' : 'desligado'}.`, 'success');
+    });
+  });
 
   const notificationsForm = appElement.querySelector('#notifications-config-form');
   if (notificationsForm) {
@@ -3719,13 +3747,11 @@ function renderHome(snapshot, currentPlayer) {
     : ((game && game.game_date) ? 'Abertura das inscrições em breve.' : 'Aguarde o próximo jogo ser marcado.');
   const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
-  const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
-  const homeMoreLine = Math.max(homeLinePlayers.length - 5, 0);
+  const homeLineAvatars = homeLinePlayers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
   const homeGoalkeeperAvatars = [
     ...homeGoalkeepers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')),
     ...homeRentalGoalkeepers.map((entry) => '<span class="home-v2-avatar home-v2-rental-goalie-avatar">🧤</span>')
   ].join('');
-  const homeMoreGoalkeepers = Math.max(homeGoalkeeperCount - 5, 0);
   const homeGoalkeeperNames = [
     ...homeGoalkeepers.map((player) => player.name),
     ...homeRentalGoalkeepers.map((entry) => String(entry.name || '') + ' (aluguel)')
@@ -3825,7 +3851,6 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-confirmed-group-title">Linha (${homeLinePlayers.length})</div>
           <div class="home-v2-avatar-row">
             ${homeLineAvatars || '<span class="home-v2-empty">Nenhum jogador de linha confirmado.</span>'}
-            ${homeMoreLine ? '<span class="home-v2-more">+' + homeMoreLine + '</span>' : ''}
           </div>
         </div>
 
@@ -3833,7 +3858,6 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-confirmed-group-title">🧤 Goleiros (${homeGoalkeeperCount}/2)</div>
           <div class="home-v2-avatar-row">
             ${homeGoalkeeperAvatars || '<span class="home-v2-empty">Nenhum goleiro confirmado.</span>'}
-            ${homeMoreGoalkeepers ? '<span class="home-v2-more">+' + homeMoreGoalkeepers + '</span>' : ''}
           </div>
           <div class="home-v2-goalie-names">${homeGoalkeeperNames}</div>
         </div>
@@ -3963,6 +3987,15 @@ function buildTeamDrawShareText(snapshot) {
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
   const game = getActiveGameFromSnapshot(snapshot);
+  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  const teamStrengthText = (ids = []) => {
+    const vals = ids
+      .map((entry) => ratingAvgs[String((entry && typeof entry === 'object') ? entry.id : entry)])
+      .filter((r) => r && r.votes > 0)
+      .map((r) => r.avg);
+    if (!vals.length) return '';
+    return ` (força ${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)})`;
+  };
   const formatTeam = (label, ids = []) => {
     const players = ids.map((id) => ((id && typeof id === 'object') ? id : playerById.get(id)));
     const goalkeepers = players.filter((p) => p && (p.rental_goalkeeper || ['gol','goleiro'].includes(String(p.position || '').toLowerCase())));
@@ -3976,7 +4009,7 @@ function buildTeamDrawShareText(snapshot) {
       return `${index + 1}. ${prefix}${player?.name || 'Jogador removido'}`;
     });
 
-    return [`${label}:`, ...lines].join('\n');
+    return [`${label}${teamStrengthText(ids)}:`, ...lines].join('\n');
   };
 
   return [
@@ -4443,7 +4476,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
         <div class="card-title">Sorteio de times</div>
         <div class="info-block">
           <div class="info-line">• Confirmados disponíveis: ${confirmedCount}</div>
-          <div class="info-line">• O sorteio usa apenas jogadores confirmados.</div>
+          <div class="info-line">• Equilibra os times pelas notas de desempenho, mantendo as posições divididas.</div>
         </div>
         ${canManagePresenceAuthz(currentPlayer) ? `
           <div class="actions" style="margin-top:12px;">
@@ -4460,9 +4493,21 @@ function renderTeamDraw(snapshot, currentPlayer) {
     return { id, player };
   };
 
+  // Força do time = média das notas de desempenho dos jogadores que já têm voto
+  // (convidados/goleiros de aluguel e quem ainda não foi votado ficam de fora da média).
+  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  const teamStrength = (entries = []) => {
+    const vals = (entries || [])
+      .map((entry) => ratingAvgs[String(getEntryId(entry))])
+      .filter((r) => r && r.votes > 0)
+      .map((r) => r.avg);
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
-      <div class="team-draw-title">${title}</div>
+      <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<button type="button" class="team-strength-badge" data-action="open-strength-info" aria-label="O que é a força do time?">⚡ ${s.toFixed(1)} <span class="team-strength-info">ⓘ</span></button>` : ''; })()}</div>
       <div class="placeholder-list">
         ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
@@ -4502,7 +4547,6 @@ function renderTeamDraw(snapshot, currentPlayer) {
       <div class="card-title">Sorteio de times</div>
       <div class="info-block">
         <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
-        <div class="info-line">• Jogadores sorteados: ${[...(sortResult.team_a || []), ...(sortResult.team_b || [])].length}</div>
       </div>
       <div class="team-draw-grid">
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
@@ -4543,6 +4587,20 @@ function renderTeamDraw(snapshot, currentPlayer) {
   `;
 }
 
+// Central de notificações: tipos controláveis e leitura do flag (default LIGADO).
+const NOTIF_TYPES = [
+  { key: 'inscricoes_abertas', label: 'Inscrições abertas', desc: 'Quando um jogo abre para confirmação (manual ou automático). Para todos.' },
+  { key: 'mensalidade_atrasada', label: 'Mensalidade atrasada', desc: 'Aviso diário (7h) para quem está em atraso.' },
+  { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
+  { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
+  { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla da carne (23h do dia do jogo). Para todos.' },
+];
+function isNotifEnabled(snapshot, key) {
+  const n = snapshot?.settings?.notifications;
+  if (!n || typeof n !== 'object' || !(key in n)) return true; // ausente = ligado
+  return n[key] !== false;
+}
+
 function renderConfig(snapshot, currentPlayer) {
   if (!authzIsAdmin(currentPlayer)) {
     return `
@@ -4557,6 +4615,16 @@ function renderConfig(snapshot, currentPlayer) {
 
   const game = getActiveGameFromSnapshot(snapshot) || {};
   const games = getCurrentGames(snapshot);
+  // Lista enxuta: mostra futuros + o ativo + o último passado; os passados mais
+  // antigos vão para um expander "Ver jogos anteriores". É SÓ exibição — nada é
+  // apagado (cada jogo mantém game_key p/ presenças, notas e churrasco).
+  const activeKeyForList = String(getGameKey(game));
+  const isOldPast = (g) => String(g.game_date || '') < carneTodayIso() && String(getGameKey(g)) !== activeKeyForList;
+  const byGameDate = (a, b) => String(a.game_date || '').localeCompare(String(b.game_date || '')) || String(a.game_time || '').localeCompare(String(b.game_time || ''));
+  const pastGamesForList = games.filter(isOldPast).sort(byGameDate);
+  const lastPastGame = pastGamesForList.length ? pastGamesForList[pastGamesForList.length - 1] : null;
+  const olderPastGames = lastPastGame ? pastGamesForList.slice(0, -1) : [];
+  const shownGames = [...games.filter((g) => !isOldPast(g)), ...(lastPastGame ? [lastPastGame] : [])].sort(byGameDate);
   const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
   const defaultNewGameMaxPlayers = maxPlayers || 10;
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
@@ -4657,8 +4725,20 @@ function renderConfig(snapshot, currentPlayer) {
       <section class="card games-config-card">
         <div class="card-title">Jogos</div>
 
+        ${olderPastGames.length ? `
+          <details class="champ-collapse game-old-list">
+            <summary class="champ-collapse-summary">
+              <span class="card-subtitle">Ver jogos anteriores · ${olderPastGames.length}</span>
+              <span class="champ-collapse-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="champ-collapse-body games-list-config">
+              ${olderPastGames.map(renderGameEditForm).join('')}
+            </div>
+          </details>
+        ` : ''}
+
         <div class="games-list-config">
-          ${games.map(renderGameEditForm).join('')}
+          ${shownGames.map(renderGameEditForm).join('')}
         </div>
 
         <details class="create-game-details games-create-inline">
@@ -4768,19 +4848,35 @@ function renderConfig(snapshot, currentPlayer) {
         </form>
       </section>
 
-      <section class="card notifications-config-card">
-        <div class="card-title">Notificações gerais</div>
-        
-        <form id="notifications-config-form" class="player-admin-form notifications-config-form">
-          <label class="field-label config-notifications-field">
-            Recado para todos
-            <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
-          </label>
-          <p class="footer-note config-notifications-help"></p>
-          <div class="player-admin-actions game-config-actions">
-            <button class="btn btn-primary" type="submit">Salvar notificação</button>
-          </div>
-        </form>
+      <section class="card notif-center-card">
+        <div class="card-title">Central de notificações</div>
+
+        <div class="card-subtitle">Avisos por push (celular)</div>
+        <p class="footer-note">Ligue ou desligue cada aviso. Salva sozinho.</p>
+        <div class="notif-center-list">
+          ${NOTIF_TYPES.map((t) => `
+            <label class="notif-center-row">
+              <span class="notif-center-text">
+                <strong>${t.label}</strong>
+                <small>${t.desc}</small>
+              </span>
+              <input type="checkbox" class="notif-center-toggle" data-notif-key="${t.key}" ${isNotifEnabled(snapshot, t.key) ? 'checked' : ''} />
+            </label>
+          `).join('')}
+        </div>
+
+        <div class="notif-center-recado">
+          <div class="card-subtitle">Recado para todos</div>
+          <p class="footer-note">Mensagem fixa que aparece na home de todos (não é push).</p>
+          <form id="notifications-config-form" class="player-admin-form notifications-config-form">
+            <label class="field-label config-notifications-field">
+              <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
+            </label>
+            <div class="player-admin-actions game-config-actions">
+              <button class="btn btn-primary" type="submit">Salvar recado</button>
+            </div>
+          </form>
+        </div>
       </section>
     </section>
   `;

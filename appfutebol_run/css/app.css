@@ -153,7 +153,7 @@ button {
 
 .login-title {
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--white);
 }
@@ -185,7 +185,7 @@ button {
   border: 1px solid var(--gray-200);
   background: var(--gray-050);
   color: var(--gray-700);
-  font-weight: 800;
+  font-weight: 600;
   border-radius: 12px;
   padding: 10px 12px;
 }
@@ -214,7 +214,7 @@ button {
 
 .form-label {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--gray-700);
 }
 
@@ -250,7 +250,7 @@ button {
   border: 0;
   border-radius: 12px;
   padding: 13px 16px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .btn-primary {
@@ -311,7 +311,7 @@ button {
 
 .header-title {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
 }
 
@@ -333,7 +333,7 @@ button {
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -343,7 +343,7 @@ button {
   color: var(--white);
   border-radius: 10px;
   padding: 8px 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .header-avatar-btn {
@@ -390,7 +390,7 @@ button {
   background: transparent;
   padding: 13px 12px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--gray-500);
   border-bottom: 2px solid transparent;
   white-space: nowrap;
@@ -430,7 +430,7 @@ button {
 
 .hero-date {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 600;
   margin-top: 8px;
 }
 
@@ -462,7 +462,7 @@ button {
 
 .progress-text {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .card {
@@ -475,7 +475,7 @@ button {
 
 .card-title {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gray-500);
@@ -519,7 +519,7 @@ button {
 
 .kpi-value {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--blue-900);
 }
 
@@ -562,7 +562,7 @@ button {
 
 .status-title {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .status-subline {
@@ -614,7 +614,7 @@ button {
   background: var(--blue-050);
   color: var(--blue-800);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
@@ -626,7 +626,7 @@ button {
 
 .row-title {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: #111827;
 }
 
@@ -638,7 +638,7 @@ button {
 
 .tag {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -811,7 +811,7 @@ button {
 
 .confirm-modal-title {
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--gray-700);
 }
 
@@ -832,7 +832,7 @@ button {
   display: grid;
   gap: 6px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -841,7 +841,7 @@ button {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -862,8 +862,38 @@ button {
 
 .team-draw-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.team-strength-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--hfc-gold, #f0a500);
+  background: rgba(240, 165, 0, 0.12);
+  border: 1px solid rgba(240, 165, 0, 0.28);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease;
+}
+.team-strength-badge:hover,
+.team-strength-badge:active {
+  background: rgba(240, 165, 0, 0.22);
+}
+.team-strength-info {
+  font-size: 11px;
+  opacity: .7;
 }
 
 @media (min-width: 720px) {
@@ -889,7 +919,7 @@ button {
 
 .presence-list-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   margin-bottom: 10px;
 }
 
@@ -982,7 +1012,7 @@ button {
   background: var(--primary);
   color: #fff;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -1020,7 +1050,7 @@ button {
   background: #fff;
   color: var(--blue-800);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
@@ -1089,7 +1119,7 @@ button {
 
 .carne-next-pill span {
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--gray-500);
@@ -1122,7 +1152,7 @@ button {
   padding: 0 10px 2px;
   color: var(--gray-500);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1165,7 +1195,7 @@ button {
 
 .carne-date-box span {
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1173,7 +1203,7 @@ button {
 .carne-date-box small {
   color: var(--gray-500);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -1195,7 +1225,7 @@ button {
   background: #fff;
   color: #111827;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.15;
   overflow-wrap: anywhere;
   word-break: normal;
@@ -1363,7 +1393,7 @@ button {
   margin-top: 6px;
   font-size: 12px;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 600;
 }
 .championship-date-grid {
   margin-top: 14px;
@@ -1388,7 +1418,7 @@ button {
 .championship-player-result-card span {
   min-width: 0;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: #0f172a;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -1400,7 +1430,7 @@ button {
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .championship-table-wrap {
   width: 100%;
@@ -1454,7 +1484,7 @@ button {
   text-align: left;
 }
 .championship-matrix-cell {
-  font-weight: 800;
+  font-weight: 600;
   min-width: 34px;
 }
 .championship-matrix-cell.is-win { color: #166534; background: #dcfce7; }
@@ -1471,11 +1501,11 @@ button {
   background: #0f172a;
   color: #fff;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 .championship-player-name {
   min-width: 150px;
-  font-weight: 800;
+  font-weight: 600;
   overflow-wrap: anywhere;
   white-space: normal;
   line-height: 1.2;
@@ -1492,7 +1522,7 @@ button {
 }
 .history-details summary {
   cursor: pointer;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
 }
 .history-grid {
@@ -1508,7 +1538,7 @@ button {
   background: #f8fafc;
 }
 .history-title {
-  font-weight: 900;
+  font-weight: 700;
   margin-bottom: 8px;
   color: #0f172a;
 }
@@ -1531,7 +1561,7 @@ button {
   border-radius: 14px;
   background: #f8fafc;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 @media (max-width: 640px) {
@@ -1574,7 +1604,7 @@ button {
 
 .championship-team-label {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #64748b;
@@ -1593,7 +1623,7 @@ button {
   background: #fff;
   padding: 9px 10px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.2;
   color: #0f172a;
   overflow-wrap: anywhere;
@@ -1680,7 +1710,7 @@ button {
 
 .home-user-name {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
@@ -1734,7 +1764,7 @@ button {
 
 .hero-presence-label {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   opacity: 0.72;
@@ -1742,7 +1772,7 @@ button {
 
 .hero-presence-status {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   margin-top: 3px;
 }
 
@@ -1811,7 +1841,7 @@ button {
 }
 
 .notification-content-carne strong {
-  font-weight: 900;
+  font-weight: 700;
   color: #166534;
 }
 
@@ -1856,7 +1886,7 @@ button {
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  font-weight: 900;
+  font-weight: 700;
   opacity: 0.78;
   margin-bottom: 10px;
 }
@@ -1864,14 +1894,14 @@ button {
 .weekly-date {
   font-size: clamp(30px, 8vw, 48px);
   line-height: 1;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -0.04em;
 }
 
 .weekly-meta {
   margin-top: 12px;
   font-size: 15px;
-  font-weight: 750;
+  font-weight: 600;
   opacity: 0.95;
 }
 
@@ -1892,7 +1922,7 @@ button {
 .weekly-count {
   margin-top: 8px;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .weekly-presence-card {
@@ -1909,13 +1939,13 @@ button {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-weight: 900;
+  font-weight: 700;
   opacity: 0.78;
 }
 
 .weekly-presence-status {
   font-size: 22px;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .weekly-presence-status.is-confirmed {
@@ -2001,7 +2031,7 @@ button {
   border-radius: 999px;
   color: #334155;
   background: #fff;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.85rem;
 }
 
@@ -2039,7 +2069,7 @@ button {
 .players-switch-head {
   padding: 13px 18px;
   color: #64748b;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -2075,7 +2105,7 @@ button {
   border-radius: 999px;
   background: #eef2ff;
   color: #1e40af;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.78rem;
 }
 
@@ -2128,7 +2158,7 @@ button {
 
 .switch-label {
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .switch-label.is-ok {
@@ -2145,7 +2175,7 @@ button {
 
 .switch-placeholder {
   color: #94a3b8;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .players-switch-actions {
@@ -2161,7 +2191,7 @@ button {
   border-radius: 10px;
   background: #f8fafc;
   color: #0f172a;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -2244,7 +2274,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .weekly-game-stats span {
@@ -2261,7 +2291,7 @@ button {
 .weekly-presence-tab {
   padding: 14px;
   text-align: center;
-  font-weight: 900;
+  font-weight: 700;
   color: #64748b;
 }
 
@@ -2320,9 +2350,9 @@ button {
     align-items: center;
   }
 
-  .players-switch-row > div:nth-child(2)::before { content: 'Posição'; font-weight: 800; color: #64748b; }
-  .players-switch-row > div:nth-child(3)::before { content: 'Pago'; font-weight: 800; color: #64748b; }
-  .players-switch-row > div:nth-child(4)::before { content: 'No jogo'; font-weight: 800; color: #64748b; }
+  .players-switch-row > div:nth-child(2)::before { content: 'Posição'; font-weight: 600; color: #64748b; }
+  .players-switch-row > div:nth-child(3)::before { content: 'Pago'; font-weight: 600; color: #64748b; }
+  .players-switch-row > div:nth-child(4)::before { content: 'No jogo'; font-weight: 600; color: #64748b; }
 
   .weekly-presence-grid {
     grid-template-columns: 1fr;
@@ -2392,7 +2422,7 @@ button {
 .weekly-presence-title {
   margin-bottom: 10px;
   color: #0f172a;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .weekly-presence-stack {
@@ -2643,7 +2673,7 @@ button {
   padding: 7px 10px;
   background: #eef2ff;
   color: #1e3a8a;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 0.78rem;
   cursor: pointer;
   flex: 0 0 auto;
@@ -2916,7 +2946,7 @@ button {
   background: #e2e8f0;
   color: #475569;
   font-size: 0.74rem;
-  font-weight: 900;
+  font-weight: 700;
   flex: 0 0 auto;
 }
 
@@ -3045,7 +3075,7 @@ button {
 
 .password-change-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   color: #0f172a;
 }
 
@@ -3072,7 +3102,7 @@ button {
   padding: 3px 8px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -3094,7 +3124,7 @@ button {
   background: #eef2ff;
   color: #1e3a8a;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -3109,7 +3139,7 @@ button {
   display: block;
   margin-top: 5px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #64748b;
 }
 
@@ -3532,7 +3562,7 @@ button {
 .championship-audit-item summary span,
 .championship-audit-item summary small {
   color: #64748b;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .championship-audit-table-wrap {
@@ -3570,7 +3600,7 @@ button {
   align-items: center;
   border-radius: 999px;
   padding: 4px 9px;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 0.75rem;
 }
 
@@ -3715,7 +3745,7 @@ button {
 .championship-teams-result-details > summary {
   cursor: pointer;
   padding: 12px 14px;
-  font-weight: 900;
+  font-weight: 700;
   color: #1d3557;
   list-style: none;
 }
@@ -3862,7 +3892,7 @@ button {
 
 .championship-team-player-pill small {
   color: #64748b;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .championship-launch-summary-grid {
@@ -3890,7 +3920,7 @@ button {
   margin-top: 2px;
   color: #64748b;
   font-size: .82rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .home-waitlist-card {
@@ -3899,7 +3929,7 @@ button {
 }
 
 .home-waitlist-highlight {
-  font-weight: 900;
+  font-weight: 700;
   color: #9a3412;
   margin-bottom: 10px;
 }
@@ -3920,7 +3950,7 @@ button {
 }
 
 .home-waitlist-row span {
-  font-weight: 900;
+  font-weight: 700;
   color: #c2410c;
 }
 
@@ -4005,7 +4035,7 @@ button {
 
 .championship-team-player-pill small {
   color: #64748b;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .championship-launch-summary-grid {
@@ -4033,7 +4063,7 @@ button {
   margin-top: 2px;
   color: #64748b;
   font-size: .82rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 @media (max-width: 760px) {
@@ -4073,7 +4103,7 @@ button {
   display: grid;
   gap: 7px;
   min-width: 0;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
 }
 
@@ -4128,28 +4158,28 @@ button {
 .championship-result-card-v2{padding:28px 32px!important;overflow:hidden}
 .championship-result-header-v2{display:grid;grid-template-columns:48px minmax(0,1fr);gap:16px;align-items:start}
 .championship-result-icon-v2{display:grid;place-items:center;width:48px;height:48px;border-radius:999px;background:#0f3765;color:#fff;font-size:1.45rem}
-.championship-result-subtitle-v2{margin:8px 0 0;color:#64748b;font-weight:700;line-height:1.45}
+.championship-result-subtitle-v2{margin:8px 0 0;color:#64748b;font-weight: 600;line-height:1.45}
 .championship-result-badges-v2{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0 0}
-.championship-pill-v2{display:inline-flex;align-items:center;border-radius:999px;padding:8px 14px;font-weight:900;font-size:.92rem}
+.championship-pill-v2{display:inline-flex;align-items:center;border-radius:999px;padding:8px 14px;font-weight: 700;font-size:.92rem}
 .championship-pill-v2.is-blue{color:#12356a;background:#e8f0fb}
 .championship-pill-v2.is-gold{color:#8a5a00;background:#fff2d2}
 .championship-pill-v2.is-green{color:#166534;background:#dcfce7}
 .championship-result-divider-v2{height:1px;background:#e5e7eb;margin:22px 0}
 .championship-result-form-v2{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:18px!important;align-items:end!important}
-.championship-field-v2{display:grid!important;gap:8px!important;min-width:0!important;margin:0!important;font-weight:900!important;color:#0f172a!important}
+.championship-field-v2{display:grid!important;gap:8px!important;min-width:0!important;margin:0!important;font-weight: 700!important;color:#0f172a!important}
 .championship-draw-field-v2{grid-column:1/-1!important}
-.championship-control-v2{width:100%!important;max-width:100%!important;min-width:0!important;height:56px!important;box-sizing:border-box!important;border:2px solid #153660!important;border-radius:10px!important;background:#fff!important;color:#0f172a!important;font-size:1rem!important;font-weight:700!important;line-height:1.2!important;padding:0 14px!important}
+.championship-control-v2{width:100%!important;max-width:100%!important;min-width:0!important;height:56px!important;box-sizing:border-box!important;border:2px solid #153660!important;border-radius:10px!important;background:#fff!important;color:#0f172a!important;font-size:1rem!important;font-weight: 600!important;line-height:1.2!important;padding:0 14px!important}
 .championship-teams-result-details-v2{margin-top:22px!important;border:1px solid #bfdbfe!important;background:#f8fbff!important;border-radius:14px!important}
 .championship-teams-result-details-v2>summary{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;gap:8px!important;align-items:center!important;padding:16px!important}
-.championship-teams-result-details-v2>summary span{font-weight:950!important;color:#173760!important}
-.championship-teams-result-details-v2>summary small{display:block!important;grid-column:2!important;color:#334155!important;font-weight:800!important}
+.championship-teams-result-details-v2>summary span{font-weight: 700!important;color:#173760!important}
+.championship-teams-result-details-v2>summary small{display:block!important;grid-column:2!important;color:#334155!important;font-weight: 600!important}
 .championship-save-result-btn-v2{width:100%!important;height:64px!important;margin-top:24px!important;font-size:1.15rem!important}
-.championship-result-info-v2{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#173760;font-weight:800;line-height:1.35}
+.championship-result-info-v2{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#173760;font-weight: 600;line-height:1.35}
 .championship-result-info-v2 strong{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:#1d4ed8;color:#fff}
 @media(max-width:760px){.championship-result-card-v2{padding:20px 16px!important}.championship-result-header-v2{grid-template-columns:40px minmax(0,1fr);gap:12px}.championship-result-icon-v2{width:40px;height:40px;font-size:1.15rem}.championship-result-badges-v2{display:grid;grid-template-columns:1fr}.championship-result-form-v2{grid-template-columns:1fr!important}.championship-control-v2{height:52px!important;font-size:.95rem!important}}
 
 /* v1.60.70 - multiple future games */
-.games-list-config{display:grid;gap:10px;margin-top:12px}.game-config-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.game-config-row.is-active{border-color:#2563eb;background:#eff6ff}.game-config-row strong,.game-config-row span{display:block}.game-config-row span{margin-top:3px;color:#64748b;font-weight:800;font-size:.86rem}@media(max-width:640px){.game-config-row{grid-template-columns:1fr}.game-config-row .btn{width:100%}}
+.games-list-config{display:grid;gap:10px;margin-top:12px}.game-config-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.game-config-row.is-active{border-color:#2563eb;background:#eff6ff}.game-config-row strong,.game-config-row span{display:block}.game-config-row span{margin-top:3px;color:#64748b;font-weight: 600;font-size:.86rem}@media(max-width:640px){.game-config-row{grid-template-columns:1fr}.game-config-row .btn{width:100%}}
 
 
 /* v1.60.66 - multiple games config UX separation */
@@ -4240,7 +4270,7 @@ button {
 .game-config-summary-main span {
   margin-top: 3px;
   color: #64748b;
-  font-weight: 800;
+  font-weight: 600;
   font-size: .86rem;
 }
 
@@ -4291,7 +4321,7 @@ button {
 .create-game-summary small {
   margin-top: 4px;
   color: #64748b;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -4542,7 +4572,7 @@ button {
   overflow: hidden;
   background: #e8eef7;
   color: #143966;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 20px !important;
 }
 
@@ -4682,7 +4712,7 @@ button {
 .home-v2-kicker {
   color: rgba(255,255,255,.64);
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: .13em;
   text-transform: uppercase;
 }
@@ -4691,7 +4721,7 @@ button {
   margin-top: 4px;
   font-size: clamp(30px, 8vw, 40px);
   line-height: .95;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -.06em;
 }
 
@@ -4699,14 +4729,14 @@ button {
   margin-top: 8px;
   color: rgba(255,255,255,.78);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .home-v2-status {
   border-radius: 999px;
   padding: 8px 11px;
   font-size: 12px;
-  font-weight: 950;
+  font-weight: 700;
   white-space: nowrap;
   background: rgba(255,255,255,.14);
   color: rgba(255,255,255,.86);
@@ -4730,14 +4760,14 @@ button {
 .home-v2-big-number strong {
   font-size: 54px;
   line-height: .9;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -.08em;
 }
 
 .home-v2-big-number span {
   color: rgba(255,255,255,.70);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
@@ -4752,7 +4782,7 @@ button {
 .home-v2-link {
   border: 0;
   border-radius: 999px;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .home-v2-primary {
@@ -4787,7 +4817,7 @@ button {
   display: block;
   color: #0f172a;
   font-size: 20px;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -.04em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4799,7 +4829,7 @@ button {
   margin-top: 2px;
   color: #64748b;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .06em;
 }
@@ -4829,14 +4859,14 @@ button {
   margin-top: 4px;
   color: var(--hfc-text, #0f172a);
   font-size: 21px;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -.035em;
 }
 .home-v2-closed-sub {
   margin-top: 5px;
   color: var(--hfc-text-muted, #64748b);
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 .home-v2-closed-card .home-v2-secondary { flex: 0 0 auto; }
 /* Tema escuro da home. */
@@ -4848,7 +4878,7 @@ button {
   display: block;
   color: #0f172a;
   font-size: 17px;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: -.035em;
 }
 
@@ -4858,7 +4888,7 @@ button {
   margin-top: 3px;
   color: #64748b;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .home-v2-link {
@@ -4875,20 +4905,32 @@ button {
   border-radius: 16px;
   background: #dbeafe;
   color: #174681;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .home-v2-avatar-row {
   display: flex;
   align-items: center;
+  gap: 0;
   min-height: 54px;
   margin-top: 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 4px 4px;
+  scrollbar-width: none;
 }
+.home-v2-avatar-row::-webkit-scrollbar { display: none; }
+/* Contém o scroll horizontal: sem min-width:0 o conteúdo do carrossel estica
+   o card (grid item) e estoura o layout inteiro. */
+.home-v2-card, .home-v2-confirmed-group { min-width: 0; }
 
 .home-v2-avatar {
   width: 54px !important;
   height: 54px !important;
   min-width: 54px !important;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
   border: 3px solid #fff !important;
   box-shadow: 0 8px 18px rgba(15,23,42,.12);
 }
@@ -4907,7 +4949,7 @@ button {
   border: 3px solid #fff;
   background: #e2e8f0;
   color: #334155;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .home-v2-notices {
@@ -4939,20 +4981,20 @@ button {
   display: block;
   color: #0f172a;
   font-size: 14px;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .home-v2-notice small {
   display: block;
   color: #64748b;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .home-v2-empty {
   color: #64748b;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .home-v2-profile {
@@ -5020,7 +5062,7 @@ button {
   gap: 12px;
   color: rgba(255,255,255,.74);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 /* v1.70.13 - Confirmados em linha/goleiros e notificações completas */
@@ -5043,7 +5085,7 @@ button {
 .home-v2-confirmed-group-title {
   color: #334155;
   font-size: 12px;
-  font-weight: 950;
+  font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
@@ -5056,7 +5098,7 @@ button {
   margin-top: 8px;
   color: #64748b;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .home-v2-rental-goalie-avatar {
@@ -5125,7 +5167,7 @@ button {
 
 .confirm-modal-field span {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--gray-700);
 }
 
@@ -5146,7 +5188,7 @@ button {
   z-index: 9999;
   padding: 10px 14px;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.3;
   text-align: center;
   letter-spacing: -0.01em;
@@ -5185,7 +5227,7 @@ button {
   border-radius: 999px;
   background: #fee2e2;
   color: #991b1b;
-  font-weight: 950;
+  font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .12em;
@@ -5221,7 +5263,7 @@ button {
 
 .fatal-env-card dt {
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .12em;
   color: #9a3412;
@@ -5230,13 +5272,13 @@ button {
 .fatal-env-card dd {
   margin: 0;
   overflow-wrap: anywhere;
-  font-weight: 800;
+  font-weight: 600;
   color: #111827;
 }
 
 .fatal-env-action {
   margin-top: 18px;
-  font-weight: 900;
+  font-weight: 700;
   color: #991b1b !important;
 }
 
@@ -5267,7 +5309,7 @@ button {
   border-radius: 999px;
   background: #fee2e2;
   color: #991b1b;
-  font-weight: 950;
+  font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .12em;
@@ -5303,7 +5345,7 @@ button {
 
 .fatal-env-card dt {
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .12em;
   color: #9a3412;
@@ -5312,13 +5354,13 @@ button {
 .fatal-env-card dd {
   margin: 0;
   overflow-wrap: anywhere;
-  font-weight: 800;
+  font-weight: 600;
   color: #111827;
 }
 
 .fatal-env-action {
   margin-top: 18px;
-  font-weight: 900;
+  font-weight: 700;
   color: #991b1b !important;
 }
 
@@ -5348,6 +5390,9 @@ button {
 
 body {
   font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ---------- LOGIN (Stadium Glass) ---------- */
@@ -5391,7 +5436,7 @@ body {
 }
 .login-title {
   color: #fff;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.12em;
 }
 .login-subtitle {
@@ -5432,7 +5477,7 @@ body {
   background: linear-gradient(180deg, var(--hfc-gold-200), var(--hfc-gold));
   color: #1a1200;
   border: none;
-  font-weight: 800;
+  font-weight: 600;
   border-radius: 14px;
   box-shadow: 0 8px 20px rgba(240, 165, 0, 0.32);
 }
@@ -5645,7 +5690,7 @@ body {
 .profile-view-id strong {
   display: block;
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -.02em;
   color: var(--hfc-text);
 }
@@ -5666,8 +5711,8 @@ body {
   background: var(--hfc-glass-2);
   border: 1px solid var(--hfc-glass-border);
 }
-.profile-view-row > span { color: var(--hfc-text-muted); font-size: 13px; font-weight: 700; }
-.profile-view-row > strong { color: var(--hfc-text); font-weight: 800; }
+.profile-view-row > span { color: var(--hfc-text-muted); font-size: 13px; font-weight: 600; }
+.profile-view-row > strong { color: var(--hfc-text); font-weight: 600; }
 .profile-view-actions { display: flex; gap: 10px; }
 .profile-view-actions .btn { flex: 1 1 0; min-width: 0; }
 .content--home .profile-view-actions .btn-primary {
@@ -5930,6 +5975,22 @@ body {
 }
 .pix-info-row:last-child { border-bottom: 0; }
 .pix-info-row > span { color: var(--hfc-text-muted); }
+
+/* Central de notificações */
+.notif-center-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.notif-center-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 10px 2px; border-bottom: 0.5px solid var(--hfc-glass-border); cursor: pointer;
+}
+.notif-center-row:last-child { border-bottom: 0; }
+.notif-center-text { display: flex; flex-direction: column; gap: 2px; }
+.notif-center-text strong { font-weight: 600; }
+.notif-center-text small { color: var(--hfc-text-muted); font-size: 12px; line-height: 1.4; }
+.notif-center-toggle { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--hfc-gold); }
+.notif-center-recado { margin-top: 16px; padding-top: 16px; border-top: 0.5px solid var(--hfc-glass-border); }
+
+/* Jogos: expander dos jogos anteriores (fica no topo, espaço abaixo) */
+.game-old-list { margin: 0 0 14px; }
 
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {
@@ -6354,7 +6415,7 @@ body {
   max-width: 168px;
   line-height: 1.15;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 /* ---------- CONFIG: regra de inadimplência (modos de mensalidade) ---------- */
@@ -6413,7 +6474,7 @@ body {
   gap: 8px;
 }
 .card-subtitle {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 14px;
   color: var(--hfc-text, #e8eefc);
 }
@@ -6497,7 +6558,7 @@ body {
 .content--championship .history-section-label {
   margin: 16px 2px 8px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--hfc-accent-blue);
@@ -6520,7 +6581,7 @@ body {
 }
 .content--championship .history-year-summary::-webkit-details-marker { display: none; }
 .content--championship .history-year-name {
-  font-weight: 900;
+  font-weight: 700;
   font-size: 15px;
   color: var(--hfc-text);
 }
@@ -6570,7 +6631,7 @@ body {
   padding: 28px 24px;
   color: var(--hfc-text, #e8eefc);
 }
-.fatal-title { font-size: 20px; font-weight: 900; margin-bottom: 10px; }
+.fatal-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
 .fatal-text { font-size: 14px; line-height: 1.5; color: var(--hfc-text-muted, #9fb0cc); margin-bottom: 20px; }
 
 /* ---------- Lightbox: tocar na foto do avatar amplia ---------- */
@@ -6645,8 +6706,8 @@ body {
   border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
   line-height: 1.15;
 }
-.carne-row-date strong { font-weight: 900; font-size: 15px; color: var(--hfc-text, #e8eefc); }
-.carne-row-date small { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; opacity: 0.7; }
+.carne-row-date strong { font-weight: 700; font-size: 15px; color: var(--hfc-text, #e8eefc); }
+.carne-row-date small { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; opacity: 0.7; }
 .carne-row-date.is-next {
   background: rgba(240,165,0,0.16);
   border-color: rgba(240,165,0,0.45);
@@ -6654,11 +6715,11 @@ body {
 .carne-row-date.is-next strong { color: var(--hfc-gold-200, #ffd980); }
 .carne-row-date.is-next small { color: var(--hfc-gold-200, #ffd980); opacity: 0.9; }
 .carne-rotation-item.is-next { border-color: rgba(240,165,0,0.3); }
-.carne-rotation-names { flex: 1 1 auto; min-width: 0; font-weight: 700; }
+.carne-rotation-names { flex: 1 1 auto; min-width: 0; font-weight: 600; }
 .carne-rotation-names small { font-weight: 500; opacity: 0.6; }
 .carne-rotation-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
 .carne-rotation-item-actions .icon-action-button {
-  width: 32px; height: 32px; font-size: 16px; font-weight: 800;
+  width: 32px; height: 32px; font-size: 16px; font-weight: 600;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
   color: var(--hfc-text, #e8eefc);
@@ -6682,7 +6743,7 @@ body {
   border-top: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
 }
 .carne-rotation-save-actions { display: flex; gap: 8px; align-items: center; }
-.carne-rotation-dirty-note { color: var(--hfc-gold-200, #ffd980); font-weight: 800; font-size: 13px; }
+.carne-rotation-dirty-note { color: var(--hfc-gold-200, #ffd980); font-weight: 600; font-size: 13px; }
 .carne-rotation-saved-note { color: var(--hfc-text-muted, #9fb0cc); font-size: 13px; }
 .carne-rotation-card.is-dirty { border-color: rgba(240,165,0,0.45); }
 
@@ -6728,7 +6789,7 @@ body {
   background: rgba(239,68,68,0.14);
   border: 1px solid rgba(239,68,68,0.35);
   color: #fecaca;
-  font-size: 13px; font-weight: 700;
+  font-size: 13px; font-weight: 600;
 }
 
 /* ===================== Votação de desempenho (modal bloqueante) ===================== */
@@ -6764,18 +6825,18 @@ body.vote-open { overflow: hidden; }
   animation: avatar-lightbox-in 0.18s ease;
 }
 .perf-vote-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.perf-vote-kicker { font-size: 12px; font-weight: 950; letter-spacing: .12em; text-transform: uppercase; color: var(--hfc-gold-200, #ffd980); }
-.perf-vote-progress { font-size: 12px; font-weight: 800; color: var(--hfc-text-muted, #9fb0cc); }
+.perf-vote-kicker { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--hfc-gold-200, #ffd980); }
+.perf-vote-progress { font-size: 12px; font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); }
 .perf-vote-player { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; }
 .avatar.perf-vote-avatar { width: 84px; height: 84px; border-radius: 999px; font-size: 28px; border: 2px solid rgba(255, 255, 255, 0.18); }
-.perf-vote-name { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
-.perf-vote-pos { font-size: 13px; font-weight: 700; color: var(--hfc-text-muted, #9fb0cc); }
+.perf-vote-name { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.perf-vote-pos { font-size: 13px; font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); }
 /* Nota: número grande colorido + slider com trilha colorida (arrasta pra avaliar). */
 .perf-vote-rate { margin-bottom: 20px; }
 .perf-vote-value {
   text-align: center;
   font-size: 64px;
-  font-weight: 950;
+  font-weight: 700;
   line-height: 1;
   letter-spacing: -.04em;
   margin-bottom: 14px;
@@ -6824,7 +6885,7 @@ body.vote-open { overflow: hidden; }
   justify-content: space-between;
   margin-top: 8px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--hfc-text-muted, #9fb0cc);
 }
 .perf-vote-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
@@ -6840,7 +6901,7 @@ body.vote-open { overflow: hidden; }
 }
 .players-subhead {
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: .02em;
   color: var(--hfc-text, #e8eefc);
   margin-bottom: 10px;
@@ -6861,7 +6922,7 @@ body.vote-open { overflow: hidden; }
 .player-compact-row.is-editing { background: rgba(240, 165, 0, 0.10); border-radius: 12px; }
 .player-compact-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .player-compact-text { min-width: 0; }
-.player-compact-text .row-title { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-compact-text .row-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-compact-text .row-subtitle { font-size: 12px; color: var(--hfc-text-muted, #9fb0cc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-compact-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .carne-edit-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -6900,7 +6961,7 @@ body.vote-open { overflow: hidden; }
 
 /* Nota média de desempenho na classificação + ranking dos churrascos. */
 .championship-nota-cell { text-align: center; }
-.championship-nota { font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.championship-nota { font-weight: 700; color: var(--hfc-gold-200, #ffd980); }
 .championship-nota.is-empty { color: var(--hfc-text-muted, #9fb0cc); font-weight: 600; }
 .churrasco-rank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .churrasco-rank-row {
@@ -6912,11 +6973,11 @@ body.vote-open { overflow: hidden; }
 .churrasco-rank-pos {
   flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 900; font-size: 13px;
+  font-weight: 700; font-size: 13px;
   background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200, #ffd980);
 }
-.churrasco-rank-name { flex: 1 1 auto; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.churrasco-rank-avg { flex: 0 0 auto; font-weight: 900; color: var(--hfc-gold-200, #ffd980); }
+.churrasco-rank-name { flex: 1 1 auto; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.churrasco-rank-avg { flex: 0 0 auto; font-weight: 700; color: var(--hfc-gold-200, #ffd980); }
 .churrasco-rank-avg small { font-weight: 600; color: var(--hfc-text-muted, #9fb0cc); margin-left: 4px; }
 
 /* Áurea no avatar do jogador melhor votado (aparece em todo lugar). */
