@@ -4881,21 +4881,31 @@ button {
 .home-v2-avatar-row {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 54px;
   margin-top: 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  padding-bottom: 4px;
+  scrollbar-width: none;
 }
+.home-v2-avatar-row::-webkit-scrollbar { display: none; }
 
 .home-v2-avatar {
   width: 54px !important;
   height: 54px !important;
   min-width: 54px !important;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
   border: 3px solid #fff !important;
   box-shadow: 0 8px 18px rgba(15,23,42,.12);
 }
 
 .home-v2-avatar + .home-v2-avatar,
 .home-v2-more {
-  margin-left: -12px;
+  margin-left: 0;
 }
 
 .home-v2-more {

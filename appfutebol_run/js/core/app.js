@@ -3735,13 +3735,11 @@ function renderHome(snapshot, currentPlayer) {
     : ((game && game.game_date) ? 'Abertura das inscrições em breve.' : 'Aguarde o próximo jogo ser marcado.');
   const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
   const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
-  const homeLineAvatars = homeLinePlayers.slice(0, 5).map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
-  const homeMoreLine = Math.max(homeLinePlayers.length - 5, 0);
+  const homeLineAvatars = homeLinePlayers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
   const homeGoalkeeperAvatars = [
     ...homeGoalkeepers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')),
     ...homeRentalGoalkeepers.map((entry) => '<span class="home-v2-avatar home-v2-rental-goalie-avatar">🧤</span>')
   ].join('');
-  const homeMoreGoalkeepers = Math.max(homeGoalkeeperCount - 5, 0);
   const homeGoalkeeperNames = [
     ...homeGoalkeepers.map((player) => player.name),
     ...homeRentalGoalkeepers.map((entry) => String(entry.name || '') + ' (aluguel)')
@@ -3841,7 +3839,6 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-confirmed-group-title">Linha (${homeLinePlayers.length})</div>
           <div class="home-v2-avatar-row">
             ${homeLineAvatars || '<span class="home-v2-empty">Nenhum jogador de linha confirmado.</span>'}
-            ${homeMoreLine ? '<span class="home-v2-more">+' + homeMoreLine + '</span>' : ''}
           </div>
         </div>
 
@@ -3849,7 +3846,6 @@ function renderHome(snapshot, currentPlayer) {
           <div class="home-v2-confirmed-group-title">🧤 Goleiros (${homeGoalkeeperCount}/2)</div>
           <div class="home-v2-avatar-row">
             ${homeGoalkeeperAvatars || '<span class="home-v2-empty">Nenhum goleiro confirmado.</span>'}
-            ${homeMoreGoalkeepers ? '<span class="home-v2-more">+' + homeMoreGoalkeepers + '</span>' : ''}
           </div>
           <div class="home-v2-goalie-names">${homeGoalkeeperNames}</div>
         </div>
