@@ -4697,10 +4697,6 @@ function renderConfig(snapshot, currentPlayer) {
       <section class="card games-config-card">
         <div class="card-title">Jogos</div>
 
-        <div class="games-list-config">
-          ${shownGames.map(renderGameEditForm).join('')}
-        </div>
-
         ${olderPastGames.length ? `
           <details class="champ-collapse game-old-list">
             <summary class="champ-collapse-summary">
@@ -4708,10 +4704,14 @@ function renderConfig(snapshot, currentPlayer) {
               <span class="champ-collapse-chevron" aria-hidden="true"></span>
             </summary>
             <div class="champ-collapse-body games-list-config">
-              ${[...olderPastGames].reverse().map(renderGameEditForm).join('')}
+              ${olderPastGames.map(renderGameEditForm).join('')}
             </div>
           </details>
         ` : ''}
+
+        <div class="games-list-config">
+          ${shownGames.map(renderGameEditForm).join('')}
+        </div>
 
         <details class="create-game-details games-create-inline">
           <summary class="create-game-summary">
