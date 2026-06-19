@@ -90,28 +90,18 @@ button {
 }
 .boot-crest-wrap { position: relative; display: grid; place-items: center; }
 .boot-crest {
-  width: 108px;
-  height: 108px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 44px rgba(0, 0, 0, 0.55));
   animation: boot-pulse 1.9s ease-in-out infinite;
 }
-.boot-title {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  font-weight: 700;
-  font-size: 23px;
-  letter-spacing: -.02em;
-  color: #ffffff;
-}
-.boot-title span {
-  font-size: 14px;
+.boot-subtitle {
   font-weight: 600;
-  letter-spacing: .06em;
-  color: var(--hfc-gold, #f0a500);
+  font-size: 15px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
 }
 .boot-loader {
   width: 26px;
@@ -122,8 +112,8 @@ button {
   animation: spin 0.8s linear infinite;
 }
 @keyframes boot-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 165, 0, 0.32), 0 16px 44px rgba(0, 0, 0, 0.55); }
-  50% { transform: scale(1.045); box-shadow: 0 0 0 16px rgba(240, 165, 0, 0), 0 16px 44px rgba(0, 0, 0, 0.55); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 @media (prefers-reduced-motion: reduce) {
   .boot-crest { animation: none; }
