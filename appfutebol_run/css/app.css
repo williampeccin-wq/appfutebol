@@ -860,6 +860,9 @@ button {
   gap: 8px;
 }
 .team-strength-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .01em;
@@ -867,8 +870,20 @@ button {
   background: rgba(240, 165, 0, 0.12);
   border: 1px solid rgba(240, 165, 0, 0.28);
   border-radius: 999px;
-  padding: 2px 9px;
+  padding: 3px 10px;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease;
+}
+.team-strength-badge:hover,
+.team-strength-badge:active {
+  background: rgba(240, 165, 0, 0.22);
+}
+.team-strength-info {
+  font-size: 11px;
+  opacity: .7;
 }
 
 @media (min-width: 720px) {

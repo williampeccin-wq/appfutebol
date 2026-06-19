@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.97.0-sorteio-por-nota';
+export const APP_VERSION = 'v1.97.1-forca-explicacao';

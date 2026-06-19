@@ -1952,6 +1952,18 @@ if (action === "admin-add-to-game") {
 
 
 
+  if (action === "open-strength-info") {
+    await showInfoModal({
+      title: '⚡ Força do time',
+      html: `
+        <p>É a <strong>nota média dos jogadores do time</strong>, segundo as notas da <strong>votação de desempenho</strong> (de 1 a 10) que cada um recebeu nos jogos anteriores.</p>
+        <p>O sorteio usa essas notas para deixar os dois times o mais <strong>equilibrados</strong> possível — sempre respeitando as posições (goleiro, zaga, meio e ataque ficam divididos entre os times).</p>
+        <p style="opacity:.75;font-size:13px;">Quem ainda não recebeu nenhuma nota, convidados e goleiros de aluguel não entram nesse cálculo da média.</p>
+      `,
+    });
+    return;
+  }
+
   if (action === "open-pix-info") {
     if (!requireAdmin(snapshot, 'Apenas administrador')) return;
     const payPlayer = (snapshot.players || []).find((p) => String(p.id) === String(id));
@@ -4497,7 +4509,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
-      <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<span class="team-strength-badge">⚡ ${s.toFixed(1)}</span>` : ''; })()}</div>
+      <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<button type="button" class="team-strength-badge" data-action="open-strength-info" aria-label="O que é a força do time?">⚡ ${s.toFixed(1)} <span class="team-strength-info">ⓘ</span></button>` : ''; })()}</div>
       <div class="placeholder-list">
         ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
