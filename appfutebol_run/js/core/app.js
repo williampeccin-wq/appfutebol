@@ -4504,8 +4504,6 @@ function renderTeamDraw(snapshot, currentPlayer) {
     if (!vals.length) return null;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
-  const strengthA = teamStrength(sortResult.team_a);
-  const strengthB = teamStrength(sortResult.team_b);
 
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
@@ -4549,8 +4547,6 @@ function renderTeamDraw(snapshot, currentPlayer) {
       <div class="card-title">Sorteio de times</div>
       <div class="info-block">
         <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
-        <div class="info-line">• Jogadores sorteados: ${[...(sortResult.team_a || []), ...(sortResult.team_b || [])].length}</div>
-        ${(strengthA !== null && strengthB !== null) ? `<div class="info-line">• Equilíbrio por nota: Time A <b>${strengthA.toFixed(1)}</b> × <b>${strengthB.toFixed(1)}</b> Time B (diferença ${Math.abs(strengthA - strengthB).toFixed(1)})</div>` : ''}
       </div>
       <div class="team-draw-grid">
         ${renderTeam('Time A', sortResult.team_a, 'team_a')}
