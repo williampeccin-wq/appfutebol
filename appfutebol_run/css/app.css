@@ -4892,6 +4892,9 @@ button {
   scrollbar-width: none;
 }
 .home-v2-avatar-row::-webkit-scrollbar { display: none; }
+/* Contém o scroll horizontal: sem min-width:0 o conteúdo do carrossel estica
+   o card (grid item) e estoura o layout inteiro. */
+.home-v2-card, .home-v2-confirmed-group { min-width: 0; }
 
 .home-v2-avatar {
   width: 54px !important;
