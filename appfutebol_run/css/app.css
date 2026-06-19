@@ -5944,6 +5944,9 @@ body {
 .notif-center-toggle { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--hfc-gold); }
 .notif-center-recado { margin-top: 16px; padding-top: 16px; border-top: 0.5px solid var(--hfc-glass-border); }
 
+/* Jogos: expander dos jogos anteriores */
+.game-old-list { margin-top: 8px; }
+
 /* Jogadores: botões de ação (editar/senha/excluir/criar acesso) em vidro */
 .content--players .icon-action-button {
   background: var(--hfc-glass) !important;

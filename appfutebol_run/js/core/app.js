@@ -4587,6 +4587,16 @@ function renderConfig(snapshot, currentPlayer) {
 
   const game = getActiveGameFromSnapshot(snapshot) || {};
   const games = getCurrentGames(snapshot);
+  // Lista enxuta: mostra futuros + o ativo + o último passado; os passados mais
+  // antigos vão para um expander "Ver jogos anteriores". É SÓ exibição — nada é
+  // apagado (cada jogo mantém game_key p/ presenças, notas e churrasco).
+  const activeKeyForList = String(getGameKey(game));
+  const isOldPast = (g) => String(g.game_date || '') < carneTodayIso() && String(getGameKey(g)) !== activeKeyForList;
+  const byGameDate = (a, b) => String(a.game_date || '').localeCompare(String(b.game_date || '')) || String(a.game_time || '').localeCompare(String(b.game_time || ''));
+  const pastGamesForList = games.filter(isOldPast).sort(byGameDate);
+  const lastPastGame = pastGamesForList.length ? pastGamesForList[pastGamesForList.length - 1] : null;
+  const olderPastGames = lastPastGame ? pastGamesForList.slice(0, -1) : [];
+  const shownGames = [...games.filter((g) => !isOldPast(g)), ...(lastPastGame ? [lastPastGame] : [])].sort(byGameDate);
   const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
   const defaultNewGameMaxPlayers = maxPlayers || 10;
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
@@ -4688,8 +4698,20 @@ function renderConfig(snapshot, currentPlayer) {
         <div class="card-title">Jogos</div>
 
         <div class="games-list-config">
-          ${games.map(renderGameEditForm).join('')}
+          ${shownGames.map(renderGameEditForm).join('')}
         </div>
+
+        ${olderPastGames.length ? `
+          <details class="champ-collapse game-old-list">
+            <summary class="champ-collapse-summary">
+              <span class="card-subtitle">Ver jogos anteriores · ${olderPastGames.length}</span>
+              <span class="champ-collapse-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="champ-collapse-body games-list-config">
+              ${[...olderPastGames].reverse().map(renderGameEditForm).join('')}
+            </div>
+          </details>
+        ` : ''}
 
         <details class="create-game-details games-create-inline">
           <summary class="create-game-summary">
