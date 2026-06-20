@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.97.2-sorteio-card-limpo';
+export const APP_VERSION = 'v1.98.0-excluir-jogo-datas';

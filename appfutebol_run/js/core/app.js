@@ -1144,6 +1144,37 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "delete-game") {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!requireAdmin(snapshot, 'Apenas administrador pode excluir jogos')) return;
+    const allGames = getCurrentGames(snapshot);
+    const target = allGames.find((game) => String(getGameKey(game)) === String(id));
+    if (!target) { showToast("Jogo não encontrado.", "error"); return; }
+    const label = `${formatDate(target.game_date)}${target.game_time ? ' · ' + target.game_time : ''}`;
+    const confirmed = await showConfirmModal({
+      title: 'Excluir jogo',
+      message: `Excluir o jogo de <strong>${label}</strong>? As confirmações de presença e o sorteio deste jogo também serão apagados. Não dá para desfazer.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+    });
+    if (!confirmed) return;
+    const remainingGames = allGames.filter((game) => String(getGameKey(game)) !== String(id));
+    const remainingConfirmations = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') !== String(id));
+    const wasActive = String(getGameKey(getActiveGameFromSnapshot(snapshot))) === String(id);
+    const nextActiveGame = wasActive
+      ? (remainingGames.length ? remainingGames[remainingGames.length - 1] : null)
+      : getActiveGameFromSnapshot(snapshot);
+    patchState({
+      games: remainingGames,
+      confirmations: remainingConfirmations,
+      active_game_id: nextActiveGame ? getGameKey(nextActiveGame) : null,
+      game: nextActiveGame || null,
+    });
+    showToast('Jogo excluído.');
+    return;
+  }
+
   if (action === "open-profile") {
     const currentPlayer = getCurrentSnapshotPlayer(snapshot);
     if (!currentPlayer) { showToast("Sessão inválida. Faça login novamente.", "error"); return; }
@@ -4691,6 +4722,7 @@ function renderConfig(snapshot, currentPlayer) {
 
           <div class="player-admin-actions game-config-actions">
             <button class="btn btn-primary" type="submit">Salvar alterações deste jogo</button>
+            <button class="btn btn-danger" type="button" data-action="delete-game" data-id="${key}">Excluir jogo</button>
           </div>
         </form>
       </details>
