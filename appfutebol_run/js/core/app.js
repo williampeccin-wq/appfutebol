@@ -1151,6 +1151,13 @@ document.addEventListener("click", async (e) => {
     const allGames = getCurrentGames(snapshot);
     const target = allGames.find((game) => String(getGameKey(game)) === String(id));
     if (!target) { showToast("Jogo não encontrado.", "error"); return; }
+    // O estado assume sempre um jogo ativo (singleton game_state); excluir o
+    // único jogo não persistiria (o save aborta com game=null e o jogo "volta"
+    // no reload). Bloqueia com aviso em vez de deixar o comportamento confuso.
+    if (allGames.length <= 1) {
+      showToast('Não dá para excluir o único jogo. Crie ou ative outro antes.', 'error');
+      return;
+    }
     const label = `${formatDate(target.game_date)}${target.game_time ? ' · ' + target.game_time : ''}`;
     const confirmed = await showConfirmModal({
       title: 'Excluir jogo',
@@ -1162,15 +1169,17 @@ document.addEventListener("click", async (e) => {
     const remainingGames = allGames.filter((game) => String(getGameKey(game)) !== String(id));
     const remainingConfirmations = (snapshot.confirmations || []).filter((entry) => String(entry?.game_key || '') !== String(id));
     const wasActive = String(getGameKey(getActiveGameFromSnapshot(snapshot))) === String(id);
-    const nextActiveGame = wasActive
-      ? (remainingGames.length ? remainingGames[remainingGames.length - 1] : null)
-      : getActiveGameFromSnapshot(snapshot);
-    patchState({
+    const nextActiveGame = wasActive ? remainingGames[remainingGames.length - 1] : getActiveGameFromSnapshot(snapshot);
+    // replaceState(repairManualSnapshot) — caminho canônico: persiste de verdade
+    // e reconcilia a fila de espera do novo jogo ativo (promove se abriu vaga).
+    const next = {
+      ...snapshot,
       games: remainingGames,
       confirmations: remainingConfirmations,
       active_game_id: nextActiveGame ? getGameKey(nextActiveGame) : null,
       game: nextActiveGame || null,
-    });
+    };
+    replaceState(repairManualSnapshot(next));
     showToast('Jogo excluído.');
     return;
   }
@@ -2139,7 +2148,11 @@ function ensureRatingsLoaded() {
   if (!isVotingEnabled()) return;
   if (_ratingsLoadStarted) return;
   _ratingsLoadStarted = true;
-  loadRatingsCache().then(() => render(getState())).catch(() => {});
+  // Se a carga falhar (rede), libera nova tentativa numa próxima render — senão
+  // o cache fica vazio para sempre e o sorteio por nota degrada em silêncio.
+  loadRatingsCache()
+    .then((cache) => { if (!cache?.loaded) _ratingsLoadStarted = false; render(getState()); })
+    .catch(() => { _ratingsLoadStarted = false; });
 }
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
@@ -3291,7 +3304,10 @@ function bindAppEvents(currentPlayer) {
     notifyWaitlistPromotion(result);
   });
 
-  appElement.querySelector('#draw-teams-btn')?.addEventListener('click', () => {
+  appElement.querySelector('#draw-teams-btn')?.addEventListener('click', async () => {
+    // Garante que as notas estejam carregadas antes de sortear (senão o
+    // balanceamento por nota cai no fallback neutro sem o admin perceber).
+    if (isVotingEnabled()) { try { await loadRatingsCache(); } catch (_) { /* segue só por posição */ } }
     const result = drawTeams();
     showToast(result.message, result.ok ? 'success' : 'error');
   });
