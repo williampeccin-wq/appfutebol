@@ -534,6 +534,7 @@ function buildConfirmedPresenceShareText(snapshot) {
       : ['Nenhum jogador de linha confirmado.']),
   ];
 
+  lines.push('', '— via Convocados · convocados.app.br');
   return lines.join('\n');
 }
 
@@ -2956,7 +2957,7 @@ function renderInner(snapshot) {
           <img class="brand-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
           <div>
             <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
-            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
+            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'} <span class="header-platform">· Convocados</span></div>
           </div>
         </div>
         <div class="header-actions">
@@ -3922,7 +3923,7 @@ function renderHome(snapshot, currentPlayer) {
       <section class="home-v2-card home-v2-confirmed-card">
         <div class="home-v2-card-head">
           <div>
-            <strong>Confirmados</strong>
+            <strong>Convocados</strong>
             <span>${homeRemainingLine} vaga${homeRemainingLine === 1 ? '' : 's'} de linha</span>
           </div>
           <button class="home-v2-link" type="button" data-tab="weekly_game">Lista</button>
@@ -4105,6 +4106,8 @@ function buildTeamDrawShareText(snapshot) {
     formatTeam('Time A', sortResult.team_a),
     '',
     formatTeam('Time B', sortResult.team_b),
+    '',
+    '— via Convocados · convocados.app.br',
   ].join('\n');
 }
 
@@ -4423,7 +4426,7 @@ function renderPresenceList(snapshot, currentPlayer) {
       </div>
 
       <div class="weekly-presence-section">
-        <div class="weekly-presence-title">Confirmados linha (${confirmedPlayers.length})</div>
+        <div class="weekly-presence-title">Convocados na linha (${confirmedPlayers.length})</div>
         <div class="weekly-presence-stack">
           ${confirmedPlayers.length
             ? confirmedPlayers.map((player) => renderWeeklyRow(player, true)).join('')
