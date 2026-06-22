@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.98.0-excluir-jogo-datas';
+export const APP_VERSION = 'v1.99.0-ui-ajustes';

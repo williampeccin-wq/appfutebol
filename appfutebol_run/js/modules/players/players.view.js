@@ -579,13 +579,6 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
           ${carneOnly.length ? carneOnly.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum perfil somente carne cadastrado.</div>'}
         </div>
       </section>
-
-      <section class="card">
-        <div class="card-title">Jogadores no grupo da carne</div>
-        <div class="placeholder-list">
-          ${jogadoresNoCarne.length ? jogadoresNoCarne.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum jogador vinculado ao grupo da carne.</div>'}
-        </div>
-      </section>
     </section>
   `;
 }
