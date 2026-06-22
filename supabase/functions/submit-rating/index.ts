@@ -81,6 +81,16 @@ Deno.serve(async (req) => {
     return json({ ok: true, deleted_game: gameKey });
   }
 
+  // ----- "Já votei?" (sem expor voter_id no cliente) -----
+  if (body.action === "has_voted") {
+    const k = String(body.kind || "");
+    const gk = String(body.game_key || "").trim();
+    if (!gk || (k !== "desempenho" && k !== "churrasco")) return json({ ok: false, error: "bad_request" }, 400);
+    const { data: mine } = await admin.from("ratings").select("id")
+      .eq("kind", k).eq("game_key", gk).eq("voter_id", voterId).limit(1).maybeSingle();
+    return json({ ok: true, voted: !!mine });
+  }
+
   // ----- Voto -----
   const kind = String(body.kind || "");
   const gameKey = String(body.game_key || "").trim();

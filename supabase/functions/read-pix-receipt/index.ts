@@ -120,6 +120,21 @@ Deno.serve(async (req) => {
     .from("players").select("id,data").eq("auth_user_id", userId).maybeSingle();
   if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
 
+  // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
+  const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
+  if (pdata0.mens_ok === true) return json({ ok: true, result: "already_paid" });
+
+  // Rate-limit por jogador: a chamada de visão é PAGA (API Anthropic). Limita a
+  // N leituras por hora para impedir abuso/loop que queime créditos.
+  const RL_WINDOW_MS = 3600_000, RL_MAX = 6;
+  const rlNow = Date.now();
+  const prevAttempts = Array.isArray(pdata0.pix_attempts)
+    ? (pdata0.pix_attempts as number[]).filter((t) => rlNow - Number(t) < RL_WINDOW_MS) : [];
+  if (prevAttempts.length >= RL_MAX) return json({ ok: false, error: "too_many_attempts" }, 429);
+  // Contabiliza a tentativa ANTES da visão (conta inclusive falhas/loops).
+  playerRow.data = { ...pdata0, pix_attempts: [...prevAttempts, rlNow] };
+  await admin.from("players").update({ data: playerRow.data }).eq("id", playerRow.id);
+
   // Leitura por visão.
   let extracted: { is_receipt: boolean; beneficiary_name: string; amount: number; date: string; e2e_id: string; bank: string };
   try {
@@ -175,12 +190,17 @@ Deno.serve(async (req) => {
 
   if (!extracted.is_receipt) return reject("not_receipt");
 
-  // 1) Beneficiário: todos os tokens configurados precisam aparecer no comprovante.
+  // 1) Beneficiário. Todos os tokens configurados têm que aparecer (senão é
+  // outra pessoa → rejeita). Se aparecem TODOS mas há tokens EXTRAS no nome do
+  // comprovante (possível homônimo, ex.: config "João Silva" × "João Silva
+  // Pereira"), NÃO marca automático — manda para revisão do admin.
   const benefTokens = normName(extracted.beneficiary_name).split(" ").filter(Boolean);
   const benefSet = new Set(benefTokens);
   const cfgTokens = cfgBeneficiary.split(" ").filter(Boolean);
-  const beneficiaryOk = cfgTokens.length > 0 && cfgTokens.every((t) => benefSet.has(t));
-  if (!beneficiaryOk) return reject("beneficiary_mismatch");
+  const cfgSet = new Set(cfgTokens);
+  const allCfgPresent = cfgTokens.length > 0 && cfgTokens.every((t) => benefSet.has(t));
+  if (!allCfgPresent) return reject("beneficiary_mismatch");
+  const nameUncertain = !(benefTokens.length > 0 && benefTokens.every((t) => cfgSet.has(t)));
 
   // 2) Valor exato (em centavos).
   if (Math.round(extracted.amount * 100) !== Math.round(cfgAmount * 100)) return reject("amount_mismatch");
@@ -188,6 +208,21 @@ Deno.serve(async (req) => {
   // 3) Data no mês corrente.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(extracted.date) || extracted.date.slice(0, 7) !== currentMonthBrt()) {
     return reject("date_not_current_month");
+  }
+
+  // Nome com tokens extras (homônimo possível) → revisão do admin, não marca automático.
+  if (nameUncertain) {
+    const newData = { ...(playerRow.data || {}) };
+    newData.mens_review = {
+      amount: extracted.amount,
+      date: extracted.date,
+      beneficiary: extracted.beneficiary_name,
+      bank: extracted.bank,
+      at: new Date().toISOString(),
+      reason: "beneficiary_uncertain",
+    };
+    await admin.from("players").update({ data: newData }).eq("id", playerRow.id);
+    return json({ ok: true, result: "review", reason: "beneficiary_uncertain", extracted: view });
   }
 
   // 4) E2E. Sem E2E legível → cai para revisão do admin (não marca automático).

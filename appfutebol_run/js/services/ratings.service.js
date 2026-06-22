@@ -54,6 +54,24 @@ export async function submitRatings(rows) {
   }
 }
 
+// "Já votei neste jogo?" — resolvido no servidor pelo JWT (não expõe voter_id).
+export async function checkHasVoted(kind, gameKey) {
+  const { url, anonKey } = getSupabase();
+  if (!url || !anonKey) return { ok: false, reason: 'not_configured' };
+  try {
+    const resp = await fetch(`${url}/functions/v1/submit-rating`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ action: 'has_voted', kind, game_key: gameKey }),
+    });
+    const out = await resp.json().catch(() => ({}));
+    if (!resp.ok || !out.ok) return { ok: false, reason: out.error || `chk_${resp.status}` };
+    return { ok: true, voted: !!out.voted };
+  } catch (_) {
+    return { ok: false, reason: 'network' };
+  }
+}
+
 // Admin: remove os votos de um jogo (usado ao EXCLUIR o jogo, p/ os votos não
 // continuarem contando na média/sorteio). Best-effort; via a mesma Edge Function.
 export async function deleteGameRatings(gameKey) {
@@ -134,11 +152,12 @@ export function duoRatingAverages(rows, gameKeys = null) {
 export async function fetchRatings({ kind = null, gameKey = null } = {}) {
   const { url, anonKey } = getSupabase();
   if (!url || !anonKey) return { ok: false, reason: 'not_configured', rows: [] };
-  const params = ['select=kind,game_key,voter_id,target_id,score,created_at'];
+  // Lê da VIEW pública (sem voter_id) — o anonimato do voto deixa de ser só de UI.
+  const params = ['select=kind,game_key,target_id,score,created_at'];
   if (kind) params.push(`kind=eq.${encodeURIComponent(kind)}`);
   if (gameKey) params.push(`game_key=eq.${encodeURIComponent(gameKey)}`);
   try {
-    const resp = await fetch(`${url}/rest/v1/ratings?${params.join('&')}`, { method: 'GET', headers: headers() });
+    const resp = await fetch(`${url}/rest/v1/ratings_public?${params.join('&')}`, { method: 'GET', headers: headers() });
     if (!resp.ok) return { ok: false, reason: `load_${resp.status}`, rows: [] };
     const rows = await resp.json().catch(() => []);
     return { ok: true, rows: Array.isArray(rows) ? rows : [] };
