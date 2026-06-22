@@ -106,11 +106,15 @@ Deno.serve(async (req) => {
     const open = start + 3600_000;
     const close = open + perfHours * 3600_000;
     if (nowMs < open || nowMs > close) return json({ ok: false, error: "voting_closed" }, 403);
-    // O votante precisa ter jogado (estar confirmado neste jogo).
+    // O votante precisa ter jogado (estar confirmado neste jogo). Aceita os dois
+    // formatos de confirmação que o sistema usa (status='confirmed' OU
+    // data.confirmed===true), igual à função notify-waitlist-promotion.
     const { data: conf } = await admin
-      .from("presence_confirmations").select("player_id")
-      .eq("game_key", gameKey).eq("status", "confirmed").eq("player_id", voterId).maybeSingle();
-    if (!conf) return json({ ok: false, error: "voter_not_in_game" }, 403);
+      .from("presence_confirmations").select("status, data")
+      .eq("game_key", gameKey).eq("player_id", voterId).maybeSingle();
+    const isConfirmed = conf?.status === "confirmed"
+      || (conf?.data as Record<string, unknown> | null)?.confirmed === true;
+    if (!isConfirmed) return json({ ok: false, error: "voter_not_in_game" }, 403);
   } else {
     const openMs = churrascoOpenMs(String(game.game_date || ""));
     if (!openMs) return json({ ok: false, error: "voting_closed" }, 403);
