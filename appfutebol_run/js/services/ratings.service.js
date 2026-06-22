@@ -25,34 +25,49 @@ function headers() {
   };
 }
 
-// Grava (upsert) os votos de um votante. Cada linha:
-// { kind, game_key, voter_id, target_id, score }.
-// on_conflict pela chave única → permite corrigir o voto antes da janela fechar.
+// Grava os votos de um votante via Edge Function submit-rating (autoridade no
+// servidor: o voter_id vem do JWT, não do cliente; a janela/participação é
+// validada lá). O cliente NÃO grava direto na tabela (RLS bloqueia a escrita).
+// `rows`: [{ kind, game_key, target_id, score }] — todos do mesmo kind/jogo.
 export async function submitRatings(rows) {
   const { url, anonKey } = getSupabase();
   if (!url || !anonKey) return { ok: false, reason: 'not_configured' };
   const clean = (Array.isArray(rows) ? rows : []).filter((r) =>
-    r && r.kind && r.game_key && r.voter_id && r.target_id
+    r && r.kind && r.game_key && r.target_id
     && Number.isFinite(Number(r.score)) && Number(r.score) >= 1 && Number(r.score) <= 10);
   if (!clean.length) return { ok: false, reason: 'no_rows' };
-  const payload = clean.map((r) => ({
-    kind: String(r.kind),
-    game_key: String(r.game_key),
-    voter_id: String(r.voter_id),
-    target_id: String(r.target_id),
-    score: Math.round(Number(r.score)),
-    updated_at: new Date().toISOString(),
-  }));
+  const kind = String(clean[0].kind);
+  const gameKey = String(clean[0].game_key);
+  const votes = clean.map((r) => ({ target_id: String(r.target_id), score: Math.round(Number(r.score)) }));
   try {
-    const resp = await fetch(`${url}/rest/v1/ratings?on_conflict=kind,game_key,voter_id,target_id`, {
+    const resp = await fetch(`${url}/functions/v1/submit-rating`, {
       method: 'POST',
-      headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(payload),
+      headers: headers(),
+      body: JSON.stringify({ kind, game_key: gameKey, votes }),
     });
-    if (!resp.ok) return { ok: false, reason: `save_${resp.status}`, body: await resp.text().catch(() => '') };
-    return { ok: true, count: payload.length };
+    const out = await resp.json().catch(() => ({}));
+    if (!resp.ok || !out.ok) return { ok: false, reason: out.error || `save_${resp.status}` };
+    return { ok: true, count: out.count };
   } catch (error) {
     console.warn('[ratings] falha ao salvar votos:', error);
+    return { ok: false, reason: 'network' };
+  }
+}
+
+// Admin: remove os votos de um jogo (usado ao EXCLUIR o jogo, p/ os votos não
+// continuarem contando na média/sorteio). Best-effort; via a mesma Edge Function.
+export async function deleteGameRatings(gameKey) {
+  const { url, anonKey } = getSupabase();
+  if (!url || !anonKey || !gameKey) return { ok: false, reason: 'not_configured' };
+  try {
+    const resp = await fetch(`${url}/functions/v1/submit-rating`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ action: 'delete_game', game_key: String(gameKey) }),
+    });
+    const out = await resp.json().catch(() => ({}));
+    return (resp.ok && out.ok) ? { ok: true } : { ok: false, reason: out.error || `del_${resp.status}` };
+  } catch (_) {
     return { ok: false, reason: 'network' };
   }
 }

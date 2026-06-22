@@ -1181,6 +1181,11 @@ document.addEventListener("click", async (e) => {
     };
     replaceState(repairManualSnapshot(next));
     showToast('Jogo excluído.');
+    // Remove os votos daquele jogo no servidor (senão continuam contando na
+    // média/sorteio) e atualiza o cache de notas. Best-effort.
+    if (isVotingEnabled()) {
+      deleteGameRatings(id).then((r) => { if (r.ok) loadRatingsCache(true).then(() => render(getState())); }).catch(() => {});
+    }
     return;
   }
 
@@ -2138,7 +2143,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e

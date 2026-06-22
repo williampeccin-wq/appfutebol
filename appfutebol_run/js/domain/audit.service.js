@@ -114,6 +114,30 @@ export function runIntegrityAudit(snapshot = {}) {
       'O jogo marcado como ativo não está na lista de jogos.'));
   }
 
+  // 5) Configuração que falha em SILÊNCIO -------------------------------------
+  const settings = (snapshot.settings && typeof snapshot.settings === 'object') ? snapshot.settings : {};
+
+  // 5a) Janela de votação de desempenho = 0 → o aviso/modal de desempenho nunca abre.
+  const perfHours = Number(settings.ratings_perf_window_hours) || 0;
+  if (perfHours <= 0) {
+    findings.push(finding('info', 'Votação de desempenho desligada (janela = 0)',
+      'Defina a janela em Config → Votação para o aviso e o modal de notas abrirem após o jogo.'));
+  }
+
+  // 5b) Comprovantes PIX aguardando revisão do admin.
+  const pixReview = players.filter((p) => p && (p.mens_review || p.data?.mens_review));
+  if (pixReview.length) {
+    findings.push(finding('warn', `${pixReview.length} comprovante(s) PIX aguardando revisão`,
+      `Enviados sem ID E2E legível: ${pixReview.map((p) => p.name || `#${p.id}`).slice(0, 8).join(', ')}. Revise o pagamento.`));
+  }
+
+  // 5c) PIX em uso, mas sem valor/beneficiário no Config → conciliação falha calada.
+  const pixInUse = pixReview.length || players.some((p) => p && (p.mens_payment || p.data?.mens_payment));
+  if (pixInUse && (!settings.mens_amount || !String(settings.mens_beneficiary || '').trim())) {
+    findings.push(finding('warn', 'PIX sem valor/beneficiário configurado',
+      'A conciliação por comprovante não marca como pago sem o valor e o beneficiário definidos no Config.'));
+  }
+
   const order = { high: 0, warn: 1, info: 2 };
   findings.sort((a, b) => order[a.level] - order[b.level]);
   return {
