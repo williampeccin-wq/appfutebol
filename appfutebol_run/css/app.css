@@ -892,6 +892,26 @@ input.input[type="datetime-local"],
   justify-content: space-between;
   gap: 8px;
 }
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 2147483646;
+  max-width: calc(100% - 24px);
+  border: 1px solid rgba(240, 165, 0, 0.5);
+  background: #f0a500;
+  color: #0c1a38;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .team-strength-badge {
   display: inline-flex;
   align-items: center;
