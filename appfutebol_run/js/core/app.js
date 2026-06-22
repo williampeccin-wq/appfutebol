@@ -2001,9 +2001,10 @@ if (action === "admin-add-to-game") {
     await showInfoModal({
       title: '⚡ Força do time',
       html: `
-        <p>É a <strong>nota média dos jogadores do time</strong>, segundo as notas da <strong>votação de desempenho</strong> (de 1 a 10) que cada um recebeu nos jogos anteriores.</p>
-        <p>O sorteio usa essas notas para deixar os dois times o mais <strong>equilibrados</strong> possível — sempre respeitando as posições (goleiro, zaga, meio e ataque ficam divididos entre os times).</p>
-        <p style="opacity:.75;font-size:13px;">Quem ainda não recebeu nenhuma nota, convidados e goleiros de aluguel não entram nesse cálculo da média.</p>
+        <p>É um <strong>índice de força</strong> (de 1 a 10) que combina duas coisas de cada jogador:</p>
+        <p>• a <strong>nota de desempenho</strong> da votação;<br>• a <strong>pontuação no campeonato</strong> (anual).</p>
+        <p>O sorteio usa esse índice para deixar os times o mais <strong>equilibrados</strong> possível — respeitando as posições (goleiro, zaga, meio e ataque divididos entre os times). Misturar o campeonato evita que quem está disparando na frente caia sempre no time mais forte.</p>
+        <p style="opacity:.75;font-size:13px;">Peso atual: metade nota, metade campeonato. Convidados e goleiros de aluguel não entram na média do selo.</p>
       `,
     });
     return;
@@ -2136,7 +2137,7 @@ import { renderPlayersScreen, renderCarneScreen } from '../modules/players/playe
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
-import { hasCapacity } from '../modules/game/game.service.js';
+import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
@@ -4067,12 +4068,17 @@ function buildTeamDrawShareText(snapshot) {
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
   const game = getActiveGameFromSnapshot(snapshot);
-  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  // Mesma força combinada do selo (nota + campeonato), normalizada no conjunto sorteado.
+  const drawnPlayers = [...(sortResult.team_a || []), ...(sortResult.team_b || [])]
+    .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String((entry && typeof entry === 'object') ? entry.id : entry)))
+    .filter(Boolean);
+  const { strengthOf } = buildStrengthResolver(drawnPlayers, snapshot);
+  const isTempEntry = (p) => !!(p && (p.temporary || p.guest || p.rental_goalkeeper));
   const teamStrengthText = (ids = []) => {
     const vals = ids
-      .map((entry) => ratingAvgs[String((entry && typeof entry === 'object') ? entry.id : entry)])
-      .filter((r) => r && r.votes > 0)
-      .map((r) => r.avg);
+      .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(entry))
+      .filter((p) => p && !isTempEntry(p))
+      .map((p) => strengthOf(p));
     if (!vals.length) return '';
     return ` (força ${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)})`;
   };
@@ -4573,14 +4579,19 @@ function renderTeamDraw(snapshot, currentPlayer) {
     return { id, player };
   };
 
-  // Força do time = média das notas de desempenho dos jogadores que já têm voto
-  // (convidados/goleiros de aluguel e quem ainda não foi votado ficam de fora da média).
-  const ratingAvgs = playerRatingAverages(getCachedRatings());
+  // Força do time = índice combinado (nota de desempenho + pontuação no
+  // campeonato), na MESMA base usada no sorteio (normalizado dentro do conjunto
+  // sorteado). Convidados/goleiros de aluguel ficam de fora da média do selo.
+  const drawnPlayers = [...(sortResult.team_a || []), ...(sortResult.team_b || [])]
+    .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String(getEntryId(entry))))
+    .filter(Boolean);
+  const { strengthOf } = buildStrengthResolver(drawnPlayers, snapshot);
+  const isTempEntry = (p) => !!(p && (p.temporary || p.guest || p.rental_goalkeeper));
   const teamStrength = (entries = []) => {
     const vals = (entries || [])
-      .map((entry) => ratingAvgs[String(getEntryId(entry))])
-      .filter((r) => r && r.votes > 0)
-      .map((r) => r.avg);
+      .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String(getEntryId(entry))))
+      .filter((p) => p && !isTempEntry(p))
+      .map((p) => strengthOf(p));
     if (!vals.length) return null;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
