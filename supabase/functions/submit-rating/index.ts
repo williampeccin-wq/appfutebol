@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
 
   const nowMs = Date.now();
 
+  let confirmedIds: Set<string> | null = null;
   if (kind === "desempenho") {
     const perfHours = Number(settings.ratings_perf_window_hours) || 0;
     const start = gameStartMs(String(game.game_date || ""), String(game.game_time || ""));
@@ -116,15 +117,15 @@ Deno.serve(async (req) => {
     const open = start + 3600_000;
     const close = open + perfHours * 3600_000;
     if (nowMs < open || nowMs > close) return json({ ok: false, error: "voting_closed" }, 403);
-    // O votante precisa ter jogado (estar confirmado neste jogo). Aceita os dois
-    // formatos de confirmação que o sistema usa (status='confirmed' OU
-    // data.confirmed===true), igual à função notify-waitlist-promotion.
-    const { data: conf } = await admin
-      .from("presence_confirmations").select("status, data")
-      .eq("game_key", gameKey).eq("player_id", voterId).maybeSingle();
-    const isConfirmed = conf?.status === "confirmed"
-      || (conf?.data as Record<string, unknown> | null)?.confirmed === true;
-    if (!isConfirmed) return json({ ok: false, error: "voter_not_in_game" }, 403);
+    // Quem jogou (confirmado neste jogo). Aceita os dois formatos de confirmação
+    // do sistema (status='confirmed' OU data.confirmed===true), igual à
+    // notify-waitlist-promotion. Serve para validar o votante E os alvos.
+    const { data: confs } = await admin
+      .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
+    confirmedIds = new Set((confs || [])
+      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
+      .map((c) => String(c.player_id)));
+    if (!confirmedIds.has(voterId)) return json({ ok: false, error: "voter_not_in_game" }, 403);
   } else {
     const openMs = churrascoOpenMs(String(game.game_date || ""));
     if (!openMs) return json({ ok: false, error: "voting_closed" }, 403);
@@ -139,7 +140,10 @@ Deno.serve(async (req) => {
     const score = Math.round(Number(v?.score));
     if (!target) continue;
     if (!Number.isFinite(score) || score < 1 || score > 10) return json({ ok: false, error: "invalid_score" }, 400);
-    if (kind === "desempenho" && target === voterId) continue; // não vota em si mesmo
+    if (kind === "desempenho") {
+      if (target === voterId) continue;                    // não vota em si mesmo
+      if (confirmedIds && !confirmedIds.has(target)) continue; // só avalia quem jogou
+    }
     rows.push({ kind, game_key: gameKey, voter_id: voterId, target_id: target, score, updated_at: nowIso });
   }
   if (!rows.length) return json({ ok: false, error: "no_votes" }, 400);

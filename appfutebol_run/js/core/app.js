@@ -2533,12 +2533,36 @@ async function syncRemoteOnce() {
 
 function startRemoteSync() {
   window.setInterval(syncRemoteOnce, REMOTE_SYNC_INTERVAL_MS);
-  // Ao voltar o foco à aba, sincroniza na hora (o poll pausa em segundo plano).
+  // Ao voltar o foco à aba, sincroniza na hora (o poll pausa em segundo plano)
+  // e checa se saiu uma versão nova do app (PWA aberto por dias não recarrega).
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) syncRemoteOnce();
+      if (!document.hidden) { syncRemoteOnce(); checkForNewVersion(); }
     });
   }
+}
+
+// Sessão de PWA aberta por muito tempo pode estar rodando código velho. Ao voltar
+// o foco, compara a versão servida com a carregada; se mudou, oferece recarregar.
+let _updateBannerShown = false;
+async function checkForNewVersion() {
+  if (_updateBannerShown) return;
+  try {
+    const resp = await fetch(`./js/core/version.js?cb=${Date.now()}`, { cache: 'no-store' });
+    if (!resp.ok) return;
+    const m = (await resp.text()).match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+    const served = m && m[1];
+    if (served && served !== APP_VERSION) {
+      _updateBannerShown = true;
+      const b = document.createElement('button');
+      b.id = '__update-banner';
+      b.type = 'button';
+      b.className = 'update-banner';
+      b.textContent = '🔄 Nova versão disponível — tocar para atualizar';
+      b.addEventListener('click', () => window.location.reload());
+      document.body.appendChild(b);
+    }
+  } catch (_) { /* sem rede / offline: ignora */ }
 }
 
 function persist(snapshot) {
