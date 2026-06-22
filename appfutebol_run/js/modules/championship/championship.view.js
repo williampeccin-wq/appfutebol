@@ -380,7 +380,7 @@ function renderHistoricalBlock(snapshot, ) {
       <div class="history-section-label">Anuais</div>
       <div class="history-list">
         ${annual.map((item, index) => `
-          <details class="history-year"${index === 0 ? ' open' : ''}>
+          <details class="history-year">
             <summary class="history-year-summary">
               <span class="history-year-name">${item.year}</span>
               <span class="history-year-hint">${item.rows.length} jogador${item.rows.length === 1 ? '' : 'es'}</span>
@@ -393,7 +393,7 @@ function renderHistoricalBlock(snapshot, ) {
       <div class="history-section-label">Campeonatos anteriores</div>
       <div class="history-list">
         ${tournaments.map((item, index) => `
-          <details class="history-year"${index === 0 ? ' open' : ''}>
+          <details class="history-year">
             <summary class="history-year-summary">
               <span class="history-year-name">${escapeHtml(item.name)}</span>
               <span class="history-year-hint">${item.rows.length} jogador${item.rows.length === 1 ? '' : 'es'}</span>

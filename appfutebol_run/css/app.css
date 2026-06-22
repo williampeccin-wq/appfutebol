@@ -664,8 +664,10 @@ button {
   gap: 8px;
 }
 
+/* Texto explicativo (tier único: footer-note / info-line / empty-inline = 12px) */
 .info-line {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--gray-700);
 }
 
@@ -701,7 +703,8 @@ button {
 }
 
 .empty-inline {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--gray-500);
 }
 
@@ -6578,9 +6581,9 @@ body {
 /* ---------- CAMPEONATO: histórico navegável (cada temporada colapsável) ---------- */
 .content--championship .history-section-label {
   margin: 16px 2px 8px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--hfc-accent-blue);
 }
@@ -6603,7 +6606,7 @@ body {
 .content--championship .history-year-summary::-webkit-details-marker { display: none; }
 .content--championship .history-year-name {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--hfc-text);
 }
 .content--championship .history-year-hint {

@@ -3277,7 +3277,11 @@ function bindAppEvents(currentPlayer) {
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
-      patchState({ ui: { currentTab: button.dataset.tab } });
+      const previousTab = getState().ui?.currentTab;
+      const nextTab = button.dataset.tab;
+      patchState({ ui: { currentTab: nextTab } });
+      // Ao trocar de aba, volta ao topo (padrão de navegação web/SPA).
+      if (previousTab !== nextTab) window.scrollTo({ top: 0 });
     });
   });
 
