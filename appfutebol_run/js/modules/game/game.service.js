@@ -3,6 +3,7 @@ import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
+import { calculateAnnualRanking } from '../championship/championship.service.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -545,28 +546,55 @@ function sortPlayersForDisplay(players = []) {
 }
 
 
-// Monta uma função nota(jogador) a partir das médias da votação de desempenho.
-// Jogador sem votos recebe a média do plantel elegível (neutro, não puxa o
-// equilíbrio para nenhum lado); se ninguém tem nota, todos valem o mesmo.
-function buildRatingResolver(players = []) {
+// Pesos do índice de força do sorteio (ajustáveis): metade nota de desempenho,
+// metade pontuação no campeonato. O campeonato entra para distribuir os líderes
+// e evitar que quem está disparando caia sempre no time mais forte.
+const STRENGTH_WEIGHTS = { perf: 0.5, champ: 0.5 };
+
+// Monta um "índice de força" por jogador combinando a média da votação de
+// desempenho com a pontuação no campeonato (anual). Cada métrica é normalizada
+// 0..1 dentro do plantel do dia e a combinação volta numa escala 1–10 (intuitiva
+// para o selo). Jogador sem nota usa a média do plantel; sem pontos = 0 pontos.
+// Devolve { strengthOf, perfOf, champOf } para reuso no selo da UI.
+export function buildStrengthResolver(players = [], snapshot = getState()) {
+  const list = Array.isArray(players) ? players : [];
   const avgs = playerRatingAverages(getCachedRatings());
-  const rated = players
-    .map((p) => avgs[String(p?.id)])
-    .filter((r) => r && r.votes > 0)
-    .map((r) => r.avg);
-  const fallback = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : 6;
-  return (player) => {
+  const ratedVals = list.map((p) => avgs[String(p?.id)]).filter((r) => r && r.votes > 0).map((r) => r.avg);
+  const perfFallback = ratedVals.length ? ratedVals.reduce((a, b) => a + b, 0) / ratedVals.length : 6;
+  const perfOf = (player) => {
     const r = avgs[String(player?.id)];
-    return (r && r.votes > 0) ? r.avg : fallback;
+    return (r && r.votes > 0) ? r.avg : perfFallback;
   };
+
+  const champMap = new Map();
+  try {
+    for (const row of calculateAnnualRanking(snapshot)) champMap.set(String(row.player_id), Number(row.points) || 0);
+  } catch (_) { /* sem campeonato → só a nota pesa */ }
+  const champOf = (player) => champMap.get(String(player?.id)) || 0;
+
+  const perfArr = list.map(perfOf);
+  const champArr = list.map(champOf);
+  const norm = (val, arr) => {
+    if (!arr.length) return 0.5;
+    const mn = Math.min(...arr), mx = Math.max(...arr);
+    return (mx > mn) ? (val - mn) / (mx - mn) : 0.5; // todos iguais → neutro
+  };
+
+  const strengthOf = (player) => {
+    const c01 = STRENGTH_WEIGHTS.perf * norm(perfOf(player), perfArr)
+      + STRENGTH_WEIGHTS.champ * norm(champOf(player), champArr);
+    return 1 + c01 * 9;
+  };
+  return { strengthOf, perfOf, champOf };
 }
 
-// Divide os confirmados em dois times equilibrados POR NOTA, mantendo a
-// PARIDADE DE POSIÇÃO como restrição rígida (cada posição é dividida o mais
-// igual possível entre os times). Dentro de cada posição, os jogadores entram
-// do mais forte para o mais fraco — com um leve "tremor" aleatório (±0.4) para
-// que jogadores de nota parecida possam trocar de lado entre um sorteio e
-// outro (os times não saem idênticos toda semana), sem quebrar o equilíbrio.
+// Divide os confirmados em dois times equilibrados pelo ÍNDICE DE FORÇA
+// (nota de desempenho + pontuação no campeonato), mantendo a PARIDADE DE
+// POSIÇÃO como restrição rígida (cada posição é dividida o mais igual possível
+// entre os times). Dentro de cada posição, os jogadores entram do mais forte
+// para o mais fraco — com um leve "tremor" aleatório (±0.4) para que jogadores
+// de força parecida possam trocar de lado entre um sorteio e outro (os times não
+// saem idênticos toda semana), sem quebrar o equilíbrio.
 function balanceTeams(players, ratingOf = () => 0) {
   const teamA = [];
   const teamB = [];
@@ -657,8 +685,8 @@ export function drawTeams() {
     };
   }
 
-  const ratingOf = buildRatingResolver(eligiblePlayers);
-  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf);
+  const { strengthOf } = buildStrengthResolver(eligiblePlayers, snapshot);
+  const { teamA, teamB } = balanceTeams(eligiblePlayers, strengthOf);
   const createdAt = new Date().toISOString();
   
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
