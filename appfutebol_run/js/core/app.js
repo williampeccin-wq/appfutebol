@@ -2143,7 +2143,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
@@ -2611,15 +2611,15 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
   if (perfVoteStatus === 'voted' || perfVoteStatus === 'active' || perfVoteStatus === 'checking') return;
 
   perfVoteStatus = 'checking';
-  const res = await fetchRatings({ kind: 'desempenho', gameKey: key });
+  const res = await checkHasVoted('desempenho', key);
   if (!res.ok) {
-    // Tabela indisponível (ex.: migração ainda não aplicada). NUNCA bloquear o
-    // app por uma votação que não tem onde gravar.
+    // Votação indisponível (ex.: migração/função ainda não aplicada). NUNCA
+    // bloquear o app por uma votação que não tem onde gravar.
     ratingsUnavailable = true;
     perfVoteStatus = 'idle';
     return;
   }
-  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) {
+  if (res.voted) {
     perfVoteStatus = 'voted';
     return;
   }
@@ -2802,9 +2802,9 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
   if (!duo) { carneVoteStatus = 'voted'; return; } // sem rodízio/dupla → nada a votar
 
   carneVoteStatus = 'checking';
-  const res = await fetchRatings({ kind: 'churrasco', gameKey: key });
+  const res = await checkHasVoted('churrasco', key);
   if (!res.ok) { ratingsUnavailable = true; carneVoteStatus = 'idle'; return; }
-  if (res.rows.some((r) => String(r.voter_id) === String(currentPlayer.id))) { carneVoteStatus = 'voted'; return; }
+  if (res.voted) { carneVoteStatus = 'voted'; return; }
 
   carneVote = { gameKey: key, voterId: String(currentPlayer.id), duo, score: null };
   carneVoteStatus = 'active';
