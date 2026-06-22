@@ -735,6 +735,26 @@ button {
   font: inherit;
 }
 
+/* Campos de data/hora: o controle nativo do WebKit (iOS/Safari) tem largura
+   intrínseca e "escorre" pra fora do container. Remover o appearance nativo +
+   travar a largura no container resolve em todos os lugares. */
+input.input[type="date"],
+input.input[type="time"],
+input.input[type="datetime-local"],
+.input[type="date"],
+.input[type="time"],
+.input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Garante que o valor não force a expansão dentro do controle */
+.input::-webkit-date-and-time-value { text-align: left; min-width: 0; }
+/* Itens de formulário em grid não podem ter min-width:auto, senão estouram */
+.field-label { min-width: 0; }
+
 @media (max-width: 720px) {
   .player-admin-form {
     grid-template-columns: 1fr;
@@ -6312,7 +6332,8 @@ body {
 .content--carne .btn-danger,
 .content--championship .btn-danger,
 .content--weekly_game .btn-danger,
-.content--players .btn-danger {
+.content--players .btn-danger,
+.content--config .btn-danger {
   background: rgba(240, 137, 123, 0.16);
   color: #f0897b;
   border: 1px solid rgba(240, 137, 123, 0.35);
