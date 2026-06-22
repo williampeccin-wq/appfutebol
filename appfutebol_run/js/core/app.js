@@ -2957,7 +2957,7 @@ function renderInner(snapshot) {
           <img class="brand-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
           <div>
             <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
-            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'} <span class="header-platform">· Convocados</span></div>
+            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
           </div>
         </div>
         <div class="header-actions">
@@ -4160,6 +4160,8 @@ function buildPaymentsShareText(snapshot) {
     '',
     `✅ Pagos (${paid.length}):`,
     list(paid),
+    '',
+    '— via Convocados · convocados.app.br',
   ].join('\n');
 }
 
