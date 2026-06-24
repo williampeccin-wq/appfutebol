@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.103.1-convocados-ajuste';
+export const APP_VERSION = 'v1.103.2-fix-confirmados';

@@ -14,6 +14,10 @@
 // senão, cai no booleano `confirmed`.
 export function isConfirmedEntry(entry) {
   if (!entry) return false;
+  // Cancelamento explícito vence um `status` defasado: se a entrada diz
+  // confirmed===false (ex.: resíduo de sync com status='confirmed' antigo), o
+  // jogador NÃO está confirmado. Sem isso a Home contava quem já cancelou.
+  if (entry.confirmed === false) return false;
   const status = String(entry.status || '').trim().toLowerCase();
   if (status) return status === 'confirmed';
   return entry.confirmed === true;

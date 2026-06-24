@@ -2121,6 +2121,7 @@ document.addEventListener("change", (e) => {
 });
 
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
+import { isConfirmedEntry } from "../domain/confirmations.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
@@ -4288,7 +4289,7 @@ function renderPresenceList(snapshot, currentPlayer) {
   const gameKey = getGameKey(game);
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
-      .filter((entry) => entry?.confirmed)
+      .filter((entry) => isConfirmedEntry(entry))
       .filter((entry) => String(entry?.game_key || '') === String(gameKey))
       .map((entry) => String(entry.player_id))
   );
@@ -4529,7 +4530,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 
   const confirmedIds = new Set(
     (snapshot.confirmations || [])
-      .filter((entry) => entry?.confirmed)
+      .filter((entry) => isConfirmedEntry(entry))
       .filter((entry) => String(entry?.game_key || '') === String(gameKey))
       .map((entry) => String(entry.player_id))
   );
