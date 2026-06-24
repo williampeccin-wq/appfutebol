@@ -479,6 +479,12 @@ function renderAvatarForApp(player, extraClass = '') {
   const initials = getInitials(player?.name);
   const aura = (player?.id && String(player.id) === String(getTopRatedPlayerId())) ? ' avatar-aura' : '';
 
+  // Convidado: sem foto, com selo "conv" abaixo da inicial para não se confundir
+  // com jogador confirmado no carrossel da Home.
+  if (player?.guest === true) {
+    return `<div class="avatar avatar-guest ${extraClass}" title="Convidado"><span class="avatar-guest-initial">${initials}</span><span class="avatar-guest-tag">conv</span></div>`;
+  }
+
   if (photo) {
     return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
   }

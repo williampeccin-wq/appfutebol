@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.103.2-fix-confirmados';
+export const APP_VERSION = 'v1.103.3-avatar-convidado';

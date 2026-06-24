@@ -608,6 +608,27 @@ button {
   flex-shrink: 0;
 }
 
+/* Convidado: inicial + selo "conv" abaixo (tamanho relativo p/ funcionar em
+   qualquer contexto de avatar). */
+.avatar-guest {
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+.avatar-guest-initial {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1;
+}
+.avatar-guest-tag {
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  line-height: 1;
+}
+
 .avatar-lg {
   width: 62px;
   height: 62px;
