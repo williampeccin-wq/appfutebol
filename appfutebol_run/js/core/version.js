@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.102.2-avatar-convidado';
+export const APP_VERSION = 'v1.102.3-carne-guard-load';

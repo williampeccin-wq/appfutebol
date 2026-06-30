@@ -508,6 +508,20 @@ async function loadSplitState(config) {
     meta: metaRow?.data || {},
   });
 
+  // Guard anti-perda do rodízio da carne (trava de carregamento): o carne_rotation
+  // mora no MESMO blob volátil (app_meta.data) dos jogos; uma gravação defasada
+  // ligada ao jogo já zerou o rodízio no servidor. Se a leitura veio SEM rodízio
+  // mas o último estado conhecido TINHA um, preserva o anterior em vez de aceitar
+  // a perda. Auto-cura: o rodízio preservado é regravado no próximo save.
+  const hasRotation = (carne) => Array.isArray(carne) && carne.some((e) => e?.type === 'carne_rotation');
+  const prevCarne = lastSplitSnapshot?.meta?.carne;
+  if (!hasRotation(state.carne) && hasRotation(prevCarne)) {
+    const preservedRotation = prevCarne.filter((e) => e?.type === 'carne_rotation');
+    const freshOthers = Array.isArray(state.carne) ? state.carne.filter((e) => e?.type !== 'carne_rotation') : [];
+    state.carne = [...preservedRotation, ...freshOthers];
+    console.warn('[storage.supabase] rodízio da carne ausente na leitura — preservado do último estado conhecido (auto-cura).');
+  }
+
   const updatedValues = [
     ...(Array.isArray(playersResult.data) ? playersResult.data.map((row) => row.updated_at) : []),
     ...(Array.isArray(presenceResult.data) ? presenceResult.data.map((row) => row.updated_at) : []),
