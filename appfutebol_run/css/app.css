@@ -4233,10 +4233,10 @@ input.input[type="datetime-local"],
 .championship-field-v2{display:grid!important;gap:8px!important;min-width:0!important;margin:0!important;font-weight: 700!important;color:#0f172a!important}
 .championship-draw-field-v2{grid-column:1/-1!important}
 .championship-control-v2{width:100%!important;max-width:100%!important;min-width:0!important;height:56px!important;box-sizing:border-box!important;border:2px solid #153660!important;border-radius:10px!important;background:#fff!important;color:#0f172a!important;font-size:1rem!important;font-weight: 600!important;line-height:1.2!important;padding:0 14px!important}
-.championship-teams-result-details-v2{margin-top:22px!important;border:1px solid #bfdbfe!important;background:#f8fbff!important;border-radius:14px!important}
+.championship-teams-result-details-v2{margin-top:22px!important;border:1px solid var(--hfc-glass-border)!important;background:var(--hfc-glass-2)!important;border-radius:14px!important}
 .championship-teams-result-details-v2>summary{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;gap:8px!important;align-items:center!important;padding:16px!important}
-.championship-teams-result-details-v2>summary span{font-weight: 700!important;color:#173760!important}
-.championship-teams-result-details-v2>summary small{display:block!important;grid-column:2!important;color:#334155!important;font-weight: 600!important}
+.championship-teams-result-details-v2>summary span{font-weight: 700!important;color:var(--hfc-text)!important}
+.championship-teams-result-details-v2>summary small{display:block!important;grid-column:2!important;color:var(--hfc-text-muted)!important;font-weight: 600!important}
 .championship-save-result-btn-v2{width:100%!important;height:64px!important;margin-top:24px!important;font-size:1.15rem!important}
 .championship-result-info-v2{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#173760;font-weight: 600;line-height:1.35}
 .championship-result-info-v2 strong{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:#1d4ed8;color:#fff}
