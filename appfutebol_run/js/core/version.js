@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.107.0-antiwipe-general';
+export const APP_VERSION = 'v1.108.0-audit-safe-batch';
