@@ -522,6 +522,23 @@ async function loadSplitState(config) {
     console.warn('[storage.supabase] rodízio da carne ausente na leitura — preservado do último estado conhecido (auto-cura).');
   }
 
+  // Guard anti-perda das settings (MESMA classe da carne): o composeState
+  // FABRICA um settings zerado (mens_amount 0, beneficiário '', janela 0) quando
+  // meta.settings vem ausente/parcial na leitura — e um save depois grava esses
+  // zeros por cima dos valores reais. Já zerou mensalidade + janela de votação em
+  // produção. Se a leitura veio "zerada" mas o último estado conhecido tinha
+  // settings preenchidas, preserva as boas. Auto-cura no próximo save.
+  const settingsPopulated = (s) => !!s && (
+    Number(s.mens_amount) > 0
+    || String(s.mens_beneficiary || '') !== ''
+    || Number(s.ratings_perf_window_hours) > 0
+  );
+  const prevSettings = lastSplitSnapshot?.meta?.settings;
+  if (!settingsPopulated(state.settings) && settingsPopulated(prevSettings)) {
+    state.settings = { ...state.settings, ...prevSettings };
+    console.warn('[storage.supabase] settings ausentes/zeradas na leitura — preservadas do último estado conhecido (auto-cura).');
+  }
+
   const updatedValues = [
     ...(Array.isArray(playersResult.data) ? playersResult.data.map((row) => row.updated_at) : []),
     ...(Array.isArray(presenceResult.data) ? presenceResult.data.map((row) => row.updated_at) : []),
@@ -731,6 +748,24 @@ async function saveSplitState(config, state) {
   if (prevCarne.length > 0 && nextCarne.length === 0) {
     console.warn('[storage.supabase] save abortado: tentativa de zerar a carne a partir de estado preenchido (degradado?). Nada foi gravado.');
     return { ok: false, conflict: false, reason: 'meta_carne_wipe_blocked' };
+  }
+
+  // Guard anti-apagão das settings (mesma lógica da carne): nunca persista um
+  // settings zerado (mensalidade/beneficiário/janela) quando o último estado
+  // conhecido os tinha preenchidos. Isso só acontece por estado em memória
+  // degradado (leitura falha/sessão expirada), nunca por ação real — a UI de
+  // Config sempre grava valores concretos. Já zerou mensalidade + janela de
+  // votação em produção. Aborta sem gravar nada.
+  const settingsPopulated = (s) => !!s && (
+    Number(s.mens_amount) > 0
+    || String(s.mens_beneficiary || '') !== ''
+    || Number(s.ratings_perf_window_hours) > 0
+  );
+  const prevSettings = previousParts?.meta?.settings;
+  const nextSettings = parts?.meta?.settings;
+  if (settingsPopulated(prevSettings) && !settingsPopulated(nextSettings)) {
+    console.warn('[storage.supabase] save abortado: tentativa de zerar as settings a partir de estado preenchido (degradado?). Nada foi gravado.');
+    return { ok: false, conflict: false, reason: 'meta_settings_wipe_blocked' };
   }
 
   const operations = buildGranularOperations(config, previousParts, parts, now);

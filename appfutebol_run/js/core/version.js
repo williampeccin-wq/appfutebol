@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.103.4-carne-guard-load';
+export const APP_VERSION = 'v1.104.0-settings-guard';
