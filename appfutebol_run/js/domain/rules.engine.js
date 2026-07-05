@@ -1,4 +1,9 @@
 import { isCarneOnly as authzIsCarneOnly } from './authz.js';
+// Fonte única de isGoalkeeperEntry (antes havia uma cópia só-entry aqui).
+// Importa p/ uso interno (getLineConfirmedCount) e reexporta p/ quem importava
+// daqui (game.service). Sem ciclo: confirmations.js é leaf (não importa nada).
+import { isGoalkeeperEntry } from './confirmations.js';
+export { isGoalkeeperEntry };
 
 // Controle de mensalidade com TRÊS modos concorrentes (escolha única do clube,
 // guardada em state.settings.mens_enforcement_mode). Só passa a valer DEPOIS do
@@ -57,10 +62,6 @@ export function shouldBlockPresenceForFinance(player, game, mode = MENSALIDADE_M
 
 export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
-}
-
-export function isGoalkeeperEntry(entry) {
-  return entry?.goalkeeper === true || entry?.segment === 'goalkeeper' || entry?.presence_role === 'goalkeeper';
 }
 
 export function getLineConfirmedCount(confirmations = []) {

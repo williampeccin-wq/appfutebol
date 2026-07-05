@@ -493,11 +493,6 @@ function renderAvatarForApp(player, extraClass = '') {
 }
 
 
-function isGoalkeeperPlayerForApp(player) {
-  const raw = String(player?.position || '').trim().toLowerCase();
-  return raw === 'gol' || raw === 'goleiro';
-}
-
 function getActiveRentalGoalkeepersForApp(snapshot) {
   const game = getActiveGameFromSnapshot(snapshot);
   return Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [];
@@ -518,8 +513,8 @@ function buildConfirmedPresenceShareText(snapshot) {
   );
 
   const players = (snapshot.players || []).filter((player) => confirmedIds.has(String(player.id)));
-  const goalkeepers = players.filter(isGoalkeeperPlayerForApp);
-  const linePlayers = players.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const goalkeepers = players.filter(isGoalkeeperPlayer);
+  const linePlayers = players.filter((player) => !isGoalkeeperPlayer(player));
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
 
   const lines = [
@@ -2130,7 +2125,7 @@ document.addEventListener("change", (e) => {
 });
 
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
-import { isConfirmedEntry } from "../domain/confirmations.js";
+import { isConfirmedEntry, isGoalkeeperPlayer } from "../domain/confirmations.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
@@ -4327,8 +4322,8 @@ function renderPresenceList(snapshot, currentPlayer) {
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
   const confirmedFootballPlayers = footballPlayers.filter((player) => confirmedIds.has(String(player.id)));
-  const goalkeeperPlayers = confirmedFootballPlayers.filter(isGoalkeeperPlayerForApp).slice(0, 2);
-  const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const goalkeeperPlayers = confirmedFootballPlayers.filter(isGoalkeeperPlayer).slice(0, 2);
+  const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayer(player));
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
   const totalGoalkeepers = goalkeeperPlayers.length + rentalGoalkeepers.length;
   const guestPlayers = getActiveGuestPlayersForApp(snapshot);
@@ -4337,8 +4332,8 @@ function renderPresenceList(snapshot, currentPlayer) {
   const lineFull = lineMax > 0 && lineUsed >= lineMax;
   const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
   const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(String(player.id)) && !waitlistedIds.has(String(player.id)));
-  const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayerForApp);
-  const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayer);
+  const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayer(player));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
