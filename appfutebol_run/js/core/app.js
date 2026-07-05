@@ -1939,7 +1939,7 @@ if (action === "admin-remove-from-game") {
   if (!player) return;
 
   const isPlayerConfirmed = Array.isArray(snapshot.confirmations)
-    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && entry.confirmed === true);
+    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && isConfirmedEntry(entry));
 
   if (!isPlayerConfirmed) {
     showToast("Jogador não está confirmado no jogo", "error");
@@ -1981,7 +1981,7 @@ if (action === "admin-add-to-game") {
   if (!player) return;
 
   const isPlayerConfirmed = Array.isArray(snapshot.confirmations)
-    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && entry.confirmed === true);
+    && snapshot.confirmations.some((entry) => String(entry.player_id) === String(id) && isConfirmedEntry(entry));
 
   if (isPlayerConfirmed) {
     showToast("Jogador já está confirmado no jogo", "error");
@@ -2545,23 +2545,26 @@ function startRemoteSync() {
   // e checa se saiu uma versão nova do app (PWA aberto por dias não recarrega).
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) { syncRemoteOnce(); checkForNewVersion(); }
+      // Voltar o foco = nova chance para a votação: uma falha transitória da Edge
+      // Function não pode deixar `ratingsUnavailable` travado a sessão inteira.
+      if (!document.hidden) { ratingsUnavailable = false; syncRemoteOnce(); checkForNewVersion(); }
     });
   }
 }
 
 // Sessão de PWA aberta por muito tempo pode estar rodando código velho. Ao voltar
 // o foco, compara a versão servida com a carregada; se mudou, oferece recarregar.
-let _updateBannerShown = false;
 async function checkForNewVersion() {
-  if (_updateBannerShown) return;
+  // Guarda por presença no DOM, não por flag permanente: se o banner some (ou
+  // uma versão MAIS nova é servida depois), ele reaparece. Antes, uma flag global
+  // travava o aviso após a 1ª vez — PWA podia rodar código velho por dias.
+  if (document.getElementById('__update-banner')) return;
   try {
     const resp = await fetch(`./js/core/version.js?cb=${Date.now()}`, { cache: 'no-store' });
     if (!resp.ok) return;
     const m = (await resp.text()).match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
     const served = m && m[1];
     if (served && served !== APP_VERSION) {
-      _updateBannerShown = true;
       const b = document.createElement('button');
       b.id = '__update-banner';
       b.type = 'button';
@@ -4168,6 +4171,11 @@ function buildPaymentsShareText(snapshot) {
 }
 
 async function copyPaymentsToClipboard() {
+  // Lista de adimplentes/inadimplentes é dado financeiro: só admin copia.
+  if (!authzIsAdmin(getCurrentPlayer())) {
+    showToast('Apenas administrador pode copiar a lista de pagamentos.', 'error');
+    return;
+  }
   const text = buildPaymentsShareText(getState());
   try {
     if (navigator.clipboard?.writeText) {
