@@ -143,29 +143,42 @@ Deno.serve(async (req) => {
   // Leitura por visão.
   let extracted: { is_receipt: boolean; beneficiary_name: string; amount: number; date: string; e2e_id: string; bank: string };
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 512,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-            { type: "text", text: PROMPT },
-          ],
-        }],
-      }),
+    // Retry em erros TRANSITÓRIOS do upstream (502 Bad Gateway/503/529 overloaded/
+    // 429). Já vimos 502 da Anthropic (via Cloudflare) derrubar leituras válidas —
+    // uma tentativa só deixava o PIX "mudo". Backoff curto: 0 / 0.7s / 1.4s.
+    const RETRIABLE = new Set([429, 500, 502, 503, 529]);
+    const reqBody = JSON.stringify({
+      model: MODEL,
+      max_tokens: 512,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+          { type: "text", text: PROMPT },
+        ],
+      }],
     });
-    if (!resp.ok) {
+    let resp: Response | undefined;
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 700 * attempt));
+      resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: reqBody,
+      });
+      if (resp.ok) break;
+      lastStatus = resp.status;
       const detail = await resp.text().catch(() => "");
-      console.warn("[pix] Anthropic erro:", resp.status, detail.slice(0, 300));
-      return json({ ok: false, error: "vision_failed", status: resp.status }, 502);
+      console.warn(`[pix] Anthropic ${resp.status} (tentativa ${attempt + 1}/3):`, detail.slice(0, 200));
+      if (!RETRIABLE.has(resp.status)) break; // erro não-transitório: não insiste
+    }
+    if (!resp || !resp.ok) {
+      return json({ ok: false, error: "vision_unavailable", status: lastStatus || 502, retriable: true }, 503);
     }
     const data = await resp.json();
     const text = (data?.content || []).find((b: { type?: string }) => b?.type === "text")?.text || "";
