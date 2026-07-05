@@ -1029,9 +1029,12 @@ function computeCarneCalendar(rotation, weeksAhead = 8, refIso = carneTodayIso()
 function persistCarneRotation(snapshot, rotation) {
   const others = (Array.isArray(snapshot.carne) ? snapshot.carne : [])
     .filter((entry) => entry?.type !== 'carne_rotation');
+  // Só aceita id PRIMITIVO (string/number). Um objeto passaria no filtro truthy e
+  // viraria "[object Object]" via String() — mesma classe do bug do resultado.
+  const asId = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : null;
   const pairs = (Array.isArray(rotation.pairs) ? rotation.pairs : [])
-    .filter((p) => p?.player1_id && p?.player2_id)
-    .map((p) => ({ player1_id: String(p.player1_id), player2_id: String(p.player2_id) }));
+    .map((p) => ({ player1_id: asId(p?.player1_id), player2_id: asId(p?.player2_id) }))
+    .filter((p) => p.player1_id && p.player2_id);
   snapshot.carne = [
     ...others,
     { id: 'carne_rotation', type: 'carne_rotation', start_date: String(rotation.start_date || '').slice(0, 10), pairs },

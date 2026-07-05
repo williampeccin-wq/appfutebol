@@ -546,6 +546,16 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     assignTeam(draw.team_b, 'win');
   }
 
+  // team_a/team_b do sorteio podem conter OBJETOS (goleiro alugado/convidado não
+  // têm id persistente — o draw embute o player inteiro; ver game.service
+  // balanceTeams). Ao gravar o resultado, String(obj) virava "[object Object]".
+  // Como o campeonato só pontua jogador REGISTRADO (statuses são por id),
+  // guardamos APENAS ids primitivos; convidado/goleiro-alugado ficam fora do
+  // registro do resultado (não pontuam mesmo).
+  const onlyPlayerIds = (arr) => (Array.isArray(arr) ? arr : [])
+    .filter((x) => typeof x === 'string' || typeof x === 'number')
+    .map(String);
+
   return {
     ok: true,
     outcome: validOutcome,
@@ -553,8 +563,8 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     game_key: draw.game_key || null,
     game_date: draw.game_date || null,
     game_time: draw.game_time || null,
-    team_a: draw.team_a,
-    team_b: draw.team_b,
+    team_a: onlyPlayerIds(draw.team_a),
+    team_b: onlyPlayerIds(draw.team_b),
     statuses,
   };
 }
