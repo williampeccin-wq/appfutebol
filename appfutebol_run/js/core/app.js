@@ -4222,6 +4222,8 @@ const PIX_ERROR_MESSAGES = {
   config_missing: 'O administrador ainda não configurou o valor e o beneficiário da mensalidade.',
   player_not_found: 'Seu cadastro não foi encontrado. Avise o administrador.',
   vision_failed: 'Não consegui ler o comprovante. Tente um print mais nítido.',
+  vision_unavailable: 'O leitor de comprovantes está instável no momento. Tente de novo em instantes.',
+  too_many_attempts: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.',
   persist_failed: 'Falha ao salvar. Tente de novo em instantes.',
   network: 'Falha de rede ao enviar o comprovante.',
 };
@@ -4291,6 +4293,12 @@ function wireSelfPixReceipt(appElement) {
     } else if (res.ok && res.result === 'review') {
       showToast('Comprovante recebido. O administrador vai revisar.', 'success');
       await reloadRemoteStateAfterCriticalOperation(getState());
+    } else if (!res.ok) {
+      // Falha (leitor instável, rede, config…): antes ficava só na nota inline,
+      // fácil de não ver. Toast garante o feedback (motivo acionável).
+      showToast(PIX_ERROR_MESSAGES[res.reason] || 'Não foi possível enviar o comprovante.', 'error');
+    } else if (res.result === 'rejected') {
+      showToast(PIX_REJECT_MESSAGES[res.reason] || 'Não consegui validar o comprovante.', 'error');
     }
   });
 }
