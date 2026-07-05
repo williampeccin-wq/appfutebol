@@ -46,7 +46,12 @@ export function shouldBlockPresenceForFinance(player, game, mode = MENSALIDADE_M
   if (!player) return false;
   const carneOnly = authzIsCarneOnly(player);
   if (carneOnly) return false;
-  return player.mens_ok !== true && isAfterMensalidadeDueDate(game, referenceDate);
+  // Só bloqueia quem é EXPLICITAMENTE inadimplente (mens_ok === false), igual ao
+  // enforceFinancialPresenceConsistency (remoção). `undefined` (registro sem o
+  // campo, comum em legado/sync parcial) NÃO é inadimplente — o antigo `!== true`
+  // aqui bloqueava quem estava em dia e divergia da remoção (mesma raiz do bug
+  // "16/16 → 14/16").
+  return player.mens_ok === false && isAfterMensalidadeDueDate(game, referenceDate);
 }
 
 
