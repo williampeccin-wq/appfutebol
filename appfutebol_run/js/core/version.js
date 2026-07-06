@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.109.3-photo-newfile-guard';
+export const APP_VERSION = 'v1.109.4-photo-upload-fix';
