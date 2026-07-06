@@ -697,12 +697,17 @@ function hydratePlayerEditForm(playerToEdit) {
   adminInput.checked = !!playerToEdit.is_admin;
   mensInput.checked = !!playerToEdit.mens_ok;
 
-  const currentPhotoDataUrl = getPlayerPhoto(playerToEdit);
+  // PREVIEW pode ser qualquer URL de exibição (assinada/pública/base64); mas o
+  // dataset.photoDataUrl é o gatilho de UPLOAD e só pode conter um data: URL
+  // (foto nova). Nunca prefill com a URL assinada — senão o "Salvar" tenta subir
+  // a URL e falha, e a re-hidratação apagava o base64 recém-selecionado.
+  const previewPhoto = getPlayerPhoto(playerToEdit);
+  const uploadablePhoto = String(playerToEdit.photoDataUrl || "").startsWith("data:") ? playerToEdit.photoDataUrl : "";
   if (photoInput) {
     photoInput.value = "";
-    photoInput.dataset.photoDataUrl = currentPhotoDataUrl || "";
+    photoInput.dataset.photoDataUrl = uploadablePhoto;
   }
-  setPlayerPhotoPreview(currentPhotoDataUrl || "", playerToEdit.name || "");
+  setPlayerPhotoPreview(previewPhoto || "", playerToEdit.name || "");
   setPlayerFormMode(true);
 }
 
