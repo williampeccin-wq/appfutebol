@@ -427,8 +427,40 @@ function normalizeSelfPosition(value) {
 }
 
 
+// Bucket de fotos é PRIVADO: `photo_url` guarda só o PATH; a exibição usa URL
+// ASSINADA temporária, buscada em lote por ensureSignedPhotos() e servida daqui.
+// Fallback enquanto não assina (ou se falhar): base64 local ou a inicial.
+const signedPhotoUrls = new Map();
+let signedPhotoUrlsAt = 0;
+let signingPhotosInFlight = false;
+
 function getPlayerPhoto(player) {
-  return player?.photo_url || player?.photoDataUrl || '';
+  const signed = signedPhotoUrls.get(String(player?.id));
+  if (signed) return signed;
+  // Fallback TRANSITÓRIO: se photo_url ainda é uma URL pública antiga (bucket
+  // não-privado), usa direto — garante que a foto não suma durante a validação.
+  // Uploads novos guardam só o PATH (sem http) → não caem aqui, usam o assinado.
+  const url = String(player?.photo_url || '');
+  if (/^https?:/i.test(url)) return url;
+  return player?.photoDataUrl || '';
+}
+
+function ensureSignedPhotos(snapshot) {
+  const withPhoto = (snapshot?.players || []).filter((p) => p?.photo_url);
+  if (!withPhoto.length || signingPhotosInFlight) return;
+  const missing = withPhoto.some((p) => !signedPhotoUrls.has(String(p.id)));
+  const age = Date.now() - signedPhotoUrlsAt;
+  if (!missing && age < 45 * 60 * 1000) return; // completo e fresco
+  if (age < 20 * 1000) return;                  // tentou há <20s: não martela em falha
+  signingPhotosInFlight = true;
+  signedPhotoUrlsAt = Date.now();
+  signPlayerPhotos(withPhoto).then((res) => {
+    signingPhotosInFlight = false;
+    if (Array.isArray(res) && res.length) {
+      res.forEach((e) => signedPhotoUrls.set(String(e.id), e.url));
+      render(getState()); // re-renderiza com as fotos assinadas
+    }
+  }).catch(() => { signingPhotosInFlight = false; });
 }
 
 function openAvatarLightbox(src, alt) {
@@ -493,11 +525,6 @@ function renderAvatarForApp(player, extraClass = '') {
 }
 
 
-function isGoalkeeperPlayerForApp(player) {
-  const raw = String(player?.position || '').trim().toLowerCase();
-  return raw === 'gol' || raw === 'goleiro';
-}
-
 function getActiveRentalGoalkeepersForApp(snapshot) {
   const game = getActiveGameFromSnapshot(snapshot);
   return Array.isArray(game?.rental_goalkeepers) ? game.rental_goalkeepers : [];
@@ -518,8 +545,8 @@ function buildConfirmedPresenceShareText(snapshot) {
   );
 
   const players = (snapshot.players || []).filter((player) => confirmedIds.has(String(player.id)));
-  const goalkeepers = players.filter(isGoalkeeperPlayerForApp);
-  const linePlayers = players.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const goalkeepers = players.filter(isGoalkeeperPlayer);
+  const linePlayers = players.filter((player) => !isGoalkeeperPlayer(player));
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
 
   const lines = [
@@ -1645,7 +1672,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
-      if (up.ok) { playerToEdit.photo_url = up.url; delete playerToEdit.photoDataUrl; }
+      if (up.ok) { playerToEdit.photo_url = up.path; delete playerToEdit.photoDataUrl; }
       else { playerToEdit.photoDataUrl = photoDataUrl; } // fallback: mantém base64
     }
   } else {
@@ -1653,7 +1680,7 @@ document.addEventListener("click", async (e) => {
     let photoFields = {};
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, newId);
-      photoFields = up.ok ? { photo_url: up.url } : { photoDataUrl }; // fallback base64
+      photoFields = up.ok ? { photo_url: up.path } : { photoDataUrl }; // fallback base64
     }
     snapshot.players.push({
       id: newId,
@@ -1768,7 +1795,7 @@ if (action === "update-self-profile") {
   let selfPhotoFields = null;
   if (selfPhotoDataUrl) {
     const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
-    selfPhotoFields = up.ok ? { photo_url: up.url, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
+    selfPhotoFields = up.ok ? { photo_url: up.path, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
   }
 
   snapshot.players = snapshot.players.map((player) => {
@@ -2129,7 +2156,7 @@ document.addEventListener("change", (e) => {
 });
 
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
-import { isConfirmedEntry } from "../domain/confirmations.js";
+import { isConfirmedEntry, isGoalkeeperPlayer } from "../domain/confirmations.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
@@ -2138,7 +2165,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
@@ -2584,6 +2611,9 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  // Garante URLs assinadas das fotos (bucket privado) — async, re-renderiza
+  // quando chegam. Guardado internamente para não martelar.
+  ensureSignedPhotos(snapshot);
   // Qualquer throw aqui apagaria a tela (innerHTML) sem repintar. O try/catch
   // garante uma tela de erro recuperável em vez de "tela branca" travada.
   try {
@@ -4322,8 +4352,8 @@ function renderPresenceList(snapshot, currentPlayer) {
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
 
   const confirmedFootballPlayers = footballPlayers.filter((player) => confirmedIds.has(String(player.id)));
-  const goalkeeperPlayers = confirmedFootballPlayers.filter(isGoalkeeperPlayerForApp).slice(0, 2);
-  const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const goalkeeperPlayers = confirmedFootballPlayers.filter(isGoalkeeperPlayer).slice(0, 2);
+  const confirmedPlayers = confirmedFootballPlayers.filter((player) => !isGoalkeeperPlayer(player));
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
   const totalGoalkeepers = goalkeeperPlayers.length + rentalGoalkeepers.length;
   const guestPlayers = getActiveGuestPlayersForApp(snapshot);
@@ -4332,8 +4362,8 @@ function renderPresenceList(snapshot, currentPlayer) {
   const lineFull = lineMax > 0 && lineUsed >= lineMax;
   const waitlistPlayers = waitlistEntries.map((entry) => entry.player).filter(Boolean);
   const pendingPlayers = footballPlayers.filter((player) => !confirmedIds.has(String(player.id)) && !waitlistedIds.has(String(player.id)));
-  const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayerForApp);
-  const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayerForApp(player));
+  const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayer);
+  const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayer(player));
 
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">

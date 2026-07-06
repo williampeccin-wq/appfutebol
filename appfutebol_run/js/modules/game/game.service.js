@@ -4,6 +4,7 @@ import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode,
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
+import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -18,11 +19,6 @@ function mergeScopedConfirmations(snapshot, scoped) {
   return [...others, ...scoped.map((entry) => ({ ...entry, game_key: key }))];
 }
 function patchScopedConfirmations(snapshot, scoped) { patchState({ confirmations: mergeScopedConfirmations(snapshot, scoped) }); }
-
-function isGoalkeeperPlayer(player) {
-  const raw = String(player?.position || '').trim().toLowerCase();
-  return raw === 'gol' || raw === 'goleiro';
-}
 
 function getConfirmedGoalkeeperCount(confirmations = [], players = []) {
   const playersById = new Map((players || []).map((player) => [String(player.id), player]));

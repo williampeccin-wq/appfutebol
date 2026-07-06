@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.107.0-pix-ux';
+export const APP_VERSION = 'v1.108.0-signed-photos';

@@ -42,10 +42,14 @@ export function isGoalkeeperPlayer(player) {
   return raw === 'gol' || raw === 'goleiro';
 }
 
+// Fonte ÚNICA de "este entry é goleiro". Superconjunto das versões antigas:
+// flags do entry (goalkeeper/segment/presence_role) OU posição do jogador.
+// rules.engine reexporta esta (antes tinha uma cópia só-entry, sem posição).
 export function isGoalkeeperEntry(entry, player) {
   if (!entry) return false;
   if (entry.goalkeeper === true) return true;
   if (entry.segment === 'goalkeeper') return true;
+  if (entry.presence_role === 'goalkeeper') return true;
   return isGoalkeeperPlayer(player);
 }
 
