@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.108.0-audit-safe-batch';
+export const APP_VERSION = 'v1.109.0-private-photos';

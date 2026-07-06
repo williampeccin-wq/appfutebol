@@ -866,17 +866,64 @@ export async function fetchRemoteHeartbeat(activeGameKey = null) {
   return { ok: true, status: 200, updatedAt: values.length ? values[values.length - 1] : null };
 }
 
-// Faz upload de uma foto (data URL base64) para o bucket público `player-photos`
-// e retorna a URL pública (com cache-busting). Mantém o caminho por jogador
-// (sobrescreve via x-upsert). Em qualquer falha retorna { ok:false } — o
-// chamador então mantém o base64 como fallback (não quebra nada).
+// Extrai o PATH de armazenamento da foto a partir do que está gravado em
+// player.photo_url — que pode ser: uma URL pública/assinada antiga (extrai o
+// trecho após /player-photos/) OU um path nu (uploads novos). Null se não houver.
+export function photoStoragePath(player) {
+  const raw = String(player?.photo_url || '');
+  if (!raw) return null;
+  const m = raw.match(/\/player-photos\/([^?]+)/);
+  if (m) return decodeURIComponent(m[1]);
+  if (!/^https?:/i.test(raw)) return raw.replace(/^\/+/, ''); // já é path
+  return null;
+}
+
+// Assina EM LOTE as fotos dos jogadores (bucket privado): 1 request devolve URLs
+// temporárias. Retorna [{ id, url }]. Falha silenciosa → avatar cai no base64/inicial.
+export async function signPlayerPhotos(players, expiresIn = 3600) {
+  const config = getConfig();
+  if (!isSupabaseConfigured()) return [];
+  const entries = (Array.isArray(players) ? players : [])
+    .map((p) => ({ id: String(p?.id || ''), path: photoStoragePath(p) }))
+    .filter((e) => e.id && e.path);
+  if (!entries.length) return [];
+  const paths = [...new Set(entries.map((e) => e.path))];
+  try {
+    const token = getAccessToken();
+    const resp = await fetch(`${baseUrl(config)}/storage/v1/object/sign/player-photos`, {
+      method: 'POST',
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${token || config.anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn, paths }),
+    });
+    if (!resp.ok) { console.warn('[storage] assinar fotos falhou:', resp.status); return []; }
+    const data = await resp.json(); // [{ error, path, signedURL }]
+    const byPath = new Map();
+    for (const row of Array.isArray(data) ? data : []) {
+      if (row?.signedURL && row?.path) byPath.set(String(row.path), `${baseUrl(config)}/storage/v1${row.signedURL}`);
+    }
+    return entries.map((e) => ({ id: e.id, url: byPath.get(e.path) })).filter((e) => e.url);
+  } catch (error) {
+    console.warn('[storage] erro ao assinar fotos:', error);
+    return [];
+  }
+}
+
+// Faz upload de uma foto (data URL base64) para o bucket `player-photos` e retorna
+// o PATH de armazenamento (com sufixo ALEATÓRIO → não-enumerável). O bucket é
+// privado: a exibição usa URL assinada (ver signPlayerPhotos). Em qualquer falha
+// retorna { ok:false } — o chamador então mantém o base64 como fallback.
 export async function uploadPlayerPhoto(dataUrl, playerId) {
   const config = getConfig();
   if (!isSupabaseConfigured() || !dataUrl || !playerId) return { ok: false };
   if (!String(dataUrl).startsWith('data:')) return { ok: false }; // já é URL? nada a fazer
   try {
     const blob = await (await fetch(dataUrl)).blob();
-    const path = `${encodeURIComponent(String(playerId))}.jpg`;
+    const rand = Math.random().toString(36).slice(2, 12);
+    const path = `${encodeURIComponent(String(playerId))}-${rand}.jpg`;
     const token = getAccessToken();
     const resp = await fetch(`${baseUrl(config)}/storage/v1/object/player-photos/${path}`, {
       method: 'POST',
@@ -893,7 +940,7 @@ export async function uploadPlayerPhoto(dataUrl, playerId) {
       console.warn('[storage] upload de foto falhou:', resp.status, await resp.text().catch(() => ''));
       return { ok: false, status: resp.status };
     }
-    return { ok: true, url: `${baseUrl(config)}/storage/v1/object/public/player-photos/${path}?v=${Date.now()}` };
+    return { ok: true, path };
   } catch (error) {
     console.warn('[storage] erro no upload de foto:', error);
     return { ok: false };
