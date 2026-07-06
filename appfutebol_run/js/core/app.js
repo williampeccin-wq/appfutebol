@@ -435,7 +435,14 @@ let signedPhotoUrlsAt = 0;
 let signingPhotosInFlight = false;
 
 function getPlayerPhoto(player) {
-  return signedPhotoUrls.get(String(player?.id)) || player?.photoDataUrl || '';
+  const signed = signedPhotoUrls.get(String(player?.id));
+  if (signed) return signed;
+  // Fallback TRANSITÓRIO: se photo_url ainda é uma URL pública antiga (bucket
+  // não-privado), usa direto — garante que a foto não suma durante a validação.
+  // Uploads novos guardam só o PATH (sem http) → não caem aqui, usam o assinado.
+  const url = String(player?.photo_url || '');
+  if (/^https?:/i.test(url)) return url;
+  return player?.photoDataUrl || '';
 }
 
 function ensureSignedPhotos(snapshot) {
