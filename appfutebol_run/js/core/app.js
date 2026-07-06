@@ -463,6 +463,14 @@ function ensureSignedPhotos(snapshot) {
   }).catch(() => { signingPhotosInFlight = false; });
 }
 
+// Após novo upload de foto: descarta a URL assinada antiga do jogador e zera o
+// cooldown, forçando re-assinar o path novo no próximo render — senão o avatar
+// continuaria mostrando a foto velha (cache por jogador).
+function invalidateSignedPhoto(id) {
+  signedPhotoUrls.delete(String(id));
+  signedPhotoUrlsAt = 0;
+}
+
 function openAvatarLightbox(src, alt) {
   if (!src) return;
   const previous = document.getElementById('avatar-lightbox');
@@ -1672,7 +1680,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
-      if (up.ok) { playerToEdit.photo_url = up.path; delete playerToEdit.photoDataUrl; }
+      if (up.ok) { playerToEdit.photo_url = up.path; delete playerToEdit.photoDataUrl; invalidateSignedPhoto(playerToEdit.id); }
       else { playerToEdit.photoDataUrl = photoDataUrl; } // fallback: mantém base64
     }
   } else {
@@ -1681,6 +1689,7 @@ document.addEventListener("click", async (e) => {
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, newId);
       photoFields = up.ok ? { photo_url: up.path } : { photoDataUrl }; // fallback base64
+      if (up.ok) invalidateSignedPhoto(newId);
     }
     snapshot.players.push({
       id: newId,
@@ -1796,6 +1805,7 @@ if (action === "update-self-profile") {
   if (selfPhotoDataUrl) {
     const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
     selfPhotoFields = up.ok ? { photo_url: up.path, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
+    if (up.ok) invalidateSignedPhoto(currentPlayer.id);
   }
 
   snapshot.players = snapshot.players.map((player) => {
