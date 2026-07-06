@@ -1682,7 +1682,7 @@ document.addEventListener("click", async (e) => {
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
       if (up.ok) { playerToEdit.photo_url = up.path; delete playerToEdit.photoDataUrl; invalidateSignedPhoto(playerToEdit.id); }
-      else { playerToEdit.photoDataUrl = photoDataUrl; } // fallback: mantém base64
+      else { playerToEdit.photoDataUrl = photoDataUrl; invalidateSignedPhoto(playerToEdit.id); showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error'); } // fallback: mantém base64
     }
   } else {
     const newId = "p_" + Date.now();
@@ -1691,6 +1691,7 @@ document.addEventListener("click", async (e) => {
       const up = await uploadPlayerPhoto(photoDataUrl, newId);
       photoFields = up.ok ? { photo_url: up.path } : { photoDataUrl }; // fallback base64
       if (up.ok) invalidateSignedPhoto(newId);
+      else showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error');
     }
     snapshot.players.push({
       id: newId,
@@ -1807,6 +1808,7 @@ if (action === "update-self-profile") {
     const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
     selfPhotoFields = up.ok ? { photo_url: up.path, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
     if (up.ok) invalidateSignedPhoto(currentPlayer.id);
+    else { invalidateSignedPhoto(currentPlayer.id); showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error'); }
   }
 
   snapshot.players = snapshot.players.map((player) => {
