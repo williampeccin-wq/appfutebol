@@ -437,30 +437,21 @@ let signingPhotosInFlight = false;
 function getPlayerPhoto(player) {
   const signed = signedPhotoUrls.get(String(player?.id));
   if (signed) return signed;
-  // Fallback TRANSITÓRIO: se photo_url ainda é uma URL pública antiga (bucket
-  // não-privado), usa direto — garante que a foto não suma durante a validação.
-  // Uploads novos guardam só o PATH (sem http) → não caem aqui, usam o assinado.
   const url = String(player?.photo_url || '');
-  if (/^https?:/i.test(url)) return url;
+  if (/^https?:/i.test(url)) return url;            // URL completa antiga
+  if (url) {                                         // path nu (upload novo) → URL pública
+    const base = String((window.HARMONIA_SUPABASE || {}).url || '').replace(/\/+$/, '');
+    if (base) return `${base}/storage/v1/object/public/player-photos/${url}`;
+  }
   return player?.photoDataUrl || '';
 }
 
-function ensureSignedPhotos(snapshot) {
-  const withPhoto = (snapshot?.players || []).filter((p) => p?.photo_url);
-  if (!withPhoto.length || signingPhotosInFlight) return;
-  const missing = withPhoto.some((p) => !signedPhotoUrls.has(String(p.id)));
-  const age = Date.now() - signedPhotoUrlsAt;
-  if (!missing && age < 45 * 60 * 1000) return; // completo e fresco
-  if (age < 20 * 1000) return;                  // tentou há <20s: não martela em falha
-  signingPhotosInFlight = true;
-  signedPhotoUrlsAt = Date.now();
-  signPlayerPhotos(withPhoto).then((res) => {
-    signingPhotosInFlight = false;
-    if (Array.isArray(res) && res.length) {
-      res.forEach((e) => signedPhotoUrls.set(String(e.id), e.url));
-      render(getState()); // re-renderiza com as fotos assinadas
-    }
-  }).catch(() => { signingPhotosInFlight = false; });
+function ensureSignedPhotos(_snapshot) {
+  // DESLIGADO: o bucket é público e getPlayerPhoto usa a URL pública direta
+  // (nunca expira, funciona em qualquer versão de cliente). A assinatura ficava
+  // frágil (expira em 1h + dependia de código fresco, que o SW às vezes cacheia
+  // velho). Mantido como no-op p/ facilitar reativar quando o bucket for privado
+  // de novo, num desenho que trate o cache do SW.
 }
 
 // Após novo upload de foto: descarta a URL assinada antiga do jogador e zera o
@@ -1690,7 +1681,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
-      if (up.ok) { playerToEdit.photo_url = up.path; delete playerToEdit.photoDataUrl; invalidateSignedPhoto(playerToEdit.id); }
+      if (up.ok) { playerToEdit.photo_url = up.url; delete playerToEdit.photoDataUrl; invalidateSignedPhoto(playerToEdit.id); }
       else { playerToEdit.photoDataUrl = photoDataUrl; invalidateSignedPhoto(playerToEdit.id); showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error'); } // fallback: mantém base64
     }
   } else {
@@ -1698,7 +1689,7 @@ document.addEventListener("click", async (e) => {
     let photoFields = {};
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, newId);
-      photoFields = up.ok ? { photo_url: up.path } : { photoDataUrl }; // fallback base64
+      photoFields = up.ok ? { photo_url: up.url } : { photoDataUrl }; // fallback base64
       if (up.ok) invalidateSignedPhoto(newId);
       else showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error');
     }
@@ -1816,7 +1807,7 @@ if (action === "update-self-profile") {
   let selfPhotoFields = null;
   if (selfPhotoDataUrl) {
     const up = await uploadPlayerPhoto(selfPhotoDataUrl, currentPlayer.id);
-    selfPhotoFields = up.ok ? { photo_url: up.path, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
+    selfPhotoFields = up.ok ? { photo_url: up.url, photoDataUrl: '' } : { photoDataUrl: selfPhotoDataUrl };
     if (up.ok) invalidateSignedPhoto(currentPlayer.id);
     else { invalidateSignedPhoto(currentPlayer.id); showToast(`Não consegui enviar a foto${up.status ? ` (erro ${up.status})` : ''}. Salvei o resto.`, 'error'); }
   }
