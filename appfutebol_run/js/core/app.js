@@ -1580,7 +1580,11 @@ document.addEventListener("click", async (e) => {
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
-  const photoDataUrl = document.getElementById("new-photo")?.dataset?.photoDataUrl || "";
+  // Só é FOTO NOVA se for um data: URL (arquivo recém-selecionado). O form
+  // pré-preenche o dataset com a foto atual (agora URL assinada) — que NÃO deve
+  // virar upload. base64 legado (data:) ainda migra normalmente.
+  const rawNewPhoto = document.getElementById("new-photo")?.dataset?.photoDataUrl || "";
+  const photoDataUrl = rawNewPhoto.startsWith("data:") ? rawNewPhoto : "";
 
   if (!name || !phone || !birthDate) {
     clearActionBusy(trigger);
@@ -1768,7 +1772,8 @@ if (action === "update-self-profile") {
   const phone = phoneValidation.digits;
   const birthDate = document.getElementById("self-birthdate")?.value?.trim();
   const positionInput = document.getElementById("self-position");
-  const selfPhotoDataUrl = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
+  const rawSelfPhoto = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
+  const selfPhotoDataUrl = rawSelfPhoto.startsWith("data:") ? rawSelfPhoto : ""; // só data: = foto nova
   const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
 
   if (!name || !phone || !birthDate) {
