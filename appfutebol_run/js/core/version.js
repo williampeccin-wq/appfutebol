@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.109.5-photos-public-url';
+export const APP_VERSION = 'v1.110.0-server-register';

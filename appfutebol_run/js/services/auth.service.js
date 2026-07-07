@@ -23,6 +23,18 @@ function authHeaders(accessToken = null) {
   };
 }
 
+// Chama a Edge Function de cadastro (autoridade no servidor). O usuário ainda não
+// tem conta → usa a anon key. Devolve { ok, session?, error?, message? }.
+async function callRegisterPlayer(body) {
+  try {
+    const url = `${trimTrailingSlash(SUPABASE_CONFIG.url)}/functions/v1/register-player`;
+    const resp = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    return await resp.json().catch(() => ({ ok: false, error: 'bad_response' }));
+  } catch (_) {
+    return { ok: false, error: 'network', message: 'Falha de rede no cadastro. Tente de novo.' };
+  }
+}
+
 function saveSession(session) {
   if (!session?.access_token || !session?.user?.id) return null;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -288,7 +300,6 @@ export async function loginWithPasskeySession(session) {
 }
 
 export async function register(payload) {
-  const snapshot = getState();
   const name = String(payload.name || '').trim();
   const phone = normalizeLoginPhone(payload.phone);
   const birthDate = String(payload.birthDate || '').trim();
@@ -296,8 +307,8 @@ export async function register(payload) {
   const position = role === 'player' ? normalizePosition(payload.position) : null;
   const password = String(payload.password || '').trim();
   const passwordConfirm = String(payload.passwordConfirm || '').trim();
-  const technicalEmail = phoneToTechnicalEmail(phone);
 
+  // Validação client-side (feedback imediato). O servidor revalida tudo.
   if (!name) {
     return { ok: false, message: 'Informe o nome.' };
   }
@@ -317,109 +328,28 @@ export async function register(payload) {
     return { ok: false, message: 'As senhas não conferem.' };
   }
 
-  const duplicatePhone = snapshot.players.find((item) => normalizeLoginPhone(item.phone) === phone);
-  if (duplicatePhone) {
-    return { ok: false, message: 'Esse telefone já está cadastrado.' };
+  // Cadastro AUTORITATIVO no servidor (Edge Function service_role): valida,
+  // checa telefone duplicado, decide 1º-jogador=admin, cria auth+player e
+  // devolve a sessão. O cliente anônimo não lê mais a tabela players.
+  const res = await callRegisterPlayer({ name, phone, birthDate, role, position, password });
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Não foi possível cadastrar. Tente de novo.' };
   }
 
-  const authResult = await requestAuth('signup', {
-    email: technicalEmail,
-    password,
-    data: { name, phone, birthDate, login_type: 'phone_password' },
-  });
-
-  if (!authResult.ok) {
-    return { ok: false, message: authResult.message };
-  }
-
-  const authUser = authResult.data?.user;
-  if (!authUser?.id) {
-    return { ok: false, message: 'Cadastro criado, mas o Supabase não retornou o usuário.' };
-  }
-
-  const loginResult = await requestAuth('token?grant_type=password', {
-    email: technicalEmail,
-    password,
-  });
-
-  if (!loginResult.ok) {
-    return {
-      ok: false,
-      message: `Cadastro criado, mas o login automático falhou: ${loginResult.message}`,
-    };
-  }
-
-  const session = saveSession(loginResult.data);
-
-  const remote = await loadRemoteState().catch(() => null);
-  const baseSnapshot = remote?.ok && remote.state ? remote.state : snapshot;
-  const basePlayers = Array.isArray(baseSnapshot.players) ? baseSnapshot.players : [];
-
-  const remoteDuplicatePhone = basePlayers.find((item) => normalizeLoginPhone(item.phone) === phone);
-  if (remoteDuplicatePhone) {
-    replaceState({
-      ...baseSnapshot,
-      session: { playerId: null, authUserId: session.user.id },
+  if (!res.session) {
+    // Cadastro OK, mas o login automático não veio → cai no login manual.
+    patchState({
       ui: {
-        ...(baseSnapshot.ui || {}),
         authMode: 'login',
-        authMessage: {
-          type: 'error',
-          text: 'Esse telefone já existe na base remota. Faça login ou peça ao administrador para conferir o cadastro.',
-        },
+        authMessage: { type: 'success', text: res.message || 'Cadastro realizado. Faça login.' },
       },
     });
-    return { ok: false, message: 'Esse telefone já existe na base remota.' };
+    return { ok: false, message: res.message || 'Cadastro realizado. Faça login.' };
   }
 
-  replaceState({
-    ...baseSnapshot,
-    session: { playerId: null, authUserId: session.user.id },
-    ui: {
-      ...(baseSnapshot.ui || {}),
-      authMode: 'login',
-      authMessage: {
-        type: 'success',
-        text: 'Cadastro realizado. Entrando automaticamente...',
-      },
-    },
-  });
-
-  const isFirstPlayer = basePlayers.length === 0;
-  const nextPlayer = {
-    id: createPlayerId(basePlayers),
-    auth_user_id: authUser.id,
-    email: technicalEmail,
-    login_phone: phone,
-    name,
-    phone,
-    birthDate,
-    role,
-    plays_football: role === 'player',
-    in_carne_group: true,
-    position,
-    mens_ok: false,
-    is_admin: isFirstPlayer,
-  };
-
-  patchState({
-    players: [...basePlayers, nextPlayer],
-    ui: {
-      authMode: 'login',
-      authMessage: {
-        type: 'success',
-        text: 'Cadastro realizado. Entrando automaticamente...',
-      },
-    },
-  });
-
-  const loggedPlayer = ensureLoggedPlayer(session);
-
-  if (!loggedPlayer) {
-    return { ok: false, message: 'Cadastro criado, mas o jogador ainda não ficou vinculado à sessão.' };
-  }
-
-  return { ok: true, player: loggedPlayer };
+  // Adota a sessão devolvida (mesmo caminho do passkey: saveSession +
+  // loadRemoteState autenticado + vincula o jogador à sessão).
+  return await loginWithPasskeySession(res.session);
 }
 
 

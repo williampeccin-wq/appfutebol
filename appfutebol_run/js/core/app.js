@@ -2364,15 +2364,14 @@ async function initInner() {
   await prepareStoredSession();
 
   // Auth gate:
-  // 1. Validate Supabase Auth first.
-  // 2. If the stored auth session is invalid, restoreSession() clears it.
-  // 3. Only after that do we load persisted state, avoiding unauthenticated REST calls on the login screen.
+  // 1. Validate Supabase Auth first (restoreSession valida o token; se logado,
+  //    ele já faz loadRemoteState AUTENTICADO + vincula o jogador à sessão).
+  // 2. Se o token guardado for inválido, restoreSession() o limpa.
+  // 3. Deslogado: NÃO lemos nada do servidor. A tela de login não precisa de
+  //    dados, e o cadastro agora é server-side (Edge Function register-player),
+  //    então o cliente anônimo não faz mais nenhuma leitura REST. Isso permite
+  //    dropar as policies de SELECT anônimo (players/app_meta/game/presence).
   await restoreSession();
-
-  if (!getCurrentPlayer()) {
-    const data = await loadPersistedState();
-    replaceState(data);
-  }
 
   lastDomainFingerprint = getDomainFingerprint(getState());
 
