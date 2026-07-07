@@ -940,7 +940,10 @@ export async function uploadPlayerPhoto(dataUrl, playerId) {
       console.warn('[storage] upload de foto falhou:', resp.status, await resp.text().catch(() => ''));
       return { ok: false, status: resp.status };
     }
-    return { ok: true, path };
+    // Grava a URL PÚBLICA COMPLETA (path aleatório = resistência a enumeração;
+    // bucket público = carrega em qualquer cliente, inclusive código antigo em
+    // cache do SW). Também devolve `path` p/ quem precisar.
+    return { ok: true, url: `${baseUrl(config)}/storage/v1/object/public/player-photos/${path}?v=${Date.now()}`, path };
   } catch (error) {
     console.warn('[storage] erro no upload de foto:', error);
     return { ok: false };
