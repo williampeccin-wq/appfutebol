@@ -27,6 +27,12 @@ export function renderAuthScreen(uiState = {}) {
 
         ${mode === 'login' ? renderLoginForm() : renderRegisterForm()}
       </section>
+
+      <p class="login-legal">
+        Ao continuar, você concorda com os
+        <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+        e a <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.
+      </p>
     </div>
   `;
 }
@@ -132,6 +138,11 @@ function renderRegisterForm() {
       </div>
 
       <p class="footer-note">Essa senha ficará vinculada ao seu usuário e será usada nos próximos acessos.</p>
+
+      <label class="register-consent">
+        <input type="checkbox" id="register-consent" name="consent" />
+        <span>Li e aceito os <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span>
+      </label>
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Criar cadastro</button>

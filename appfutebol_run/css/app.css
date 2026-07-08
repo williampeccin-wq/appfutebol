@@ -6392,6 +6392,29 @@ body {
 }
 .self-delete-actions .btn { flex: 1; }
 
+/* Links legais (login / perfil) e checkbox de aceite (cadastro) */
+.login-legal {
+  margin: 14px auto 0;
+  max-width: 340px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--hfc-text-muted, #9fb2cc);
+}
+.login-legal a, .profile-legal a { color: var(--hfc-accent, #f0c040); text-decoration: underline; }
+.profile-legal { margin-top: 14px; text-align: center; font-size: 12px; }
+.register-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.register-consent input { margin-top: 3px; flex: none; width: 18px; height: 18px; }
+.register-consent a { color: var(--hfc-accent, #f0c040); text-decoration: underline; }
+
 /* Jogadores: card de upload de foto em vidro (corrige contraste do nome/título) */
 .content--players .player-photo-upload {
   background: var(--hfc-glass-2);

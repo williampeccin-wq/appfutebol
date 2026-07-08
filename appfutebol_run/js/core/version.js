@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.111.0-account-delete';
+export const APP_VERSION = 'v1.112.0-legal-links';

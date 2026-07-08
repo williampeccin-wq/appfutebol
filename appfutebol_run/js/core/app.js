@@ -3104,6 +3104,10 @@ function bindAuthEvents() {
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(registerForm);
+      if (!registerForm.querySelector('#register-consent')?.checked) {
+        showToast('Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.', 'error');
+        return;
+      }
       const submitButton = registerForm.querySelector('button[type="submit"]');
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
       const result = await register({
@@ -4121,6 +4125,11 @@ function renderProfilePanel(activePlayer) {
           </div>
         </div>
       ` : ''}
+
+      <p class="footer-note profile-legal">
+        <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+        · <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+      </p>
     </section>
   `;
 }
