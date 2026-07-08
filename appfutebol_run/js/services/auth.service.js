@@ -420,3 +420,52 @@ export async function logout() {
     ui: { authMessage: null, authMode: 'login', currentTab: 'home' },
   });
 }
+
+// Auto-exclusão de conta (LGPD art. 18 / requisito de loja). Re-autentica com a
+// senha (evita exclusão num aparelho desbloqueado alheio), chama a Edge Function
+// delete-account com a sessão do TITULAR (o servidor deriva quem é do token) e,
+// no sucesso, limpa a sessão e volta ao login. Ver [[harmonia-produtizacao]].
+export async function deleteOwnAccount(password) {
+  const pass = String(password || '').trim();
+  if (!pass) return { ok: false, message: 'Digite sua senha para confirmar a exclusão.' };
+
+  const currentPlayer = getCurrentPlayer();
+  const phone = normalizeLoginPhone(currentPlayer?.phone || currentPlayer?.login_phone || '');
+  if (!phone) return { ok: false, message: 'Telefone do usuário não encontrado.' };
+
+  // 1) Confirma a identidade re-autenticando com a senha.
+  const authCheck = await requestAuth('token?grant_type=password', {
+    email: phoneToTechnicalEmail(phone),
+    password: pass,
+  });
+  if (!authCheck.ok) return { ok: false, message: 'Senha incorreta.' };
+
+  // 2) Garante um token válido e chama a função com a sessão do titular.
+  const stored = await prepareStoredSession();
+  const token = stored?.access_token;
+  if (!token) return { ok: false, message: 'Sessão inválida. Faça login novamente.' };
+
+  let data = {};
+  try {
+    const url = `${trimTrailingSlash(SUPABASE_CONFIG.url)}/functions/v1/delete-account`;
+    const resp = await fetch(url, { method: 'POST', headers: authHeaders(token), body: '{}' });
+    data = await resp.json().catch(() => ({ ok: false }));
+  } catch (_) {
+    return { ok: false, message: 'Falha de rede ao excluir a conta. Tente de novo.' };
+  }
+
+  if (!data.ok) {
+    if (data.error === 'last_admin') {
+      return { ok: false, message: data.message || 'Você é o único administrador. Promova outro admin antes de excluir sua conta.' };
+    }
+    return { ok: false, message: data.message || 'Não foi possível excluir a conta. Tente de novo.' };
+  }
+
+  // 3) Conta apagada no servidor → limpa a sessão local e volta ao login.
+  clearStoredSession();
+  patchState({
+    session: { playerId: null, authUserId: null },
+    ui: { authMode: 'login', currentTab: 'home', authMessage: { type: 'success', text: 'Conta excluída. Sentiremos sua falta! 👋' } },
+  });
+  return { ok: true };
+}

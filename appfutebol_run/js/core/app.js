@@ -36,6 +36,7 @@ function showToast(msg, type='success') {
 let editingPlayerId = null;
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
+let selfDeleteOpen = false;       // dentro do painel, zona de exclusão de conta aberta
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma). É o único estado
 // transitório da edição do rodízio — todo o resto é auto-salvo no estado.
 let editingCarnePairIndex = -1;
@@ -1247,7 +1248,21 @@ document.addEventListener("click", async (e) => {
   if (action === "close-profile") {
     selfProfileOpen = false;
     selfProfileEditOpen = false;
+    selfDeleteOpen = false;
     render(snapshot);
+    return;
+  }
+
+  if (action === "toggle-self-delete") {
+    selfProfileOpen = true;
+    selfDeleteOpen = !selfDeleteOpen;
+    render(snapshot);
+    if (selfDeleteOpen) {
+      setTimeout(() => {
+        document.getElementById("self-delete-zone")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("self-delete-password")?.focus();
+      }, 60);
+    }
     return;
   }
 
@@ -2181,7 +2196,7 @@ import { getState as loadPersistedState, saveState as savePersistedState, getSto
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
-import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
+import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession, deleteOwnAccount } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
@@ -3339,7 +3354,22 @@ function bindCarneRotationDrag() {
 }
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; resetCarneRotationDraft(); await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false; resetCarneRotationDraft(); await logout(); });
+
+  appElement.querySelector('#self-delete-confirm')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const password = document.getElementById('self-delete-password')?.value || '';
+    setActionBusy(button, 'Excluindo...');
+    const result = await deleteOwnAccount(password);
+    clearActionBusy(button);
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível excluir a conta.', 'error');
+      return;
+    }
+    // Sucesso: deleteOwnAccount já limpou a sessão e mudou p/ login; força o reset local.
+    selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false;
+    showToast('Conta excluída.', 'success');
+  });
   bindPushOptin(currentPlayer);
   bindCarneRotationDrag();
   appElement.querySelector('#carne-rotation-start')?.addEventListener('change', (event) => {
@@ -4077,7 +4107,20 @@ function renderProfilePanel(activePlayer) {
         <button class="btn btn-primary" type="button" data-action="toggle-self-profile-edit">Editar cadastro</button>
         ${isPasskeyEnabled() && passkeySupported() ? `<button class="btn btn-secondary" type="button" data-action="register-passkey">🔑 Ativar passkey neste aparelho</button>` : ''}
         <button class="btn btn-secondary" type="button" id="logout-button">Sair</button>
+        <button class="btn btn-danger" type="button" data-action="toggle-self-delete">Excluir minha conta</button>
       </div>
+
+      ${selfDeleteOpen ? `
+        <div class="self-delete-zone" id="self-delete-zone">
+          <p class="footer-note"><strong>Atenção: esta ação é permanente.</strong> Sua conta e seus dados pessoais (nome, telefone, foto) serão removidos e você não poderá mais entrar. Registros históricos do grupo (escalações, ranking) ficam anônimos.</p>
+          <label class="form-label" for="self-delete-password">Confirme com sua senha</label>
+          <input class="input" id="self-delete-password" type="password" autocomplete="current-password" placeholder="Sua senha" />
+          <div class="self-delete-actions">
+            <button class="btn btn-secondary" type="button" data-action="toggle-self-delete">Cancelar</button>
+            <button class="btn btn-danger" type="button" id="self-delete-confirm">Excluir definitivamente</button>
+          </div>
+        </div>
+      ` : ''}
     </section>
   `;
 }

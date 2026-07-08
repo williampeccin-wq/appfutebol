@@ -6367,11 +6367,30 @@ body {
 .content--championship .btn-danger,
 .content--weekly_game .btn-danger,
 .content--players .btn-danger,
-.content--config .btn-danger {
+.content--config .btn-danger,
+.self-profile-card .btn-danger,
+.self-delete-zone .btn-danger {
   background: rgba(240, 137, 123, 0.16);
   color: #f0897b;
   border: 1px solid rgba(240, 137, 123, 0.35);
 }
+
+/* Zona de auto-exclusão de conta no painel de perfil */
+.self-delete-zone {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(240, 137, 123, 0.35);
+  border-radius: 12px;
+  background: rgba(240, 137, 123, 0.06);
+  display: grid;
+  gap: 8px;
+}
+.self-delete-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.self-delete-actions .btn { flex: 1; }
 
 /* Jogadores: card de upload de foto em vidro (corrige contraste do nome/título) */
 .content--players .player-photo-upload {
