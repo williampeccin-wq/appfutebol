@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Termos de Uso — Convocados</title>
+<style>
+  :root{ --bg:#0c1626; --card:#0f1d31; --line:#20344f; --text:#e7eefb; --muted:#9fb2cc; --accent:#f0c040; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; line-height:1.6; }
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 20px 72px; }
+  header{ border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:8px; }
+  h1{ font-size:24px; margin:0 0 4px; }
+  h2{ font-size:18px; margin:30px 0 8px; color:#fff; }
+  p,li{ color:var(--text); font-size:15px; }
+  .muted{ color:var(--muted); font-size:13px; }
+  a{ color:var(--accent); }
+  .ph{ background:#3a2d0a; color:#ffdf80; padding:0 5px; border-radius:4px; font-size:13px; white-space:nowrap; }
+  .box{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; }
+  .warn{ border-color:#7a5c12; background:#241c07; }
+  ul{ padding-left:20px; }
+  footer{ margin-top:40px; border-top:1px solid var(--line); padding-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Termos de Uso</h1>
+    <p class="muted">Aplicativo <strong>Convocados</strong> · Última atualização: <span class="ph">{{DATA_VIGENCIA}}</span></p>
+  </header>
+
+  <div class="box warn">
+    <strong>Rascunho para revisão.</strong> Redigido para refletir o funcionamento real do aplicativo. <strong>Não é aconselhamento jurídico</strong> e deve ser revisado por um(a) advogado(a) antes da publicação. Preencha os campos <span class="ph">{{chaves}}</span>.
+  </div>
+
+  <p>Estes Termos regem o uso do aplicativo <strong>Convocados</strong> ("aplicativo"). Ao criar uma conta ou usar o aplicativo, você concorda com estes Termos e com a <a href="./privacidade.html">Política de Privacidade</a>. Se não concordar, não utilize o aplicativo.</p>
+
+  <h2>1. O que é o aplicativo</h2>
+  <p>O Convocados é uma ferramenta para <strong>organizar grupos e clubes de futebol amador</strong>: cadastro de membros, confirmação de presença, escalação e sorteio de times, controle de mensalidade, avaliações entre membros e comunicados por notificação. O aplicativo é operado por <span class="ph">{{RAZAO_SOCIAL_OU_NOME}}</span> para o(s) grupo(s) que o utilizam.</p>
+
+  <h2>2. Cadastro e conta</h2>
+  <ul>
+    <li>Você deve fornecer informações verdadeiras e manter seu cadastro atualizado.</li>
+    <li>Sua conta é pessoal e intransferível. Você é responsável por manter a senha em sigilo e por toda atividade feita na sua conta.</li>
+    <li>Se o membro for menor de 18 anos, o cadastro deve ser feito ou autorizado por um responsável legal.</li>
+    <li>O administrador do grupo pode gerenciar membros (incluir, ajustar dados de organização, remover) para fins de operação do grupo.</li>
+  </ul>
+
+  <h2>3. Uso aceitável</h2>
+  <p>Você concorda em não:</p>
+  <ul>
+    <li>Usar o aplicativo para fins ilícitos, ofensivos, discriminatórios ou que violem direitos de terceiros.</li>
+    <li>Publicar conteúdo (nome, foto, comentários) que não tenha o direito de usar.</li>
+    <li>Tentar acessar contas ou dados de outros usuários, burlar segurança ou sobrecarregar o serviço.</li>
+    <li>Enviar comprovantes falsos ou de terceiros sem autorização.</li>
+  </ul>
+
+  <h2>4. Mensalidade e pagamentos (PIX)</h2>
+  <div class="box">
+    <p>O aplicativo <strong>não processa pagamentos</strong> nem intermedia valores. A cobrança da mensalidade e o pagamento por PIX ocorrem <strong>diretamente entre você e o grupo/beneficiário</strong>, por fora do aplicativo.</p>
+    <p>A função de envio de comprovante apenas <strong>lê os dados do comprovante</strong> para marcar automaticamente o pagamento como recebido. O reconhecimento automático é um facilitador e pode falhar; a confirmação final e qualquer disputa sobre valores são responsabilidade do grupo e do administrador, não do aplicativo.</p>
+  </div>
+
+  <h2>5. Avaliações e conteúdo dos membros</h2>
+  <p>As avaliações (desempenho, churrasco) refletem a opinião dos membros e são exibidas de forma anonimizada. Espera-se respeito e boa-fé. O administrador pode moderar ou remover conteúdo inadequado.</p>
+
+  <h2>6. Disponibilidade e isenção de garantias</h2>
+  <p>O aplicativo é oferecido "no estado em que se encontra". Não garantimos funcionamento ininterrupto ou livre de erros, e podemos alterar, suspender ou descontinuar funcionalidades. Na máxima extensão permitida em lei, não nos responsabilizamos por perdas decorrentes de indisponibilidade, falhas de terceiros (Supabase, provedores de push, etc.) ou uso indevido por parte dos membros.</p>
+
+  <h2>7. Encerramento da conta</h2>
+  <p>Você pode <strong>excluir sua conta a qualquer momento</strong> pelo próprio aplicativo. O administrador pode remover membros do grupo. O tratamento de dados após o encerramento segue a <a href="./privacidade.html">Política de Privacidade</a>.</p>
+
+  <h2>8. Alterações destes Termos</h2>
+  <p>Podemos atualizar estes Termos. Mudanças relevantes serão comunicadas no aplicativo; o uso continuado após a atualização representa concordância com a nova versão.</p>
+
+  <h2>9. Lei aplicável e foro</h2>
+  <p>Estes Termos são regidos pelas leis do Brasil. Fica eleito o foro da comarca de <span class="ph">{{CIDADE_UF}}</span> para dirimir controvérsias, salvo disposição legal em contrário.</p>
+
+  <h2>10. Contato</h2>
+  <p>Dúvidas sobre estes Termos: <span class="ph">{{EMAIL_CONTATO}}</span>.</p>
+
+  <footer>
+    <p class="muted">Veja também a <a href="./privacidade.html">Política de Privacidade</a>.</p>
+  </footer>
+</div>
+</body>
+</html>

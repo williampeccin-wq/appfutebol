@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Política de Privacidade — Convocados</title>
+<style>
+  :root{ --bg:#0c1626; --card:#0f1d31; --line:#20344f; --text:#e7eefb; --muted:#9fb2cc; --accent:#f0c040; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; line-height:1.6; }
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 20px 72px; }
+  header{ border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:8px; }
+  h1{ font-size:24px; margin:0 0 4px; }
+  h2{ font-size:18px; margin:30px 0 8px; color:#fff; }
+  h3{ font-size:15px; margin:18px 0 4px; color:var(--accent); }
+  p,li{ color:var(--text); font-size:15px; }
+  .muted{ color:var(--muted); font-size:13px; }
+  a{ color:var(--accent); }
+  .ph{ background:#3a2d0a; color:#ffdf80; padding:0 5px; border-radius:4px; font-size:13px; white-space:nowrap; }
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; display:block; overflow-x:auto; }
+  th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th{ color:#fff; background:#12233a; }
+  .box{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; }
+  .warn{ border-color:#7a5c12; background:#241c07; }
+  ul{ padding-left:20px; }
+  footer{ margin-top:40px; border-top:1px solid var(--line); padding-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Política de Privacidade</h1>
+    <p class="muted">Aplicativo <strong>Convocados</strong> · Última atualização: <span class="ph">{{DATA_VIGENCIA}}</span></p>
+  </header>
+
+  <div class="box warn">
+    <strong>Rascunho para revisão.</strong> Este documento foi redigido para refletir com fidelidade o que o aplicativo realmente coleta e para onde os dados vão, seguindo a LGPD (Lei 13.709/2018). <strong>Não é aconselhamento jurídico</strong> e deve ser revisado por um(a) advogado(a) antes da publicação nas lojas. Os campos entre <span class="ph">{{chaves}}</span> precisam ser preenchidos.
+  </div>
+
+  <p>Esta Política explica como o aplicativo <strong>Convocados</strong> ("aplicativo", "nós") coleta, usa, compartilha e protege os dados pessoais de seus usuários, e quais são os seus direitos como titular.</p>
+
+  <h2>1. Quem é o controlador dos dados</h2>
+  <p>O controlador — responsável pelas decisões sobre o tratamento dos seus dados — é:</p>
+  <ul>
+    <li><strong>Responsável:</strong> <span class="ph">{{RAZAO_SOCIAL_OU_NOME}}</span></li>
+    <li><strong>Inscrição:</strong> <span class="ph">{{CNPJ_OU_CPF}}</span></li>
+    <li><strong>Contato / Encarregado (DPO):</strong> <span class="ph">{{EMAIL_CONTATO}}</span></li>
+    <li><strong>Localidade:</strong> <span class="ph">{{CIDADE_UF}}</span>, Brasil</li>
+  </ul>
+
+  <h2>2. Quais dados coletamos</h2>
+  <p>Coletamos apenas os dados necessários para organizar o grupo/clube de futebol e suas atividades:</p>
+
+  <h3>Fornecidos por você no cadastro e no uso</h3>
+  <table>
+    <tr><th>Dado</th><th>Para quê</th></tr>
+    <tr><td>Nome</td><td>Identificar você nas listas de presença, escalações e no grupo</td></tr>
+    <tr><td>Telefone</td><td>É o seu login e o identificador da conta</td></tr>
+    <tr><td>Data de nascimento</td><td>Registro de aniversário e verificação de idade</td></tr>
+    <tr><td>Senha</td><td>Autenticação (armazenada de forma criptografada — nunca vemos a senha)</td></tr>
+    <tr><td>Posição em campo / perfil (jogador ou carnê)</td><td>Montar escalações e sorteios de times</td></tr>
+    <tr><td>Foto de perfil (opcional)</td><td>Avatar exibido aos demais membros do grupo</td></tr>
+    <tr><td>Comprovante de pagamento PIX (opcional)</td><td>Reconhecer automaticamente o pagamento da mensalidade — ver seção 5</td></tr>
+    <tr><td>Chave de acesso / passkey (opcional)</td><td>Login por biometria/dispositivo, alternativa à senha</td></tr>
+  </table>
+
+  <h3>Gerados pelo uso do aplicativo</h3>
+  <ul>
+    <li><strong>Confirmações de presença</strong> nos jogos.</li>
+    <li><strong>Status de mensalidade</strong> (em dia / pendente) e metadados do pagamento PIX (valor, data, beneficiário, banco e o identificador da transação — "E2E"). <strong>A imagem do comprovante não é armazenada.</strong></li>
+    <li><strong>Avaliações/votos</strong> (desempenho e churrasco). Os votos são exibidos de forma <strong>anonimizada</strong>: mostramos as notas, mas não quem votou.</li>
+    <li><strong>Inscrição de notificações push</strong> (identificador técnico do navegador/dispositivo), se você autorizar as notificações.</li>
+  </ul>
+
+  <h3>Não coletamos</h3>
+  <p>Não coletamos localização (GPS), contatos do seu telefone, nem dados sensíveis (saúde, biometria armazenada por nós, opinião política etc.). O login por biometria/passkey é processado pelo seu próprio dispositivo — nós recebemos apenas uma credencial pública, nunca sua digital ou rosto.</p>
+
+  <h2>3. Bases legais e finalidades (LGPD art. 7º)</h2>
+  <ul>
+    <li><strong>Execução de um serviço a seu pedido / legítimo interesse</strong> (organizar o grupo, escalações, presença, mensalidades): dados de cadastro e de uso.</li>
+    <li><strong>Consentimento</strong> (revogável a qualquer momento): foto de perfil, notificações push, envio do comprovante PIX.</li>
+  </ul>
+
+  <h2>4. Com quem compartilhamos</h2>
+  <p>Não vendemos seus dados. Compartilhamos com prestadores estritamente necessários para o funcionamento ("operadores"):</p>
+  <table>
+    <tr><th>Terceiro</th><th>Papel</th><th>Local</th></tr>
+    <tr><td>Supabase</td><td>Banco de dados, autenticação e armazenamento de fotos</td><td>Nuvem (fora do Brasil)</td></tr>
+    <tr><td>Anthropic (Claude)</td><td>Leitura automática do comprovante PIX — ver seção 5</td><td><strong>Estados Unidos</strong></td></tr>
+    <tr><td>Cloudflare</td><td>Hospedagem e entrega do aplicativo (registra IP/logs de acesso)</td><td>Nuvem (fora do Brasil)</td></tr>
+    <tr><td>Google Fonts</td><td>Carregamento das fontes visuais (recebe seu endereço IP na requisição)</td><td>Estados Unidos</td></tr>
+    <tr><td>Serviço de push do navegador (Google/Apple/Mozilla)</td><td>Entrega das notificações, se você as autorizar</td><td>Fora do Brasil</td></tr>
+  </table>
+  <p>Também podemos divulgar dados se exigido por lei ou ordem judicial.</p>
+
+  <h2>5. Comprovante PIX e transferência internacional</h2>
+  <div class="box">
+    <p>Quando você envia um comprovante PIX para reconhecimento automático da mensalidade, a <strong>imagem é transmitida ao serviço da Anthropic (Claude), nos Estados Unidos</strong>, apenas para extrair os dados do pagamento (valor, data, beneficiário, banco e identificador da transação).</p>
+    <ul>
+      <li>A imagem é usada <strong>somente</strong> para essa leitura e <strong>não é armazenada</strong> por nós.</li>
+      <li>Guardamos apenas os <strong>metadados</strong> extraídos e o identificador da transação (para evitar reuso do mesmo comprovante).</li>
+      <li>Essa é uma <strong>transferência internacional de dados</strong> (LGPD art. 33). Ao enviar o comprovante, você concorda com essa transferência. O envio é opcional — você pode informar o pagamento por outro meio ao administrador.</li>
+    </ul>
+  </div>
+
+  <h2>6. Armazenamento local no seu dispositivo</h2>
+  <p>Guardamos dados no seu próprio dispositivo (armazenamento do navegador) para manter você conectado e o app funcionando offline: sua sessão de login e uma cópia do estado do grupo. Não usamos cookies de rastreamento publicitário. Limpar os dados do navegador remove essas informações locais.</p>
+
+  <h2>7. Por quanto tempo guardamos</h2>
+  <p>Mantemos seus dados enquanto sua conta existir e você fizer parte do grupo. Ao excluir sua conta (ver seção 9), removemos ou anonimizamos seus dados pessoais, exceto o que a lei exigir reter (por ex. registros financeiros mínimos) ou dados já anonimizados (como notas de votação sem identificação).</p>
+
+  <h2>8. Segurança</h2>
+  <p>Adotamos medidas técnicas para proteger seus dados: autenticação, controle de acesso por regras no banco (cada usuário só acessa o que lhe cabe), criptografia em trânsito (HTTPS) e senhas armazenadas com hash. Nenhum sistema é 100% infalível; em caso de incidente relevante, seguiremos os deveres de comunicação da LGPD.</p>
+
+  <h2>9. Seus direitos (LGPD art. 18)</h2>
+  <p>Você pode, a qualquer momento:</p>
+  <ul>
+    <li>Acessar, corrigir ou atualizar seus dados (boa parte direto no app, em "Meu perfil").</li>
+    <li><strong>Excluir sua conta</strong> e seus dados pessoais, pelo próprio aplicativo.</li>
+    <li>Revogar consentimentos (foto, push, envio de comprovante).</li>
+    <li>Solicitar a portabilidade ou confirmação do tratamento, escrevendo para <span class="ph">{{EMAIL_CONTATO}}</span>.</li>
+  </ul>
+
+  <h2>10. Crianças e adolescentes</h2>
+  <p>Se o grupo incluir menores de 18 anos, o cadastro deve ser feito ou autorizado por um responsável legal, e o tratamento dos dados do menor observa o melhor interesse dele (LGPD art. 14 e Estatuto da Criança e do Adolescente). O responsável pode solicitar a exclusão a qualquer momento pelo contato acima. <span class="muted">(Remova esta seção se o grupo for exclusivamente de adultos.)</span></p>
+
+  <h2>11. Alterações desta Política</h2>
+  <p>Podemos atualizar esta Política. Mudanças relevantes serão comunicadas no aplicativo. A data no topo indica a versão vigente.</p>
+
+  <h2>12. Contato</h2>
+  <p>Dúvidas ou solicitações sobre privacidade: <span class="ph">{{EMAIL_CONTATO}}</span>.</p>
+
+  <footer>
+    <p class="muted">Veja também os <a href="./termos.html">Termos de Uso</a>.</p>
+  </footer>
+</div>
+</body>
+</html>
