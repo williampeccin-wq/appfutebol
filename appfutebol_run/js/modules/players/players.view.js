@@ -158,18 +158,50 @@ function renderSelfProfileCard(currentPlayer) {
   return '';
 }
 
+// Fila de aprovação (admin): auto-cadastros aguardando liberação para o grupo.
+function renderPendingApprovalCard(pendingPlayers, currentPlayer) {
+  if (!isAdmin(currentPlayer) || !pendingPlayers.length) return '';
+  return `
+    <section class="card pending-approval-card">
+      <div class="pending-approval-head">
+        <span class="card-title">Pendentes de aprovação</span>
+        <span class="pending-approval-count">${pendingPlayers.length}</span>
+      </div>
+      <p class="footer-note">Cadastros novos aguardando sua liberação para entrar no grupo.</p>
+      <div class="pending-approval-list">
+        ${pendingPlayers.map((p) => `
+          <div class="pending-approval-row">
+            <div class="pending-approval-id">
+              <strong>${escapeHtml(p.name || 'Sem nome')}</strong>
+              <small>${escapeHtml(p.phone || '')}</small>
+            </div>
+            <div class="pending-approval-actions">
+              <button class="btn btn-primary btn-sm" type="button" data-action="approve-player" data-id="${escapeAttr(p.id)}">Aprovar</button>
+              <button class="btn btn-danger btn-sm" type="button" data-action="reject-player" data-id="${escapeAttr(p.id)}">Recusar</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
 
 
 
 export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
   const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const allPlayers = orderedPlayers;
-  const jogadores = orderedPlayers.filter((player) => player.plays_football !== false);
-  const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
+  // Auto-cadastro pendente NÃO é membro: sai das listas/contagens de membro e
+  // aparece só na fila de aprovação do admin (renderPendingApprovalCard).
+  const pendingPlayers = orderedPlayers.filter((player) => player.pending === true);
+  const activePlayers = orderedPlayers.filter((player) => player.pending !== true);
+  const allPlayers = activePlayers;
+  const jogadores = activePlayers.filter((player) => player.plays_football !== false);
+  const carneGroup = activePlayers.filter((player) => player.in_carne_group === true);
   // "Somente carne" = qualquer perfil que não joga (independente do grupo), para
   // garantir que todos sejam editáveis aqui na aba Jogadores.
-  const carneOnly = orderedPlayers.filter((player) => player.plays_football === false);
+  const carneOnly = activePlayers.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isCarneOnly(player));
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
@@ -180,6 +212,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   return `
     <section class="section-stack">
       ${renderPlayerManagementCard(currentPlayer)}
+      ${renderPendingApprovalCard(pendingPlayers, currentPlayer)}
       ${renderSelfProfileCard(currentPlayer)}
       <section class="players-admin-panel">
         <div class="players-admin-header">

@@ -1986,6 +1986,74 @@ if (action === "delete-player") {
 }
 
 
+if (action === "approve-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode aprovar cadastros')) return;
+  const currentSnapshot = structuredClone(getState());
+  if (Array.isArray(currentSnapshot.players)) currentSnapshot.players = currentSnapshot.players.map(normalizePlayer);
+  const player = currentSnapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Aprovando...');
+
+  player.pending = false; // vira membro (o trigger permite admin mudar pending)
+  const safeSnapshot = repairManualSnapshot(currentSnapshot);
+  replaceState(safeSnapshot);
+
+  uiActionInFlight = false;
+  clearActionBusy(trigger);
+  showToast(`${player.name || 'Jogador'} aprovado! Já pode entrar no grupo.`, 'success');
+  return;
+}
+
+
+if (action === "reject-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode recusar cadastros')) return;
+  if (!requireCriticalOperationAllowed('recusar cadastro', trigger)) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+  const currentPlayerId = snapshot.session?.playerId;
+
+  const ok = await showConfirmModal({
+    title: 'Recusar cadastro',
+    message: `Recusar o cadastro de ${player.name}? A conta será removida e a pessoa não entrará no grupo.`,
+    confirmText: 'Recusar',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Recusando...');
+
+  try {
+    const result = await deletePlayerOperation({
+      player,
+      currentPlayerId,
+      allPlayers: snapshot.players,
+      confirmationText: player.name,
+    });
+
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível recusar o cadastro.', 'error');
+      return;
+    }
+
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast('Cadastro recusado.', 'success');
+  } catch (error) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    showToast(error?.message || 'Erro ao recusar cadastro.', 'error');
+  }
+
+  return;
+}
+
+
 if (action === "admin-remove-from-game") {
   const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
   const player = snapshot.players.find((p) => p.id === id);
@@ -2995,6 +3063,26 @@ async function submitCarneVote() {
 }
 // =================== fim votação do churrasco ===================
 
+// Tela de espera do auto-cadastro (pending). Ver portão em renderInner.
+function renderPendingScreen(currentPlayer) {
+  return `
+    <div class="login-screen">
+      <img class="login-crest" src="./img/convocados-crest.png" alt="Escudo" style="width:140px;height:140px;object-fit:contain;background:transparent;border:none;box-shadow:none;">
+      <section class="auth-card" style="text-align:center;">
+        <h2 style="margin:0 0 8px;font-size:20px;color:var(--hfc-text,#e7eefb);">Cadastro enviado! 🎉</h2>
+        <p class="footer-note" style="margin:0;">Olá, ${escapeHtml(currentPlayer?.name || '')}. Sua conta foi criada e está <strong>aguardando a aprovação do administrador</strong> do grupo. Assim que ele liberar, você entra automaticamente — pode fechar e voltar depois.</p>
+        <div class="actions" style="margin-top:16px;">
+          <button class="btn btn-secondary" type="button" id="pending-logout">Sair</button>
+        </div>
+      </section>
+      <p class="login-legal">
+        <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+        · <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+      </p>
+    </div>
+  `;
+}
+
 function renderInner(snapshot) {
   // Fonte única: o mesmo buildGameView que alimenta a home e a tela de jogo.
   // Antes este banner somava confirmações de TODOS os jogos e incluía
@@ -3009,6 +3097,14 @@ function renderInner(snapshot) {
     appElement.innerHTML = renderAuthScreen(snapshot.ui);
     bindAuthEvents();
     bindPhoneOnlyInputs();
+    return;
+  }
+
+  // Portão de aprovação: auto-cadastro entra pendente e NÃO acessa o grupo até
+  // um admin aprovar. Vê só a tela de espera (com Sair), não o roster/jogos.
+  if (currentPlayer.pending === true) {
+    appElement.innerHTML = renderPendingScreen(currentPlayer);
+    appElement.querySelector('#pending-logout')?.addEventListener('click', async () => { await logout(); });
     return;
   }
 

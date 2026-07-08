@@ -1,7 +1,7 @@
 import { APP_VERSION } from "../../core/version.js";
 
 export function renderAuthScreen(uiState = {}) {
-  const mode = 'login';
+  const mode = uiState.authMode === 'register' ? 'register' : 'login';
   // Aceita tanto string solta quanto objeto { type, text }. Antes, uma string
   // (ex.: sessão expirada) caía em message.text === undefined e renderizava
   // literalmente "undefined" na caixa de aviso.
@@ -19,8 +19,9 @@ export function renderAuthScreen(uiState = {}) {
       <div class="login-subtitle" style="margin-top:2px;font-size:13px;opacity:0.75;">Convoca. Joga. Resenha. <span style="opacity:.6;">· ${String(APP_VERSION || '').replace(/^v/, '').split('-')[0]}</span></div>
 
       <section class="auth-card">
-        <div class="auth-tabs auth-tabs-single">
-          <button class="auth-tab is-active" type="button" data-auth-mode="login">Entrar</button>
+        <div class="auth-tabs">
+          <button class="auth-tab ${mode === 'login' ? 'is-active' : ''}" type="button" data-auth-mode="login">Entrar</button>
+          <button class="auth-tab ${mode === 'register' ? 'is-active' : ''}" type="button" data-auth-mode="register">Cadastrar</button>
         </div>
 
         ${messageText ? `<div class="message-box ${messageClass}">${messageText}</div>` : ''}

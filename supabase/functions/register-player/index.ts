@@ -114,6 +114,9 @@ Deno.serve(async (req) => {
     position,
     mens_ok: false,
     is_admin: isFirstPlayer,
+    // Auto-cadastro NÃO dá acesso ao grupo: entra pendente de aprovação do admin.
+    // O 1º usuário (que vira admin) é a exceção — já entra aprovado.
+    pending: !isFirstPlayer,
   };
   const { error: insErr } = await admin.from("players").insert({
     id: playerId,

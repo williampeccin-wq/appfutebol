@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.112.0-legal-links';
+export const APP_VERSION = 'v1.113.0-approval-gate';

@@ -6415,6 +6415,22 @@ body {
 .register-consent input { margin-top: 3px; flex: none; width: 18px; height: 18px; }
 .register-consent a { color: var(--hfc-accent, #f0c040); text-decoration: underline; }
 
+/* Fila de aprovação de auto-cadastro (admin) */
+.pending-approval-card { border: 1px solid rgba(240, 192, 64, 0.35); }
+.pending-approval-head { display: flex; align-items: center; gap: 8px; }
+.pending-approval-count {
+  background: var(--hfc-accent, #f0c040); color: #1a1a1a;
+  border-radius: 999px; padding: 1px 9px; font-weight: 700; font-size: 13px;
+}
+.pending-approval-list { display: grid; gap: 6px; margin-top: 8px; }
+.pending-approval-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 0; border-top: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.08));
+}
+.pending-approval-id { display: flex; flex-direction: column; min-width: 0; }
+.pending-approval-id small { opacity: .7; }
+.pending-approval-actions { display: flex; gap: 6px; flex: none; }
+
 /* Jogadores: card de upload de foto em vidro (corrige contraste do nome/título) */
 .content--players .player-photo-upload {
   background: var(--hfc-glass-2);
