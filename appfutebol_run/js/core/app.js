@@ -550,7 +550,7 @@ function buildConfirmedPresenceShareText(snapshot) {
   const rentalGoalkeepers = getActiveRentalGoalkeepersForApp(snapshot);
 
   const lines = [
-    '⚽ Presença Harmonia FC',
+    '⚽ Presença Convocados',
     `Jogo: ${formatDate(game.game_date)} às ${game.game_time || '--:--'}`,
     '',
     `🧤 Goleiros (${goalkeepers.length + rentalGoalkeepers.length}/2):`,
@@ -3120,9 +3120,9 @@ function renderInner(snapshot) {
     <div class="header">
       <div class="header-row">
         <div class="brand-lockup">
-          <img class="brand-crest" src="./assets/harmonia-crest.jpeg" alt="Escudo Harmonia">
+          <img class="brand-crest" src="./img/convocados-crest.png" alt="Escudo Convocados">
           <div>
-            <div class="header-title">HARMONIA <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
+            <div class="header-title">CONVOCADOS <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
             <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
           </div>
         </div>
@@ -3365,7 +3365,7 @@ async function bindPushControl(card, currentPlayer) {
       if (isHomeCard) { card.style.display = 'none'; return; }
       statusLine.textContent = 'Ativado ✓';
       showButton('Desativar');
-      showHint('Você receberá os avisos do Harmonia neste aparelho. Pode desativar aqui quando quiser.');
+      showHint('Você receberá os avisos do Convocados neste aparelho. Pode desativar aqui quando quiser.');
     } else {
       statusLine.textContent = 'Desativado';
       showButton('Ativar');
@@ -4055,7 +4055,7 @@ function renderHome(snapshot, currentPlayer) {
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
           <div>
-            <div class="home-v2-kicker">Hoje no Harmonia</div>
+            <div class="home-v2-kicker">Hoje no Convocados</div>
             <div class="home-v2-date">${formatDate(game && game.game_date)}</div>
             <div class="home-v2-time">${(game && game.game_time) || '--:--'} · ${homeStatusText}</div>
           </div>
@@ -4303,7 +4303,7 @@ function buildTeamDrawShareText(snapshot) {
   };
 
   return [
-    '⚽ Times do Harmonia',
+    '⚽ Times do Convocados',
     `Jogo: ${formatDate(game.game_date)} às ${game.game_time || '--:--'}`,
     '',
     formatTeam('Time A', sortResult.team_a),
@@ -4355,7 +4355,7 @@ function buildPaymentsShareText(snapshot) {
   const list = (arr) => (arr.length ? arr.map((player, index) => `${index + 1}. ${player.name}`).join('\n') : '—');
 
   return [
-    '💰 Mensalidade Harmonia FC',
+    '💰 Mensalidade Convocados',
     due ? `Vencimento: ${formatDate(due)}` : 'Vencimento: não definido',
     '',
     `❌ Pendentes (${unpaid.length}):`,

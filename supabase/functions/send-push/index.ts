@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
   }
   const target = payload.target || "all";
   const notification = JSON.stringify({
-    title: payload.title || "Harmonia FC",
+    title: payload.title || "Convocados",
     body: payload.body || "",
     url: payload.url || "./",
   });

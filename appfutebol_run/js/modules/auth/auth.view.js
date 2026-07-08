@@ -15,7 +15,7 @@ export function renderAuthScreen(uiState = {}) {
   return `
     <div class="login-screen">
       <img class="login-crest" src="./img/convocados-crest.png" alt="Escudo Convocados" style="width:188px;height:188px;border-radius:0;object-fit:contain;box-shadow:none;background:transparent;border:none;outline:none;">
-      <div class="login-subtitle" style="margin-top:6px;color:var(--hfc-text);font-weight:600;letter-spacing:.04em;">Harmonia FC</div>
+      <div class="login-subtitle" style="margin-top:6px;color:var(--hfc-text);font-weight:600;letter-spacing:.04em;">Convocados</div>
       <div class="login-subtitle" style="margin-top:2px;font-size:13px;opacity:0.75;">Convoca. Joga. Resenha. <span style="opacity:.6;">· ${String(APP_VERSION || '').replace(/^v/, '').split('-')[0]}</span></div>
 
       <section class="auth-card">

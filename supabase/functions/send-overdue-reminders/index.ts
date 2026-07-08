@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       .from("push_subscriptions").select("endpoint, p256dh, auth").eq("player_id", playerId);
     if (!subs || !subs.length) continue;
 
-    const title = "Harmonia FC — mensalidade";
+    const title = "Convocados — mensalidade";
     const body = `Oi, ${firstName}! Sua mensalidade está em atraso. Fala com o ADM do grupo pra acertar e evitar bloqueios. 💛⚽`;
 
     for (const sub of subs) {

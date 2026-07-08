@@ -401,7 +401,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
   if (!schedule.length) {
     return `
       <section class="card carne-schedule-card">
-        <div class="card-title">Tabela da carne Harmonia</div>
+        <div class="card-title">Tabela da carne Convocados</div>
         <div class="empty-inline">Nenhuma dupla cadastrada ainda. O admin pode criar a primeira dupla acima.</div>
       </section>
     `;
@@ -411,7 +411,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
     <section class="card carne-schedule-card">
       <div class="carne-schedule-header">
         <div>
-          <div class="card-title carne-schedule-title">Tabela da carne Harmonia</div>
+          <div class="card-title carne-schedule-title">Tabela da carne Convocados</div>
           <p class="carne-schedule-subtitle">Rodízio semanal de quarta-feira em duplas.</p>
         </div>
         ${nextEntry ? `
@@ -422,7 +422,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
         ` : ''}
       </div>
 
-      <div class="carne-schedule-list ${admin ? 'has-actions' : 'no-actions'}" role="table" aria-label="Tabela da carne Harmonia">
+      <div class="carne-schedule-list ${admin ? 'has-actions' : 'no-actions'}" role="table" aria-label="Tabela da carne Convocados">
         <div class="carne-schedule-list-head" role="row">
           <div role="columnheader">Data</div>
           <div role="columnheader">Dupla responsável</div>

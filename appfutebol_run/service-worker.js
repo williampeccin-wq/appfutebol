@@ -37,11 +37,11 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' };
   }
 
-  const title = payload.title || 'Harmonia FC';
+  const title = payload.title || 'Convocados';
   const options = {
     body: payload.body || '',
-    icon: payload.icon || './assets/harmonia-crest.jpeg',
-    badge: './assets/harmonia-crest.jpeg',
+    icon: payload.icon || './img/convocados-crest.png',
+    badge: './img/convocados-crest.png',
     tag: payload.tag || undefined,
     // Carrega referências de auditoria para o clique.
     data: { url: payload.url || './', logId: payload.logId || null, receiptUrl: payload.receiptUrl || null, anonKey: payload.anonKey || null },
