@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.114.0-convocados';
+export const APP_VERSION = 'v1.115.0-twa-ready';

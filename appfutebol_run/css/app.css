@@ -288,7 +288,8 @@ button {
   z-index: 10;
   background: linear-gradient(135deg, var(--blue-900), var(--blue-800));
   color: var(--white);
-  padding: 18px 20px 14px;
+  /* safe-area-inset-top: respeita o recorte/status bar quando embrulhado (TWA/PWA) */
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 20px 14px;
   box-shadow: var(--shadow-sm);
 }
 
