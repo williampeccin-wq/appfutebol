@@ -11,8 +11,49 @@
 // senha e DEVOLVE a sessão (o cliente adota via loginWithPasskeySession).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import webpush from "npm:web-push@3.6.7";
 
 const TECHNICAL_EMAIL_DOMAIN = "harmonia.app";
+
+// Avisa os admins (push) que caiu um auto-cadastro aguardando aprovação.
+// Best-effort: qualquer falha aqui NÃO quebra o cadastro. Reusa os secrets VAPID
+// já configurados para a função send-push.
+// deno-lint-ignore no-explicit-any
+async function notifyAdminsOfRegistration(admin: any, playerName: string): Promise<void> {
+  try {
+    const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") || "";
+    const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") || "";
+    const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@harmonia.app";
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+
+    const { data: admins } = await admin.from("players").select("id").eq("is_admin", true);
+    const adminIds = (admins || []).map((a: { id: string }) => String(a.id));
+    if (!adminIds.length) return;
+
+    const { data: subs } = await admin
+      .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", adminIds);
+    if (!subs?.length) return;
+
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+    const notification = JSON.stringify({
+      title: "Novo cadastro 📝",
+      body: `${playerName} quer entrar no grupo. Toque para aprovar.`,
+      url: "./",
+    });
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, notification);
+      } catch (err) {
+        const statusCode = (err as { statusCode?: number })?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[register] notifyAdmins:", String(err));
+  }
+}
 
 const ALLOWED_ORIGIN = (o: string): boolean =>
   /^https?:\/\/localhost(:\d+)?$/i.test(o)
@@ -131,6 +172,9 @@ Deno.serve(async (req) => {
     await admin.auth.admin.deleteUser(authUserId).catch(() => {});
     return json({ ok: false, error: "insert_player_failed" }, 500);
   }
+
+  // Auto-cadastro pendente: avisa os admins por push (best-effort, não bloqueia).
+  if (!isFirstPlayer) await notifyAdminsOfRegistration(admin, name);
 
   // --- 5) Loga com a senha e devolve a sessão (cliente adota) ---
   try {
