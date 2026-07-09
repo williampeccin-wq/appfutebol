@@ -140,6 +140,22 @@ function renderRegisterForm() {
 
       <p class="footer-note">Essa senha ficará vinculada ao seu usuário e será usada nos próximos acessos.</p>
 
+      <div id="register-minor-block" class="register-minor-block" style="display:none;">
+        <p class="footer-note"><strong>Menor de 18 anos.</strong> O cadastro precisa ser autorizado por um responsável legal (LGPD art. 14 / ECA).</p>
+        <div class="form-group">
+          <label class="form-label" for="register-guardian-name">Nome do responsável legal</label>
+          <input class="input" id="register-guardian-name" name="guardianName" type="text" autocomplete="name" autocapitalize="words" placeholder="Nome completo do responsável">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="register-guardian-phone">Telefone do responsável</label>
+          <input class="input" id="register-guardian-phone" name="guardianPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Com DDD, só números">
+        </div>
+        <label class="register-consent">
+          <input type="checkbox" id="register-guardian-consent" name="guardianConsent" />
+          <span>Sou o responsável legal por este jogador menor de idade e autorizo o cadastro e o tratamento dos dados dele.</span>
+        </label>
+      </div>
+
       <label class="register-consent">
         <input type="checkbox" id="register-consent" name="consent" />
         <span>Li e aceito os <a href="./termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="./privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span>

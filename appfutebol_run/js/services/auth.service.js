@@ -307,6 +307,8 @@ export async function register(payload) {
   const position = role === 'player' ? normalizePosition(payload.position) : null;
   const password = String(payload.password || '').trim();
   const passwordConfirm = String(payload.passwordConfirm || '').trim();
+  const guardianName = String(payload.guardianName || '').trim();
+  const guardianPhone = String(payload.guardianPhone || '').replace(/\D/g, '');
 
   // Validação client-side (feedback imediato). O servidor revalida tudo.
   if (!name) {
@@ -331,7 +333,7 @@ export async function register(payload) {
   // Cadastro AUTORITATIVO no servidor (Edge Function service_role): valida,
   // checa telefone duplicado, decide 1º-jogador=admin, cria auth+player e
   // devolve a sessão. O cliente anônimo não lê mais a tabela players.
-  const res = await callRegisterPlayer({ name, phone, birthDate, role, position, password });
+  const res = await callRegisterPlayer({ name, phone, birthDate, role, position, password, guardianName, guardianPhone });
   if (!res.ok) {
     return { ok: false, message: res.message || 'Não foi possível cadastrar. Tente de novo.' };
   }

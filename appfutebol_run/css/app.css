@@ -6416,6 +6416,17 @@ body {
 .register-consent input { margin-top: 3px; flex: none; width: 18px; height: 18px; }
 .register-consent a { color: var(--hfc-accent, #f0c040); text-decoration: underline; }
 
+/* Bloco do responsável legal (cadastro de menor de 18) */
+.register-minor-block {
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  background: rgba(240, 192, 64, 0.05);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 6px 0;
+  display: grid;
+  gap: 8px;
+}
+
 /* Fila de aprovação de auto-cadastro (admin) */
 .pending-approval-card { border: 1px solid rgba(240, 192, 64, 0.35); }
 .pending-approval-head { display: flex; align-items: center; gap: 8px; }

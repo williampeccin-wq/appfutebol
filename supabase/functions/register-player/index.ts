@@ -76,6 +76,17 @@ function normalizePosition(value: unknown): string | null {
   const v = String(value || "");
   return ["gol", "zag", "meia", "atk"].includes(v) ? v : null;
 }
+function ageFromBirthDate(iso: string): number | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const birth = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const md = now.getMonth() - birth.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
@@ -105,6 +116,15 @@ Deno.serve(async (req) => {
   if (!birthDate) return json({ ok: false, error: "missing_birthdate", message: "Informe a data de nascimento." });
   if (role === "player" && !position) return json({ ok: false, error: "missing_position", message: "Selecione a posição em campo." });
   if (password.length < 6) return json({ ok: false, error: "weak_password", message: "A senha precisa ter pelo menos 6 caracteres." });
+
+  // Menor de 18: exige responsável legal (LGPD art. 14 / ECA). Revalida no servidor.
+  const age = ageFromBirthDate(birthDate);
+  const isMinor = age !== null && age < 18;
+  const guardianName = String(payload.guardianName || "").trim();
+  const guardianPhone = normalizePhone(payload.guardianPhone);
+  if (isMinor && (!guardianName || guardianPhone.length < 10)) {
+    return json({ ok: false, error: "guardian_required", message: "Cadastro de menor: informe o responsável legal (nome e telefone)." });
+  }
 
   const technicalEmail = `${phone}@${TECHNICAL_EMAIL_DOMAIN}`;
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -158,6 +178,13 @@ Deno.serve(async (req) => {
     // Auto-cadastro NÃO dá acesso ao grupo: entra pendente de aprovação do admin.
     // O 1º usuário (que vira admin) é a exceção — já entra aprovado.
     pending: !isFirstPlayer,
+    // Menor de idade + consentimento do responsável legal (LGPD art. 14 / ECA).
+    ...(isMinor ? {
+      minor: true,
+      guardian_name: guardianName,
+      guardian_phone: guardianPhone,
+      parental_consent_at: new Date().toISOString(),
+    } : {}),
   };
   const { error: insErr } = await admin.from("players").insert({
     id: playerId,

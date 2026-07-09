@@ -3228,12 +3228,27 @@ function bindAuthEvents() {
     togglePosition();
     roleSelect?.addEventListener('change', togglePosition);
 
+    const birthInput = registerForm.querySelector('#register-birthdate');
+    birthInput?.addEventListener('input', syncRegisterMinorBlock);
+    birthInput?.addEventListener('change', syncRegisterMinorBlock);
+    syncRegisterMinorBlock();
+
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(registerForm);
       if (!registerForm.querySelector('#register-consent')?.checked) {
         showToast('Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.', 'error');
         return;
+      }
+      // Menor de 18: exige consentimento do responsável legal (LGPD art. 14 / ECA).
+      const idade = ageFromBirthDate(formData.get('birthDate'));
+      if (idade !== null && idade < 18) {
+        const gName = String(formData.get('guardianName') || '').trim();
+        const gPhone = String(formData.get('guardianPhone') || '').replace(/\D/g, '');
+        if (!registerForm.querySelector('#register-guardian-consent')?.checked || !gName || gPhone.length < 10) {
+          showToast('Cadastro de menor: informe o responsável legal (nome + telefone) e marque a autorização.', 'error');
+          return;
+        }
       }
       const submitButton = registerForm.querySelector('button[type="submit"]');
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
@@ -3245,6 +3260,8 @@ function bindAuthEvents() {
         position: formData.get('position'),
         password: formData.get('password'),
         passwordConfirm: formData.get('passwordConfirm'),
+        guardianName: formData.get('guardianName'),
+        guardianPhone: formData.get('guardianPhone'),
       });
 
       if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Criar cadastro'; }
@@ -3261,6 +3278,26 @@ function bindAuthEvents() {
   }
 }
 
+
+function ageFromBirthDate(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const birth = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const md = now.getMonth() - birth.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
+
+// Mostra o bloco do responsável legal quando a data de nascimento indica <18.
+function syncRegisterMinorBlock() {
+  const block = document.getElementById('register-minor-block');
+  if (!block) return;
+  const age = ageFromBirthDate(document.getElementById('register-birthdate')?.value);
+  block.style.display = (age !== null && age < 18) ? '' : 'none';
+}
 
 function getPresenceIcon(reason, confirmed, capacityOk) {
   if (confirmed) return "✅";
