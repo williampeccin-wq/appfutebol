@@ -189,6 +189,9 @@ function resetPlayerForm() {
   }
   if (adminInput) adminInput.checked = false;
   if (mensInput) mensInput.checked = true;
+  const gkPaysReset = document.getElementById("new-gk-pays");
+  if (gkPaysReset) gkPaysReset.checked = false;
+  syncGkPaysVisibility();
   if (photoInput) {
     photoInput.value = "";
     photoInput.dataset.photoDataUrl = "";
@@ -689,6 +692,9 @@ function hydratePlayerEditForm(playerToEdit) {
   positionInput.value = playerToEdit.position || "meia";
   adminInput.checked = !!playerToEdit.is_admin;
   mensInput.checked = !!playerToEdit.mens_ok;
+  const gkPaysInput = document.getElementById("new-gk-pays");
+  if (gkPaysInput) gkPaysInput.checked = !!playerToEdit.gk_pays;
+  syncGkPaysVisibility();
 
   // PREVIEW pode ser qualquer URL de exibição (assinada/pública/base64); mas o
   // dataset.photoDataUrl é o gatilho de UPLOAD e só pode conter um data: URL
@@ -1592,6 +1598,7 @@ document.addEventListener("click", async (e) => {
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
+  const gk_pays = document.getElementById("new-gk-pays")?.checked; // só relevante p/ goleiro
   // Só é FOTO NOVA se for um data: URL (arquivo recém-selecionado). O form
   // pré-preenche o dataset com a foto atual (agora URL assinada) — que NÃO deve
   // virar upload. base64 legado (data:) ainda migra normalmente.
@@ -1637,6 +1644,7 @@ document.addEventListener("click", async (e) => {
       in_carne_group: true,
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
+      gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
       ...(photoDataUrl ? { photoDataUrl } : {}),
     });
@@ -1693,6 +1701,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.in_carne_group = true;
     playerToEdit.position = role === "player" ? position : null;
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
+    playerToEdit.gk_pays = role === "player" ? !!gk_pays : false;
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
@@ -1717,6 +1726,7 @@ document.addEventListener("click", async (e) => {
       in_carne_group: true,
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
+      gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
       ...photoFields,
       active: true,
@@ -2237,18 +2247,29 @@ if (action === "admin-add-to-game") {
 });
 
 
+// Mostra o checkbox "Goleiro paga mensalidade" só quando a posição é goleiro.
+function syncGkPaysVisibility() {
+  const group = document.getElementById("gk-pays-group");
+  if (!group) return;
+  const role = document.getElementById("new-role")?.value;
+  const pos = document.getElementById("new-position")?.value;
+  group.style.display = (role !== "carne" && pos === "gol") ? "" : "none";
+}
+
 document.addEventListener("change", (e) => {
   const target = e.target;
-  if (!target || target.id !== "new-role") return;
+  if (!target) return;
 
-  const position = document.getElementById("new-position");
-  if (!position) return;
+  if (target.id === "new-role") {
+    const position = document.getElementById("new-position");
+    if (position) {
+      if (target.value === "carne") { position.value = "meia"; position.disabled = true; }
+      else { position.disabled = false; }
+    }
+  }
 
-  if (target.value === "carne") {
-    position.value = "meia";
-    position.disabled = true;
-  } else {
-    position.disabled = false;
+  if (target.id === "new-role" || target.id === "new-position") {
+    syncGkPaysVisibility();
   }
 });
 
@@ -2725,8 +2746,8 @@ function render(snapshot) {
 }
 
 // ===================== Votação de desempenho (modal bloqueante) =====================
-// Abre 1h após o início do jogo e dura settings.ratings_perf_window_hours. Só para
-// quem esteve dentro do jogo e ainda não votou. Cada votante dá nota 1–10 em cada
+// Abre quando o ADMIN lança o resultado do jogo e dura settings.ratings_perf_window_hours.
+// Só para quem esteve dentro do jogo e ainda não votou. Cada votante dá nota 1–10 em cada
 // OUTRO jogador. O overlay vive fora de #app, então o re-render (poll 4s) não o apaga.
 let perfVote = null;          // { gameKey, voterId, targets:[player], index, scores:{id:score} }
 let perfVoteGameKey = null;   // jogo cujo status já foi avaliado
@@ -2745,10 +2766,20 @@ function parseGameDateTimeMs(game) {
 function getPerfWindow(snapshot, game) {
   const hours = Number(snapshot?.settings?.ratings_perf_window_hours) || 0;
   if (hours <= 0) return null;
-  const startMs = parseGameDateTimeMs(game);
-  if (!startMs) return null;
-  const openMs = startMs + 60 * 60 * 1000; // 1h após o início
-  return { openMs, closeMs: openMs + hours * 60 * 60 * 1000 };
+  const gameDate = String(game?.game_date || '').slice(0, 10);
+  if (!gameDate) return null;
+  // A votação SÓ abre depois que o admin LANÇA O RESULTADO deste jogo — dá tempo
+  // de reorganizar times / tirar quem não apareceu antes de liberar as notas.
+  // Casado por DATA (o game_key do resultado é inconsistente: às vezes null, às
+  // vezes com ':' no horário). Dura ratings_perf_window_hours a partir do lançamento.
+  const results = snapshot?.championship?.active?.results || [];
+  const markedMs = results
+    .filter((r) => String(r?.date || '').slice(0, 10) === gameDate)
+    .map((r) => Date.parse(r?.created_at || ''))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => b - a)[0];
+  if (!markedMs) return null; // sem resultado lançado → votação fechada
+  return { openMs: markedMs, closeMs: markedMs + hours * 60 * 60 * 1000 };
 }
 
 function getInGamePlayers(snapshot, game) {

@@ -25,6 +25,16 @@ export function isCarneOnly(player) {
   return getPlayerRole(player) === 'carne' || player?.plays_football === false;
 }
 
+// Isenção de MENSALIDADE (não confundir com "não joga"). Carne é isento; e o
+// goleiro é isento POR PADRÃO (na maioria dos grupos não paga) — o admin pode
+// marcar "paga mensalidade" (gk_pays=true) para o goleiro que for pagante.
+export function isMensalidadeExempt(player) {
+  if (isCarneOnly(player)) return true;
+  const pos = String(player?.position || '').trim().toLowerCase();
+  const isGoalkeeper = pos === 'gol' || pos === 'goleiro';
+  return isGoalkeeper && player?.gk_pays !== true;
+}
+
 export function playsFootball(player) {
   if (!player) return false;
   if (player.plays_football === false) return false;

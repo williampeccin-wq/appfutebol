@@ -1,4 +1,4 @@
-import { isCarneOnly as authzIsCarneOnly } from './authz.js';
+import { isCarneOnly as authzIsCarneOnly, isMensalidadeExempt as authzIsMensalidadeExempt } from './authz.js';
 // Fonte única de isGoalkeeperEntry (antes havia uma cópia só-entry aqui).
 // Importa p/ uso interno (getLineConfirmedCount) e reexporta p/ quem importava
 // daqui (game.service). Sem ciclo: confirmations.js é leaf (não importa nada).
@@ -49,8 +49,8 @@ export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateStri
 export function shouldBlockPresenceForFinance(player, game, mode = MENSALIDADE_MODES.NONE, referenceDate = getLocalDateString()) {
   if (mode !== MENSALIDADE_MODES.PARTIAL && mode !== MENSALIDADE_MODES.TOTAL) return false;
   if (!player) return false;
-  const carneOnly = authzIsCarneOnly(player);
-  if (carneOnly) return false;
+  // Isento de mensalidade (carne OU goleiro não-pagante) nunca é bloqueado.
+  if (authzIsMensalidadeExempt(player)) return false;
   // Só bloqueia quem é EXPLICITAMENTE inadimplente (mens_ok === false), igual ao
   // enforceFinancialPresenceConsistency (remoção). `undefined` (registro sem o
   // campo, comum em legado/sync parcial) NÃO é inadimplente — o antigo `!== true`

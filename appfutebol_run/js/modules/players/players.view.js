@@ -14,17 +14,18 @@ import {
 } from './players.service.js';
 import { getCachedRatings, duoRatingAverages } from '../../services/ratings.service.js';
 import { isVotingEnabled } from '../../core/flags.js';
+import { isMensalidadeExempt } from '../../domain/authz.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
 }
 
 function isFinancePending(player) {
-  return !isCarneOnly(player) && !player?.mens_ok;
+  return !isMensalidadeExempt(player) && !player?.mens_ok;
 }
 
 function renderFinanceControls(player, currentPlayer) {
-  if (isCarneOnly(player)) return '<span class="switch-placeholder">—</span>';
+  if (isMensalidadeExempt(player)) return '<span class="switch-placeholder">—</span>';
 
   const isPaid = !isFinancePending(player);
   const action = isPaid ? 'mark-debt' : 'mark-paid';
@@ -145,6 +146,7 @@ function renderPlayerManagementCard(currentPlayer) {
 
         <label><input id="new-admin" type="checkbox" /> Admin</label>
         <label><input id="new-mens" type="checkbox" checked /> Mensalidade OK</label>
+        <label id="gk-pays-group" style="display:none;"><input id="new-gk-pays" type="checkbox" /> Goleiro paga mensalidade</label>
 
         <div class="player-admin-actions"><button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button><button class="btn btn-secondary" type="button" data-action="cancel-edit" id="cancel-edit-button" style="display:none;">Cancelar</button></div>
       </div>
@@ -202,7 +204,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   // "Somente carne" = qualquer perfil que não joga (independente do grupo), para
   // garantir que todos sejam editáveis aqui na aba Jogadores.
   const carneOnly = activePlayers.filter((player) => player.plays_football === false);
-  const jogadoresFinanceiros = jogadores.filter((player) => !isCarneOnly(player));
+  const jogadoresFinanceiros = jogadores.filter((player) => !isMensalidadeExempt(player));
   const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
   const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
   const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
