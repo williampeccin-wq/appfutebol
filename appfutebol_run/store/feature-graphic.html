@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Convocados — Feature Graphic 1024×500</title>
+<style>
+  html,body{ margin:0; padding:0; background:#0a1220; }
+  /* Play Store feature graphic = 1024×500 exatos. Abra e capture/exporte esta caixa. */
+  .fg{
+    position:relative; width:1024px; height:500px; overflow:hidden;
+    background:
+      radial-gradient(1200px 700px at 78% 18%, rgba(240,192,64,0.10), transparent 60%),
+      linear-gradient(135deg, #0e1c30 0%, #0b1526 55%, #081020 100%);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    color:#eaf1fb; display:flex; align-items:center; justify-content:center; gap:44px; padding:0 64px; box-sizing:border-box;
+  }
+  /* linhas de campo sutis ao fundo */
+  .lines{ position:absolute; inset:0; opacity:0.10; }
+  .crest-wrap{ flex:none; width:256px; height:256px; display:flex; align-items:center; justify-content:center;
+    filter:drop-shadow(0 18px 40px rgba(0,0,0,0.55)); }
+  .crest-wrap img{ width:256px; height:256px; object-fit:contain; }
+  .copy{ position:relative; flex:none; }
+  .wordmark{ font-weight:900; font-size:74px; letter-spacing:0.5px; line-height:0.95; margin:0; white-space:nowrap;
+    background:linear-gradient(180deg,#ffffff 0%, #cdd9ec 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .accent{ height:6px; width:160px; margin:16px 0 20px; border-radius:6px;
+    background:linear-gradient(90deg,#f0c040,#e0a828); box-shadow:0 4px 18px rgba(240,192,64,0.4); }
+  .slogan{ font-size:32px; font-weight:700; color:#f0c040; margin:0; white-space:nowrap; }
+  .sub{ font-size:20px; font-weight:500; color:#9fb2cc; margin:14px 0 0; max-width:470px; line-height:1.35; }
+</style>
+</head>
+<body>
+  <div class="fg" id="fg">
+    <svg class="lines" viewBox="0 0 1024 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <g fill="none" stroke="#ffffff" stroke-width="2">
+        <circle cx="512" cy="250" r="120"/>
+        <line x1="512" y1="0" x2="512" y2="500"/>
+        <rect x="0" y="150" width="150" height="200"/>
+        <rect x="874" y="150" width="150" height="200"/>
+      </g>
+    </svg>
+    <div class="crest-wrap"><img src="../img/convocados-crest.png" alt="Convocados"></div>
+    <div class="copy">
+      <h1 class="wordmark">CONVOCADOS</h1>
+      <div class="accent"></div>
+      <p class="slogan">Convoca. Joga. Resenha.</p>
+      <p class="sub">Organize sua pelada: presença, times, mensalidade e campeonato num app só.</p>
+    </div>
+  </div>
+</body>
+</html>
