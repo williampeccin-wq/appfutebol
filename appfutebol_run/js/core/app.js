@@ -3768,10 +3768,19 @@ function bindAppEvents(currentPlayer) {
       const mensMode = [MENSALIDADE_MODES.PARTIAL, MENSALIDADE_MODES.TOTAL].includes(rawMode) ? rawMode : MENSALIDADE_MODES.NONE;
       const mensAmount = Math.max(0, Number(formData.get('mens_amount')) || 0);
       const mensBeneficiary = String(formData.get('mens_beneficiary') || '').trim();
-      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary } });
+      const goalkeepersPay = formData.get('goalkeepers_pay') === 'on';
+      const next = structuredClone(getState());
+      next.settings = { ...(next.settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary, goalkeepers_pay: goalkeepersPay };
+      // Aplica em massa: liga/desliga a cobrança em TODOS os goleiros atuais
+      // (exceção individual continua possível pelo checkbox na edição do jogador).
+      (next.players || []).forEach((p) => {
+        const pos = String(p?.position || '').trim().toLowerCase();
+        if (pos === 'gol' || pos === 'goleiro') p.gk_pays = goalkeepersPay;
+      });
       // Aplica imediatamente a regra (no "total" pode remover inadimplentes e
       // promover a fila) e persiste/renderiza no padrão das demais ações admin.
-      const safeSnapshot = repairManualSnapshot(getState());
+      const safeSnapshot = repairManualSnapshot(next);
+      replaceState(safeSnapshot);
       savePersistedState(safeSnapshot);
       render(safeSnapshot);
       const modeLabel = mensMode === MENSALIDADE_MODES.TOTAL ? 'Bloqueio total' : mensMode === MENSALIDADE_MODES.PARTIAL ? 'Bloqueio parcial' : 'Sem bloqueio';
@@ -5147,6 +5156,13 @@ function renderConfig(snapshot, currentPlayer) {
             Nome do beneficiário (PIX)
             <input class="input" type="text" name="mens_beneficiary" value="${escapeHtml(snapshot.settings?.mens_beneficiary || '')}" placeholder="Como aparece no comprovante (quem recebe)" />
             <small class="footer-note">Usado para validar o comprovante PIX que o jogador envia. Valor e beneficiário precisam bater exatamente.</small>
+          </label>
+
+          <label class="field-label" style="flex-direction:row;align-items:flex-start;gap:10px;">
+            <input type="checkbox" name="goalkeepers_pay" style="margin-top:3px;width:18px;height:18px;flex:none;" ${snapshot.settings?.goalkeepers_pay ? 'checked' : ''} />
+            <span>🧤 Goleiros pagam mensalidade
+              <small class="footer-note">Desligado (padrão): goleiros ficam isentos. Ligado: cobra de todos os goleiros. Aplica em todos os goleiros ao salvar — dá pra abrir exceção por goleiro na edição do jogador.</small>
+            </span>
           </label>
 
           <fieldset class="mens-mode-fieldset">
