@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.117.0-goleiro-toggle';
+export const APP_VERSION = 'v1.117.1-goleiro-toggle-layout';

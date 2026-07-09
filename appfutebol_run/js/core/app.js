@@ -5158,12 +5158,13 @@ function renderConfig(snapshot, currentPlayer) {
             <small class="footer-note">Usado para validar o comprovante PIX que o jogador envia. Valor e beneficiário precisam bater exatamente.</small>
           </label>
 
-          <label class="field-label" style="flex-direction:row;align-items:flex-start;gap:10px;">
-            <input type="checkbox" name="goalkeepers_pay" style="margin-top:3px;width:18px;height:18px;flex:none;" ${snapshot.settings?.goalkeepers_pay ? 'checked' : ''} />
-            <span>🧤 Goleiros pagam mensalidade
-              <small class="footer-note">Desligado (padrão): goleiros ficam isentos. Ligado: cobra de todos os goleiros. Aplica em todos os goleiros ao salvar — dá pra abrir exceção por goleiro na edição do jogador.</small>
-            </span>
-          </label>
+          <div class="field-label" style="gap:6px;">
+            <label style="display:flex;flex-direction:row;align-items:center;gap:10px;cursor:pointer;">
+              <input type="checkbox" name="goalkeepers_pay" style="width:18px;height:18px;flex:none;margin:0;" ${snapshot.settings?.goalkeepers_pay ? 'checked' : ''} />
+              <span style="font-weight:600;">🧤 Goleiros pagam mensalidade</span>
+            </label>
+            <small class="footer-note">Desligado (padrão): goleiros ficam isentos. Ligado: cobra de todos os goleiros. Aplica em todos os goleiros ao salvar — dá pra abrir exceção por goleiro na edição do jogador.</small>
+          </div>
 
           <fieldset class="mens-mode-fieldset">
             <legend class="field-label">Regra para inadimplentes</legend>
