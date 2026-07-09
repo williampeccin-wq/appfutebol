@@ -7,7 +7,7 @@
 - **Package name:** `br.app.convocados` *(definitivo — casa com o assetlinks.json)*
 - **Categoria:** Esportes
 - **Tags/target:** futebol amador, pelada, organização de grupo
-- **E-mail de contato:** `{{EMAIL_CONTATO}}`
+- **E-mail de contato:** `williampeccin@gmail.com`
 - **Política de privacidade (URL):** `https://convocados.app.br/privacidade.html`
 
 ## Descrição curta *(máx. 80 caracteres)*
