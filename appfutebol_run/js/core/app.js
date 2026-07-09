@@ -188,6 +188,9 @@ function resetPlayerForm() {
   }
   if (adminInput) adminInput.checked = false;
   if (mensInput) mensInput.checked = true;
+  const gkPaysReset = document.getElementById("new-gk-pays");
+  if (gkPaysReset) gkPaysReset.checked = false;
+  syncGkPaysVisibility();
   if (photoInput) {
     photoInput.value = "";
     photoInput.dataset.photoDataUrl = "";
@@ -687,6 +690,9 @@ function hydratePlayerEditForm(playerToEdit) {
   positionInput.value = playerToEdit.position || "meia";
   adminInput.checked = !!playerToEdit.is_admin;
   mensInput.checked = !!playerToEdit.mens_ok;
+  const gkPaysInput = document.getElementById("new-gk-pays");
+  if (gkPaysInput) gkPaysInput.checked = !!playerToEdit.gk_pays;
+  syncGkPaysVisibility();
 
   // PREVIEW pode ser qualquer URL de exibição (assinada/pública/base64); mas o
   // dataset.photoDataUrl é o gatilho de UPLOAD e só pode conter um data: URL
@@ -1576,6 +1582,7 @@ document.addEventListener("click", async (e) => {
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
+  const gk_pays = document.getElementById("new-gk-pays")?.checked; // só relevante p/ goleiro
   // Só é FOTO NOVA se for um data: URL (arquivo recém-selecionado). O form
   // pré-preenche o dataset com a foto atual (agora URL assinada) — que NÃO deve
   // virar upload. base64 legado (data:) ainda migra normalmente.
@@ -1621,6 +1628,7 @@ document.addEventListener("click", async (e) => {
       in_carne_group: true,
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
+      gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
       ...(photoDataUrl ? { photoDataUrl } : {}),
     });
@@ -1677,6 +1685,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.in_carne_group = true;
     playerToEdit.position = role === "player" ? position : null;
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
+    playerToEdit.gk_pays = role === "player" ? !!gk_pays : false;
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
@@ -1701,6 +1710,7 @@ document.addEventListener("click", async (e) => {
       in_carne_group: true,
       position: role === "player" ? position : null,
       mens_ok: role === "player" ? !!mens_ok : false,
+      gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
       ...photoFields,
       active: true,
@@ -2153,18 +2163,29 @@ if (action === "admin-add-to-game") {
 });
 
 
+// Mostra o checkbox "Goleiro paga mensalidade" só quando a posição é goleiro.
+function syncGkPaysVisibility() {
+  const group = document.getElementById("gk-pays-group");
+  if (!group) return;
+  const role = document.getElementById("new-role")?.value;
+  const pos = document.getElementById("new-position")?.value;
+  group.style.display = (role !== "carne" && pos === "gol") ? "" : "none";
+}
+
 document.addEventListener("change", (e) => {
   const target = e.target;
-  if (!target || target.id !== "new-role") return;
+  if (!target) return;
 
-  const position = document.getElementById("new-position");
-  if (!position) return;
+  if (target.id === "new-role") {
+    const position = document.getElementById("new-position");
+    if (position) {
+      if (target.value === "carne") { position.value = "meia"; position.disabled = true; }
+      else { position.disabled = false; }
+    }
+  }
 
-  if (target.value === "carne") {
-    position.value = "meia";
-    position.disabled = true;
-  } else {
-    position.disabled = false;
+  if (target.id === "new-role" || target.id === "new-position") {
+    syncGkPaysVisibility();
   }
 });
 
@@ -3607,10 +3628,19 @@ function bindAppEvents(currentPlayer) {
       const mensMode = [MENSALIDADE_MODES.PARTIAL, MENSALIDADE_MODES.TOTAL].includes(rawMode) ? rawMode : MENSALIDADE_MODES.NONE;
       const mensAmount = Math.max(0, Number(formData.get('mens_amount')) || 0);
       const mensBeneficiary = String(formData.get('mens_beneficiary') || '').trim();
-      patchState({ settings: { ...(getState().settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary } });
+      const goalkeepersPay = formData.get('goalkeepers_pay') === 'on';
+      const next = structuredClone(getState());
+      next.settings = { ...(next.settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary, goalkeepers_pay: goalkeepersPay };
+      // Aplica em massa: liga/desliga a cobrança em TODOS os goleiros atuais
+      // (exceção individual continua possível pelo checkbox na edição do jogador).
+      (next.players || []).forEach((p) => {
+        const pos = String(p?.position || '').trim().toLowerCase();
+        if (pos === 'gol' || pos === 'goleiro') p.gk_pays = goalkeepersPay;
+      });
       // Aplica imediatamente a regra (no "total" pode remover inadimplentes e
       // promover a fila) e persiste/renderiza no padrão das demais ações admin.
-      const safeSnapshot = repairManualSnapshot(getState());
+      const safeSnapshot = repairManualSnapshot(next);
+      replaceState(safeSnapshot);
       savePersistedState(safeSnapshot);
       render(safeSnapshot);
       const modeLabel = mensMode === MENSALIDADE_MODES.TOTAL ? 'Bloqueio total' : mensMode === MENSALIDADE_MODES.PARTIAL ? 'Bloqueio parcial' : 'Sem bloqueio';
@@ -4965,6 +4995,14 @@ function renderConfig(snapshot, currentPlayer) {
             <input class="input" type="text" name="mens_beneficiary" value="${escapeHtml(snapshot.settings?.mens_beneficiary || '')}" placeholder="Como aparece no comprovante (quem recebe)" />
             <small class="footer-note">Usado para validar o comprovante PIX que o jogador envia. Valor e beneficiário precisam bater exatamente.</small>
           </label>
+
+          <div class="field-label" style="gap:6px;">
+            <label style="display:flex;flex-direction:row;align-items:center;gap:10px;cursor:pointer;">
+              <input type="checkbox" name="goalkeepers_pay" style="width:18px;height:18px;flex:none;margin:0;" ${snapshot.settings?.goalkeepers_pay ? 'checked' : ''} />
+              <span style="font-weight:600;">🧤 Goleiros pagam mensalidade</span>
+            </label>
+            <small class="footer-note">Desligado (padrão): goleiros ficam isentos. Ligado: cobra de todos os goleiros. Aplica em todos os goleiros ao salvar — dá pra abrir exceção por goleiro na edição do jogador.</small>
+          </div>
 
           <fieldset class="mens-mode-fieldset">
             <legend class="field-label">Regra para inadimplentes</legend>
