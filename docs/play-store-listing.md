@@ -8,7 +8,7 @@
 - **Categoria:** Esportes
 - **Tags/target:** futebol amador, pelada, organização de grupo
 - **E-mail de contato:** `williampeccin@gmail.com`
-- **Política de privacidade (URL):** `https://convocados.app.br/privacidade.html`
+- **Política de privacidade (URL):** `https://convocados.app.br/privacidade`  *(URL canônica — o Cloudflare Pages remove o `.html`; evita redirect na validação do Google)*
 
 ## Descrição curta *(máx. 80 caracteres)*
 ```
