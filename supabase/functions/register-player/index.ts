@@ -19,14 +19,16 @@ const TECHNICAL_EMAIL_DOMAIN = "harmonia.app";
 // Best-effort: qualquer falha aqui NÃO quebra o cadastro. Reusa os secrets VAPID
 // já configurados para a função send-push.
 // deno-lint-ignore no-explicit-any
-async function notifyAdminsOfRegistration(admin: any, playerName: string): Promise<void> {
+async function notifyAdminsOfRegistration(admin: any, playerName: string, clubId: string): Promise<void> {
   try {
     const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") || "";
     const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") || "";
     const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@harmonia.app";
     if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
 
-    const { data: admins } = await admin.from("players").select("id").eq("is_admin", true);
+    // Multi-tenant: só os admins DO MESMO CLUBE são avisados.
+    const { data: admins } = await admin
+      .from("players").select("id").eq("is_admin", true).eq("club_id", clubId);
     const adminIds = (admins || []).map((a: { id: string }) => String(a.id));
     if (!adminIds.length) return;
 
@@ -75,6 +77,17 @@ function normalizePhone(value: unknown): string {
 function normalizePosition(value: unknown): string | null {
   const v = String(value || "");
   return ["gol", "zag", "meia", "atk"].includes(v) ? v : null;
+}
+// Código de convite: 6 chars, alfabeto sem ambíguos (0/O, 1/I/L). ~1e9 combos.
+function genInviteCode(): string {
+  const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)];
+  return s;
+}
+function slugify(s: string): string {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "clube";
 }
 function ageFromBirthDate(iso: string): number | null {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -129,17 +142,34 @@ Deno.serve(async (req) => {
   const technicalEmail = `${phone}@${TECHNICAL_EMAIL_DOMAIN}`;
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // --- 1) Telefone duplicado? (checagem no servidor, ANTES de criar a conta) ---
+  // --- Onboarding multi-tenant: criar um clube OU entrar por código ---
+  const clubMode = payload.clubMode === "create" ? "create"
+    : payload.clubMode === "join" ? "join" : null;
+  if (!clubMode) return json({ ok: false, error: "missing_club_choice", message: "Escolha criar um clube ou entrar com um código." });
+  const clubName = String(payload.clubName || "").trim();
+  const inviteCode = String(payload.inviteCode || "").trim().toUpperCase();
+  if (clubMode === "create" && (clubName.length < 2 || clubName.length > 60)) {
+    return json({ ok: false, error: "bad_club_name", message: "Dê um nome ao seu clube (2 a 60 caracteres)." });
+  }
+  if (clubMode === "join" && inviteCode.length < 4) {
+    return json({ ok: false, error: "missing_invite_code", message: "Informe o código do clube." });
+  }
+
+  // --- 1) Telefone duplicado? (MVP: telefone é GLOBAL = 1 conta = 1 clube) ---
   const { data: dup, error: dupErr } = await admin
     .from("players").select("id").eq("data->>phone", phone).limit(1).maybeSingle();
   if (dupErr) { console.error("[register] dup check:", dupErr.message); return json({ ok: false, error: "lookup_failed" }, 500); }
   if (dup?.id) return json({ ok: false, error: "duplicate_phone", message: "Esse telefone já está cadastrado." });
 
-  // --- 2) Primeiro jogador vira admin (decidido no SERVIDOR) ---
-  const { count, error: countErr } = await admin
-    .from("players").select("id", { count: "exact", head: true });
-  if (countErr) { console.error("[register] count:", countErr.message); return json({ ok: false, error: "count_failed" }, 500); }
-  const isFirstPlayer = (count || 0) === 0;
+  // --- 2) Entrar por código: resolve o clube ANTES de criar a conta (fail fast) ---
+  let joinClubId: string | null = null;
+  if (clubMode === "join") {
+    const { data: found, error: findErr } = await admin
+      .from("clubs").select("id").eq("invite_code", inviteCode).maybeSingle();
+    if (findErr) { console.error("[register] find club:", findErr.message); return json({ ok: false, error: "lookup_failed" }, 500); }
+    if (!found?.id) return json({ ok: false, error: "invalid_invite_code", message: "Código de clube inválido. Confira com o administrador." });
+    joinClubId = found.id;
+  }
 
   // --- 3) Cria o usuário no Auth (já confirmado) ---
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -159,7 +189,41 @@ Deno.serve(async (req) => {
   }
   const authUserId = created.user.id;
 
-  // --- 4) Insere a linha em players (mesma forma do upsert do cliente) ---
+  // --- 4) Resolve o clube final: CRIA um novo OU usa o do código ---
+  let clubId: string;
+  let createdInviteCode: string | null = null;
+  if (clubMode === "create") {
+    let newClub: { id: string; invite_code: string } | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const code = genInviteCode();
+      const { data, error } = await admin.from("clubs").insert({
+        name: clubName,
+        slug: `${slugify(clubName)}-${code.toLowerCase()}`,
+        invite_code: code,
+        plan: "free",
+        owner_auth_user_id: authUserId,
+      }).select("id, invite_code").single();
+      if (!error && data) { newClub = data as { id: string; invite_code: string }; break; }
+      if (error && error.code === "23505") continue; // colisão de code/slug → tenta outro
+      console.error("[register] create club:", error?.message);
+      await admin.auth.admin.deleteUser(authUserId).catch(() => {});
+      return json({ ok: false, error: "create_club_failed" }, 500);
+    }
+    if (!newClub) {
+      await admin.auth.admin.deleteUser(authUserId).catch(() => {});
+      return json({ ok: false, error: "create_club_failed" }, 500);
+    }
+    clubId = newClub.id;
+    createdInviteCode = newClub.invite_code;
+  } else {
+    clubId = joinClubId!;
+  }
+
+  // Quem CRIA o clube entra admin aprovado; quem ENTRA por código fica pendente.
+  const isAdmin = clubMode === "create";
+  const isPending = clubMode === "join";
+
+  // --- 5) Insere a linha em players (club_id explícito p/ o clube resolvido) ---
   const playerId = `p${Date.now()}`;
   const playerData = {
     id: playerId,
@@ -174,10 +238,10 @@ Deno.serve(async (req) => {
     in_carne_group: true,
     position,
     mens_ok: false,
-    is_admin: isFirstPlayer,
-    // Auto-cadastro NÃO dá acesso ao grupo: entra pendente de aprovação do admin.
-    // O 1º usuário (que vira admin) é a exceção — já entra aprovado.
-    pending: !isFirstPlayer,
+    is_admin: isAdmin,
+    // Entrar por código NÃO dá acesso ao grupo: entra pendente de aprovação do
+    // admin do clube. Quem cria o clube (dono) já entra aprovado.
+    pending: isPending,
     // Menor de idade + consentimento do responsável legal (LGPD art. 14 / ECA).
     ...(isMinor ? {
       minor: true,
@@ -189,19 +253,22 @@ Deno.serve(async (req) => {
   const { error: insErr } = await admin.from("players").insert({
     id: playerId,
     auth_user_id: authUserId,
-    is_admin: isFirstPlayer,
+    is_admin: isAdmin,
+    club_id: clubId,
     data: playerData,
     updated_at: new Date().toISOString(),
   });
   if (insErr) {
-    // Não deixa usuário do Auth órfão sem player: desfaz a criação.
+    // Não deixa órfãos: desfaz o usuário do Auth e, se criamos um clube só pra
+    // este dono, remove o clube órfão também.
     console.error("[register] insert player:", insErr.message);
     await admin.auth.admin.deleteUser(authUserId).catch(() => {});
+    if (clubMode === "create") { try { await admin.from("clubs").delete().eq("id", clubId); } catch (_) { /* best-effort */ } }
     return json({ ok: false, error: "insert_player_failed" }, 500);
   }
 
-  // Auto-cadastro pendente: avisa os admins por push (best-effort, não bloqueia).
-  if (!isFirstPlayer) await notifyAdminsOfRegistration(admin, name);
+  // Entrar por código = pendente: avisa os admins DAQUELE clube (best-effort).
+  if (isPending) await notifyAdminsOfRegistration(admin, name, clubId);
 
   // --- 5) Loga com a senha e devolve a sessão (cliente adota) ---
   try {
@@ -209,11 +276,13 @@ Deno.serve(async (req) => {
     const { data: signIn, error: signErr } = await anonClient.auth.signInWithPassword({ email: technicalEmail, password });
     if (signErr || !signIn?.session) {
       // Cadastro OK, mas login automático falhou → cliente cai no login manual.
-      return json({ ok: true, session: null, message: "Cadastro realizado. Faça login." });
+      return json({ ok: true, session: null, club: createdInviteCode ? { invite_code: createdInviteCode } : null, message: "Cadastro realizado. Faça login." });
     }
     const s = signIn.session;
     return json({
       ok: true,
+      // Ao CRIAR um clube, devolve o invite_code p/ a UI mostrar e o dono compartilhar.
+      club: createdInviteCode ? { invite_code: createdInviteCode } : null,
       session: { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at, user: s.user },
     });
   } catch (error) {

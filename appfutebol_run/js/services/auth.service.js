@@ -309,10 +309,20 @@ export async function register(payload) {
   const passwordConfirm = String(payload.passwordConfirm || '').trim();
   const guardianName = String(payload.guardianName || '').trim();
   const guardianPhone = String(payload.guardianPhone || '').replace(/\D/g, '');
+  // Onboarding multi-tenant: criar um clube OU entrar por código.
+  const clubMode = payload.clubMode === 'join' ? 'join' : 'create';
+  const clubName = String(payload.clubName || '').trim();
+  const inviteCode = String(payload.inviteCode || '').trim().toUpperCase();
 
   // Validação client-side (feedback imediato). O servidor revalida tudo.
   if (!name) {
     return { ok: false, message: 'Informe o nome.' };
+  }
+  if (clubMode === 'create' && clubName.length < 2) {
+    return { ok: false, message: 'Dê um nome ao seu clube.' };
+  }
+  if (clubMode === 'join' && inviteCode.length < 4) {
+    return { ok: false, message: 'Informe o código do clube.' };
   }
   if (phone.length < 10 || phone.length > 11) {
     return { ok: false, message: 'Informe um telefone válido.' };
@@ -333,10 +343,12 @@ export async function register(payload) {
   // Cadastro AUTORITATIVO no servidor (Edge Function service_role): valida,
   // checa telefone duplicado, decide 1º-jogador=admin, cria auth+player e
   // devolve a sessão. O cliente anônimo não lê mais a tabela players.
-  const res = await callRegisterPlayer({ name, phone, birthDate, role, position, password, guardianName, guardianPhone });
+  const res = await callRegisterPlayer({ name, phone, birthDate, role, position, password, guardianName, guardianPhone, clubMode, clubName, inviteCode });
   if (!res.ok) {
     return { ok: false, message: res.message || 'Não foi possível cadastrar. Tente de novo.' };
   }
+  // Ao criar um clube, guarda o código de convite p/ mostrar ao dono depois do login.
+  const createdInviteCode = res.club?.invite_code || null;
 
   if (!res.session) {
     // Cadastro OK, mas o login automático não veio → cai no login manual.
@@ -351,7 +363,10 @@ export async function register(payload) {
 
   // Adota a sessão devolvida (mesmo caminho do passkey: saveSession +
   // loadRemoteState autenticado + vincula o jogador à sessão).
-  return await loginWithPasskeySession(res.session);
+  const loginResult = await loginWithPasskeySession(res.session);
+  // Dono de clube recém-criado: devolve o código pra UI mostrar/compartilhar.
+  if (loginResult.ok && createdInviteCode) loginResult.inviteCode = createdInviteCode;
+  return loginResult;
 }
 
 

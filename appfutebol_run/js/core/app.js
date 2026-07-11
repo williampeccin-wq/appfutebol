@@ -3233,6 +3233,25 @@ function bindAuthEvents() {
     birthInput?.addEventListener('change', syncRegisterMinorBlock);
     syncRegisterMinorBlock();
 
+    // Onboarding multi-tenant: alterna entre "Criar um clube" e "Entrar com código".
+    const clubModeInput = registerForm.querySelector('#register-club-mode');
+    const clubNameInput = registerForm.querySelector('#register-club-name');
+    const inviteInput = registerForm.querySelector('#register-invite-code');
+    const clubHint = registerForm.querySelector('#register-club-hint');
+    const clubTabs = registerForm.querySelectorAll('[data-club-mode]');
+    const setClubMode = (mode) => {
+      const isCreate = mode !== 'join';
+      if (clubModeInput) clubModeInput.value = isCreate ? 'create' : 'join';
+      clubTabs.forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-club-mode') === (isCreate ? 'create' : 'join')));
+      if (clubNameInput) clubNameInput.style.display = isCreate ? '' : 'none';
+      if (inviteInput) inviteInput.style.display = isCreate ? 'none' : '';
+      if (clubHint) clubHint.textContent = isCreate
+        ? 'Você vira o administrador do clube.'
+        : 'Peça o código ao administrador. Você entra como pendente até ele aprovar.';
+    };
+    clubTabs.forEach((b) => b.addEventListener('click', () => setClubMode(b.getAttribute('data-club-mode'))));
+    setClubMode('create');
+
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(registerForm);
@@ -3250,6 +3269,18 @@ function bindAuthEvents() {
           return;
         }
       }
+      // Escolha do clube (criar vs entrar por código).
+      const clubMode = String(formData.get('clubMode') || 'create') === 'join' ? 'join' : 'create';
+      const clubName = String(formData.get('clubName') || '').trim();
+      const inviteCode = String(formData.get('inviteCode') || '').trim().toUpperCase();
+      if (clubMode === 'create' && clubName.length < 2) {
+        showToast('Dê um nome ao seu clube.', 'error');
+        return;
+      }
+      if (clubMode === 'join' && inviteCode.length < 4) {
+        showToast('Informe o código do clube que você recebeu.', 'error');
+        return;
+      }
       const submitButton = registerForm.querySelector('button[type="submit"]');
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
       const result = await register({
@@ -3262,6 +3293,9 @@ function bindAuthEvents() {
         passwordConfirm: formData.get('passwordConfirm'),
         guardianName: formData.get('guardianName'),
         guardianPhone: formData.get('guardianPhone'),
+        clubMode,
+        clubName,
+        inviteCode,
       });
 
       if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Criar cadastro'; }
@@ -3273,6 +3307,9 @@ function bindAuthEvents() {
             authMessage: { type: 'error', text: result.message },
           },
         });
+      } else if (result.inviteCode) {
+        // Dono de clube recém-criado: mostra o código pra ele compartilhar.
+        showToast(`Clube criado! Código de convite: ${result.inviteCode} — compartilhe com o pessoal.`, 'success');
       }
     });
   }
