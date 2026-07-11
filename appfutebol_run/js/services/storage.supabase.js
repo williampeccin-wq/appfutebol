@@ -57,6 +57,45 @@ function getCurrentAuthUserId() {
   return getAuthSession()?.user?.id || null;
 }
 
+// Multi-tenant: a key do blob (app_meta/game_state) é o club_id do usuário logado,
+// não mais 'default'. Resolve uma vez por sessão (query leve) e cacheia. Sem sessão
+// ou sem player row → cai no fallback config.stateKey ('default'), preservando o
+// comportamento single-tenant durante a transição.
+let clubKeyCache = { uid: null, key: null };
+
+async function resolveClubKey(config) {
+  const uid = getCurrentAuthUserId();
+  if (!uid) return config.stateKey || 'default';
+  if (clubKeyCache.uid === uid && clubKeyCache.key) return clubKeyCache.key;
+  try {
+    const res = await requestJson(
+      config,
+      tableUrl(config, SPLIT_TABLES.players, `auth_user_id=eq.${encodeURIComponent(uid)}&select=club_id&limit=1`),
+      { method: 'GET' }
+    );
+    const cid = Array.isArray(res.data) ? res.data[0]?.club_id : null;
+    if (cid) {
+      clubKeyCache = { uid, key: cid };
+      return cid;
+    }
+  } catch (_error) {
+    // rede/leitura falhou — usa fallback, não cacheia
+  }
+  return config.stateKey || 'default';
+}
+
+// Versão síncrona p/ os caminhos de escrita: usa o cache já resolvido na carga.
+// A carga sempre precede a gravação no ciclo do app, então o cache está quente.
+function currentClubKey(config) {
+  const uid = getCurrentAuthUserId();
+  if (uid && clubKeyCache.uid === uid && clubKeyCache.key) return clubKeyCache.key;
+  return config.stateKey || 'default';
+}
+
+export function resetClubKeyCache() {
+  clubKeyCache = { uid: null, key: null };
+}
+
 function buildHeaders(config, prefer = null) {
   const accessToken = getAccessToken();
 
@@ -449,10 +488,11 @@ async function requestNoContent(config, url, options = {}) {
 }
 
 async function loadSplitState(config) {
+  const clubKey = await resolveClubKey(config);
   const [playersResult, gameResult, metaResult] = await Promise.all([
     requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,auth_user_id,is_admin,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at&limit=1`), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at&limit=1`), { method: 'GET' }),
   ]);
 
   if (!playersResult.ok || !gameResult.ok || !metaResult.ok) {
@@ -700,24 +740,26 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   }
 
 
+  const clubKey = currentClubKey(config);
+
   if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
     operations.push({
       type: 'upsert_game',
-      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
+      run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
     });
   }
 
   if (gameStateHadVolatileDraw && !operations.some((operation) => operation.type === 'upsert_game')) {
     operations.push({
       type: 'cleanup_game_draw_fields',
-      run: () => upsertRow(config, SPLIT_TABLES.game, { key: 'default', data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
+      run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
     });
   }
 
   if (stableStringify(previousParts?.meta || {}) !== stableStringify(nextParts.meta || {})) {
     operations.push({
       type: 'upsert_meta',
-      run: () => upsertRow(config, SPLIT_TABLES.meta, { key: 'default', data: nextParts.meta, updated_at: now }),
+      run: () => upsertRow(config, SPLIT_TABLES.meta, { key: clubKey, data: nextParts.meta, updated_at: now }),
     });
   }
 
@@ -728,9 +770,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 // os objetos gravados "inteiros" e, portanto, o alvo de sobrescrita cega entre
 // admins. players/presence usam chave por linha e não sofrem esse problema.
 async function fetchSharedUpdatedAt(config) {
+  const clubKey = currentClubKey(config);
   const [gameRes, metaRes] = await Promise.all([
-    requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
   ]);
   const values = [];
   if (gameRes?.ok && Array.isArray(gameRes.data) && gameRes.data[0]?.updated_at) values.push(gameRes.data[0].updated_at);
@@ -843,10 +886,11 @@ export function setLastRemoteUpdatedAt(value) {
 export async function fetchRemoteHeartbeat(activeGameKey = null) {
   const config = getConfig();
   if (!isSupabaseConfigured()) return { ok: false, status: null, updatedAt: null };
+  const clubKey = await resolveClubKey(config);
   const requests = [
     requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=updated_at&order=updated_at.desc&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.game, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=updated_at&limit=1'), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
   ];
   // Presença só do jogo ATIVO — espelha o que loadSplitState usa para compor o
   // lastRemoteUpdatedAt. Filtrar por outro jogo (ou todos) faria o heartbeat
@@ -1209,9 +1253,11 @@ export async function savePlayerDeletionTombstone(playerId, phone = '') {
     return { ok: false, reason: 'missing_player_id' };
   }
 
+  const clubKey = await resolveClubKey(config);
+
   const currentResult = await requestJson(
     config,
-    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'),
+    tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at&limit=1`),
     { method: 'GET' }
   );
 
@@ -1237,7 +1283,7 @@ export async function savePlayerDeletionTombstone(playerId, phone = '') {
   // e mascarar a exclusão lógica. Aqui a operação é explicitamente UPDATE.
   const patchResult = await requestJson(
     config,
-    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at'),
+    tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at`),
     {
       method: 'PATCH',
       prefer: 'return=representation',
@@ -1293,6 +1339,8 @@ export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
     return { ok: false, reason: 'missing_phone' };
   }
 
+  const clubKey = await resolveClubKey(config);
+
   const [playersResult, metaResult] = await Promise.all([
     requestJson(
       config,
@@ -1301,7 +1349,7 @@ export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
     ),
     requestJson(
       config,
-      tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at&limit=1'),
+      tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at&limit=1`),
       { method: 'GET' }
     ),
   ]);
@@ -1391,7 +1439,7 @@ export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
 
   const patchMetaResult = await requestJson(
     config,
-    tableUrl(config, SPLIT_TABLES.meta, 'key=eq.default&select=key,data,updated_at'),
+    tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at`),
     {
       method: 'PATCH',
       prefer: 'return=representation',

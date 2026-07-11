@@ -1,5 +1,5 @@
 import { getState, patchState, replaceState } from '../core/state.js';
-import { loadRemoteState } from './storage.supabase.js';
+import { loadRemoteState, resetClubKeyCache } from './storage.supabase.js';
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 import { normalizePhone } from '../domain/rules.engine.js';
 
@@ -417,6 +417,7 @@ export async function logout() {
   }
 
   clearStoredSession();
+  resetClubKeyCache();
   patchState({
     session: { playerId: null, authUserId: null },
     ui: { authMessage: null, authMode: 'login', currentTab: 'home' },

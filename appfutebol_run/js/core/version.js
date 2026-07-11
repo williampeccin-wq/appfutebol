@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.118.0-consentimento-menor';
+export const APP_VERSION = 'v1.119.0-multitenant-p3-blob-por-clube';
