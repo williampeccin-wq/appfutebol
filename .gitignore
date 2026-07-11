@@ -10,3 +10,4 @@ node_modules/
 
 # Config local do Claude Code (mantém .claude/settings.json, ignora overrides locais)
 .claude/settings.local.json
+supabase/.temp/
