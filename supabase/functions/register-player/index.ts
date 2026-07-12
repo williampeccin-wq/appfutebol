@@ -267,6 +267,18 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "insert_player_failed" }, 500);
   }
 
+  // Clube NOVO: semeia um blob vazio (app_meta/game_state com key=club_id). Sem
+  // isso, a 1ª carga do dono cai no guard anti-degradação ("meta ausente com
+  // players") — falso positivo, porque o clube legitimamente ainda não tem dados.
+  // composeState fabrica os defaults a partir do {} (clube vazio, sem jogos/config).
+  if (clubMode === "create") {
+    const nowIso = new Date().toISOString();
+    const seedMeta = await admin.from("app_meta").insert({ key: clubId, data: {}, updated_at: nowIso });
+    if (seedMeta.error) console.error("[register] seed app_meta:", seedMeta.error.message);
+    const seedGame = await admin.from("game_state").insert({ key: clubId, data: {}, updated_at: nowIso });
+    if (seedGame.error) console.error("[register] seed game_state:", seedGame.error.message);
+  }
+
   // Entrar por código = pendente: avisa os admins DAQUELE clube (best-effort).
   if (isPending) await notifyAdminsOfRegistration(admin, name, clubId);
 
