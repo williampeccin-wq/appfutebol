@@ -94,6 +94,34 @@ function currentClubKey(config) {
 
 export function resetClubKeyCache() {
   clubKeyCache = { uid: null, key: null };
+  clubInfoCache = { uid: null, info: null };
+}
+
+// Info do clube (nome / código de convite / plano) do usuário logado. Lida sob
+// demanda e cacheada por sessão. NÃO entra no estado sincronizado (não é blob).
+let clubInfoCache = { uid: null, info: null };
+
+export function getClubInfo() {
+  const uid = getCurrentAuthUserId();
+  if (uid && clubInfoCache.uid === uid) return clubInfoCache.info;
+  return null;
+}
+
+async function loadClubInfo(config, clubKey) {
+  const uid = getCurrentAuthUserId();
+  if (!uid || !clubKey || clubKey === 'default') return;
+  if (clubInfoCache.uid === uid && clubInfoCache.info) return;
+  try {
+    const res = await requestJson(
+      config,
+      tableUrl(config, 'clubs', `id=eq.${encodeURIComponent(clubKey)}&select=name,invite_code,plan&limit=1`),
+      { method: 'GET' }
+    );
+    const row = Array.isArray(res.data) ? res.data[0] : null;
+    if (row) clubInfoCache = { uid, info: { name: row.name, inviteCode: row.invite_code, plan: row.plan } };
+  } catch (_error) {
+    // best-effort; a área admin só não mostra o código nesta carga
+  }
 }
 
 function buildHeaders(config, prefer = null) {
@@ -489,6 +517,9 @@ async function requestNoContent(config, url, options = {}) {
 
 async function loadSplitState(config) {
   const clubKey = await resolveClubKey(config);
+  // Info do clube (código de convite p/ a área admin) — fire-and-forget, não
+  // atrasa a carga do estado; o cache fica quente antes do admin abrir o Config.
+  loadClubInfo(config, clubKey);
   const [playersResult, gameResult, metaResult] = await Promise.all([
     requestJson(config, tableUrl(config, SPLIT_TABLES.players, 'select=id,auth_user_id,is_admin,data,updated_at&order=data->>name.asc'), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=key,data,updated_at&limit=1`), { method: 'GET' }),

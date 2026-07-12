@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.120.0-multitenant-p4-onboarding';
+export const APP_VERSION = 'v1.121.0-multitenant-p5b-invite-code';

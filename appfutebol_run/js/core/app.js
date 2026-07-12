@@ -1175,6 +1175,26 @@ document.addEventListener("click", async (e) => {
   if (uiActionInFlight && action !== "cancel-edit") return;
   const id = trigger.dataset.id || "";
 
+  // Copiar o código de convite do clube (área admin). Independe do estado.
+  if (action === "copy-invite-code") {
+    e.preventDefault();
+    const code = trigger.dataset.code || "";
+    if (!code) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = code; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      }
+      showToast(`Código ${code} copiado. Compartilhe com o pessoal.`);
+    } catch (_error) {
+      showToast(`Não foi possível copiar. Código: ${code}`, 'error');
+    }
+    return;
+  }
+
   const snapshot = structuredClone(getState());
   if (Array.isArray(snapshot.players)) {
     snapshot.players = snapshot.players.map(normalizePlayer);
@@ -2283,7 +2303,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, getClubInfo } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession, deleteOwnAccount } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
@@ -5124,8 +5144,21 @@ function renderConfig(snapshot, currentPlayer) {
     `;
   };
 
+  const clubInfo = getClubInfo();
+  const inviteCard = clubInfo?.inviteCode ? `
+      <section class="card">
+        <div class="card-title">Convite do clube</div>
+        <p class="footer-note">Compartilhe este código com quem for entrar${clubInfo.name ? ` no <strong>${escapeHtml(clubInfo.name)}</strong>` : ''}. Novos membros entram pendentes até você aprovar.</p>
+        <div class="invite-code-row">
+          <code class="invite-code">${escapeHtml(clubInfo.inviteCode)}</code>
+          <button class="btn btn-secondary btn-sm" type="button" data-action="copy-invite-code" data-code="${escapeHtml(clubInfo.inviteCode)}">Copiar</button>
+        </div>
+      </section>
+  ` : '';
+
   return `
     <section class="section-stack">
+      ${inviteCard}
       <details class="card champ-collapse"${audit.high ? ' open' : ''}>
         <summary class="champ-collapse-summary">
           <span class="card-title">Saúde dos dados ${audit.findings.length ? `· ${audit.findings.length}` : '✅'}</span>

@@ -7115,3 +7115,23 @@ body.vote-open { overflow: hidden; }
   50% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 20px 6px rgba(240, 165, 0, 0.72); }
 }
 @media (prefers-reduced-motion: reduce) { .avatar.avatar-aura { animation: none; } }
+
+/* Código de convite do clube (área admin · Passo 5b multi-tenant) */
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.invite-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--hfc-gold, #f0a500);
+  background: var(--hfc-glass, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  padding: 8px 16px;
+}
