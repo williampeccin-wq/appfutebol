@@ -15,6 +15,7 @@ import {
 import { getCachedRatings, duoRatingAverages } from '../../services/ratings.service.js';
 import { isVotingEnabled } from '../../core/flags.js';
 import { isMensalidadeExempt } from '../../domain/authz.js';
+import { isPro } from '../../domain/gating.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
@@ -233,7 +234,9 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
         ${isAdmin(currentPlayer) ? `
           <div class="players-pay-actions">
             <span class="players-pay-due">Vencimento da mensalidade: <strong>${mensDueLabel}</strong></span>
-            <button class="btn btn-secondary btn-sm" type="button" id="copy-payments-btn">Copiar pagos/pendentes</button>
+            ${isPro()
+              ? `<button class="btn btn-secondary btn-sm" type="button" id="copy-payments-btn">Copiar pagos/pendentes</button>`
+              : `<button class="btn btn-secondary btn-sm" type="button" data-action="pro-upsell" data-feature="Relatório de pagamentos">🔒 Relatório de pagamentos (Pro)</button>`}
           </div>
         ` : ''}
 

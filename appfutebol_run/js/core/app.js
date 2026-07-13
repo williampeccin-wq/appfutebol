@@ -3994,6 +3994,8 @@ function renderTab(snapshot, activeTab, currentPlayer) {
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
       }
     case 'championship':
+      // Campeonato completo (Rei da Quadra + histórico) é Pro — Free vê o cadeado.
+      if (!isPro()) return renderProLock({ title: 'Campeonato & Rei da Quadra', benefit: 'Lance resultados, acompanhe a classificação do Rei da Quadra e o histórico de campeões do grupo. Disponível no Pro.' });
       return renderChampionshipScreen(snapshot, currentPlayer);
     case 'config':
       return renderConfig(snapshot, currentPlayer);

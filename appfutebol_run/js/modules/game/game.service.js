@@ -4,6 +4,7 @@ import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode,
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
+import { isPro } from '../../domain/gating.js';
 import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
 
 
@@ -681,8 +682,12 @@ export function drawTeams() {
     };
   }
 
+  // Sorteio INTELIGENTE (índice de força = nota + campeonato) é Pro. No Free o
+  // sorteio é BÁSICO: mantém a paridade de posição (restrição rígida no
+  // balanceTeams) e sorteia aleatório dentro de cada posição (ratingOf = 0).
   const { strengthOf } = buildStrengthResolver(eligiblePlayers, snapshot);
-  const { teamA, teamB } = balanceTeams(eligiblePlayers, strengthOf);
+  const ratingOf = isPro() ? strengthOf : () => 0;
+  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf);
   const createdAt = new Date().toISOString();
   
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
