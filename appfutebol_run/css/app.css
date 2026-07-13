@@ -7135,3 +7135,42 @@ body.vote-open { overflow: hidden; }
   border-radius: 10px;
   padding: 8px 16px;
 }
+
+/* Cadeados / upsell do Pro (gating Free×Pro · Passo 7) */
+.pro-lock {
+  border: 1px solid var(--hfc-gold, #f0a500);
+  background: linear-gradient(180deg, rgba(240,165,0,0.08), var(--hfc-glass, rgba(255,255,255,0.04)));
+}
+.pro-lock-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--hfc-gold, #f0a500);
+  background: rgba(240,165,0,0.14);
+  border: 1px solid rgba(240,165,0,0.35);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+}
+.pro-lock-benefit { margin-bottom: 14px; }
+.pro-lock-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pro-lock-price {
+  font-weight: 700;
+  color: var(--hfc-gold, #f0a500);
+}
+.pro-lock-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+.pro-lock-inline > div { flex: 1; min-width: 140px; }

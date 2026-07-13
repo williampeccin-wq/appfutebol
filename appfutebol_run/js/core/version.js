@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.121.0-multitenant-p5b-invite-code';
+export const APP_VERSION = 'v1.122.0-cadeados-pro';

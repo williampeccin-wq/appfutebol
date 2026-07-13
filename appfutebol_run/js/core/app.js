@@ -1175,6 +1175,14 @@ document.addEventListener("click", async (e) => {
   if (uiActionInFlight && action !== "cancel-edit") return;
   const id = trigger.dataset.id || "";
 
+  // Upsell do Pro (cadeados). Billing ainda não existe → por ora informa.
+  if (action === "pro-upsell") {
+    e.preventDefault();
+    const feature = trigger.dataset.feature || "esse recurso";
+    showToast(`${feature} é do plano Pro (R$ 39,90/mês pro grupo todo). O pagamento chega já já — por enquanto, fala com a gente pra ativar. 👊`, 'info');
+    return;
+  }
+
   // Copiar o código de convite do clube (área admin). Independe do estado.
   if (action === "copy-invite-code") {
     e.preventDefault();
@@ -2310,6 +2318,7 @@ import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, con
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
+import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -3978,6 +3987,8 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
     case 'carne':
       {
+        // Carnê/rodízio é recurso Pro — clube Free vê o cadeado + upsell.
+        if (!isPro()) return renderProLock({ title: 'Carnê & rodízio de duplas', benefit: 'Organize o carnê do churrasco com rodízio automático de duplas, datado e sem confusão. Disponível no Pro.' });
         const carneRotation = carneEditingView();
         const carneDates = (carneRotation.pairs || []).map((_, i) => (carneRotation.start_date ? carneAddDays(carneRotation.start_date, i * 7) : ''));
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
@@ -4328,12 +4339,14 @@ function renderProfilePanel(activePlayer) {
         <div class="self-pix-block">
           ${activePlayer.mens_review ? `
             <p class="footer-note">📨 Comprovante enviado — aguardando o administrador confirmar.</p>
-          ` : `
+          ` : isPro() ? `
             <p class="footer-note">Pague o PIX e envie o comprovante: a confirmação é automática.</p>
+            <button class="btn btn-primary self-pix-submit-btn" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
+            <input id="self-pix-file" type="file" accept="image/*" hidden />
+            <div id="self-pix-result" class="self-pix-result" hidden></div>
+          ` : `
+            <p class="footer-note">Pague o PIX e avise o administrador — ele confirma seu pagamento.</p>
           `}
-          <button class="btn btn-primary self-pix-submit-btn" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
-          <input id="self-pix-file" type="file" accept="image/*" hidden />
-          <div id="self-pix-result" class="self-pix-result" hidden></div>
         </div>
       ` : ''}
 
@@ -5296,10 +5309,12 @@ function renderConfig(snapshot, currentPlayer) {
           </div>
         </form>
 
+        ${isPro() ? `
         <div class="mens-reminder-block">
           <div class="card-subtitle">Lembrete de atraso (push)</div>
           <p class="footer-note">Todo dia às 7h, quem estiver em atraso (a partir do 1º dia após o vencimento) recebe um aviso amigável por push, automaticamente.</p>
         </div>
+        ` : renderProLockInline({ title: 'Lembrete automático de atraso', benefit: 'Todo dia às 7h, quem está em atraso recebe um push amigável — sem você precisar cobrar na mão.' })}
       </section>
 
       <section class="card ratings-config-card">
