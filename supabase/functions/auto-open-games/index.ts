@@ -73,18 +73,6 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
-  const { data: metaRow, error: metaErr } = await admin
-    .from("app_meta").select("data, updated_at").eq("key", "default").maybeSingle();
-  if (metaErr) { console.error("[auto-open] meta read:", metaErr.message); return json({ error: "meta_query_failed" }, 500); }
-
-  const data = (metaRow?.data || {}) as Record<string, unknown>;
-  const prevUpdatedAt = metaRow?.updated_at;
-  const settings = (data.settings || {}) as Record<string, unknown>;
-  const notif = (settings.notifications || {}) as Record<string, boolean>;
-  const enabled = (k: string) => notif[k] !== false; // ausente = ligado
-  const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
-  const nowMs = Date.now();
-
   // Envia uma notificação para uma lista de inscrições; remove as mortas.
   async function pushTo(subs: Array<{ endpoint: string; p256dh: string; auth: string }>, title: string, body: string) {
     const payload = JSON.stringify({ title, body, url: "./" });
@@ -100,83 +88,106 @@ Deno.serve(async (req) => {
     }
     return { sent, removed };
   }
-  // Insere a linha de dedup; true se é a primeira vez (deve enviar).
-  async function claim(kind: string, gameKey: string, title: string, body: string): Promise<boolean> {
-    const { error } = await admin.from("push_log").insert({ kind, game_key: gameKey, title, body, status: "sent" });
+  // Insere a linha de dedup (POR CLUBE); true se é a primeira vez (deve enviar).
+  async function claim(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
+    const { error } = await admin.from("push_log").insert({ kind, game_key: gameKey, club_id: clubId, title, body, status: "sent" });
     if (error) return false; // 23505 (já enviado) ou outro erro → não envia
     return true;
   }
 
-  const out: Record<string, unknown> = { now: nowBrtMinute(), opened: 0, perf: 0, churrasco: 0 };
-
-  // ---------- 1) Abertura automática de inscrições ----------
+  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, perf: 0, churrasco: 0 };
+  const nowMs = Date.now();
   const nowBrt = nowBrtMinute();
-  const toOpen: Array<Record<string, unknown>> = [];
-  const nextGames = games.map((g) => {
-    const at = String(g?.auto_open_at || "").slice(0, 16);
-    if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
-    return g;
-  });
-  if (toOpen.length) {
-    const { data: upd, error: upErr } = await admin
-      .from("app_meta")
-      .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
-      .eq("key", "default").eq("updated_at", prevUpdatedAt).select("key");
-    if (upErr) { console.error("[auto-open] meta write:", upErr.message); return json({ error: "meta_update_failed" }, 500); }
-    if (upd && upd.length) {
-      out.opened = toOpen.length;
-      if (enabled(KIND_OPEN)) {
-        const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth");
-        for (const g of toOpen) {
-          const gameKey = String(g.game_key || g.id || "");
-          const title = "Inscrições abertas ⚽";
-          const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
-          if (await claim(KIND_OPEN, gameKey, title, body)) await pushTo(subs || [], title, body);
+
+  // Multi-tenant: itera TODOS os clubes; cada um tem seu blob app_meta key=club_id.
+  const { data: clubList, error: clubErr } = await admin.from("clubs").select("id, plan");
+  if (clubErr) { console.error("[auto-open] clubs read:", clubErr.message); return json({ error: "clubs_query_failed" }, 500); }
+
+  for (const club of (clubList || [])) {
+    const clubId = String(club.id);
+    const isPro = String(club.plan || "free") === "pro";
+
+    const { data: metaRow, error: metaErr } = await admin
+      .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
+    if (metaErr) { console.error("[auto-open] meta read", clubId, metaErr.message); continue; }
+    if (!metaRow) continue;
+
+    const data = (metaRow.data || {}) as Record<string, unknown>;
+    const prevUpdatedAt = metaRow.updated_at;
+    const settings = (data.settings || {}) as Record<string, unknown>;
+    const notif = (settings.notifications || {}) as Record<string, boolean>;
+    const enabled = (k: string) => notif[k] !== false; // ausente = ligado
+    const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
+    out.clubs = (out.clubs as number) + 1;
+
+    // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
+    if (isPro) {
+      const toOpen: Array<Record<string, unknown>> = [];
+      const nextGames = games.map((g) => {
+        const at = String(g?.auto_open_at || "").slice(0, 16);
+        if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
+        return g;
+      });
+      if (toOpen.length) {
+        const { data: upd, error: upErr } = await admin
+          .from("app_meta")
+          .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
+          .eq("key", clubId).eq("updated_at", prevUpdatedAt).select("key");
+        if (upErr) { console.error("[auto-open] meta write", clubId, upErr.message); }
+        else if (upd && upd.length) {
+          out.opened = (out.opened as number) + toOpen.length;
+          if (enabled(KIND_OPEN)) {
+            const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth").eq("club_id", clubId);
+            for (const g of toOpen) {
+              const gameKey = String(g.game_key || g.id || "");
+              const title = "Inscrições abertas ⚽";
+              const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+              if (await claim(KIND_OPEN, gameKey, title, body, clubId)) await pushTo(subs || [], title, body);
+            }
+          }
         }
       }
-    } else {
-      out.skipped = "concurrent_write";
     }
-  }
 
-  // ---------- 2) Votação de desempenho (1h após o jogo) → quem jogou ----------
-  const perfHours = Number(settings.ratings_perf_window_hours) || 0;
-  if (enabled(KIND_PERF) && perfHours > 0) {
-    for (const g of games) {
-      const start = gameStartMs(String(g.game_date || ""), String(g.game_time || ""));
-      if (!start) continue;
-      const open = start + 3600_000;
-      const close = open + perfHours * 3600_000;
-      if (nowMs < open || nowMs > close) continue;
-      const gameKey = String(g.game_key || g.id || "");
-      const title = "Hora de votar ⭐";
-      const body = `Dê as notas de desempenho do jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
-      if (!(await claim(KIND_PERF, gameKey, title, body))) continue;
-      const { data: confs } = await admin
-        .from("presence_confirmations").select("player_id").eq("game_key", gameKey).eq("status", "confirmed");
-      const ids = [...new Set((confs || []).map((c) => String(c.player_id)).filter(Boolean))];
-      if (!ids.length) continue;
-      const { data: subs } = await admin
-        .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids);
-      const r = await pushTo(subs || [], title, body);
-      out.perf = (out.perf as number) + 1; out.perfSent = r.sent;
+    // ---------- 2) Votação de desempenho (1h após o jogo) → quem jogou ----------
+    const perfHours = Number(settings.ratings_perf_window_hours) || 0;
+    if (enabled(KIND_PERF) && perfHours > 0) {
+      for (const g of games) {
+        const start = gameStartMs(String(g.game_date || ""), String(g.game_time || ""));
+        if (!start) continue;
+        const open = start + 3600_000;
+        const close = open + perfHours * 3600_000;
+        if (nowMs < open || nowMs > close) continue;
+        const gameKey = String(g.game_key || g.id || "");
+        const title = "Hora de votar ⭐";
+        const body = `Dê as notas de desempenho do jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+        if (!(await claim(KIND_PERF, gameKey, title, body, clubId))) continue;
+        const { data: confs } = await admin
+          .from("presence_confirmations").select("player_id").eq("game_key", gameKey).eq("status", "confirmed").eq("club_id", clubId);
+        const ids = [...new Set((confs || []).map((c) => String(c.player_id)).filter(Boolean))];
+        if (!ids.length) continue;
+        const { data: subs } = await admin
+          .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids).eq("club_id", clubId);
+        await pushTo(subs || [], title, body);
+        out.perf = (out.perf as number) + 1;
+      }
     }
-  }
 
-  // ---------- 3) Votação do churrasco (23h do dia do jogo) → todos ----------
-  if (enabled(KIND_CHURR)) {
-    for (const g of games) {
-      const openMs = churrascoOpenMs(String(g.game_date || ""));
-      if (!openMs) continue;
-      const closeMs = openMs + 13 * 3600_000; // 23h → 12h do dia seguinte
-      if (nowMs < openMs || nowMs > closeMs) continue;
-      const gameKey = String(g.game_key || g.id || "");
-      const title = "Vote no churrasco 🥩🔥";
-      const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
-      if (!(await claim(KIND_CHURR, gameKey, title, body))) continue;
-      const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth");
-      const r = await pushTo(subs || [], title, body);
-      out.churrasco = (out.churrasco as number) + 1; out.churrSent = r.sent;
+    // ---------- 3) Votação do churrasco (23h do dia do jogo) → todos ----------
+    if (enabled(KIND_CHURR)) {
+      for (const g of games) {
+        const openMs = churrascoOpenMs(String(g.game_date || ""));
+        if (!openMs) continue;
+        const closeMs = openMs + 13 * 3600_000; // 23h → 12h do dia seguinte
+        if (nowMs < openMs || nowMs > closeMs) continue;
+        const gameKey = String(g.game_key || g.id || "");
+        const title = "Vote no churrasco 🥩🔥";
+        const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
+        if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
+        const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth").eq("club_id", clubId);
+        await pushTo(subs || [], title, body);
+        out.churrasco = (out.churrasco as number) + 1;
+      }
     }
   }
 
