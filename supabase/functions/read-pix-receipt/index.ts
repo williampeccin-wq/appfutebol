@@ -114,16 +114,26 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // Config do clube + jogador.
-  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
+  // Jogador + clube do chamador (multi-tenant).
+  const { data: playerRow } = await admin
+    .from("players").select("id,data,club_id").eq("auth_user_id", userId).maybeSingle();
+  if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
+  const clubId = String(playerRow.club_id || "");
+  if (!clubId) return json({ ok: false, error: "player_not_found" });
+
+  // GATE Pro: a leitura automática do comprovante (PIX-IA) é recurso do plano Pro.
+  // Autoridade no servidor — o cliente pode esconder o botão, mas quem barra é aqui.
+  const { data: clubRow } = await admin.from("clubs").select("plan").eq("id", clubId).maybeSingle();
+  if ((clubRow?.plan || "free") !== "pro") {
+    return json({ ok: false, error: "pro_required", message: "A leitura automática do comprovante é um recurso do plano Pro." });
+  }
+
+  // Config do clube (blob por club_id — não mais 'default').
+  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", clubId).maybeSingle();
   const settings = metaRow?.data?.settings || {};
   const cfgAmount = Number(settings.mens_amount) || 0;
   const cfgBeneficiary = normName(String(settings.mens_beneficiary || ""));
   if (!cfgAmount || !cfgBeneficiary) return json({ ok: false, error: "config_missing" });
-
-  const { data: playerRow } = await admin
-    .from("players").select("id,data").eq("auth_user_id", userId).maybeSingle();
-  if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
 
   // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
   const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
@@ -258,13 +268,15 @@ Deno.serve(async (req) => {
     return json({ ok: true, result: "review", reason: "no_e2e", extracted: view });
   }
 
-  // E2E inédito?
-  const { data: dup } = await admin.from("pix_receipts").select("e2e_id").eq("e2e_id", e2e).maybeSingle();
+  // E2E inédito? (dedup dentro do clube; o E2E do PIX é globalmente único, mas
+  // escopar por clube mantém o isolamento — service_role enxerga todos.)
+  const { data: dup } = await admin.from("pix_receipts").select("e2e_id").eq("e2e_id", e2e).eq("club_id", clubId).maybeSingle();
   if (dup?.e2e_id) return reject("duplicate_e2e");
 
   // Tudo ok: registra o E2E e marca pago.
   const ins = await admin.from("pix_receipts").insert({
     e2e_id: e2e,
+    club_id: clubId,
     player_id: String(playerRow.id),
     auth_user_id: userId,
     amount: extracted.amount,
