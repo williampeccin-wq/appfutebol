@@ -72,9 +72,11 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   const { data: voter } = await admin
-    .from("players").select("id, is_admin").eq("auth_user_id", userId).maybeSingle();
+    .from("players").select("id, is_admin, club_id").eq("auth_user_id", userId).maybeSingle();
   if (!voter) return json({ ok: false, error: "player_not_found" }, 403);
   const voterId = String(voter.id);
+  const clubId = String(voter.club_id || "");        // multi-tenant: clube do votante
+  if (!clubId) return json({ ok: false, error: "player_not_found" }, 403);
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch (_) { /* corpo inválido */ }
@@ -84,7 +86,7 @@ Deno.serve(async (req) => {
     if (!voter.is_admin) return json({ ok: false, error: "forbidden" }, 403);
     const gameKey = String(body.game_key || "").trim();
     if (!gameKey) return json({ ok: false, error: "missing_game_key" }, 400);
-    const { error } = await admin.from("ratings").delete().eq("game_key", gameKey);
+    const { error } = await admin.from("ratings").delete().eq("game_key", gameKey).eq("club_id", clubId);
     if (error) { console.error("[submit-rating] delete:", error.message); return json({ ok: false, error: "delete_failed" }, 500); }
     return json({ ok: true, deleted_game: gameKey });
   }
@@ -95,7 +97,7 @@ Deno.serve(async (req) => {
     const gk = String(body.game_key || "").trim();
     if (!gk || (k !== "desempenho" && k !== "churrasco")) return json({ ok: false, error: "bad_request" }, 400);
     const { data: mine } = await admin.from("ratings").select("id")
-      .eq("kind", k).eq("game_key", gk).eq("voter_id", voterId).limit(1).maybeSingle();
+      .eq("kind", k).eq("game_key", gk).eq("voter_id", voterId).eq("club_id", clubId).limit(1).maybeSingle();
     return json({ ok: true, voted: !!mine });
   }
 
@@ -107,8 +109,8 @@ Deno.serve(async (req) => {
   if (!gameKey) return json({ ok: false, error: "missing_game_key" }, 400);
   if (!votes.length) return json({ ok: false, error: "no_votes" }, 400);
 
-  // Estado: settings (janela) + o jogo
-  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
+  // Estado: settings (janela) + o jogo — blob por club_id (não mais 'default')
+  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", clubId).maybeSingle();
   const data = (metaRow?.data || {}) as Record<string, unknown>;
   const settings = (data.settings || {}) as Record<string, unknown>;
   const games = Array.isArray(data.games) ? data.games as Array<Record<string, unknown>> : [];
@@ -152,7 +154,7 @@ Deno.serve(async (req) => {
       if (target === voterId) continue;                    // não vota em si mesmo
       if (confirmedIds && !confirmedIds.has(target)) continue; // só avalia quem jogou
     }
-    rows.push({ kind, game_key: gameKey, voter_id: voterId, target_id: target, score, updated_at: nowIso });
+    rows.push({ kind, game_key: gameKey, voter_id: voterId, target_id: target, score, club_id: clubId, updated_at: nowIso });
   }
   if (!rows.length) return json({ ok: false, error: "no_votes" }, 400);
 

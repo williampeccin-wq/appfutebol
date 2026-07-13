@@ -77,10 +77,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // Data do jogo (para a mensagem) — do app_meta.data.games.
+  // Clube do chamador (multi-tenant): tudo abaixo opera dentro deste clube.
+  const { data: caller } = await admin
+    .from("players").select("club_id").eq("auth_user_id", userData.user.id).maybeSingle();
+  const clubId = String(caller?.club_id || "");
+  if (!clubId) return json({ error: "unauthorized" }, 401);
+
+  // Data do jogo (para a mensagem) — do app_meta.data.games (blob por club_id).
   let gameDate = "";
   try {
-    const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
+    const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", clubId).maybeSingle();
     const games = ((metaRow?.data as Record<string, unknown> | null)?.games as Array<Record<string, unknown>> | undefined) || [];
     const g = games.find((x) => String(x?.game_key || x?.id || "") === gameKey);
     gameDate = formatGameDate(String(g?.date || ""));
@@ -100,7 +106,7 @@ Deno.serve(async (req) => {
       const { data: conf } = await admin
         .from("presence_confirmations")
         .select("status, data")
-        .eq("game_key", gameKey).eq("player_id", playerId).maybeSingle();
+        .eq("game_key", gameKey).eq("player_id", playerId).eq("club_id", clubId).maybeSingle();
       confirmed = conf?.status === "confirmed"
         || (conf?.data as Record<string, unknown> | null)?.confirmed === true;
       if (confirmed) break;
@@ -118,7 +124,7 @@ Deno.serve(async (req) => {
     // 2) Dedup: o índice único (kind, player_id, game_key) garante 1 só envio.
     const { data: logRow, error: insErr } = await admin
       .from("push_log")
-      .insert({ kind: KIND, player_id: playerId, game_key: gameKey, title, body, status: "sent" })
+      .insert({ kind: KIND, player_id: playerId, game_key: gameKey, club_id: clubId, title, body, status: "sent" })
       .select("id").single();
     if (insErr) {
       // 23505 = unique_violation -> já foi notificado.
