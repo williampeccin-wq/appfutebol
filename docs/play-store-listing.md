@@ -12,36 +12,44 @@
 
 ## Descrição curta *(máx. 80 caracteres)*
 ```
-Convoca, joga, resenha: presença, times, mensalidade e campeonato num app só.
+Organize a pelada e pare de conferir PIX na mão. Presença, times e mensalidade.
 ```
+*(78 caracteres. Lidera com a dor que o diferencial resolve + palavras-chave de busca: pelada, presença, times, mensalidade, PIX.)*
 
 ## Descrição completa *(máx. 4000 caracteres)*
 ```
-O Convocados organiza a sua pelada do começo ao fim — sem planilha, sem grupo do zap bagunçado.
+A sua pelada organizada do começo ao fim — e a mensalidade que se confere sozinha.
 
-⚽ CONFIRMAÇÃO DE PRESENÇA
-Abra a lista da semana e confirme presença em um toque. Vagas de linha e goleiros contadas na hora, com fila de espera automática quando lota.
+Chega de planilha, de "quem confirmou?" no grupo do zap e de ficar conferindo comprovante de PIX na mão.
 
-🎽 SORTEIO DE TIMES EQUILIBRADO
-Times sorteados considerando o desempenho e a pontuação de cada jogador — chega de time desbalanceado.
+🤖 A MENSALIDADE QUE SE CONFERE SOZINHA
+O jogador paga o PIX e manda o comprovante. O Convocados lê o comprovante e dá baixa automaticamente — você não confere mais nada na mão. O admin vê na hora quem está em dia e quem está devendo. Ninguém mais faz isso.
 
-💰 MENSALIDADE COM PIX AUTOMÁTICO
-O jogador paga o PIX e envia o comprovante: o app lê o comprovante e marca o pagamento automaticamente. O administrador acompanha quem está em dia e quem está pendente.
+⚽ CONFIRMAÇÃO DE PRESENÇA EM UM TOQUE
+Abra a lista da semana e confirme. Vagas de linha e goleiros contadas na hora, com fila de espera automática quando lota.
+
+🎽 SORTEIO DE TIMES EQUILIBRADO — E DE GRAÇA
+Times sorteados pelo equilíbrio de cada jogador. Chega de time desbalanceado. E o sorteio é, e sempre vai ser, de graça.
 
 🏆 CAMPEONATO E RANKING
-Registre resultados, acompanhe o ranking do "Rei da Quadra" e o histórico de campeões do grupo.
+Registre resultados, acompanhe o "Rei da Quadra" e o histórico de campeões do grupo.
 
-⭐ AVALIAÇÕES
-Depois do jogo, o grupo avalia o desempenho (e a resenha do churrasco!). Notas anônimas, sem climão.
+⭐ RESENHA PÓS-JOGO
+O grupo dá nota ao desempenho (e ao churrasco!). Anônimo, sem climão.
 
 🔔 AVISOS NA HORA
-Notificações quando as inscrições abrem, quando a mensalidade vence e quando um novo cadastro precisa da sua aprovação.
+Inscrições abertas, mensalidade vencendo, novo cadastro pra aprovar — tudo na notificação, sem precisar ficar de olho.
 
 👥 FEITO PRA GRUPOS FECHADOS
-Novos cadastros entram como pendentes e só acessam o grupo depois que o administrador aprova. Você controla quem entra.
+Novo cadastro entra como pendente e só acessa depois que o admin aprova. Você controla quem entra.
+
+Feito por quem joga pelada de verdade. Preço justo e transparente — e aqui a gente responde de verdade.
 
 Convoca. Joga. Resenha.
 ```
+*(Ordem proposital: o **diferencial (PIX-IA) como herói** no topo — é o que ninguém mais tem e o que aparece antes do "ler mais". O "de graça" só onde é compromisso seguro: **o sorteio**. Fecho com a **voz de marca** (feito por quem joga, transparência, atendimento) — atacando a fraqueza do líder.)*
+
+> ⚠️ **Decisão a bater antes de ligar o gating (a armadilha do Chega+):** no lançamento Fase 0 tudo sai grátis, **incluindo o PIX-IA**. Como o PIX-IA é o gancho do Pro (R$39,90), quando o gating entrar, ou (a) o PIX-IA vira Pro e os grupos que já usavam free são **grandfathered** (mantêm), ou (b) fica free e o gancho do Pro passa a ser o pacote (lembrete+relatório+campeonato+sorteio inteligente). **Nunca tirar de quem já tinha** — foi o erro deles. A ficha acima NÃO promete "PIX grátis pra sempre" de propósito, justamente pra não amarrar essa mão.
 
 ## Rating de conteúdo
 - Responder o questionário do Play (o app não tem conteúdo adulto/violento; coleta de dados declarada no Data Safety — ver [store-privacy-labels.md](store-privacy-labels.md)).
