@@ -11,6 +11,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Handler de fetch MÍNIMO (pass-through): NÃO faz cache nem intercepta nada — a
+// rede resolve normalmente, preservando o "no-cache" do Cloudflare (sempre a
+// versão nova). Existe só porque o Chrome exige um listener de 'fetch' registrado
+// para oferecer "Instalar app" (critério de instalabilidade do PWA, sobretudo em
+// versões mais antigas do Chrome). Sem event.respondWith(), o navegador faz o
+// fetch padrão — comportamento idêntico ao de não ter handler, só que instalável.
+self.addEventListener('fetch', () => { /* no-op proposital */ });
+
 // Recibo de auditoria: avisa o servidor que a mensagem foi entregue/aberta.
 // Best-effort — nunca quebra a notificação se a rede falhar. O anon key (público)
 // vem no payload porque o gateway do Supabase exige credencial mesmo nesta rota.
