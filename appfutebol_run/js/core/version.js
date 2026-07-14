@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.123.0-cadeados-espalhados';
+export const APP_VERSION = 'v1.124.0-limites-free';

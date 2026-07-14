@@ -145,7 +145,9 @@ function renderPlayerManagementCard(currentPlayer) {
           <option value="atk">Atacante</option>
         </select>
 
-        <label><input id="new-admin" type="checkbox" /> Admin</label>
+        ${isPro()
+          ? `<label><input id="new-admin" type="checkbox" /> Admin</label>`
+          : `<label class="pro-lock-toggle" data-action="pro-upsell" data-feature="Multi-admin"><input id="new-admin" type="checkbox" disabled /> 🔒 Admin <span style="opacity:.7;">(Pro)</span></label>`}
         <label><input id="new-mens" type="checkbox" checked /> Mensalidade OK</label>
         <label id="gk-pays-group" style="display:none;"><input id="new-gk-pays" type="checkbox" /> Goleiro paga mensalidade</label>
 

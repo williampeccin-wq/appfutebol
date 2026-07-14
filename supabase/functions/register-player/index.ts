@@ -14,6 +14,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 const TECHNICAL_EMAIL_DOMAIN = "harmonia.app";
+// Limite de membros do plano GRÁTIS (clube Pro é ilimitado). Server-side.
+const FREE_MEMBER_LIMIT = 25;
 
 // Avisa os admins (push) que caiu um auto-cadastro aguardando aprovação.
 // Best-effort: qualquer falha aqui NÃO quebra o cadastro. Reusa os secrets VAPID
@@ -165,10 +167,17 @@ Deno.serve(async (req) => {
   let joinClubId: string | null = null;
   if (clubMode === "join") {
     const { data: found, error: findErr } = await admin
-      .from("clubs").select("id").eq("invite_code", inviteCode).maybeSingle();
+      .from("clubs").select("id, plan").eq("invite_code", inviteCode).maybeSingle();
     if (findErr) { console.error("[register] find club:", findErr.message); return json({ ok: false, error: "lookup_failed" }, 500); }
     if (!found?.id) return json({ ok: false, error: "invalid_invite_code", message: "Código de clube inválido. Confira com o administrador." });
     joinClubId = found.id;
+    // Limite do Free: teto de membros (Pro é ilimitado).
+    if (String(found.plan || "free") !== "pro") {
+      const { count } = await admin.from("players").select("id", { count: "exact", head: true }).eq("club_id", found.id);
+      if ((count || 0) >= FREE_MEMBER_LIMIT) {
+        return json({ ok: false, error: "club_full", message: `Este clube atingiu o limite de ${FREE_MEMBER_LIMIT} membros do plano gratuito. O administrador libera mais vagas assinando o Pro.` }, 403);
+      }
+    }
   }
 
   // --- 3) Cria o usuário no Auth (já confirmado) ---
