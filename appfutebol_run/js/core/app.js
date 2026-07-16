@@ -2190,7 +2190,7 @@ document.addEventListener("change", (e) => {
 });
 
 import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } from "../domain/projection.js";
-import { isConfirmedEntry, isGoalkeeperPlayer } from "../domain/confirmations.js";
+import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/confirmations.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
@@ -2691,9 +2691,23 @@ function getPerfWindow(snapshot, game) {
 
 function getInGamePlayers(snapshot, game) {
   const key = getGameKey(game);
-  const ids = new Set((snapshot.confirmations || [])
-    .filter((e) => e?.confirmed && String(e?.game_key || '') === String(key))
-    .map((e) => String(e.player_id)));
+  // Quem "jogou" = quem está CONFIRMADO neste jogo, pela regra CANÔNICA
+  // (isConfirmedEntry respeita o status: um 'cancelled'/'removed' NÃO conta,
+  // mesmo com confirmed cru stale-true). Dedup por jogador: a ÚLTIMA entrada
+  // (maior timestamp) vence, pra uma remoção recente não ser atropelada por
+  // uma confirmação antiga/duplicada residual. Endurece a votação contra o bug
+  // "removido antes do voto ainda aparece pra receber nota".
+  const latestByPlayer = new Map();
+  for (const e of (snapshot.confirmations || [])) {
+    if (!belongsToGame(e, key)) continue;
+    const pid = String(e?.player_id || '');
+    if (!pid) continue;
+    const t = String(e?.timestamp || e?.confirmed_at || e?.cancelled_at || '');
+    const prev = latestByPlayer.get(pid);
+    if (!prev || t >= prev.t) latestByPlayer.set(pid, { t, entry: e });
+  }
+  const ids = new Set();
+  for (const [pid, { entry }] of latestByPlayer) if (isConfirmedEntry(entry)) ids.add(pid);
   return (snapshot.players || []).filter((p) => ids.has(String(p.id)));
 }
 
