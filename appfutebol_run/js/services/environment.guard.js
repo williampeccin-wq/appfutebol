@@ -1,7 +1,8 @@
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 
 const PROD_SUPABASE_URLS = new Set([
-  'https://kpgghcrmbkrwpvtegcjh.supabase.co',
+  'https://kpgghcrmbkrwpvtegcjh.supabase.co', // Harmonia FC (branch production)
+  'https://nwsnakzttmvuyejbfzom.supabase.co', // Convocados (branch main / convocados.app.br)
 ]);
 
 function trimTrailingSlash(value) {
