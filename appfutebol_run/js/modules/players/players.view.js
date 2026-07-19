@@ -135,7 +135,7 @@ function renderPlayerManagementCard(currentPlayer) {
 
         <select id="new-role" class="input">
           <option value="player">Jogador</option>
-          <option value="carne">Carne</option>
+          <option value="carne">Churrasco</option>
         </select>
 
         <select id="new-position" class="input" data-role-dependent="position">
@@ -204,7 +204,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const allPlayers = activePlayers;
   const jogadores = activePlayers.filter((player) => player.plays_football !== false);
   const carneGroup = activePlayers.filter((player) => player.in_carne_group === true);
-  // "Somente carne" = qualquer perfil que não joga (independente do grupo), para
+  // "Somente churrasco" = qualquer perfil que não joga (independente do grupo), para
   // garantir que todos sejam editáveis aqui na aba Jogadores.
   const carneOnly = activePlayers.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isMensalidadeExempt(player));
@@ -253,8 +253,8 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 
         ${carneOnly.length ? `
           <div class="players-carne-only">
-            <div class="players-subhead">Somente carne <strong>${carneOnly.length}</strong></div>
-            <div class="player-compact-list" role="table" aria-label="Somente carne">
+            <div class="players-subhead">Somente churrasco <strong>${carneOnly.length}</strong></div>
+            <div class="player-compact-list" role="table" aria-label="Somente churrasco">
               ${carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
             </div>
           </div>
@@ -378,7 +378,7 @@ function renderCarneScheduleForm(currentPlayer, orderedPlayers) {
 
   return `
     <section class="card" id="carne-schedule-form-card">
-      <div class="card-title" id="carne-schedule-form-title">Cadastrar dupla da carne</div>
+      <div class="card-title" id="carne-schedule-form-title">Cadastrar dupla do churrasco</div>
       <div class="player-admin-form carne-schedule-form">
         <input id="carne-schedule-id" type="hidden" value="" />
         <input id="carne-schedule-date" class="input" type="date" />
@@ -408,7 +408,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
   if (!schedule.length) {
     return `
       <section class="card carne-schedule-card">
-        <div class="card-title">Tabela da carne Convocados</div>
+        <div class="card-title">Tabela do churrasco Convocados</div>
         <div class="empty-inline">Nenhuma dupla cadastrada ainda. O admin pode criar a primeira dupla acima.</div>
       </section>
     `;
@@ -418,7 +418,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
     <section class="card carne-schedule-card">
       <div class="carne-schedule-header">
         <div>
-          <div class="card-title carne-schedule-title">Tabela da carne Convocados</div>
+          <div class="card-title carne-schedule-title">Tabela do churrasco Convocados</div>
           <p class="carne-schedule-subtitle">Rodízio semanal de quarta-feira em duplas.</p>
         </div>
         ${nextEntry ? `
@@ -429,7 +429,7 @@ function renderCarneScheduleTable(schedule, orderedPlayers, currentPlayer) {
         ` : ''}
       </div>
 
-      <div class="carne-schedule-list ${admin ? 'has-actions' : 'no-actions'}" role="table" aria-label="Tabela da carne Convocados">
+      <div class="carne-schedule-list ${admin ? 'has-actions' : 'no-actions'}" role="table" aria-label="Tabela do churrasco Convocados">
         <div class="carne-schedule-list-head" role="row">
           <div role="columnheader">Data</div>
           <div role="columnheader">Dupla responsável</div>
@@ -475,13 +475,13 @@ function renderCarneMemberRow(player) {
         <div>
           <div class="row-title">${escapeHtml(player.name)}</div>
           <div class="row-subtitle">
-            ${player.plays_football === false ? 'Somente carne' : getRoleLabel(player)}
+            ${player.plays_football === false ? 'Somente churrasco' : getRoleLabel(player)}
             ${player.birthDate ? ` · Nasc. ${formatBirthDate(player.birthDate)}` : ''}
           </div>
         </div>
       </div>
       <div class="carne-member-tags">
-        <span class="position-pill">${player.plays_football === false ? 'Somente carne' : getPositionLabel(player.position)}</span>
+        <span class="position-pill">${player.plays_football === false ? 'Somente churrasco' : getPositionLabel(player.position)}</span>
         ${player.plays_football !== false ? `<span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>` : ''}
       </div>
     </div>
@@ -545,7 +545,7 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
   if (!admin) {
     return `
       <section class="card carne-rotation-card">
-        <div class="card-title">Calendário da carne</div>
+        <div class="card-title">Calendário do churrasco</div>
         <p class="footer-note">Rodízio semanal automático. A dupla do topo é a próxima responsável.</p>
         <div class="carne-rotation-list">${listHtml}</div>
       </section>
@@ -554,7 +554,7 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
 
   return `
     <section class="card carne-rotation-card" id="carne-rotation-card">
-      <div class="card-title">Calendário da carne</div>
+      <div class="card-title">Calendário do churrasco</div>
       <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. <strong>Tudo salva automaticamente.</strong></p>
 
       ${dupIds.size ? '<div class="carne-rotation-warning">⚠️ Há jogador(es) em mais de uma dupla. Cada pessoa deve estar em só uma.</div>' : ''}
@@ -592,7 +592,7 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
       ${renderChurrascoRanking(snapshot)}
 
       <section class="card">
-        <div class="card-title">Resumo do carne</div>
+        <div class="card-title">Resumo do churrasco</div>
         <div class="kpi-grid">
           <div class="kpi-box">
             <div class="kpi-value">${carneGroup.length}</div>
@@ -600,11 +600,11 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
           </div>
           <div class="kpi-box">
             <div class="kpi-value">${carneOnly.length}</div>
-            <div class="kpi-label">Somente carne</div>
+            <div class="kpi-label">Somente churrasco</div>
           </div>
           <div class="kpi-box">
             <div class="kpi-value">${jogadoresNoCarne.length}</div>
-            <div class="kpi-label">Jogadores também no carne</div>
+            <div class="kpi-label">Jogadores também no churrasco</div>
           </div>
           <div class="kpi-box kpi-box--highlight">
             <div class="kpi-value">${cycleLength}</div>
@@ -614,9 +614,9 @@ export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = nu
       </section>
 
       <section class="card">
-        <div class="card-title">Somente carne</div>
+        <div class="card-title">Somente churrasco</div>
         <div class="placeholder-list">
-          ${carneOnly.length ? carneOnly.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum perfil somente carne cadastrado.</div>'}
+          ${carneOnly.length ? carneOnly.map((player) => renderCarneMemberRow(player)).join('') : '<div class="empty-inline">Nenhum perfil somente churrasco cadastrado.</div>'}
         </div>
       </section>
     </section>
@@ -674,7 +674,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   const isEditing = player.id === editingPlayerId;
   const carneOnly = isCarneOnly(player);
   const access = admin ? (player.auth_user_id ? 'Acesso criado' : 'Sem acesso') : '';
-  const subtitle = `${carneOnly ? 'Somente carne' : getPositionLabel(player.position)}${access ? ` · ${access}` : ''}`;
+  const subtitle = `${carneOnly ? 'Somente churrasco' : getPositionLabel(player.position)}${access ? ` · ${access}` : ''}`;
 
   return `
     <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">

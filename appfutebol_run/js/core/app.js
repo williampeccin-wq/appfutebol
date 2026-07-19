@@ -866,7 +866,7 @@ function renderSelfProfileEditCardForHome(activePlayer) {
           `}
 
           <div class="self-profile-note">
-            Você pode alterar nome, telefone, nascimento e posição. Mensalidade, perfil, grupo da carne e permissão de admin continuam restritos ao administrador.
+            Você pode alterar nome, telefone, nascimento e posição. Mensalidade, perfil, grupo do churrasco e permissão de admin continuam restritos ao administrador.
           </div>
 
           <div class="password-change-card">
@@ -1161,7 +1161,7 @@ function resetCarneScheduleForm() {
   if (dateInput) dateInput.value = '';
   if (player1Input) player1Input.value = '';
   if (player2Input) player2Input.value = '';
-  if (title) title.textContent = 'Cadastrar dupla da carne';
+  if (title) title.textContent = 'Cadastrar dupla do churrasco';
   if (cancelButton) cancelButton.style.display = 'none';
   if (saveButton) saveButton.textContent = 'Salvar dupla';
 }
@@ -1180,6 +1180,12 @@ document.addEventListener("click", async (e) => {
     e.preventDefault();
     const feature = trigger.dataset.feature || "esse recurso";
     showToast(`${feature} é do plano Pro (R$ 39,90/mês pro grupo todo). O pagamento chega já já — por enquanto, fala com a gente pra ativar. 👊`, 'info');
+    return;
+  }
+
+  if (action === "finance-add-expense" || action === "finance-add-income") {
+    e.preventDefault();
+    showToast('Em breve: formulário de lançamento. 💸', 'info');
     return;
   }
 
@@ -1331,7 +1337,7 @@ document.addEventListener("click", async (e) => {
   if (action === "save-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
     if (!authzIsAdmin(current)) {
-      showToast("Apenas administrador pode alterar a tabela da carne", "error");
+      showToast("Apenas administrador pode alterar a tabela do churrasco", "error");
       return;
     }
 
@@ -1389,7 +1395,7 @@ document.addEventListener("click", async (e) => {
   if (action === "edit-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
     if (!authzIsAdmin(current)) {
-      showToast("Apenas administrador pode editar a tabela da carne", "error");
+      showToast("Apenas administrador pode editar a tabela do churrasco", "error");
       return;
     }
 
@@ -1411,7 +1417,7 @@ document.addEventListener("click", async (e) => {
     dateInput.value = entry.date;
     player1Input.value = entry.player1_id;
     player2Input.value = entry.player2_id;
-    if (title) title.textContent = 'Editando dupla da carne';
+    if (title) title.textContent = 'Editando dupla do churrasco';
     if (cancelButton) cancelButton.style.display = 'inline-flex';
     if (saveButton) saveButton.textContent = 'Salvar alteração';
     if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1428,7 +1434,7 @@ document.addEventListener("click", async (e) => {
   if (action === "delete-carne-schedule") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
     if (!authzIsAdmin(current)) {
-      showToast("Apenas administrador pode excluir dupla da carne", "error");
+      showToast("Apenas administrador pode excluir dupla do churrasco", "error");
       return;
     }
 
@@ -1437,7 +1443,7 @@ document.addEventListener("click", async (e) => {
     if (!entry) return;
 
     const confirmedDelete = await showConfirmModal({
-      title: 'Excluir dupla da carne',
+      title: 'Excluir dupla do churrasco',
       message: 'Tem certeza que deseja excluir esta dupla da tabela?',
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
@@ -1462,7 +1468,7 @@ document.addEventListener("click", async (e) => {
   // re-renderizam, e só persistem em "Salvar rodízio". Assim o poll não reverte
   // as alterações no meio de uma sequência de edições.
   if (action === "carne-rotation-add-pair") {
-    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do churrasco')) return;
     const p1 = document.getElementById('carne-rotation-player-1')?.value?.trim();
     const p2 = document.getElementById('carne-rotation-player-2')?.value?.trim();
     if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
@@ -1481,7 +1487,7 @@ document.addEventListener("click", async (e) => {
   }
 
   if (action === "carne-rotation-remove-pair") {
-    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do churrasco')) return;
     const idx = Number(id);
     const view = carneEditingView();
     if (!(idx >= 0 && idx < view.pairs.length)) return;
@@ -1492,7 +1498,7 @@ document.addEventListener("click", async (e) => {
   }
 
   if (action === "carne-pair-edit") {
-    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do churrasco')) return;
     editingCarnePairIndex = Number(id);
     render(getState());
     return;
@@ -1505,7 +1511,7 @@ document.addEventListener("click", async (e) => {
   }
 
   if (action === "carne-pair-save") {
-    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do carnê')) return;
+    if (!requireAdmin(snapshot, 'Apenas administrador pode editar o rodízio do churrasco')) return;
     const idx = Number(id);
     const view = carneEditingView();
     if (!(idx >= 0 && idx < view.pairs.length)) return;
@@ -2305,7 +2311,6 @@ import { buildGameView, buildPlayersView, getGames, getActiveGame, getGameKey } 
 import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/confirmations.js";
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
-import { runIntegrityAudit } from "../domain/audit.service.js";
 import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
@@ -2317,6 +2322,8 @@ import { getCurrentPlayer, login, logout, register, restoreSession, prepareStore
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
+import { renderFinanceScreen } from '../modules/finance/finance.ledger.view.js';
+import { loadLedgerCache } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
@@ -2343,6 +2350,16 @@ function ensureRatingsLoaded() {
   loadRatingsCache()
     .then((cache) => { if (!cache?.loaded) _ratingsLoadStarted = false; render(getState()); })
     .catch(() => { _ratingsLoadStarted = false; });
+}
+
+// Livro-caixa (aba Financeiro, Pro): carrega uma vez e re-renderiza quando chega.
+let _ledgerLoadStarted = false;
+function ensureLedgerLoaded() {
+  if (_ledgerLoadStarted) return;
+  _ledgerLoadStarted = true;
+  loadLedgerCache()
+    .then(() => render(getState()))
+    .catch(() => { _ledgerLoadStarted = false; });
 }
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
@@ -3183,8 +3200,11 @@ function renderInner(snapshot) {
   }
 
   const requestedTab = snapshot.ui.currentTab || 'home';
-  const activeTab = !canAccessConfig(currentPlayer) && requestedTab === 'config' ? 'home' : requestedTab;
+  const blockedTab = (requestedTab === 'config' && !canAccessConfig(currentPlayer))
+    || (requestedTab === 'finance' && !canManageFinance(currentPlayer));
+  const activeTab = blockedTab ? 'home' : requestedTab;
   ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
+  if (activeTab === 'finance') ensureLedgerLoaded(); // livro-caixa (Pro)
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
@@ -3197,7 +3217,7 @@ function renderInner(snapshot) {
           <img class="brand-crest" src="./img/convocados-crest.png" alt="Escudo Convocados">
           <div>
             <div class="header-title">CONVOCADOS <span style='font-size:12px;opacity:0.7;'>${getDisplayVersion()}</span></div>
-            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do carnê' : 'Jogador'}</div>
+            <div class="header-subtitle">${authzIsAdmin(currentPlayer) ? 'Administrador' : getPlayerRole(currentPlayer) === 'carne' ? 'Grupo do churrasco' : 'Jogador'}</div>
           </div>
         </div>
         <div class="header-actions">
@@ -3401,7 +3421,7 @@ function getPresenceIcon(reason, confirmed, capacityOk) {
 function getPresenceReasonLabel(reason) {
   switch (reason) {
     case 'carne_only':
-      return 'Somente carnê';
+      return 'Somente churrasco';
     case 'mensalidade_pendente':
       return 'Mensalidade pendente';
     case 'mensalidade_sem_data':
@@ -3457,9 +3477,9 @@ function buildPresenceFeedback({ confirmed, capacityOk, presenceGuard, currentPl
     title: getPresenceReasonLabel(primaryReason),
     text: presenceGuard.message || (
       carneStatus
-        ? 'Você está vinculado ao grupo do carnê e não pode confirmar presença agora.'
+        ? 'Você está vinculado ao grupo do churrasco e não pode confirmar presença agora.'
         : currentPlayer?.role === 'carne'
-          ? 'Perfis somente carnê não participam da confirmação do jogo.'
+          ? 'Perfis somente churrasco não participam da confirmação do jogo.'
           : 'Sua confirmação está bloqueada no momento.'
     ),
     badge: getPresenceReasonLabel(primaryReason),
@@ -3977,9 +3997,10 @@ function renderBottomNav(activeTab, currentPlayer) {
     ['home', 'Home'],
     ['weekly_game', 'Jogo da semana'],
     ['players', 'Jogadores'],
-    ['carne', 'Carne'],
+    ['carne', 'Churrasco'],
     ['championship', 'Campeonato'],
   ];
+  if (canManageFinance(currentPlayer)) items.push(['finance', 'Financeiro']);
   if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
 
   return `
@@ -4002,7 +4023,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'carne':
       {
         // Carnê/rodízio é recurso Pro — clube Free vê o cadeado + upsell.
-        if (!isPro()) return renderProLock({ title: 'Carnê & rodízio de duplas', benefit: 'Organize o carnê do churrasco com rodízio automático de duplas, datado e sem confusão. Disponível no Pro.' });
+        if (!isPro()) return renderProLock({ title: 'Churrasco & rodízio de duplas', benefit: 'Organize o churrasco com rodízio automático de duplas, datado e sem confusão. Disponível no Pro.' });
         const carneRotation = carneEditingView();
         const carneDates = (carneRotation.pairs || []).map((_, i) => (carneRotation.start_date ? carneAddDays(carneRotation.start_date, i * 7) : ''));
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
@@ -4011,6 +4032,9 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       // Campeonato completo (Rei da Quadra + histórico) é Pro — Free vê o cadeado.
       if (!isPro()) return renderProLock({ title: 'Campeonato & Rei da Quadra', benefit: 'Lance resultados, acompanhe a classificação do Rei da Quadra e o histórico de campeões do grupo. Disponível no Pro.' });
       return renderChampionshipScreen(snapshot, currentPlayer);
+    case 'finance':
+      if (!isPro()) return renderProLock({ title: 'Controle financeiro', benefit: 'Livro-caixa do clube: mensalidade, despesas e demonstrativo — tudo num lugar só. Disponível no Pro.' });
+      return renderFinanceScreen(snapshot, currentPlayer);
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
@@ -4075,7 +4099,7 @@ function renderHome(snapshot, currentPlayer) {
         player2: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-',
         player1Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id)) || null,
         player2Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id)) || null,
-        message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
+        message: `Dupla do churrasco (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
       }
     : null;
 
@@ -4187,7 +4211,7 @@ function renderHome(snapshot, currentPlayer) {
   const homeNoticeItems = [
     carneNotification ? {
       icon: '🥩',
-      title: 'Dupla da carne',
+      title: 'Dupla do churrasco',
       text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-'),
       html: '<div class="notification-content-carne">'
         + '<div class="home-carne-avatars">'
@@ -4332,7 +4356,7 @@ function renderProfilePanel(activePlayer) {
   const carneOnly = activePlayer.plays_football === false;
   const roleLabel = authzIsAdmin(activePlayer)
     ? 'Administrador · ' + getPositionLabel(activePlayer.position)
-    : (getPlayerRole(activePlayer) === 'carne' ? 'Somente carne' : getPositionLabel(activePlayer.position));
+    : (getPlayerRole(activePlayer) === 'carne' ? 'Somente churrasco' : getPositionLabel(activePlayer.position));
 
   return `
     <section class="card self-profile-card profile-view-card" id="self-profile-card">
@@ -5068,7 +5092,7 @@ const NOTIF_TYPES = [
   { key: 'mensalidade_atrasada', label: 'Mensalidade atrasada', desc: 'Aviso diário (7h) para quem está em atraso.' },
   { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
   { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
-  { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla da carne (23h do dia do jogo). Para todos.' },
+  { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla do churrasco (23h do dia do jogo). Para todos.' },
 ];
 function isNotifEnabled(snapshot, key) {
   const n = snapshot?.settings?.notifications;
@@ -5105,9 +5129,6 @@ function renderConfig(snapshot, currentPlayer) {
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
   const mensEnforcementMode = getMensalidadeMode(snapshot.settings);
 
-  const audit = runIntegrityAudit(snapshot);
-  const auditLevelTag = { high: 'is-warn', warn: 'is-warn', info: 'is-neutral' };
-  const auditLevelLabel = { high: 'Crítico', warn: 'Atenção', info: 'Info' };
 
   const renderGameEditForm = (item) => {
     const key = getGameKey(item);
@@ -5188,29 +5209,6 @@ function renderConfig(snapshot, currentPlayer) {
   return `
     <section class="section-stack">
       ${inviteCard}
-      <details class="card champ-collapse"${audit.high ? ' open' : ''}>
-        <summary class="champ-collapse-summary">
-          <span class="card-title">Saúde dos dados ${audit.findings.length ? `· ${audit.findings.length}` : '✅'}</span>
-          <span class="champ-collapse-chevron" aria-hidden="true"></span>
-        </summary>
-        <div class="champ-collapse-body">
-          ${audit.findings.length ? `
-            <p class="footer-note">Verificação automática (somente leitura). ${audit.high ? `<strong>${audit.high} crítico(s)</strong> · ` : ''}${audit.warn} atenção · ${audit.info} info.</p>
-            <div class="placeholder-list">
-              ${audit.findings.map((f) => `
-                <div class="player-compact-row">
-                  <div class="player-compact-text">
-                    <div class="row-title">${escapeHtml(f.title)}</div>
-                    <div class="row-subtitle">${escapeHtml(f.detail)}</div>
-                  </div>
-                  <span class="tag ${auditLevelTag[f.level] || 'is-neutral'}">${auditLevelLabel[f.level] || f.level}</span>
-                </div>
-              `).join('')}
-            </div>
-          ` : '<div class="empty-inline">Nenhum problema encontrado. ✅</div>'}
-        </div>
-      </details>
-
       <section class="card games-config-card">
         <div class="card-title">Jogos</div>
 
