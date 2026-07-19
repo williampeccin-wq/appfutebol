@@ -1183,9 +1183,27 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
-  if (action === "finance-add-expense" || action === "finance-add-income") {
+  if (action === "finance-submit") {
     e.preventDefault();
-    showToast('Em breve: formulário de lançamento. 💸', 'info');
+    const kind = (document.getElementById('fin-kind')?.value) === 'receita' ? 'receita' : 'despesa';
+    const category = document.getElementById('fin-category')?.value || 'outro';
+    const amount = Number(document.getElementById('fin-amount')?.value);
+    const date = document.getElementById('fin-date')?.value || '';
+    const description = (document.getElementById('fin-desc')?.value || '').trim();
+    if (!(amount > 0)) { showToast('Informe um valor maior que zero.', 'error'); return; }
+    if (!date) { showToast('Informe a data.', 'error'); return; }
+    const clubId = getCurrentClubId();
+    if (!clubId) { showToast('Não consegui identificar o clube. Recarregue e tente de novo.', 'error'); return; }
+    let createdBy = null;
+    try { createdBy = JSON.parse(localStorage.getItem('harmonia_auth_session') || 'null')?.user?.id || null; } catch (_) { /* ok */ }
+    trigger.disabled = true;
+    addLedgerEntry({ kind, category, amount, date, description, clubId, createdBy })
+      .then((res) => {
+        trigger.disabled = false;
+        if (res.ok) { showToast('Lançamento adicionado. 💸', 'success'); render(getState()); }
+        else { showToast('Não deu pra salvar o lançamento. Tente de novo.', 'error'); }
+      })
+      .catch(() => { trigger.disabled = false; showToast('Falha ao salvar o lançamento.', 'error'); });
     return;
   }
 
@@ -2316,14 +2334,14 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, getClubInfo } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, getClubInfo, getCurrentClubId } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession, deleteOwnAccount } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderFinanceScreen } from '../modules/finance/finance.ledger.view.js';
-import { loadLedgerCache } from '../modules/finance/finance.ledger.service.js';
+import { loadLedgerCache, addLedgerEntry } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
@@ -3989,6 +4007,7 @@ const BOTTOM_NAV_ICONS = {
   players: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 13.7a5.5 5.5 0 0 1 3.5 6.3"/></svg>',
   carne: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="translate(6.9 0.4) scale(0.42)"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></g><path d="M16.5 21.5 8 11"/><path d="M8 11 5.4 9.8M8 11 6.4 9M8 11 7.4 8.2"/><path d="M7.5 21.5 16 11"/><path d="M16 11 18.2 8.4 16.7 12 Z"/></svg>',
   championship: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9 21h6"/><path d="M12 14v7"/></svg>',
+  finance: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M21 12h-5a2 2 0 0 0 0 4h5a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z"/></svg>',
   config: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
 };
 

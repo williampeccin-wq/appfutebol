@@ -107,6 +107,15 @@ export function getClubInfo() {
   return null;
 }
 
+// club_id (uuid) do usuário logado, se já resolvido no cache. Usado por features
+// que gravam em tabelas granulares por clube (ex.: livro-caixa). Retorna null se
+// ainda não resolvido (a RLS rejeita club_id errado, então é seguro).
+export function getCurrentClubId() {
+  const uid = getCurrentAuthUserId();
+  if (uid && clubKeyCache.uid === uid && clubKeyCache.key && clubKeyCache.key !== 'default') return clubKeyCache.key;
+  return null;
+}
+
 async function loadClubInfo(config, clubKey) {
   const uid = getCurrentAuthUserId();
   if (!uid || !clubKey || clubKey === 'default') return;
