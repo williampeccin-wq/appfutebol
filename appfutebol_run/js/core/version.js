@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.131.0-financeiro-delete';
+export const APP_VERSION = 'v1.132.0-financeiro-polish';

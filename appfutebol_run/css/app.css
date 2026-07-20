@@ -5960,6 +5960,13 @@ body {
   color: var(--hfc-text);
 }
 .content--finance .input::placeholder { color: var(--hfc-text-muted); }
+.content--finance .icon-action-button {
+  background: var(--hfc-glass) !important;
+  border: 1px solid var(--hfc-glass-border) !important;
+  color: #f0897b !important;
+  border-radius: 11px;
+}
+.content--finance .icon-action-button:hover { background: rgba(255, 255, 255, 0.12) !important; }
 .content--players .players-switch-row.is-current { background: rgba(143, 180, 255, 0.08); }
 
 .content--players .filter-pill {
