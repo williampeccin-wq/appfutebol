@@ -1,7 +1,7 @@
 // Tela do LIVRO-CAIXA (aba Financeiro, Pro). Render síncrono a partir do cache
 // (finance.ledger.service). Ver docs/finance-design.md e o mock aprovado.
 
-import { getCachedLedger, ledgerSummary, collectionThisMonth } from './finance.ledger.service.js';
+import { getCachedLedger, ledgerSummary, collectionThisMonth, pendingMembersThisMonth } from './finance.ledger.service.js';
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -9,6 +9,10 @@ function esc(s) {
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function brl(v) { return BRL.format(Number(v) || 0); }
 function brlShort(v) { return 'R$ ' + Math.round(Number(v) || 0).toLocaleString('pt-BR'); }
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return (((parts[0] || '')[0] || '') + (parts.length > 1 ? (parts[parts.length - 1][0] || '') : '')).toUpperCase() || '?';
+}
 
 const CAT_LABEL = { mensalidade: 'Mensalidade', diaria: 'Diária', quadra: 'Quadra', material: 'Material', outro: 'Outro' };
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -48,6 +52,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer) {
   const { saldo, entMes, saiMes } = ledgerSummary(rows);
   const netMes = entMes - saiMes;
   const col = collectionThisMonth(snapshot, rows);
+  const pending = pendingMembersThisMonth(snapshot, rows);
   const pct = col.expected > 0 ? Math.min(100, Math.round((col.collected / col.expected) * 100)) : 0;
   const nameById = new Map((Array.isArray(snapshot?.players) ? snapshot.players : []).map((p) => [String(p.id), p.name || '']));
   const mesNome = mesAtualNome();
@@ -83,6 +88,25 @@ export function renderFinanceScreen(snapshot, _currentPlayer) {
         </div>
         <div class="footer-note" style="margin-top:6px;">${brlShort(col.collected)} de ${brlShort(col.expected)}${col.missing ? ` · faltam ${col.missing}` : ''}</div>
       </section>
+
+      ${(col.expected > 0 && pending.length) ? `
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <span class="card-title" style="margin:0;">Em atraso</span>
+          <span class="footer-note">${pending.length} de ${col.totalMembers}</span>
+        </div>
+        <div class="player-compact-list">
+          ${pending.map((p) => `
+            <div class="player-compact-row" role="row">
+              <div class="player-compact-main" style="display:flex;align-items:center;gap:11px;">
+                <span style="width:32px;height:32px;border-radius:50%;background:rgba(240,137,123,.16);color:#f0897b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">${initials(p.name)}</span>
+                <div class="player-compact-text"><div class="row-title">${esc(p.name)}</div></div>
+              </div>
+              <span class="tag" style="background:rgba(240,137,123,.15);color:#f0897b;white-space:nowrap;">Pendente</span>
+            </div>`).join('')}
+        </div>
+      </section>
+      ` : ''}
 
       <section class="card">
         <div class="card-title">Lançamentos</div>

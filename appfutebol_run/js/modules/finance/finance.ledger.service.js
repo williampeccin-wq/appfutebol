@@ -93,6 +93,18 @@ export async function deleteLedgerEntry(id) {
   }
 }
 
+// Membros pagantes SEM mensalidade lançada no mês (inadimplentes). Usa o roster
+// + as receitas de mensalidade com player_id do mês de referência.
+export function pendingMembersThisMonth(snapshot, rows = getCachedLedger(), refYm = currentYm()) {
+  const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+  const payers = players.filter((p) => p && !p.deleted && (p.plays_football !== false || p.in_carne_group));
+  const paid = new Set();
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    if (r.kind === 'receita' && r.category === 'mensalidade' && ym(r.date) === refYm && r.player_id) paid.add(String(r.player_id));
+  }
+  return payers.filter((p) => !paid.has(String(p.id))).map((p) => ({ id: String(p.id), name: p.name || '' }));
+}
+
 function ym(date) { return String(date || '').slice(0, 7); }
 function currentYm() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
