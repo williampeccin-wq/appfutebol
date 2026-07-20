@@ -21,8 +21,11 @@ function fmtDate(iso) {
   const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${Number(m[3])} ${MESES[Number(m[2]) - 1] || ''}` : esc(iso);
 }
-function mesAtualAbrev() { return MESES[new Date().getMonth()] || ''; }
-function mesAtualNome() { return MESES_FULL[new Date().getMonth()] || ''; }
+function currentYmStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function monthIdx(ym) { return (Number(String(ym).split('-')[1]) || 1) - 1; }
+function mesAbrevDe(ym) { return MESES[monthIdx(ym)] || ''; }
+function mesNomeDe(ym) { return MESES_FULL[monthIdx(ym)] || ''; }
+function anoDe(ym) { return String(ym).split('-')[0] || ''; }
 
 function entryRow(r, nameById) {
   const receita = r.kind === 'receita';
@@ -47,20 +50,24 @@ function entryRow(r, nameById) {
     </div>`;
 }
 
-export function renderFinanceScreen(snapshot, _currentPlayer) {
+export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
   const rows = getCachedLedger();
-  const { saldo, entMes, saiMes } = ledgerSummary(rows);
+  const ym = refYm || currentYmStr();
+  const isCurrent = ym >= currentYmStr();
+  const { saldo, entMes, saiMes } = ledgerSummary(rows, ym);
   const netMes = entMes - saiMes;
-  const col = collectionThisMonth(snapshot, rows);
-  const pending = pendingMembersThisMonth(snapshot, rows);
+  const col = collectionThisMonth(snapshot, rows, ym);
+  const pending = pendingMembersThisMonth(snapshot, rows, ym);
   const pct = col.expected > 0 ? Math.min(100, Math.round((col.collected / col.expected) * 100)) : 0;
   const nameById = new Map((Array.isArray(snapshot?.players) ? snapshot.players : []).map((p) => [String(p.id), p.name || '']));
-  const mesNome = mesAtualNome();
-  const mesAbrev = mesAtualAbrev();
+  const mesNome = mesNomeDe(ym);
+  const mesAbrev = mesAbrevDe(ym);
+  const ano = anoDe(ym);
 
-  const listHtml = rows.length
-    ? rows.slice(0, 40).map((r) => entryRow(r, nameById)).join('')
-    : '<div class="empty-inline">Nenhum lançamento ainda. Adicione uma despesa ou registre uma entrada.</div>';
+  const monthRows = rows.filter((r) => String(r.date || '').slice(0, 7) === ym);
+  const listHtml = monthRows.length
+    ? monthRows.slice(0, 60).map((r) => entryRow(r, nameById)).join('')
+    : `<div class="empty-inline">Nenhum lançamento em ${esc(mesNome)}.</div>`;
 
   return `
     <section class="section-stack">
@@ -68,8 +75,14 @@ export function renderFinanceScreen(snapshot, _currentPlayer) {
       <section class="card">
         <div class="card-subtitle" style="text-transform:uppercase;letter-spacing:.04em;">Saldo em caixa</div>
         <div style="font-size:30px;font-weight:700;letter-spacing:-.01em;">${brl(saldo)}</div>
-        ${netMes !== 0 ? `<div class="footer-note" style="color:${netMes >= 0 ? '#5dcaa5' : '#f0997b'};margin-top:2px;">${netMes >= 0 ? '+' : '−'}${brlShort(Math.abs(netMes))} este mês</div>` : ''}
+        ${netMes !== 0 ? `<div class="footer-note" style="color:${netMes >= 0 ? '#5dcaa5' : '#f0997b'};margin-top:2px;">${netMes >= 0 ? '+' : '−'}${brlShort(Math.abs(netMes))} em ${esc(mesNome.toLowerCase())}</div>` : ''}
       </section>
+
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:2px 0;">
+        <button class="icon-action-button" type="button" data-action="finance-month-prev" aria-label="Mês anterior"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span style="font-size:15px;font-weight:600;min-width:132px;text-align:center;">${esc(mesNome)} ${esc(ano)}</span>
+        <button class="icon-action-button" type="button" data-action="finance-month-next" aria-label="Próximo mês"${isCurrent ? ' disabled style="opacity:.35;"' : ''}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
 
       <section class="card">
         <div class="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">

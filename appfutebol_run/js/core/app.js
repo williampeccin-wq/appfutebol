@@ -40,6 +40,14 @@ let selfDeleteOpen = false;       // dentro do painel, zona de exclusão de cont
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma). É o único estado
 // transitório da edição do rodízio — todo o resto é auto-salvo no estado.
 let editingCarnePairIndex = -1;
+let financeMonth = null; // 'YYYY-MM' selecionado na aba Financeiro; null = mês atual
+function financeCurrentYm() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function financeEffectiveYm() { return financeMonth || financeCurrentYm(); }
+function financeAddYm(ym, delta) {
+  const [y, m] = String(ym).split('-').map(Number);
+  const d = new Date(y, (m - 1) + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 
 let uiActionInFlight = false;
@@ -1238,6 +1246,19 @@ document.addEventListener("click", async (e) => {
         else showToast('Não deu pra enviar a cobrança. Tente de novo.', 'error');
       })
       .catch(() => { trigger.disabled = false; showToast('Falha ao enviar a cobrança.', 'error'); });
+    return;
+  }
+
+  if (action === "finance-month-prev") {
+    e.preventDefault();
+    financeMonth = financeAddYm(financeEffectiveYm(), -1);
+    render(getState());
+    return;
+  }
+  if (action === "finance-month-next") {
+    e.preventDefault();
+    const next = financeAddYm(financeEffectiveYm(), 1);
+    if (next <= financeCurrentYm()) { financeMonth = (next === financeCurrentYm()) ? null : next; render(getState()); }
     return;
   }
 
@@ -4095,7 +4116,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       return renderChampionshipScreen(snapshot, currentPlayer);
     case 'finance':
       if (!isPro()) return renderProLock({ title: 'Controle financeiro', benefit: 'Livro-caixa do clube: mensalidade, despesas e demonstrativo — tudo num lugar só. Disponível no Pro.' });
-      return renderFinanceScreen(snapshot, currentPlayer);
+      return renderFinanceScreen(snapshot, currentPlayer, financeEffectiveYm());
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
