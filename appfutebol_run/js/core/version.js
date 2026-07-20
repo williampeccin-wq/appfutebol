@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.128.0-financeiro-form';
+export const APP_VERSION = 'v1.129.0-financeiro-dark';

@@ -5934,6 +5934,32 @@ body {
   background: rgba(255, 255, 255, 0.04);
   color: var(--hfc-text-muted);
 }
+
+.content--finance {
+  background: radial-gradient(130% 50% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 38%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);
+}
+.content--finance .card {
+  background: var(--hfc-glass);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: none;
+  color: var(--hfc-text);
+}
+.content--finance .card-title,
+.content--finance .row-title { color: var(--hfc-text); }
+.content--finance .card-subtitle,
+.content--finance .row-subtitle,
+.content--finance .kpi-label,
+.content--finance .footer-note { color: var(--hfc-text-muted); }
+.content--finance .kpi-value { color: var(--hfc-text); }
+.content--finance .input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hfc-glass-border);
+  color: var(--hfc-text);
+}
+.content--finance .input::placeholder { color: var(--hfc-text-muted); }
 .content--players .players-switch-row.is-current { background: rgba(143, 180, 255, 0.08); }
 
 .content--players .filter-pill {
