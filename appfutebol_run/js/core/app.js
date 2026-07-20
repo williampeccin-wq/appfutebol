@@ -1187,7 +1187,7 @@ document.addEventListener("click", async (e) => {
     e.preventDefault();
     const kind = (document.getElementById('fin-kind')?.value) === 'receita' ? 'receita' : 'despesa';
     const category = document.getElementById('fin-category')?.value || 'outro';
-    const amount = Number(document.getElementById('fin-amount')?.value);
+    const amount = Number((document.getElementById('fin-amount')?.value || '').replace(/\./g, '').replace(',', '.'));
     const date = document.getElementById('fin-date')?.value || '';
     const description = (document.getElementById('fin-desc')?.value || '').trim();
     if (!(amount > 0)) { showToast('Informe um valor maior que zero.', 'error'); return; }
@@ -3688,6 +3688,14 @@ function bindAppEvents(currentPlayer) {
     showToast("Senha alterada com sucesso.", "success");
   });
 
+
+  // Máscara de moeda (baseada em centavos): digita só números, formata "1.234,56".
+  appElement.querySelectorAll('input[data-mask="currency"]').forEach((el) => {
+    el.addEventListener('input', () => {
+      const digits = el.value.replace(/\D/g, '').slice(0, 12);
+      el.value = digits ? (parseInt(digits, 10) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+    });
+  });
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {

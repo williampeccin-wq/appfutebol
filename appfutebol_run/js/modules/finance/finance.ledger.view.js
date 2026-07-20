@@ -106,7 +106,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer) {
           </select>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-          <input id="fin-amount" class="input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Valor (R$)" />
+          <input id="fin-amount" class="input" type="text" inputmode="numeric" data-mask="currency" placeholder="Valor · 0,00" autocomplete="off" />
           <input id="fin-date" class="input" type="date" value="${new Date().toISOString().slice(0, 10)}" aria-label="Data" />
         </div>
         <input id="fin-desc" class="input" type="text" placeholder="Descrição (ex.: aluguel da quadra)" style="margin-top:10px;" />
