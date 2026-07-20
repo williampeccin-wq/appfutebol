@@ -1262,6 +1262,23 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "finance-publish") {
+    e.preventDefault();
+    const clubId = getCurrentClubId();
+    if (!clubId) { showToast('Não identifiquei o clube. Recarregue e tente de novo.', 'error'); return; }
+    const pubYm = financeEffectiveYm();
+    const s = ledgerSummary(getCachedLedger(), pubYm);
+    trigger.disabled = true;
+    publishSummary(clubId, { saldo: s.saldo, entMes: s.entMes, saiMes: s.saiMes, ym: pubYm, publishedAt: new Date().toISOString() })
+      .then((res) => {
+        trigger.disabled = false;
+        if (res.ok) { showToast('Resumo publicado pro grupo. 📢', 'success'); render(getState()); }
+        else showToast('Não deu pra publicar. Tente de novo.', 'error');
+      })
+      .catch(() => { trigger.disabled = false; showToast('Falha ao publicar o resumo.', 'error'); });
+    return;
+  }
+
   // Copiar o código de convite do clube (área admin). Independe do estado.
   if (action === "copy-invite-code") {
     e.preventDefault();
@@ -2395,8 +2412,8 @@ import { getCurrentPlayer, login, logout, register, restoreSession, prepareStore
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
-import { renderFinanceScreen } from '../modules/finance/finance.ledger.view.js';
-import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember } from '../modules/finance/finance.ledger.service.js';
+import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finance/finance.ledger.view.js';
+import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
@@ -2433,6 +2450,16 @@ function ensureLedgerLoaded() {
   loadLedgerCache()
     .then(() => render(getState()))
     .catch(() => { _ledgerLoadStarted = false; });
+}
+
+// Resumo financeiro publicado ao grupo (finance_public): carrega uma vez.
+let _pubLoadStarted = false;
+function ensureFinancePublicLoaded() {
+  if (_pubLoadStarted) return;
+  const clubId = getCurrentClubId();
+  if (!clubId) return;
+  _pubLoadStarted = true;
+  loadPublicSummary(clubId).then(() => render(getState())).catch(() => { _pubLoadStarted = false; });
 }
 
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
@@ -3274,10 +3301,13 @@ function renderInner(snapshot) {
 
   const requestedTab = snapshot.ui.currentTab || 'home';
   const blockedTab = (requestedTab === 'config' && !canAccessConfig(currentPlayer))
-    || (requestedTab === 'finance' && !canManageFinance(currentPlayer));
+    || (requestedTab === 'finance' && !canManageFinance(currentPlayer) && !isPro());
   const activeTab = blockedTab ? 'home' : requestedTab;
   ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
-  if (activeTab === 'finance') ensureLedgerLoaded(); // livro-caixa (Pro)
+  if (activeTab === 'finance') {
+    ensureFinancePublicLoaded(); // resumo publicado (admin vê status; membro vê o resumo)
+    if (canManageFinance(currentPlayer)) ensureLedgerLoaded(); // livro-caixa (só admin lê)
+  }
   if (activeTab !== requestedTab) {
     patchState({ ui: { currentTab: activeTab } });
     return;
@@ -4082,7 +4112,7 @@ function renderBottomNav(activeTab, currentPlayer) {
     ['carne', 'Churrasco'],
     ['championship', 'Campeonato'],
   ];
-  if (canManageFinance(currentPlayer)) items.push(['finance', 'Financeiro']);
+  if (canManageFinance(currentPlayer) || isPro()) items.push(['finance', 'Financeiro']);
   if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
 
   return `
@@ -4116,6 +4146,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       return renderChampionshipScreen(snapshot, currentPlayer);
     case 'finance':
       if (!isPro()) return renderProLock({ title: 'Controle financeiro', benefit: 'Livro-caixa do clube: mensalidade, despesas e demonstrativo — tudo num lugar só. Disponível no Pro.' });
+      if (!canManageFinance(currentPlayer)) return renderPublicFinanceScreen(snapshot);
       return renderFinanceScreen(snapshot, currentPlayer, financeEffectiveYm());
     case 'config':
       return renderConfig(snapshot, currentPlayer);

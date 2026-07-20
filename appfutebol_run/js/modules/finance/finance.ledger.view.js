@@ -1,7 +1,7 @@
 // Tela do LIVRO-CAIXA (aba Financeiro, Pro). Render síncrono a partir do cache
 // (finance.ledger.service). Ver docs/finance-design.md e o mock aprovado.
 
-import { getCachedLedger, ledgerSummary, collectionThisMonth, pendingMembersThisMonth } from './finance.ledger.service.js';
+import { getCachedLedger, ledgerSummary, collectionThisMonth, pendingMembersThisMonth, getPublicSummary } from './finance.ledger.service.js';
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -52,6 +52,7 @@ function entryRow(r, nameById) {
 
 export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
   const rows = getCachedLedger();
+  const pub = getPublicSummary();
   const ym = refYm || currentYmStr();
   const isCurrent = ym >= currentYmStr();
   const { saldo, entMes, saiMes } = ledgerSummary(rows, ym);
@@ -149,8 +150,42 @@ export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
         </div>
         <input id="fin-desc" class="input" type="text" placeholder="Descrição (ex.: aluguel da quadra)" style="margin-top:10px;" />
         <button class="btn btn-primary" type="button" data-action="finance-submit" style="width:100%;margin-top:12px;">Adicionar lançamento</button>
-        <p class="footer-note" style="text-align:center;margin-top:12px;">Publicar resumo ao grupo · em breve</p>
+        <div style="text-align:center;margin-top:14px;">
+          <button class="btn btn-secondary btn-sm" type="button" data-action="finance-publish">Publicar resumo ao grupo</button>
+          <p class="footer-note" style="margin-top:6px;">${pub && pub.updatedAt ? `Publicado · o grupo vê saldo e entradas/saídas do mês.` : `O grupo verá saldo e entradas/saídas do mês (sem quem está devendo).`}</p>
+        </div>
       </section>
 
+    </section>`;
+}
+
+// Tela read-only do resumo publicado (membro comum, clube Pro).
+export function renderPublicFinanceScreen(_snapshot) {
+  const p = getPublicSummary();
+  if (!p) {
+    return `
+      <section class="section-stack">
+        <section class="card">
+          <div class="card-title">Financeiro do grupo</div>
+          <div class="empty-inline">O administrador ainda não publicou o resumo financeiro.</div>
+        </section>
+      </section>`;
+  }
+  const mes = p.ym ? `${mesNomeDe(p.ym)} ${anoDe(p.ym)}` : '';
+  const ab = p.ym ? mesAbrevDe(p.ym) : '';
+  return `
+    <section class="section-stack">
+      <section class="card">
+        <div class="card-subtitle" style="text-transform:uppercase;letter-spacing:.04em;">Saldo em caixa</div>
+        <div style="font-size:30px;font-weight:700;letter-spacing:-.01em;">${brl(p.saldo)}</div>
+        ${mes ? `<div class="footer-note" style="margin-top:2px;">Prestação de contas · ${esc(mes)}</div>` : ''}
+      </section>
+      <section class="card">
+        <div class="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><div class="kpi-label">Entradas${ab ? ' · ' + esc(ab) : ''}</div><div class="kpi-value" style="color:#5dcaa5;">${brlShort(p.entMes)}</div></div>
+          <div><div class="kpi-label">Saídas${ab ? ' · ' + esc(ab) : ''}</div><div class="kpi-value" style="color:#f0997b;">${brlShort(p.saiMes)}</div></div>
+        </div>
+      </section>
+      <p class="footer-note" style="text-align:center;">Resumo publicado pelo administrador do clube.</p>
     </section>`;
 }

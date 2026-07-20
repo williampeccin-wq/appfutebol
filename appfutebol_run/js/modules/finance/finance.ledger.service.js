@@ -131,6 +131,42 @@ export async function chargeMember(playerId, name = '', amount = 0) {
   }
 }
 
+// ---- Publicar resumo ao grupo (finance_public: admin escreve, membros leem) ----
+let _pub = { data: null, loadedAt: 0 };
+export function getPublicSummary() { return _pub.data; }
+
+export async function loadPublicSummary(clubId, force = false) {
+  const { url, anonKey } = getSupabase();
+  if (!url || !anonKey || !clubId) return _pub.data;
+  if (!force && _pub.loadedAt && Date.now() - _pub.loadedAt < 15000) return _pub.data;
+  try {
+    const resp = await fetch(`${url}/rest/v1/finance_public?club_id=eq.${encodeURIComponent(clubId)}&select=data,updated_at&limit=1`, { headers: headers() });
+    if (resp.ok) {
+      const rows = await resp.json();
+      const row = Array.isArray(rows) ? rows[0] : null;
+      _pub = { data: row ? { ...(row.data || {}), updatedAt: row.updated_at } : null, loadedAt: Date.now() };
+    }
+  } catch (_) { /* mantém */ }
+  return _pub.data;
+}
+
+export async function publishSummary(clubId, summary) {
+  const { url } = getSupabase();
+  if (!url || !clubId) return { ok: false, reason: 'invalid' };
+  try {
+    const resp = await fetch(`${url}/rest/v1/finance_public?on_conflict=club_id`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ club_id: clubId, data: summary, updated_at: new Date().toISOString() }),
+    });
+    if (!resp.ok) return { ok: false, reason: 'http_' + resp.status, detail: await resp.text().catch(() => '') };
+    await loadPublicSummary(clubId, true);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'network', detail: String(e && e.message || e) };
+  }
+}
+
 function ym(date) { return String(date || '').slice(0, 7); }
 function currentYm() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
