@@ -312,5 +312,23 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "persist_failed" }, 500);
   }
 
+  // Espelha a mensalidade no LIVRO-CAIXA (aba Financeiro / Pro). Idempotente por
+  // pix_e2e_id (unique). NÃO-fatal: o pagamento já está confirmado; o caixa é
+  // derivado — se falhar, loga e segue (backfill futuro cobre).
+  const finDate = /^\d{4}-\d{2}-\d{2}$/.test(extracted.date) ? extracted.date : new Date().toISOString().slice(0, 10);
+  const fin = await admin.from("finance_entries").insert({
+    club_id: clubId,
+    kind: "receita",
+    category: "mensalidade",
+    amount: extracted.amount,
+    date: finDate,
+    player_id: String(playerRow.id),
+    source: "pix_ia",
+    pix_e2e_id: e2e,
+  });
+  if (fin.error && String(fin.error.code) !== "23505") {
+    console.warn("[pix] insert finance_entries erro:", fin.error);
+  }
+
   return json({ ok: true, result: "marked", extracted: view });
 });
