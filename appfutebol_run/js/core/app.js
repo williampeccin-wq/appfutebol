@@ -1207,6 +1207,22 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "finance-delete-entry") {
+    e.preventDefault();
+    const entryId = trigger.dataset.id;
+    if (!entryId) return;
+    showConfirmModal({ title: 'Excluir lançamento', message: 'Remover este lançamento do caixa? Não dá pra desfazer.', confirmText: 'Excluir', cancelText: 'Cancelar' })
+      .then((ok) => {
+        if (!ok) return null;
+        return deleteLedgerEntry(entryId).then((res) => {
+          if (res.ok) { showToast('Lançamento removido.', 'success'); render(getState()); }
+          else { showToast('Não deu pra remover o lançamento. Tente de novo.', 'error'); }
+        });
+      })
+      .catch(() => {});
+    return;
+  }
+
   // Copiar o código de convite do clube (área admin). Independe do estado.
   if (action === "copy-invite-code") {
     e.preventDefault();
@@ -2341,7 +2357,7 @@ import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, con
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderFinanceScreen } from '../modules/finance/finance.ledger.view.js';
-import { loadLedgerCache, addLedgerEntry } from '../modules/finance/finance.ledger.service.js';
+import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';

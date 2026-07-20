@@ -76,6 +76,23 @@ export async function addLedgerEntry({ kind, category, amount, date, description
   }
 }
 
+// Exclui um lançamento (RLS exige admin do clube).
+export async function deleteLedgerEntry(id) {
+  const { url } = getSupabase();
+  if (!url || !id) return { ok: false, reason: 'invalid' };
+  try {
+    const resp = await fetch(`${url}/rest/v1/finance_entries?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: headers(),
+    });
+    if (!resp.ok) return { ok: false, reason: 'http_' + resp.status };
+    await loadLedgerCache(true);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'network', detail: String(e && e.message || e) };
+  }
+}
+
 function ym(date) { return String(date || '').slice(0, 7); }
 function currentYm() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 

@@ -36,8 +36,9 @@ function entryRow(r, nameById) {
           <div class="row-subtitle">${fmtDate(r.date)} · ${src}</div>
         </div>
       </div>
-      <div class="player-compact-right">
+      <div class="player-compact-right" style="display:flex;align-items:center;gap:10px;">
         <strong style="color:${color};white-space:nowrap;">${val}</strong>
+        <button class="icon-action-button" type="button" data-action="finance-delete-entry" data-id="${esc(r.id)}" title="Excluir" aria-label="Excluir lançamento"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
       </div>
     </div>`;
 }
