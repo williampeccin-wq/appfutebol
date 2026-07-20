@@ -105,6 +105,32 @@ export function pendingMembersThisMonth(snapshot, rows = getCachedLedger(), refY
   return payers.filter((p) => !paid.has(String(p.id))).map((p) => ({ id: String(p.id), name: p.name || '' }));
 }
 
+// Cobra um membro em atraso via push (Edge Function send-push, admin-only). O
+// alvo é o player_id exibido no "Em atraso". Retorna ok mesmo se o membro não
+// tiver push ligado (0 assinaturas) — o admin vê o feedback de envio.
+export async function chargeMember(playerId, name = '', amount = 0) {
+  const { url } = getSupabase();
+  if (!url || !playerId) return { ok: false, reason: 'invalid' };
+  const valor = amount ? ` de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}` : '';
+  const primeiro = String(name || '').trim().split(/\s+/)[0] || '';
+  try {
+    const resp = await fetch(`${url}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        target: String(playerId),
+        title: 'Mensalidade pendente',
+        body: `Opa${primeiro ? ', ' + primeiro : ''}! Sua mensalidade${valor} está em aberto. Manda o PIX quando puder. 🙏`,
+        url: './',
+      }),
+    });
+    if (!resp.ok) return { ok: false, reason: 'http_' + resp.status };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'network', detail: String(e && e.message || e) };
+  }
+}
+
 function ym(date) { return String(date || '').slice(0, 7); }
 function currentYm() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 

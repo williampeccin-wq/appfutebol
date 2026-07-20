@@ -102,7 +102,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer) {
                 <span style="width:32px;height:32px;border-radius:50%;background:rgba(240,137,123,.16);color:#f0897b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">${initials(p.name)}</span>
                 <div class="player-compact-text"><div class="row-title">${esc(p.name)}</div></div>
               </div>
-              <span class="tag" style="background:rgba(240,137,123,.15);color:#f0897b;white-space:nowrap;">Pendente</span>
+              <button class="btn btn-secondary btn-sm" type="button" data-action="finance-charge" data-id="${esc(p.id)}" data-name="${esc(p.name)}" style="white-space:nowrap;">Cobrar</button>
             </div>`).join('')}
         </div>
       </section>
