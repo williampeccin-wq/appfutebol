@@ -57,12 +57,15 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // player_id autoritativo: o jogador dono do JWT (não confia no corpo).
+  // player_id e club_id autoritativos: do jogador dono do JWT (não confia no corpo).
   const { data: player } = await admin
-    .from("players").select("id").eq("auth_user_id", userId).maybeSingle();
+    .from("players").select("id, club_id").eq("auth_user_id", userId).maybeSingle();
   const playerId = player?.id ? String(player.id) : null;
 
-  const { error } = await admin.from("push_subscriptions").upsert({
+  // O club_id é o que isola o push entre clubes. Sem gravá-lo, a coluna assume o
+  // DEFAULT (clube-semente) e a inscrição passa a receber push de outro clube —
+  // e o envio escopado do clube real não a encontra (notificação morta).
+  const subscription: Record<string, unknown> = {
     endpoint,
     player_id: playerId,
     auth_user_id: userId,
@@ -70,7 +73,10 @@ Deno.serve(async (req) => {
     auth,
     user_agent: userAgent,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "endpoint" });
+  };
+  if (player?.club_id) subscription.club_id = player.club_id;
+
+  const { error } = await admin.from("push_subscriptions").upsert(subscription, { onConflict: "endpoint" });
   if (error) { console.error("[register-push] upsert:", error.message); return json({ ok: false, error: "save_failed" }, 500); }
   return json({ ok: true });
 });

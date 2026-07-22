@@ -67,14 +67,19 @@ Deno.serve(async (req) => {
 
   // --- 2) Acha o player e bloqueia o último admin ---
   const { data: player, error: pErr } = await admin
-    .from("players").select("id, is_admin, data").eq("auth_user_id", authUserId).maybeSingle();
+    .from("players").select("id, is_admin, data, club_id").eq("auth_user_id", authUserId).maybeSingle();
   if (pErr) { console.error("[delete] lookup player:", pErr.message); return json({ ok: false, error: "lookup_failed" }, 500); }
 
   const playerId = player?.id ? String(player.id) : null;
 
   if (player?.is_admin) {
+    // A contagem PRECISA ser por clube: global, o único admin do clube B passa
+    // porque o clube A tem admins — e o clube B fica sem administrador para
+    // sempre (ninguém aprova cadastro, ninguém abre jogo, e promover exige admin).
     const { count, error: cErr } = await admin
-      .from("players").select("id", { count: "exact", head: true }).eq("is_admin", true);
+      .from("players").select("id", { count: "exact", head: true })
+      .eq("is_admin", true)
+      .eq("club_id", player.club_id);
     if (cErr) { console.error("[delete] admin count:", cErr.message); return json({ ok: false, error: "count_failed" }, 500); }
     if ((count || 0) <= 1) {
       return json({ ok: false, error: "last_admin", message: "Você é o único administrador. Promova outro admin antes de excluir sua conta." });

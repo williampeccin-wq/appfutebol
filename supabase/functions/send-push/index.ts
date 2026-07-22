@@ -51,11 +51,17 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const { data: player } = await admin
     .from("players")
-    .select("is_admin")
+    .select("is_admin, club_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (!player?.is_admin) return json({ error: "forbidden" }, 403);
+
+  // Ser admin de ALGUM clube não pode virar permissão de disparar para TODOS.
+  // Esta função roda com service_role (ignora RLS), então o escopo por clube
+  // precisa ser explícito na query — é a única barreira que resta.
+  const callerClubId = player.club_id;
+  if (!callerClubId) return json({ error: "club_not_resolved" }, 403);
 
   // 2) Payload
   let payload: { target?: string; title?: string; body?: string; url?: string };
@@ -72,7 +78,11 @@ Deno.serve(async (req) => {
   });
 
   // 3) Busca inscrições
-  let query = admin.from("push_subscriptions").select("endpoint, p256dh, auth, player_id");
+  // Escopo por clube ANTES do alvo: um `target` de outro clube simplesmente não
+  // casa, então isto também fecha o IDOR por player_id enumerado.
+  let query = admin.from("push_subscriptions")
+    .select("endpoint, p256dh, auth, player_id")
+    .eq("club_id", callerClubId);
   if (target && target !== "all") query = query.eq("player_id", target);
   const { data: subscriptions, error } = await query;
   if (error) return json({ error: "subscriptions_query_failed", detail: error.message }, 500);
