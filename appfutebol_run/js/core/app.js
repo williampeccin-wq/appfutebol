@@ -2456,7 +2456,13 @@ function ensureLedgerLoaded() {
   if (_ledgerLoadStarted) return;
   _ledgerLoadStarted = true;
   loadLedgerCache()
-    .then(() => render(getState()))
+    .then((res) => {
+      // `loadLedgerCache` nunca rejeita, então o .catch abaixo era código morto:
+      // uma falha passageira deixava `_ledgerLoadStarted` travado em true e a aba
+      // inutilizável pelo resto da sessão. Libera a flag para nova tentativa.
+      if (!res?.ok) _ledgerLoadStarted = false;
+      render(getState());
+    })
     .catch(() => { _ledgerLoadStarted = false; });
 }
 

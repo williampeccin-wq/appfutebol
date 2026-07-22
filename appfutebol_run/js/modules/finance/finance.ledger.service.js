@@ -27,24 +27,34 @@ function headers(extra = {}) {
   };
 }
 
-let _cache = { rows: [], loadedAt: 0 };
+// `ok` distingue "carregou e veio vazio" de "não consegui carregar" — sem essa
+// distinção a tela mostra saldo R$ 0,00 e o roster INTEIRO em "Em atraso" como
+// se fosse verdade, e o admin dispara cobrança pra quem já pagou.
+let _cache = { rows: [], loadedAt: 0, ok: false, failed: false };
 
 export function getCachedLedger() { return _cache.rows; }
+export function getLedgerStatus() { return { ok: _cache.ok, failed: _cache.failed }; }
 
 // Carrega os lançamentos do clube (RLS já escopa por clube + admin). Cache 15s;
-// force=true ignora o cache (após uma escrita).
+// force=true ignora o cache (após uma escrita). NÃO lança: devolve {ok, rows}
+// para o chamador decidir (o `ensureLedgerLoaded` usa isso para permitir retry).
 export async function loadLedgerCache(force = false) {
   const { url, anonKey } = getSupabase();
-  if (!url || !anonKey) return _cache.rows;
-  if (!force && _cache.loadedAt && Date.now() - _cache.loadedAt < 15000) return _cache.rows;
+  if (!url || !anonKey) { _cache.failed = true; return { ok: false, rows: _cache.rows }; }
+  if (!force && _cache.ok && _cache.loadedAt && Date.now() - _cache.loadedAt < 15000) {
+    return { ok: true, rows: _cache.rows };
+  }
   try {
     const sel = 'select=id,kind,category,amount,date,description,player_id,source,created_at';
     const resp = await fetch(`${url}/rest/v1/finance_entries?${sel}&order=date.desc,created_at.desc`, { headers: headers() });
-    if (!resp.ok) return _cache.rows;
+    if (!resp.ok) { _cache.failed = true; return { ok: false, rows: _cache.rows }; }
     const rows = await resp.json();
-    _cache = { rows: Array.isArray(rows) ? rows : [], loadedAt: Date.now() };
-  } catch (_) { /* mantém o cache anterior */ }
-  return _cache.rows;
+    _cache = { rows: Array.isArray(rows) ? rows : [], loadedAt: Date.now(), ok: true, failed: false };
+    return { ok: true, rows: _cache.rows };
+  } catch (_) {
+    _cache.failed = true; // mantém as linhas anteriores, mas marca a falha
+    return { ok: false, rows: _cache.rows };
+  }
 }
 
 // Insere um lançamento manual (despesa ou entrada). RLS exige admin do clube.
@@ -83,9 +93,14 @@ export async function deleteLedgerEntry(id) {
   try {
     const resp = await fetch(`${url}/rest/v1/finance_entries?id=eq.${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: headers(),
+      headers: headers({ Prefer: 'return=representation' }),
     });
     if (!resp.ok) return { ok: false, reason: 'http_' + resp.status };
+    // A RLS pode filtrar a linha e ainda assim responder 2xx com ZERO linhas
+    // afetadas. Sem conferir o corpo, o app dizia "lançamento removido" e ele
+    // continuava lá — o admin só descobria ao recarregar.
+    const removed = await resp.json().catch(() => []);
+    if (!Array.isArray(removed) || removed.length === 0) return { ok: false, reason: 'not_deleted' };
     await loadLedgerCache(true);
     return { ok: true };
   } catch (e) {
@@ -97,7 +112,10 @@ export async function deleteLedgerEntry(id) {
 // + as receitas de mensalidade com player_id do mês de referência.
 export function pendingMembersThisMonth(snapshot, rows = getCachedLedger(), refYm = currentYm()) {
   const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
-  const payers = players.filter((p) => p && !p.deleted && (p.plays_football !== false || p.in_carne_group));
+  // `pending` = cadastro aguardando aprovação: nem entra no app ainda, então não
+  // deve nem a mensalidade. Incluí-lo inflava a meta de coleta e liberava o botão
+  // "Cobrar" para quem não é membro.
+  const payers = players.filter((p) => p && !p.deleted && p.pending !== true && (p.plays_football !== false || p.in_carne_group));
   const paid = new Set();
   for (const r of (Array.isArray(rows) ? rows : [])) {
     if (r.kind === 'receita' && r.category === 'mensalidade' && ym(r.date) === refYm && r.player_id) paid.add(String(r.player_id));
@@ -188,7 +206,10 @@ export function ledgerSummary(rows = getCachedLedger(), refYm = currentYm()) {
 export function collectionThisMonth(snapshot, rows = getCachedLedger(), refYm = currentYm()) {
   const amount = Number(snapshot?.settings?.mens_amount) || 0;
   const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
-  const payers = players.filter((p) => p && !p.deleted && (p.plays_football !== false || p.in_carne_group));
+  // `pending` = cadastro aguardando aprovação: nem entra no app ainda, então não
+  // deve nem a mensalidade. Incluí-lo inflava a meta de coleta e liberava o botão
+  // "Cobrar" para quem não é membro.
+  const payers = players.filter((p) => p && !p.deleted && p.pending !== true && (p.plays_football !== false || p.in_carne_group));
   const totalMembers = payers.length;
   const paidIds = new Set();
   let collected = 0;

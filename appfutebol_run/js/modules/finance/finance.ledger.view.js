@@ -1,7 +1,7 @@
 // Tela do LIVRO-CAIXA (aba Financeiro, Pro). Render síncrono a partir do cache
 // (finance.ledger.service). Ver docs/finance-design.md e o mock aprovado.
 
-import { getCachedLedger, ledgerSummary, collectionThisMonth, pendingMembersThisMonth, getPublicSummary } from './finance.ledger.service.js';
+import { getCachedLedger, getLedgerStatus, ledgerSummary, collectionThisMonth, pendingMembersThisMonth, getPublicSummary } from './finance.ledger.service.js';
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,6 +22,13 @@ function fmtDate(iso) {
   return m ? `${Number(m[3])} ${MESES[Number(m[2]) - 1] || ''}` : esc(iso);
 }
 function currentYmStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+// Data de HOJE no fuso do aparelho. `toISOString()` devolve UTC: no Brasil
+// (UTC−3), das 21h à meia-noite ele já aponta para o dia (e o MÊS) seguinte —
+// o lançamento do dia 31 às 21h caía em agosto e sumia do fechamento de julho.
+function todayLocalIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 function monthIdx(ym) { return (Number(String(ym).split('-')[1]) || 1) - 1; }
 function mesAbrevDe(ym) { return MESES[monthIdx(ym)] || ''; }
 function mesNomeDe(ym) { return MESES_FULL[monthIdx(ym)] || ''; }
@@ -52,6 +59,23 @@ function entryRow(r, nameById, showDelete = true) {
 }
 
 export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
+  // Enquanto o livro-caixa não carregou, NÃO renderizamos números. Um 401/5xx
+  // passageiro fazia a tela afirmar "saldo R$ 0,00" e jogar o roster inteiro em
+  // "Em atraso" com o botão Cobrar ativo — o admin cobrava quem já tinha pago.
+  // Dado errado com cara de certo é pior que tela vazia.
+  const status = getLedgerStatus();
+  if (!status.ok) {
+    return `
+      <section class="section-stack">
+        <section class="card">
+          <div class="card-title">Financeiro</div>
+          <div class="empty-inline">${status.failed
+            ? 'Não consegui carregar o livro-caixa agora. Prefiro não mostrar nada a mostrar valores errados — saia da aba e volte para tentar de novo.'
+            : 'Carregando o livro-caixa…'}</div>
+        </section>
+      </section>`;
+  }
+
   const rows = getCachedLedger();
   const pub = getPublicSummary();
   const ym = refYm || currentYmStr();
@@ -147,7 +171,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
           <input id="fin-amount" class="input" type="text" inputmode="numeric" data-mask="currency" placeholder="Valor · 0,00" autocomplete="off" />
-          <input id="fin-date" class="input" type="date" value="${new Date().toISOString().slice(0, 10)}" aria-label="Data" />
+          <input id="fin-date" class="input" type="date" value="${todayLocalIso()}" aria-label="Data" />
         </div>
         <input id="fin-desc" class="input" type="text" placeholder="Descrição (ex.: aluguel da quadra)" style="margin-top:10px;" />
         <button class="btn btn-primary" type="button" data-action="finance-submit" style="width:100%;margin-top:12px;">Adicionar lançamento</button>
