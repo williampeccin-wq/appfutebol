@@ -2685,6 +2685,17 @@ function bindGlobalSystemEvents() {
       }
     }, 600);
   });
+
+  // Escrita remota falhou: o local JÁ salvou (a tela mostra o resultado), mas o
+  // servidor não recebeu. Sem avisar, a pessoa confia numa confirmação que vai
+  // sumir no próximo sync. Throttle de 30s para não virar spam em rede instável.
+  let lastRemoteSaveFailAt = 0;
+  window.addEventListener('harmonia:remote-save-failed', () => {
+    const now = Date.now();
+    if (now - lastRemoteSaveFailAt < 30000) return;
+    lastRemoteSaveFailAt = now;
+    showToast('Não consegui salvar no servidor: sua alteração ficou só neste aparelho. Confira a internet e refaça.', 'error');
+  });
 }
 
 
@@ -2696,6 +2707,16 @@ function getDomainFingerprint(snapshot) {
     championship: snapshot.championship || null,
     carne: snapshot.carne || [],
     notifications: snapshot.notifications || [],
+    // Sem os campos abaixo, uma alteração que só tocasse config/jogos/exclusões
+    // era lida como "nada mudou": o poll DESCARTAVA o estado remoto, o outro
+    // admin nunca recebia o valor novo — e, na gravação seguinte dele, o valor
+    // velho que ele ainda tinha REVERTIA o do primeiro. É a explicação do
+    // "a configuração voltou sozinha".
+    settings: snapshot.settings || null,
+    games: snapshot.games || [],
+    active_game_id: snapshot.active_game_id || null,
+    deleted_player_ids: snapshot.deleted_player_ids || [],
+    deleted_player_phones: snapshot.deleted_player_phones || [],
   });
 }
 

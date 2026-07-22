@@ -119,10 +119,20 @@ function createHybridStorageAdapter() {
         return merged;
       }
 
-      if (remote.ok && !isValidAppState(remote.state)) {
-        console.warn("[storage.adapter] ignoring invalid remote state and keeping local snapshot");
+      // A leitura remota FALHOU (rede/HTTP/token expirado). Publicar o snapshot
+      // local aqui era o caminho do apagão: um blip de 4G no momento errado
+      // gravava por cima do servidor — e `games`, `active_game_id`,
+      // `notifications` e os tombstones de exclusão NÃO são cobertos pelo guard
+      // anti-apagão do save, então sumiam de vez (jogador excluído ressuscitava).
+      // Regra: sem leitura boa, não se escreve. Devolve o local e tenta depois.
+      if (!remote.ok) {
+        console.warn("[storage.adapter] remote load failed; keeping local snapshot WITHOUT publishing:", remote.reason);
+        return localSnapshot;
       }
 
+      // Aqui a leitura FUNCIONOU e o remoto veio vazio/inválido — clube novo,
+      // ainda sem estado. Semear a partir do local é o comportamento desejado.
+      console.warn("[storage.adapter] remote state invalid/empty; seeding from local snapshot");
       await saveRemoteState(createRemoteSnapshot(localSnapshot));
       return localSnapshot;
     },
@@ -164,10 +174,21 @@ function createHybridStorageAdapter() {
           }
 
           if (!result.ok) {
+            // Falhar aqui em SILÊNCIO era o pior caso do dia a dia: o jogador
+            // tocava "Confirmar" na quadra com sinal ruim, a UI mostrava
+            // "Confirmado" (o local já salvou), nada subia — e no ciclo seguinte
+            // o poll trazia o remoto SEM a confirmação e ela sumia. Presença
+            // perdida na noite do jogo, sem rastro pro admin. Avisa a UI.
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
+            window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+              detail: { reason: result.reason },
+            }));
           }
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
+          window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+            detail: { reason: 'remote_save_queue_failed' },
+          }));
           return { ok: false, reason: 'remote_save_queue_failed', error };
         }).finally(() => {
           pendingRemoteWrites = Math.max(0, pendingRemoteWrites - 1);

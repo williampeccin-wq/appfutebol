@@ -471,14 +471,48 @@ function rememberSplitSnapshot(state, updatedAt = null) {
   lastRemoteUpdatedAt = updatedAt || lastRemoteUpdatedAt;
 }
 
+// Uma conexão PENDURADA (transição Wi-Fi→4G faz isso, sem RST) segurava o fetch
+// por dezenas de segundos ou minutos. Como `pendingRemoteWrites` só zera no
+// `finally` da escrita, e o poll de sync retorna cedo enquanto há escrita
+// pendente, o app inteiro parava de receber confirmações — justo na noite do
+// jogo. Timeout explícito transforma "pendurado" em erro tratável.
+const REQUEST_TIMEOUT_MS = 20000;
+
+async function fetchWithTimeout(url, init) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Timeout/rede caem no MESMO formato dos demais erros ({ok:false,...}) para que
+// os chamadores não precisem de try/catch extra.
+function failedRequest(error) {
+  const timedOut = error && error.name === 'AbortError';
+  return {
+    ok: false,
+    status: 0,
+    body: timedOut ? 'request_timeout' : String((error && error.message) || error),
+    data: null,
+  };
+}
+
 async function requestJson(config, url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...buildHeaders(config, options.prefer || null),
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetchWithTimeout(url, {
+      ...options,
+      headers: {
+        ...buildHeaders(config, options.prefer || null),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (error) {
+    return failedRequest(error);
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -500,13 +534,19 @@ async function requestJson(config, url, options = {}) {
 }
 
 async function requestNoContent(config, url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...buildHeaders(config, options.prefer || null),
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetchWithTimeout(url, {
+      ...options,
+      headers: {
+        ...buildHeaders(config, options.prefer || null),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (error) {
+    const failed = failedRequest(error);
+    return { ok: false, status: failed.status, body: failed.body };
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');

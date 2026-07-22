@@ -275,10 +275,13 @@ export function loadLocalState() {
 
   try {
     const parsed = JSON.parse(raw);
-    const normalized = normalizeData(buildMergedData({
-      session: parsed?.session || {},
-      ui: parsed?.ui || {},
-    }));
+    // `buildMergedData` foi escrito para receber o objeto INTEIRO: cada campo
+    // tem a sua guarda (`Array.isArray(parsed.X) ? parsed.X : seed.X`). Passar
+    // só {session, ui} fazia TODAS essas guardas caírem no seed — o cache local
+    // devolvia players/game/confirmations/carne/championship vazios, e o
+    // adapter chegava a publicar essa semente por cima do servidor quando a
+    // leitura remota falhava. Era o caminho do apagão.
+    const normalized = normalizeData(buildMergedData(parsed && typeof parsed === 'object' ? parsed : {}));
     const repaired = validateAndRepairState(normalized, { defaultSeed });
     const normalizedRaw = JSON.stringify(repaired.state);
 
