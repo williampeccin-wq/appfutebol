@@ -4843,7 +4843,7 @@ function renderPresenceList(snapshot, currentPlayer) {
       <div class="players-switch-player">
         ${renderAvatarForApp(player)}
         <div>
-          <div class="row-title">${player.name}</div>
+          <div class="row-title">${escapeHtml(player.name)}</div>
           <div class="row-subtitle">${getPositionLabel(player.position)} · ${formatPhone(player.phone)}</div>
         </div>
       </div>
@@ -4871,7 +4871,7 @@ function renderPresenceList(snapshot, currentPlayer) {
       <div class="players-switch-player">
         ${renderAvatarForApp(player)}
         <div>
-          <div class="row-title">🧤 ${player.name}</div>
+          <div class="row-title">🧤 ${escapeHtml(player.name)}</div>
           <div class="row-subtitle">Goleiro confirmado · não ocupa vaga de linha</div>
         </div>
       </div>
@@ -4987,7 +4987,7 @@ function renderPresenceList(snapshot, currentPlayer) {
                 <div class="players-switch-player">
                   ${renderAvatarForApp(player)}
                   <div>
-                    <div class="row-title">#${index + 1} · ${player.name}</div>
+                    <div class="row-title">#${index + 1} · ${escapeHtml(player.name)}</div>
                     <div class="row-subtitle">${getPositionLabel(player.position)} · aguardando vaga</div>
                   </div>
                 </div>
@@ -5137,7 +5137,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
               <div class="placeholder-main team-draw-player-main">
                 ${renderAvatarForApp(player)}
                 <div class="team-draw-player-text">
-                  <div class="row-title">${player?.guest ? '👤 ' : ((player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : '')}${player?.name || 'Jogador removido'}</div>
+                  <div class="row-title">${player?.guest ? '👤 ' : ((player?.rental_goalkeeper || ['gol','goleiro'].includes(String(player?.position || '').toLowerCase())) ? '🧤 ' : '')}${escapeHtml(player?.name || 'Jogador removido')}</div>
                   <div class="row-subtitle">${player?.guest ? 'Convidado' : getPositionLabel(player?.position)}</div>
                 </div>
               </div>
@@ -5148,7 +5148,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
                   data-action="move-drawn-player"
                   data-player-id="${id}"
                   data-from-team="${teamKey}"
-                  aria-label="Mover ${player.name || 'jogador'} para ${targetLabel}"
+                  aria-label="Mover ${escapeHtml(player.name || 'jogador')} para ${targetLabel}"
                   title="Mover para ${targetLabel}"
                 >
                   ⇄
@@ -5182,7 +5182,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
                 <div class="players-switch-player">
                   ${player.rental_goalkeeper ? `<div class="avatar rental-goalkeeper-avatar">🧤</div>` : (player.guest ? `<div class="avatar guest-avatar">👤</div>` : renderAvatarForApp(player))}
                   <div>
-                    <div class="row-title">${player.name}</div>
+                    <div class="row-title">${escapeHtml(player.name)}</div>
                     <div class="row-subtitle">${player.rental_goalkeeper ? 'Goleiro de aluguel' : (player.guest ? 'Convidado' : getPositionLabel(player.position))}</div>
                   </div>
                 </div>

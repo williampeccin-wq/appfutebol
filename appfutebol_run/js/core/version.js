@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.137.0-financeiro-membro';
+export const APP_VERSION = 'v1.138.0-xss-escape';
