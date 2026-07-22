@@ -9,7 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ALLOWED_ORIGIN = (o: string): boolean =>
   /^https?:\/\/localhost(:\d+)?$/i.test(o)
   || /^https:\/\/([a-z0-9-]+\.)*harmoniafc-prod\.pages\.dev$/i.test(o)
-  || /^https:\/\/([a-z0-9-]+\.)*convocados-[a-z0-9]+\.pages\.dev$/i.test(o)
+  || /^https:\/\/([a-z0-9-]+\.)*convocados-44x\.pages\.dev$/i.test(o)
   || /^https:\/\/([a-z0-9-]+\.)*convocados\.app\.br$/i.test(o);
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") || "";
