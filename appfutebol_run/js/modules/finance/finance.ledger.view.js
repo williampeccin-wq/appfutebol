@@ -27,7 +27,8 @@ function mesAbrevDe(ym) { return MESES[monthIdx(ym)] || ''; }
 function mesNomeDe(ym) { return MESES_FULL[monthIdx(ym)] || ''; }
 function anoDe(ym) { return String(ym).split('-')[0] || ''; }
 
-function entryRow(r, nameById) {
+// showDelete=false é a versão read-only usada na prestação de contas do membro.
+function entryRow(r, nameById, showDelete = true) {
   const receita = r.kind === 'receita';
   const isMens = r.category === 'mensalidade';
   const who = r.player_id ? nameById.get(String(r.player_id)) : '';
@@ -45,7 +46,7 @@ function entryRow(r, nameById) {
       </div>
       <div class="player-compact-right" style="display:flex;align-items:center;gap:10px;">
         <strong style="color:${color};white-space:nowrap;">${val}</strong>
-        <button class="icon-action-button" type="button" data-action="finance-delete-entry" data-id="${esc(r.id)}" title="Excluir" aria-label="Excluir lançamento"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
+        ${showDelete ? `<button class="icon-action-button" type="button" data-action="finance-delete-entry" data-id="${esc(r.id)}" title="Excluir" aria-label="Excluir lançamento"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
       </div>
     </div>`;
 }
@@ -160,7 +161,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
 }
 
 // Tela read-only do resumo publicado (membro comum, clube Pro).
-export function renderPublicFinanceScreen(_snapshot) {
+export function renderPublicFinanceScreen(snapshot) {
   const p = getPublicSummary();
   if (!p) {
     return `
@@ -173,6 +174,13 @@ export function renderPublicFinanceScreen(_snapshot) {
   }
   const mes = p.ym ? `${mesNomeDe(p.ym)} ${anoDe(p.ym)}` : '';
   const ab = p.ym ? mesAbrevDe(p.ym) : '';
+  // Lançamentos do mês publicado (read-only). Os nomes são resolvidos aqui, no
+  // cliente do membro, para não engordar o payload publicado nem congelá-los.
+  const entries = Array.isArray(p.entries) ? p.entries : [];
+  const nameById = new Map((Array.isArray(snapshot?.players) ? snapshot.players : []).map((pl) => [String(pl.id), pl.name || '']));
+  const entriesHtml = entries.length
+    ? entries.map((r) => entryRow(r, nameById, false)).join('')
+    : `<div class="empty-inline">Nenhum lançamento em ${esc(mesNomeDe(p.ym || ''))}.</div>`;
   return `
     <section class="section-stack">
       <section class="card">
@@ -185,6 +193,10 @@ export function renderPublicFinanceScreen(_snapshot) {
           <div><div class="kpi-label">Entradas${ab ? ' · ' + esc(ab) : ''}</div><div class="kpi-value" style="color:#5dcaa5;">${brlShort(p.entMes)}</div></div>
           <div><div class="kpi-label">Saídas${ab ? ' · ' + esc(ab) : ''}</div><div class="kpi-value" style="color:#f0997b;">${brlShort(p.saiMes)}</div></div>
         </div>
+      </section>
+      <section class="card">
+        <div class="card-title">Lançamentos${mes ? ` · ${esc(mes)}` : ''}</div>
+        ${entriesHtml}
       </section>
       <p class="footer-note" style="text-align:center;">Resumo publicado pelo administrador do clube.</p>
     </section>`;

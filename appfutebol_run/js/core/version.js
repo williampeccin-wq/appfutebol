@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.136.0-financeiro-publicar';
+export const APP_VERSION = 'v1.137.0-financeiro-membro';

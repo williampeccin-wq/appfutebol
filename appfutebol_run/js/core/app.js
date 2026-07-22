@@ -1267,9 +1267,17 @@ document.addEventListener("click", async (e) => {
     const clubId = getCurrentClubId();
     if (!clubId) { showToast('Não identifiquei o clube. Recarregue e tente de novo.', 'error'); return; }
     const pubYm = financeEffectiveYm();
-    const s = ledgerSummary(getCachedLedger(), pubYm);
+    const allRows = getCachedLedger();
+    const s = ledgerSummary(allRows, pubYm);
+    // Os lançamentos do mês vão junto do resumo: prestação de contas item a item,
+    // não só os totais. Levamos só campos de exibição — o NOME do jogador é
+    // resolvido no cliente do membro (payload menor e nome sempre atual).
+    const pubEntries = allRows
+      .filter((r) => String(r.date || '').slice(0, 7) === pubYm)
+      .slice(0, 60)
+      .map((r) => ({ id: r.id, kind: r.kind, category: r.category, amount: r.amount, date: r.date, description: r.description, player_id: r.player_id, source: r.source }));
     trigger.disabled = true;
-    publishSummary(clubId, { saldo: s.saldo, entMes: s.entMes, saiMes: s.saiMes, ym: pubYm, publishedAt: new Date().toISOString() })
+    publishSummary(clubId, { saldo: s.saldo, entMes: s.entMes, saiMes: s.saiMes, ym: pubYm, entries: pubEntries, publishedAt: new Date().toISOString() })
       .then((res) => {
         trigger.disabled = false;
         if (res.ok) { showToast('Resumo publicado pro grupo. 📢', 'success'); render(getState()); }
@@ -3332,9 +3340,9 @@ function renderInner(snapshot) {
     </div>
 
     <main class="content content--${activeTab}">
-      <div style="padding:10px;font-weight:bold;">
+      ${activeTab === 'finance' ? '' : `<div style="padding:10px;font-weight:bold;">
 ${confirmedCount} / ${maxPlayers} jogadores de linha confirmados
-</div>
+</div>`}
 ${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
 
