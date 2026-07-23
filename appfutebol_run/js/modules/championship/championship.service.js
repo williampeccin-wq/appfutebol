@@ -552,7 +552,23 @@ export function getActiveDrawTeams(snapshot, drawId = null) {
   return selected;
 }
 
-export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
+// Escalação REAL do jogo, a partir do sorteio: { playerId: 'a' | 'b' }.
+// Convidado / goleiro alugado não entram — o sorteio embute o objeto do jogador
+// (sem id persistente) e o campeonato só pontua jogador registrado.
+export function buildLineupFromDraw(draw) {
+  const map = {};
+  const add = (arr, side) => (Array.isArray(arr) ? arr : []).forEach((v) => {
+    if (typeof v === 'string' || typeof v === 'number') map[String(v)] = side;
+  });
+  add(draw?.team_a, 'a');
+  add(draw?.team_b, 'b');
+  return map;
+}
+
+// `lineup` permite corrigir o que o sorteio não sabe: quem desistiu em cima da
+// hora, quem entrou no lugar, quem saiu no meio. Sem ele, vale o sorteio.
+// Formato: { playerId: 'a' | 'b' | 'out' } — 'out' (ou ausente) = não jogou.
+export function buildTeamResultStatuses(snapshot, outcome, drawId = null, lineup = null) {
   const draw = getActiveDrawTeams(snapshot, drawId);
   if (!draw.ok) return { ok: false, message: draw.message };
 
@@ -570,26 +586,31 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     });
   };
 
-  if (validOutcome === 'draw') {
-    assignTeam(draw.team_a, 'draw');
-    assignTeam(draw.team_b, 'draw');
-  } else if (validOutcome === 'team_a') {
-    assignTeam(draw.team_a, 'win');
-    assignTeam(draw.team_b, 'loss');
-  } else if (validOutcome === 'team_b') {
-    assignTeam(draw.team_a, 'loss');
-    assignTeam(draw.team_b, 'win');
+  // A escalação ajustada manda; sem ajuste, vale o sorteio. Só entram ids que
+  // são jogador registrado — convidado/goleiro alugado não pontuam (o sorteio
+  // embute o objeto do jogador, sem id persistente, e String(obj) virava
+  // "[object Object]" no registro antigo).
+  const map = (lineup && typeof lineup === 'object' && Object.keys(lineup).length)
+    ? lineup
+    : buildLineupFromDraw(draw);
+  const isPlayer = (id) => Object.prototype.hasOwnProperty.call(statuses, String(id));
+  const teamA = Object.keys(map).filter((id) => map[id] === 'a' && isPlayer(id));
+  const teamB = Object.keys(map).filter((id) => map[id] === 'b' && isPlayer(id));
+
+  if (!teamA.length && !teamB.length) {
+    return { ok: false, message: 'Nenhum jogador registrado na escalação. Ajuste quem jogou antes de lançar.' };
   }
 
-  // team_a/team_b do sorteio podem conter OBJETOS (goleiro alugado/convidado não
-  // têm id persistente — o draw embute o player inteiro; ver game.service
-  // balanceTeams). Ao gravar o resultado, String(obj) virava "[object Object]".
-  // Como o campeonato só pontua jogador REGISTRADO (statuses são por id),
-  // guardamos APENAS ids primitivos; convidado/goleiro-alugado ficam fora do
-  // registro do resultado (não pontuam mesmo).
-  const onlyPlayerIds = (arr) => (Array.isArray(arr) ? arr : [])
-    .filter((x) => typeof x === 'string' || typeof x === 'number')
-    .map(String);
+  if (validOutcome === 'draw') {
+    assignTeam(teamA, 'draw');
+    assignTeam(teamB, 'draw');
+  } else if (validOutcome === 'team_a') {
+    assignTeam(teamA, 'win');
+    assignTeam(teamB, 'loss');
+  } else if (validOutcome === 'team_b') {
+    assignTeam(teamA, 'loss');
+    assignTeam(teamB, 'win');
+  }
 
   return {
     ok: true,
@@ -598,8 +619,8 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     game_key: draw.game_key || null,
     game_date: draw.game_date || null,
     game_time: draw.game_time || null,
-    team_a: onlyPlayerIds(draw.team_a),
-    team_b: onlyPlayerIds(draw.team_b),
+    team_a: teamA,
+    team_b: teamB,
     statuses,
   };
 }

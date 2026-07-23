@@ -38,6 +38,10 @@ let editingPlayerId = null;
 // Precisa ser estado, não só valor do <select>: a data e as escalações exibidas
 // dependem dele, e o app re-renderiza por innerHTML a cada poll.
 let championshipDrawId = null;
+// Escalação ajustada do resultado: { drawId, map: { playerId: 'a'|'b'|'out' } }.
+// Estado (e não só o valor dos <select>) porque o app re-renderiza por innerHTML
+// a cada poll — sem isto o ajuste do admin sumia no meio da edição.
+let championshipLineup = null;
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma). É o único estado
@@ -1517,7 +1521,10 @@ document.addEventListener("click", async (e) => {
 
     const outcome = document.getElementById('championship-team-outcome')?.value;
     const drawId = document.getElementById('championship-draw-id')?.value || null;
-    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId);
+    const lineupMap = (championshipLineup && String(championshipLineup.drawId) === String(drawId))
+      ? championshipLineup.map
+      : null;
+    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId, lineupMap);
 
     if (!builtResult.ok) {
       showToast(builtResult.message || "Resultado inválido", "error");
@@ -1541,6 +1548,7 @@ document.addEventListener("click", async (e) => {
     // Solta a seleção: lançado um resultado, o formulário volta ao sorteio mais
     // recente em vez de ficar preso no que acabou de ser lançado.
     championshipDrawId = null;
+    championshipLineup = null;
 
     const safeSnapshot = repairManualSnapshot(snapshot);
     await Promise.resolve(savePersistedState(safeSnapshot));
@@ -3482,6 +3490,35 @@ function bindAppEvents(currentPlayer) {
   // e ver/lançar os dados de outro.
   appElement.querySelector('#championship-draw-id')?.addEventListener('change', (event) => {
     championshipDrawId = event.target.value || null;
+    championshipLineup = null;   // sorteio novo, escalação recomeça do sorteio
+    render(getState());
+  });
+
+  // Ajuste de quem jogou. Lê o estado ATUAL da tela inteira (todos os selects)
+  // em vez de aplicar um delta: assim o estado nunca fica dessincronizado do
+  // que o admin está vendo, mesmo com o re-render do poll no meio da edição.
+  const capturarEscalacao = () => {
+    const map = {};
+    appElement.querySelectorAll('[data-lineup-player]').forEach((sel) => {
+      map[sel.dataset.lineupPlayer] = sel.value;
+    });
+    return map;
+  };
+  appElement.querySelectorAll('[data-lineup-player]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
+      championshipLineup = { drawId, map: capturarEscalacao() };
+      render(getState());
+    });
+  });
+
+  // Substituto: entra já no Time A (o caso comum é repor quem desistiu); o
+  // admin troca para o Time B no próprio seletor da linha se for o caso.
+  appElement.querySelector('#championship-add-to-lineup')?.addEventListener('change', (event) => {
+    const playerId = event.target.value;
+    if (!playerId) return;
+    const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
+    championshipLineup = { drawId, map: { ...capturarEscalacao(), [playerId]: 'a' } };
     render(getState());
   });
 
@@ -3802,7 +3839,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
       }
     case 'championship':
-      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
+      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup);
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
@@ -4198,7 +4235,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
 }
 
 function renderChampionship(snapshot, currentPlayer) {
-  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
+  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup);
 }
 
 function buildTeamDrawShareText(snapshot) {

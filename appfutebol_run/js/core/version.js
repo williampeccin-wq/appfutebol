@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.110.3-aliases-renomeados';
+export const APP_VERSION = 'v1.111.0-ajuste-escalacao';
