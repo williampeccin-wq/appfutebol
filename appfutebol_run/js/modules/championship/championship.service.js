@@ -209,6 +209,9 @@ const IMPORTED_SHEET_ROUNDS = [
       'Vítor': 0,
       'Telo': 1,
       'Trocinho': 0,
+      // Jogou em 03/06 mas ficou de fora da planilha importada (por isso nunca
+      // pontuou nessa rodada). Confirmado pelo admin em 23/07/2026. 3 = vitória.
+      'Robson': 3,
     },
   },
 ];
