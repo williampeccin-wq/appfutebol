@@ -30,16 +30,21 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 
 const IMPORTED_SHEET_NAME_ALIASES = {
   // De/para validado com a planilha Inverno 26.
+  // ATENÇÃO: o alvo é o NOME DE EXIBIÇÃO ATUAL do jogador. Se alguém for
+  // renomeado no app, o alias quebra em silêncio e a pessoa deixa de pontuar nas
+  // rodadas importadas (foi o que aconteceu com Vinicius/Lucas/Samuel — os
+  // alvos antigos "Vinicius amigo Caue"/"Lucas Neto" não existiam mais).
   'ADRIANO': 'DANO',
   'CAUE': 'S2CANSADO',
-  'VINICIUS': 'VINICIUS AMIGO CAUE',
+  'VINICIUS': 'VINICIUS CAUE',   // era 'VINICIUS AMIGO CAUE' (renomeado); confirmado admin 23/07
   'ANDRE DAMS': 'ANDRE',
   'ANDRÉ DAMS': 'ANDRE',
-  'LUCAS SILVA': 'LUCAS NETO',
+  'LUCAS SILVA': 'LUKINHA',      // era 'LUCAS NETO' (renomeado p/ Lukinha😎, mesmo fone); o emoji é removido pelo normalizeName; confirmado admin 23/07
   'DAVID': 'DVD',
   'GEDE': 'GEDIEL',
   'NATAN': 'NATAN',
   'PAPAI PH': 'PH',
+  'SAMUEL': 'SAMUEL REIS',       // renomeado de 'Samuel'; confirmado admin 23/07
   'WILLIAM': 'WILLIAM',
 };
 
@@ -325,7 +330,12 @@ export function isFootballPlayer(player) {
 export function normalizeName(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')      // remove acentos
+    // Remove emojis/pictogramas: um jogador com emoji no nome (ex.: "Lukinha\ud83d\ude0e")
+    // n\u00e3o casava com a planilha importada porque o emoji sobrevivia \u00e0
+    // normaliza\u00e7\u00e3o. Como isto roda nos DOIS lados da compara\u00e7\u00e3o, tirar n\u00e3o
+    // quebra nenhum casamento existente e conserta os nomes com emoji.
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}]/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toUpperCase();
