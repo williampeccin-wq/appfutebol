@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.109.1-fix-votacao-removido';
+export const APP_VERSION = 'v1.110.0-desacopla-jogo-ativo';

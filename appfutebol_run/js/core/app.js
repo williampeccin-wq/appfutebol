@@ -2689,6 +2689,25 @@ function getPerfWindow(snapshot, game) {
   return { openMs, closeMs: openMs + hours * 60 * 60 * 1000 };
 }
 
+// Jogo cuja janela de votação está ABERTA agora, do mais recente para o mais
+// antigo. Antes as votações usavam o jogo ATIVO: abrir o próximo jogo (manual
+// OU pelo cron `auto-open-games`, 2 dias antes) passava a calcular a janela
+// sobre uma data futura e a votação do jogo recém-terminado sumia da tela —
+// mesmo com a janela dele ainda aberta. Os votos JÁ dados nunca se perderam
+// (ficam em `ratings`); o que sumia era a chance de quem ainda não tinha votado.
+// Sem janela aberta devolve null e o chamador cai no jogo ativo, preservando o
+// comportamento anterior (a votação simplesmente não aparece).
+function getGameWithOpenVoteWindow(snapshot, windowFn) {
+  const now = Date.now();
+  return getCurrentGames(snapshot)
+    .slice()
+    .sort((a, b) => String(b?.game_date || '').localeCompare(String(a?.game_date || '')))
+    .find((game) => {
+      const win = windowFn(game);
+      return !!win && now >= win.openMs && now <= win.closeMs;
+    }) || null;
+}
+
 function getInGamePlayers(snapshot, game) {
   const key = getGameKey(game);
   // Quem "jogou" = quem está CONFIRMADO neste jogo, pela regra CANÔNICA
@@ -2714,7 +2733,9 @@ function getInGamePlayers(snapshot, game) {
 async function maybeShowPerfVote(snapshot, currentPlayer) {
   if (!isVotingEnabled()) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
-  const game = getActiveGameFromSnapshot(snapshot);
+  // Desacoplado do jogo ativo: vale o jogo cuja janela está aberta.
+  const game = getGameWithOpenVoteWindow(snapshot, (g) => getPerfWindow(snapshot, g))
+    || getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
   const win = getPerfWindow(snapshot, game);
   const now = Date.now();
@@ -2904,7 +2925,9 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
   // Desempenho tem prioridade: se o modal dele está aberto, espera.
   if (document.getElementById('perf-vote-overlay')) return;
 
-  const game = getActiveGameFromSnapshot(snapshot);
+  // Desacoplado do jogo ativo: vale o jogo cuja janela está aberta.
+  const game = getGameWithOpenVoteWindow(snapshot, getCarneWindow)
+    || getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
   const win = getCarneWindow(game);
   const now = Date.now();

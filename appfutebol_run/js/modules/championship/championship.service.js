@@ -488,8 +488,16 @@ function normalizeDrawEntry(draw, fallbackId = '') {
   };
 }
 
+// Sorteios disponíveis para lançar resultado. Varre TODOS os jogos, não só o
+// ativo: cada jogo guarda o próprio `sort_result`/`draw_history`, e ler apenas
+// o ativo fazia o resultado do jogo ANTERIOR virar inalcançável assim que um
+// novo jogo era aberto (o novo nasce sem sorteio → lista vazia → o app dizia
+// "faça o sorteio antes de lançar o resultado"). Como a abertura do próximo
+// jogo é automática (cron `auto-open-games`, 2 dias antes), a janela para
+// lançar fechava sozinha toda semana — foi o que deixou 15/07 e 22/07 sem
+// resultado no campeonato. A ordenação por created_at desc é preservada, então
+// o caso normal continua trazendo o sorteio mais recente primeiro.
 export function getChampionshipDrawOptions(snapshot) {
-  const game = snapshot?.game || {};
   const options = [];
   const pushDraw = (draw, fallbackId) => {
     const normalized = normalizeDrawEntry(draw, fallbackId);
@@ -498,8 +506,22 @@ export function getChampionshipDrawOptions(snapshot) {
     options.push(normalized);
   };
 
-  pushDraw(game.sort_result, 'current_draw');
-  (Array.isArray(game.draw_history) ? game.draw_history : []).forEach((draw, index) => pushDraw(draw, `draw_history_${index}`));
+  const collectFrom = (game, prefix) => {
+    if (!game || typeof game !== 'object') return;
+    pushDraw(game.sort_result, `${prefix}_draw`);
+    (Array.isArray(game.draw_history) ? game.draw_history : [])
+      .forEach((draw, index) => pushDraw(draw, `${prefix}_history_${index}`));
+  };
+
+  // O ativo primeiro (mantém os ids de fallback históricos p/ não invalidar
+  // resultados já lançados que referenciam 'current_draw'/'draw_history_N').
+  const active = snapshot?.game || {};
+  pushDraw(active.sort_result, 'current_draw');
+  (Array.isArray(active.draw_history) ? active.draw_history : []).forEach((draw, index) => pushDraw(draw, `draw_history_${index}`));
+
+  // Depois todos os demais jogos do histórico.
+  const games = Array.isArray(snapshot?.games) ? snapshot.games : [];
+  games.forEach((game) => collectFrom(game, String(game?.game_key || game?.id || game?.game_date || 'game')));
 
   return options.sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')));
 }
