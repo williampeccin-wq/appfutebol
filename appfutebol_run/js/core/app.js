@@ -34,6 +34,10 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
+// Sorteio escolhido no seletor de "lançar resultado". null = o mais recente.
+// Precisa ser estado, não só valor do <select>: a data e as escalações exibidas
+// dependem dele, e o app re-renderiza por innerHTML a cada poll.
+let championshipDrawId = null;
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma). É o único estado
@@ -1533,6 +1537,10 @@ document.addEventListener("click", async (e) => {
       team_b: builtResult.team_b,
       statuses: builtResult.statuses,
     });
+
+    // Solta a seleção: lançado um resultado, o formulário volta ao sorteio mais
+    // recente em vez de ficar preso no que acabou de ser lançado.
+    championshipDrawId = null;
 
     const safeSnapshot = repairManualSnapshot(snapshot);
     await Promise.resolve(savePersistedState(safeSnapshot));
@@ -3469,6 +3477,14 @@ function bindAppEvents(currentPlayer) {
     copyPaymentsToClipboard();
   });
 
+  // Trocar o sorteio re-renderiza a tela, para que a DATA e as ESCALAÇÕES
+  // acompanhem a escolha. Sem isto o admin podia escolher o sorteio de um jogo
+  // e ver/lançar os dados de outro.
+  appElement.querySelector('#championship-draw-id')?.addEventListener('change', (event) => {
+    championshipDrawId = event.target.value || null;
+    render(getState());
+  });
+
   wireSelfPixReceipt(appElement);
 
   appElement.querySelector('#copy-confirmed-btn')?.addEventListener('click', () => {
@@ -3786,7 +3802,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
       }
     case 'championship':
-      return renderChampionshipScreen(snapshot, currentPlayer);
+      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
@@ -4182,7 +4198,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
 }
 
 function renderChampionship(snapshot, currentPlayer) {
-  return renderChampionshipScreen(snapshot, currentPlayer);
+  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
 }
 
 function buildTeamDrawShareText(snapshot) {
