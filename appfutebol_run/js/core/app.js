@@ -3477,8 +3477,8 @@ function bindAppEvents(currentPlayer) {
     showToast(result.message, result.ok ? 'success' : 'error');
   });
 
-  appElement.querySelector('#copy-draw-btn')?.addEventListener('click', () => {
-    copyTeamDrawToClipboard();
+  appElement.querySelector('#share-draw-btn')?.addEventListener('click', () => {
+    shareTeamDrawImage();
   });
 
   appElement.querySelector('#copy-payments-btn')?.addEventListener('click', () => {
@@ -4284,34 +4284,59 @@ function buildTeamDrawShareText(snapshot) {
   ].join('\n');
 }
 
-async function copyTeamDrawToClipboard() {
+// Compartilha a escalação como IMAGEM. Substituiu de propósito o "copiar times"
+// em texto: texto é editável no WhatsApp, e o admin corrigia a escalação por lá
+// sem o app saber — em 15/07 isso fez o campeonato pontuar o jogador errado
+// (Robson desistiu, Thiago entrou, ninguém atualizou o app). Com imagem, mudar a
+// escalação exige voltar aqui, que é onde a correção vale.
+async function shareTeamDrawImage() {
   const snapshot = getState();
-  const text = buildTeamDrawShareText(snapshot);
-
-  if (!text) {
-    showToast('Nenhum sorteio disponível para copiar.', 'error');
+  if (!snapshot?.game?.sort_result) {
+    showToast('Nenhum sorteio disponível para compartilhar.', 'error');
     return;
   }
 
+  showToast('Gerando a imagem…');
+  let blob = null;
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      textarea.remove();
-    }
+    const { gerarImagemEscalacao } = await import('../modules/game/lineup-image.js');
+    blob = await gerarImagemEscalacao(snapshot, { titulo: 'ESCALAÇÃO' });
+  } catch (error) {
+    console.error('[escalacao] falha ao gerar imagem', error);
+  }
+  if (!blob) {
+    showToast('Não consegui gerar a imagem da escalação.', 'error');
+    return;
+  }
 
-    showToast('Times copiados.');
+  const nomeArquivo = `times-${String(snapshot?.game?.game_date || 'jogo')}.png`;
+  const file = new File([blob], nomeArquivo, { type: 'image/png' });
+
+  // Celular: abre a folha de compartilhamento (WhatsApp direto).
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;   // cancelar também cai aqui: nada a avisar
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') return;   // usuário cancelou
+    console.warn('[escalacao] share indisponível, baixando', error);
+  }
+
+  // Desktop / navegador sem Web Share de arquivo: baixa o PNG.
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Imagem da escalação baixada.');
   } catch (error) {
     console.error(error);
-    showToast('Não foi possível copiar automaticamente.', 'error');
+    showToast('Não foi possível compartilhar a imagem.', 'error');
   }
 }
 
@@ -4858,7 +4883,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 
       ${canManagePresenceAuthz(currentPlayer) ? `
         <div class="actions" style="margin-top:12px;">
-          <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
+          <button class="btn btn-secondary" type="button" id="share-draw-btn">📸 Compartilhar escalação</button>
           <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
           <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear novamente</button>
         </div>
