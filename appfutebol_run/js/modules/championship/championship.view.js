@@ -198,7 +198,7 @@ function renderRoundMatrix(snapshot) {
   `;
 }
 
-function renderResultForm(snapshot, currentPlayer) {
+function renderResultForm(snapshot, currentPlayer, selectedDrawId = null) {
   if (!canManageChampionship(currentPlayer)) return '';
 
   const players = getFootballPlayers(snapshot);
@@ -216,7 +216,11 @@ function renderResultForm(snapshot, currentPlayer) {
       </section>`;
   }
 
-  const selectedDraw = draws[0];
+  // O sorteio ESCOLHIDO no seletor comanda a tela (data + escalações). Antes era
+  // sempre `draws[0]` (o mais recente) e o <select> só era lido no submit: dava
+  // para escolher o sorteio de um jogo e ver/gravar os dados de outro. Ficava
+  // invisível enquanto a lista só tinha sorteios do mesmo jogo.
+  const selectedDraw = (selectedDrawId && draws.find((draw) => String(draw.id) === String(selectedDrawId))) || draws[0];
   const playerById = new Map(players.map((player) => [String(player.id), player]));
   const selectedDate = selectedDraw.date || (selectedDraw.created_at ? new Date(selectedDraw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
   const manualResults = getManualChampionshipResults(snapshot);
@@ -250,7 +254,8 @@ function renderResultForm(snapshot, currentPlayer) {
               const date = draw.date || (draw.created_at ? new Date(draw.created_at).toISOString().slice(0, 10) : '');
               const result = manualResults.find((entry) => String(entry.draw_id || '') === String(draw.id || '') || String(entry.date || '') === String(date));
               const total = (draw.team_a?.length || 0) + (draw.team_b?.length || 0);
-              return `<option value="${escapeHtml(draw.id)}">${formatDate(date)} · ${draw.game_time || '--:--'} · ${total} jogadores${result ? ' · lançado' : ''}</option>`;
+              const isSel = String(draw.id) === String(selectedDraw.id);
+              return `<option value="${escapeHtml(draw.id)}"${isSel ? ' selected' : ''}>${formatDate(date)} · ${draw.game_time || '--:--'} · ${total} jogadores${result ? ' · lançado' : ''}</option>`;
             }).join('')}
           </select>
         </label>
@@ -421,7 +426,7 @@ function collapsibleCard({ title, note = '', body = '', open = false, extraClass
     </details>`;
 }
 
-export function renderChampionshipScreen(snapshot, currentPlayer) {
+export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
@@ -434,7 +439,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer) {
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      ${renderResultForm(snapshot, currentPlayer)}
+      ${renderResultForm(snapshot, currentPlayer, selectedDrawId)}
 
       ${collapsibleCard({
         title: 'Classificação atual · Inverno 26',

@@ -34,6 +34,10 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
+// Sorteio escolhido no seletor de "lançar resultado". null = o mais recente.
+// Precisa ser estado (não só o valor do <select>): a data e as escalações
+// exibidas dependem dele, e o app re-renderiza por innerHTML a cada poll.
+let championshipDrawId = null;
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 let selfDeleteOpen = false;       // dentro do painel, zona de exclusão de conta aberta
@@ -1682,6 +1686,10 @@ document.addEventListener("click", async (e) => {
       statuses: builtResult.statuses,
     });
 
+    // Solta a seleção: lançado o resultado, o formulário volta ao sorteio mais
+    // recente em vez de ficar preso no que acabou de ser lançado.
+    championshipDrawId = null;
+
     const safeSnapshot = repairManualSnapshot(snapshot);
     await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
@@ -2963,6 +2971,26 @@ function getPerfWindow(snapshot, game) {
   return { openMs: markedMs, closeMs: markedMs + hours * 60 * 60 * 1000 };
 }
 
+// Jogo cuja janela de votação está ABERTA agora, do mais recente para o mais
+// antigo. Antes as votações usavam o jogo ATIVO: abrir o próximo jogo (manual
+// OU pelo cron `auto-open-games`, 2 dias antes) trocava a referência e a
+// votação do jogo recém-terminado sumia da tela mesmo com a janela dele aberta.
+// Neste app a janela de desempenho abre no lançamento do resultado — então
+// deixar de conseguir lançar (bug do getChampionshipDrawOptions, corrigido
+// junto) tirava a votação inteira daquele jogo. `windowFn` recebe o jogo e
+// devolve a janela pela regra de cada votação. Sem janela aberta, devolve null
+// e o chamador cai no jogo ativo (comportamento anterior preservado).
+function getGameWithOpenVoteWindow(snapshot, windowFn) {
+  const now = Date.now();
+  return getCurrentGames(snapshot)
+    .slice()
+    .sort((a, b) => String(b?.game_date || '').localeCompare(String(a?.game_date || '')))
+    .find((game) => {
+      const win = windowFn(game);
+      return !!win && now >= win.openMs && now <= win.closeMs;
+    }) || null;
+}
+
 function getInGamePlayers(snapshot, game) {
   const key = getGameKey(game);
   // Quem "jogou" = quem está CONFIRMADO neste jogo, pela regra CANÔNICA
@@ -2988,7 +3016,9 @@ function getInGamePlayers(snapshot, game) {
 async function maybeShowPerfVote(snapshot, currentPlayer) {
   if (!isVotingEnabled()) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
-  const game = getActiveGameFromSnapshot(snapshot);
+  // Desacoplado do jogo ativo: vale o jogo cuja janela está aberta.
+  const game = getGameWithOpenVoteWindow(snapshot, (g) => getPerfWindow(snapshot, g))
+    || getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
   const win = getPerfWindow(snapshot, game);
   const now = Date.now();
@@ -3178,7 +3208,9 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
   // Desempenho tem prioridade: se o modal dele está aberto, espera.
   if (document.getElementById('perf-vote-overlay')) return;
 
-  const game = getActiveGameFromSnapshot(snapshot);
+  // Desacoplado do jogo ativo: vale o jogo cuja janela está aberta.
+  const game = getGameWithOpenVoteWindow(snapshot, getCarneWindow)
+    || getActiveGameFromSnapshot(snapshot);
   const key = getGameKey(game);
   const win = getCarneWindow(game);
   const now = Date.now();
@@ -3855,6 +3887,13 @@ function bindAppEvents(currentPlayer) {
     copyPaymentsToClipboard();
   });
 
+  // Trocar o sorteio re-renderiza a tela, para a DATA e as ESCALAÇÕES
+  // acompanharem a escolha (sem isto dava para lançar o jogo errado).
+  appElement.querySelector('#championship-draw-id')?.addEventListener('change', (event) => {
+    championshipDrawId = event.target.value || null;
+    render(getState());
+  });
+
   wireSelfPixReceipt(appElement);
 
   appElement.querySelector('#copy-confirmed-btn')?.addEventListener('click', () => {
@@ -4178,7 +4217,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'championship':
       // Campeonato completo (Rei da Quadra + histórico) é Pro — Free vê o cadeado.
       if (!isPro()) return renderProLock({ title: 'Campeonato & Rei da Quadra', benefit: 'Lance resultados, acompanhe a classificação do Rei da Quadra e o histórico de campeões do grupo. Disponível no Pro.' });
-      return renderChampionshipScreen(snapshot, currentPlayer);
+      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
     case 'finance':
       if (!isPro()) return renderProLock({ title: 'Controle financeiro', benefit: 'Livro-caixa do clube: mensalidade, despesas e demonstrativo — tudo num lugar só. Disponível no Pro.' });
       if (!canManageFinance(currentPlayer)) return renderPublicFinanceScreen(snapshot);
@@ -4598,7 +4637,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
 }
 
 function renderChampionship(snapshot, currentPlayer) {
-  return renderChampionshipScreen(snapshot, currentPlayer);
+  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
 }
 
 function buildTeamDrawShareText(snapshot) {
