@@ -2444,6 +2444,19 @@ function bindGlobalSystemEvents() {
     showToast('Armazenamento do aparelho cheio. Os dados seguem salvos no servidor; considere remover fotos grandes.', 'error');
   });
 
+  // A gravação no servidor não aconteceu — o que está na tela agora é só local
+  // e vai ser substituído pelo estado remoto. O usuário PRECISA saber que
+  // precisa refazer; antes isso era silencioso e a alteração sumia sozinha.
+  // Um alerta por vez: o poll pode disparar o evento em sequência.
+  let remoteSaveFailureNotifiedAt = 0;
+  window.addEventListener('harmonia:remote-save-failed', (event) => {
+    const agora = Date.now();
+    if (agora - remoteSaveFailureNotifiedAt < 8000) return;
+    remoteSaveFailureNotifiedAt = agora;
+    console.warn('[app] alteração não salva no servidor:', event?.detail?.reason);
+    showToast('Sua alteração NÃO foi salva no servidor e será desfeita. Verifique a conexão e refaça.', 'error');
+  });
+
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.

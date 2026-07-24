@@ -155,19 +155,33 @@ function createHybridStorageAdapter() {
             { expectedUpdatedAt }
           );
 
+          // Chegar aqui significa que nem o rebase resolveu: a alteração NÃO
+          // está no servidor. O estado local será substituído pelo remoto, ou
+          // seja, o que o usuário acabou de fazer vai sumir da tela. Isso
+          // precisa ser dito — foi o silêncio aqui que fez um resultado de
+          // campeonato desaparecer sem ninguém perceber (INCIDENTE 23/07).
           if (result.conflict) {
             console.warn("[storage.adapter] remote conflict detected; local change was not pushed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {
               detail: { reason: result.reason },
+            }));
+            window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+              detail: { reason: result.reason, conflict: true },
             }));
             return;
           }
 
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
+            window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+              detail: { reason: result.reason, conflict: false },
+            }));
           }
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
+          window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+            detail: { reason: 'remote_save_queue_failed', conflict: false },
+          }));
           return { ok: false, reason: 'remote_save_queue_failed', error };
         }).finally(() => {
           pendingRemoteWrites = Math.max(0, pendingRemoteWrites - 1);
