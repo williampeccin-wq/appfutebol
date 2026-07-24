@@ -173,7 +173,10 @@ function createHybridStorageAdapter() {
             window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {
               detail: { reason: result.reason },
             }));
-            return;
+            window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+              detail: { reason: result.reason, conflict: true },
+            }));
+            return { ok: false, conflict: true, reason: result.reason };
           }
 
           if (!result.ok) {
@@ -184,16 +187,18 @@ function createHybridStorageAdapter() {
             // perdida na noite do jogo, sem rastro pro admin. Avisa a UI.
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
-              detail: { reason: result.reason },
+              detail: { reason: result.reason, conflict: false },
             }));
           }
+
+          // O resultado PRECISA voltar para quem chamou. Antes esta cadeia
+          // resolvia `undefined` no sucesso e no erro, então quem gravava não
+          // tinha como saber se deu certo — e afirmava "salvo" de qualquer jeito.
+          return result;
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
           window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
             detail: { reason: 'remote_save_queue_failed', conflict: false },
-          }));
-          window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
-            detail: { reason: 'remote_save_queue_failed' },
           }));
           return { ok: false, reason: 'remote_save_queue_failed', error };
         }).finally(() => {

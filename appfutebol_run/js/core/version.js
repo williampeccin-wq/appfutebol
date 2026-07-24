@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.151.0-autoteste-parametrizacao';
+export const APP_VERSION = 'v1.152.0-poll-nao-atropela-edicao';

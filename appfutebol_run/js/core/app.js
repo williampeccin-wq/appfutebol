@@ -66,6 +66,12 @@ function financeAddYm(ym, delta) {
 
 
 let uiActionInFlight = false;
+// Quantos ciclos de sync seguidos foram pulados por causa de uiActionInFlight.
+// Teto de segurança para a flag não conseguir travar a sincronização para
+// sempre caso vaze ligada. 5 ciclos x 6s = ~30s, bem acima de qualquer upload
+// de foto ou tempo de leitura de um modal.
+let syncSkipStreak = 0;
+const SYNC_SKIP_MAX = 5;
 
 // Dev/test hook: exposes centralized authorization decisions without leaking DB keys.
 exposeAuthz(() => getCurrentPlayer());
@@ -1723,7 +1729,13 @@ document.addEventListener("click", async (e) => {
     uiActionInFlight = true;
     setActionBusy(trigger, 'Salvando...');
 
-    persistChampionshipResult(snapshot, {
+    // RELÊ o estado. O `snapshot` foi capturado antes dos modais acima, e
+    // enquanto o admin lia a pergunta o poll pode ter trocado o estado por
+    // baixo. Gravar o snapshot velho aqui carimba dado obsoleto por cima.
+    const snapshotFresco = getState();
+    snapshotFresco.session = snapshot.session;   // sessão é local, não vem do poll
+
+    persistChampionshipResult(snapshotFresco, {
       id: globalThis.crypto?.randomUUID ? `championship_result_${globalThis.crypto.randomUUID()}` : `championship_result_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       date,
       outcome: builtResult.outcome,
@@ -1740,11 +1752,18 @@ document.addEventListener("click", async (e) => {
     championshipDrawId = null;
     championshipLineup = null;
 
-    const safeSnapshot = repairManualSnapshot(snapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
+    const safeSnapshot = repairManualSnapshot(snapshotFresco);
+    const gravacao = await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
     uiActionInFlight = false;
-    showToast("Resultado lançado e classificação recalculada", "success");
+
+    // Não afirmar sucesso sem ter certeza: se a gravação remota falhou, o
+    // resultado vive só neste aparelho e some no próximo sync.
+    if (gravacao && gravacao.ok !== true) {
+      showToast('Resultado NÃO foi salvo no servidor. Verifique a conexão e lance de novo.', 'error');
+    } else {
+      showToast("Resultado lançado e classificação recalculada", "success");
+    }
     return;
   }
 
@@ -2865,6 +2884,26 @@ async function syncRemoteOnce() {
   // Há escrita local ainda não confirmada no servidor: aplicar o remoto agora
   // reverteria a edição do usuário (lost update). Pula este ciclo.
   if (hasPendingRemoteWrites()) return;
+  // Ação do usuário EM ANDAMENTO. Vários handlers capturam o estado, esperam
+  // algo demorado (upload de foto, modal de confirmação) e só então gravam.
+  // Se o poll trocar o estado nesse intervalo, o handler grava o snapshot
+  // velho por cima do que acabou de chegar — inclusive revertendo a edição de
+  // outra pessoa. `hasPendingRemoteWrites` só cobre DEPOIS do save; esta guarda
+  // cobre o intervalo ANTES dele. Ver INCIDENTE 24/07 (resultado do campeonato
+  // relançado voltava sozinho).
+  //
+  // Com TETO: se a flag vazar ligada (um handler que sai por um caminho sem
+  // resetá-la), o app deixaria de sincronizar para sempre e ninguém saberia.
+  // Depois de SYNC_SKIP_MAX ciclos consecutivos preferimos sincronizar mesmo
+  // assim — ficar defasado é pior do que a corrida que a guarda evita.
+  if (uiActionInFlight && syncSkipStreak < SYNC_SKIP_MAX) {
+    syncSkipStreak += 1;
+    return;
+  }
+  if (syncSkipStreak >= SYNC_SKIP_MAX) {
+    console.warn('[remote-sync] uiActionInFlight preso por muitos ciclos — sincronizando assim mesmo.');
+  }
+  syncSkipStreak = 0;
 
   syncInFlight = true;
   try {
