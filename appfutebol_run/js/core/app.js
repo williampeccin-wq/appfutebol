@@ -2486,7 +2486,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
-import { FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, proximaDataDeJogo } from '../domain/club-profile.js';
+import { FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -4209,45 +4209,10 @@ function bindAppEvents(currentPlayer) {
     clubProfileForm.addEventListener('submit', (event) => {
       event.preventDefault();
       if (!requireAdmin(getState(), 'Apenas administrador pode configurar o clube')) return;
-      const f = new FormData(clubProfileForm);
-      const inteiro = (nome, padrao) => {
-        const n = Number(f.get(nome));
-        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : padrao;
-      };
-
+      // A montagem do perfil é pura e testada (perfilDoFormulario); aqui só
+      // lemos o formulário e gravamos.
       const next = structuredClone(getState());
-      const atual = getClubProfile(next);
-      // Grava o perfil COMPLETO (defaults + o que mudou). O acessor tolera
-      // perfil parcial, mas gravar inteiro deixa explícito no banco o que o
-      // clube pratica — e tira a instalação legada da ponte do dataset.
-      next.profile = {
-        ...atual,
-        schema_version: 1,
-        game: {
-          ...atual.game,
-          format: String(f.get('format') || atual.game.format),
-          players_per_team: inteiro('players_per_team', atual.game.players_per_team),
-          goalkeepers_per_game: inteiro('goalkeepers_per_game', atual.game.goalkeepers_per_game),
-          cadence: String(f.get('cadence') || atual.game.cadence),
-          day_of_week: inteiro('day_of_week', atual.game.day_of_week),
-        },
-        positions: { ...atual.positions, enabled: f.get('usa_posicoes') === 'on' },
-        modules: {
-          ...atual.modules,
-          churrasco: f.get('mod_churrasco') === 'on',
-          campeonato: f.get('mod_campeonato') === 'on',
-          votacao_desempenho: f.get('mod_votacao') === 'on',
-        },
-        championship: {
-          ...atual.championship,
-          points: {
-            win: inteiro('pts_win', atual.championship.points.win),
-            draw: inteiro('pts_draw', atual.championship.points.draw),
-            loss: inteiro('pts_loss', atual.championship.points.loss),
-            no_play: inteiro('pts_no_play', atual.championship.points.no_play),
-          },
-        },
-      };
+      next.profile = perfilDoFormulario(new FormData(clubProfileForm), getClubProfile(next));
 
       const safeSnapshot = repairManualSnapshot(next);
       replaceState(safeSnapshot);

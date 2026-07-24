@@ -215,6 +215,64 @@ export function horarioPadraoDeJogo(state, options = null) {
   return getClubProfile(state, options).game.default_time || '';
 }
 
+/**
+ * Monta o perfil a partir dos campos do formulário de configuração.
+ *
+ * É PURA de propósito: `campos` é qualquer coisa com `.get(nome)` — um FormData
+ * no browser, um Map no teste. Enquanto essa transformação morava dentro do
+ * listener de submit, ela era a única parte da parametrização sem cobertura, e
+ * é justamente onde um nome de campo errado (ou uma seção esquecida no spread)
+ * passa despercebido: o admin salva, o app diz "salvo", e o valor não foi.
+ *
+ * Grava o perfil COMPLETO (defaults + o que mudou). O acessor tolera perfil
+ * parcial, mas gravar inteiro deixa explícito no banco o que o clube pratica —
+ * e tira a instalação legada da ponte do dataset histórico.
+ */
+export function perfilDoFormulario(campos, perfilAtual) {
+  const atual = perfilAtual;
+  const texto = (nome, padrao) => String(campos.get(nome) || padrao);
+  const ligado = (nome) => campos.get(nome) === 'on';
+  const inteiro = (nome, padrao) => {
+    // String vazia PRECISA ser rejeitada explicitamente: Number('') é 0, e 0
+    // passa em `>= 0`. Sem esta guarda, o admin que apagasse o campo para
+    // redigitar e salvasse sem querer zerava a configuração do clube — e
+    // "0 jogadores por time" é uma configuração destrutiva e silenciosa.
+    const bruto = campos.get(nome);
+    if (bruto === null || bruto === undefined || String(bruto).trim() === '') return padrao;
+    const n = Number(bruto);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : padrao;
+  };
+
+  return {
+    ...atual,
+    schema_version: 1,
+    game: {
+      ...atual.game,
+      format: texto('format', atual.game.format),
+      players_per_team: inteiro('players_per_team', atual.game.players_per_team),
+      goalkeepers_per_game: inteiro('goalkeepers_per_game', atual.game.goalkeepers_per_game),
+      cadence: texto('cadence', atual.game.cadence),
+      day_of_week: inteiro('day_of_week', atual.game.day_of_week),
+    },
+    positions: { ...atual.positions, enabled: ligado('usa_posicoes') },
+    modules: {
+      ...atual.modules,
+      churrasco: ligado('mod_churrasco'),
+      campeonato: ligado('mod_campeonato'),
+      votacao_desempenho: ligado('mod_votacao'),
+    },
+    championship: {
+      ...atual.championship,
+      points: {
+        win: inteiro('pts_win', atual.championship.points.win),
+        draw: inteiro('pts_draw', atual.championship.points.draw),
+        loss: inteiro('pts_loss', atual.championship.points.loss),
+        no_play: inteiro('pts_no_play', atual.championship.points.no_play),
+      },
+    },
+  };
+}
+
 /** Módulo ligado para este clube? Usado para esconder abas e ações. */
 export function isModuleOn(state, moduleName, options = null) {
   const modules = getClubProfile(state, options).modules;

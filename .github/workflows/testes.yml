@@ -1,0 +1,32 @@
+# Roda a suíte de regressão a cada push e em cada PR.
+#
+# Sem dependências e sem build: os testes usam só o runner embutido do Node e
+# importam os módulos reais de appfutebol_run/js. Se um dia isto ficar lento ou
+# exigir instalação, algo saiu do lugar.
+name: testes
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+
+jobs:
+  regressao:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sintaxe de todos os módulos
+        # Pega import quebrado e erro de digitação antes de qualquer asserção —
+        # o app não tem build, então isto é a única checagem estática que existe.
+        run: |
+          for f in $(find appfutebol_run/js -name '*.js'); do
+            node --input-type=module --check < "$f" || { echo "SINTAXE QUEBRADA: $f"; exit 1; }
+          done
+
+      - name: Suíte de regressão
+        run: node --test "tests/*.regression.mjs"
