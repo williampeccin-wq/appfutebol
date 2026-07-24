@@ -57,6 +57,12 @@ let editingCarnePairIndex = -1;
 
 
 let uiActionInFlight = false;
+// Quantos ciclos de sync seguidos foram pulados por causa de uiActionInFlight.
+// Teto de segurança para a flag não conseguir travar a sincronização para
+// sempre caso vaze ligada. 5 ciclos x 6s = ~30s, bem acima de qualquer upload
+// de foto ou tempo de leitura de um modal.
+let syncSkipStreak = 0;
+const SYNC_SKIP_MAX = 5;
 
 // Dev/test hook: exposes centralized authorization decisions without leaking DB keys.
 exposeAuthz(() => getCurrentPlayer());
@@ -2619,6 +2625,23 @@ async function syncRemoteOnce() {
   // Há escrita local ainda não confirmada no servidor: aplicar o remoto agora
   // reverteria a edição do usuário (lost update). Pula este ciclo.
   if (hasPendingRemoteWrites()) return;
+  // Ação do usuário EM ANDAMENTO. Vários handlers capturam o estado, esperam
+  // algo demorado (upload de foto, modal de confirmação) e só então gravam. Se
+  // o poll trocar o estado nesse intervalo, o handler grava o snapshot velho
+  // por cima do que acabou de chegar — inclusive revertendo a edição de outra
+  // pessoa. `hasPendingRemoteWrites` só cobre DEPOIS do save; esta guarda cobre
+  // o intervalo ANTES dele. Ver INCIDENTE 24/07.
+  //
+  // Com TETO: se a flag vazar ligada, o app deixaria de sincronizar para sempre
+  // e ninguém saberia. Ficar defasado é pior do que a corrida que ela evita.
+  if (uiActionInFlight && syncSkipStreak < SYNC_SKIP_MAX) {
+    syncSkipStreak += 1;
+    return;
+  }
+  if (syncSkipStreak >= SYNC_SKIP_MAX) {
+    console.warn('[remote-sync] uiActionInFlight preso por muitos ciclos — sincronizando assim mesmo.');
+  }
+  syncSkipStreak = 0;
 
   syncInFlight = true;
   try {

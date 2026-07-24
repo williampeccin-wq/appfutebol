@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.117.0-lancamento-confiavel';
+export const APP_VERSION = 'v1.118.0-poll-nao-atropela-edicao';
