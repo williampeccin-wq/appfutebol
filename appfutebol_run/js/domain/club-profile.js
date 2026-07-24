@@ -174,6 +174,42 @@ function isoDe(data) {
   return `${data.getFullYear()}-${mes}-${dia}`;
 }
 
+// Presets de formato. Escolher um preenche o resto — é o atalho para quem não
+// quer configurar campo a campo. 'custom' deixa os números como estão.
+export const FORMATOS = {
+  campo11:  { label: 'Campo (11 por time)',   players_per_team: 11, goalkeepers_per_game: 2 },
+  society7: { label: 'Society (7 por time)',  players_per_team: 7,  goalkeepers_per_game: 2 },
+  futsal5:  { label: 'Futsal (5 por time)',   players_per_team: 5,  goalkeepers_per_game: 2 },
+  custom:   { label: 'Outro (eu defino)',     players_per_team: null, goalkeepers_per_game: null },
+};
+
+/** Quantos goleiros cabem num jogo deste clube. 0 = clube não usa goleiro fixo. */
+export function goleirosPorJogo(state, options = null) {
+  const n = Number(getClubProfile(state, options).game.goalkeepers_per_game);
+  return Number.isFinite(n) && n >= 0 ? n : 2;
+}
+
+/** Quantos jogadores de linha por time — usado para sugerir o limite do jogo. */
+export function jogadoresPorTime(state, options = null) {
+  const n = Number(getClubProfile(state, options).game.players_per_team);
+  return Number.isFinite(n) && n > 0 ? n : 11;
+}
+
+/**
+ * Limite de jogadores de linha sugerido para um jogo novo: os dois times cheios.
+ * Só sugestão — o admin edita no formulário, porque a realidade da quadra manda.
+ */
+export function limiteSugeridoDeJogo(state, options = null) {
+  const perfil = getClubProfile(state, options);
+  const times = Number(perfil.game.teams) || 2;
+  return jogadoresPorTime(state, options) * times;
+}
+
+/** O clube usa posição em campo? Clube de pelada simples pode não usar. */
+export function usaPosicoes(state, options = null) {
+  return getClubProfile(state, options).positions.enabled !== false;
+}
+
 /** Horário padrão do jogo deste clube. */
 export function horarioPadraoDeJogo(state, options = null) {
   return getClubProfile(state, options).game.default_time || '';

@@ -6,6 +6,7 @@ import { getCachedRatings, playerRatingAverages } from '../../services/ratings.s
 import { calculateAnnualRanking } from '../championship/championship.service.js';
 import { isPro } from '../../domain/gating.js';
 import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
+import { goleirosPorJogo, usaPosicoes } from '../../domain/club-profile.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -124,9 +125,16 @@ export function addRentalGoalkeeper(name = '') {
   const game = activeGame(snapshot);
   const current = getRentalGoalkeepers(game);
   const cleanName = String(name || '').trim() || `Goleiro de aluguel ${current.length + 1}`;
+  // O teto de goleiros vem do perfil do clube: futsal costuma usar 2, mas há
+  // clube que joga sem goleiro fixo (0) ou com um só.
+  const tetoGoleiros = goleirosPorJogo(snapshot);
 
-  if (current.length >= 2) {
-    return { ok: false, message: 'Limite de 2 goleiros atingido.' };
+  if (tetoGoleiros <= 0) {
+    return { ok: false, message: 'Este clube não usa goleiro fixo. Ajuste em Config › Como o clube joga.' };
+  }
+
+  if (current.length >= tetoGoleiros) {
+    return { ok: false, message: `Limite de ${tetoGoleiros} goleiro(s) atingido.` };
   }
 
   const entry = {
@@ -138,7 +146,7 @@ export function addRentalGoalkeeper(name = '') {
 
   patchActiveGame(snapshot, {
     ...game,
-    rental_goalkeepers: [...current, entry].slice(0, 2),
+    rental_goalkeepers: [...current, entry].slice(0, tetoGoleiros),
   });
 
   return { ok: true, message: `${cleanName} adicionado como goleiro.`, goalkeeper: entry };
@@ -377,8 +385,9 @@ export function toggleConfirmation(playerId, options = {}) {
   const goalkeeperPlayer = isGoalkeeperPlayer(player);
   const goalkeeperCount = getConfirmedGoalkeeperCount(capacityConfirmations, snapshot.players || []);
 
-  if (goalkeeperPlayer && goalkeeperCount >= 2) {
-    return { ok: false, message: 'O jogo já tem 2 goleiros confirmados.' };
+  const tetoGoleiros = goleirosPorJogo(snapshot);
+  if (goalkeeperPlayer && tetoGoleiros > 0 && goalkeeperCount >= tetoGoleiros) {
+    return { ok: false, message: `O jogo já tem ${tetoGoleiros} goleiro(s) confirmado(s).` };
   }
 
   const decision = getPresenceDecision({ player, game, confirmations: capacityConfirmations, mode: effectiveMode });
@@ -592,7 +601,10 @@ export function buildStrengthResolver(players = [], snapshot = getState()) {
 // para o mais fraco — com um leve "tremor" aleatório (±0.4) para que jogadores
 // de força parecida possam trocar de lado entre um sorteio e outro (os times não
 // saem idênticos toda semana), sem quebrar o equilíbrio.
-function balanceTeams(players, ratingOf = () => 0) {
+// `porPosicao=false`: clube que não usa posição (pelada simples). Sem isso, o
+// sorteio dividia por 'meia' para todo mundo — inofensivo, mas a paridade de
+// posição vira uma restrição fantasma que atrapalha o equilíbrio por nota.
+function balanceTeams(players, ratingOf = () => 0, porPosicao = true) {
   const teamA = [];
   const teamB = [];
   const totals = { A: 0, B: 0 };
@@ -605,7 +617,7 @@ function balanceTeams(players, ratingOf = () => 0) {
   };
 
   players.forEach((player) => {
-    buckets[getPositionBucket(player)].push(player);
+    buckets[porPosicao ? getPositionBucket(player) : 'meia'].push(player);
   });
 
   const countPos = (team, pos) => team.filter((p) => getPositionBucket(p) === pos).length;
@@ -687,7 +699,7 @@ export function drawTeams() {
   // balanceTeams) e sorteia aleatório dentro de cada posição (ratingOf = 0).
   const { strengthOf } = buildStrengthResolver(eligiblePlayers, snapshot);
   const ratingOf = isPro() ? strengthOf : () => 0;
-  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf);
+  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf, usaPosicoes(snapshot));
   const createdAt = new Date().toISOString();
   
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');

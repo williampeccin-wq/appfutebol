@@ -2486,7 +2486,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
-import { getClubProfile, horarioPadraoDeJogo, isModuleOn, proximaDataDeJogo } from '../domain/club-profile.js';
+import { FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -4195,6 +4195,17 @@ function bindAppEvents(currentPlayer) {
 
   const clubProfileForm = appElement.querySelector('#club-profile-form');
   if (clubProfileForm) {
+    // Escolher um formato preenche os números na hora. Sem isto o seletor seria
+    // decorativo: o admin escolheria "Futsal" e continuaria vendo 11 por time.
+    clubProfileForm.querySelector('[name="format"]')?.addEventListener('change', (event) => {
+      const preset = FORMATOS[event.target.value];
+      if (!preset || preset.players_per_team == null) return;   // 'custom' não mexe
+      const ppt = clubProfileForm.querySelector('[name="players_per_team"]');
+      const gk = clubProfileForm.querySelector('[name="goalkeepers_per_game"]');
+      if (ppt) ppt.value = preset.players_per_team;
+      if (gk) gk.value = preset.goalkeepers_per_game;
+    });
+
     clubProfileForm.addEventListener('submit', (event) => {
       event.preventDefault();
       if (!requireAdmin(getState(), 'Apenas administrador pode configurar o clube')) return;
@@ -4212,7 +4223,15 @@ function bindAppEvents(currentPlayer) {
       next.profile = {
         ...atual,
         schema_version: 1,
-        game: { ...atual.game, cadence: String(f.get('cadence') || atual.game.cadence), day_of_week: inteiro('day_of_week', atual.game.day_of_week) },
+        game: {
+          ...atual.game,
+          format: String(f.get('format') || atual.game.format),
+          players_per_team: inteiro('players_per_team', atual.game.players_per_team),
+          goalkeepers_per_game: inteiro('goalkeepers_per_game', atual.game.goalkeepers_per_game),
+          cadence: String(f.get('cadence') || atual.game.cadence),
+          day_of_week: inteiro('day_of_week', atual.game.day_of_week),
+        },
+        positions: { ...atual.positions, enabled: f.get('usa_posicoes') === 'on' },
         modules: {
           ...atual.modules,
           churrasco: f.get('mod_churrasco') === 'on',
@@ -5516,7 +5535,9 @@ function renderConfig(snapshot, currentPlayer) {
   const olderPastGames = lastPastGame ? pastGamesForList.slice(0, -1) : [];
   const shownGames = [...games.filter((g) => !isOldPast(g)), ...(lastPastGame ? [lastPastGame] : [])].sort(byGameDate);
   const maxPlayers = Number(game.max_players || game.maxPlayers || 10);
-  const defaultNewGameMaxPlayers = maxPlayers || 10;
+  // Fallback vem do PERFIL (jogadores por time x nº de times), não de um 10
+  // fixo: clube de futsal não deveria ver 10 sugerido.
+  const defaultNewGameMaxPlayers = maxPlayers || limiteSugeridoDeJogo(snapshot);
   const adminNotification = (Array.isArray(snapshot.notifications) ? snapshot.notifications.find((item) => item?.type === 'admin')?.message : '') || '';
   const mensEnforcementMode = getMensalidadeMode(snapshot.settings);
 
@@ -5668,6 +5689,24 @@ function renderConfig(snapshot, currentPlayer) {
         <p class="footer-note">O app nasceu com os costumes de um clube só. Aqui você diz os do seu: o que não usar some da navegação, e a pontuação do campeonato deixa de ser fixa.</p>
         <form id="club-profile-form" class="player-admin-form game-config-form">
           <label class="form-group">
+            <span class="form-label">Formato do jogo</span>
+            <select name="format" class="input">
+              ${Object.entries(FORMATOS)
+                .map(([v, f]) => `<option value="${v}" ${perfil.game.format === v ? 'selected' : ''}>${f.label}</option>`).join('')}
+            </select>
+            <small class="footer-note">Escolher um formato preenche os números abaixo. "Outro" mantém o que você digitar.</small>
+          </label>
+
+          <div class="form-group">
+            <span class="form-label">Tamanho do jogo</span>
+            <div class="club-profile-points">
+              <label><small>Jogadores por time</small><input type="number" name="players_per_team" class="input" min="1" max="30" value="${perfil.game.players_per_team}" /></label>
+              <label><small>Goleiros no jogo</small><input type="number" name="goalkeepers_per_game" class="input" min="0" max="4" value="${perfil.game.goalkeepers_per_game}" /></label>
+            </div>
+            <small class="footer-note">Goleiros = 0 para clube que não usa goleiro fixo. Jogadores por time sugere o limite ao criar um jogo.</small>
+          </div>
+
+          <label class="form-group">
             <span class="form-label">Com que frequência vocês jogam</span>
             <select name="cadence" class="input">
               ${[['semanal', 'Toda semana'], ['quinzenal', 'A cada 15 dias'], ['mensal', 'Uma vez por mês'], ['avulso', 'Sem periodicidade']]
@@ -5688,7 +5727,10 @@ function renderConfig(snapshot, currentPlayer) {
             <label class="checkbox-row"><input type="checkbox" name="mod_churrasco" ${perfil.modules.churrasco ? 'checked' : ''} /> <span>Churrasco e rodízio de duplas</span></label>
             <label class="checkbox-row"><input type="checkbox" name="mod_campeonato" ${perfil.modules.campeonato ? 'checked' : ''} /> <span>Campeonato e classificação</span></label>
             <label class="checkbox-row"><input type="checkbox" name="mod_votacao" ${perfil.modules.votacao_desempenho ? 'checked' : ''} /> <span>Votação de desempenho</span></label>
+            <label class="checkbox-row"><input type="checkbox" name="usa_posicoes" ${perfil.positions.enabled !== false ? 'checked' : ''} /> <span>Posição em campo (goleiro, zagueiro…)</span></label>
           </div>
+
+          <p class="footer-note">O sorteio é sempre de <strong>2 times</strong>. Mais times exige mudar como o sorteio é guardado — está no plano, ainda não disponível.</p>
 
           <div class="form-group">
             <span class="form-label">Pontuação do campeonato</span>

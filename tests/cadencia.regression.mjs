@@ -100,3 +100,40 @@ assert.equal(
 );
 
 console.log('OK — 12 asserções. Cadência e dia da semana passam a decidir a próxima data de jogo.');
+
+// ---------------------------------------------------------------- tamanho do jogo
+//
+// Estes campos existiam no perfil desde a F1 mas NINGUÉM os lia. Foram ligados
+// junto com a abertura da tela: expor um controle sem consumi-lo é o defeito
+// que esta suíte existe para impedir.
+
+const { goleirosPorJogo, jogadoresPorTime, limiteSugeridoDeJogo, usaPosicoes, FORMATOS } =
+  await import('../appfutebol_run/js/domain/club-profile.js');
+
+assert.equal(goleirosPorJogo({}, SEM_LEGADO), 2, 'default de goleiros é o de hoje');
+assert.equal(goleirosPorJogo(clube({ goalkeepers_per_game: 0 }), SEM_LEGADO), 0,
+  'clube sem goleiro fixo pode zerar');
+assert.equal(goleirosPorJogo(clube({ goalkeepers_per_game: 1 }), SEM_LEGADO), 1,
+  'clube com um goleiro só');
+
+assert.equal(jogadoresPorTime({}, SEM_LEGADO), 11, 'default de jogadores por time é o de hoje');
+assert.equal(limiteSugeridoDeJogo({}, SEM_LEGADO), 22, 'limite sugerido = 11 x 2 times');
+assert.equal(
+  limiteSugeridoDeJogo(clube({ players_per_team: 5 }), SEM_LEGADO), 10,
+  'futsal sugere 10 jogadores de linha, não 22',
+);
+
+assert.equal(usaPosicoes({}, SEM_LEGADO), true, 'por padrão o clube usa posição, como hoje');
+assert.equal(
+  usaPosicoes({ profile: { positions: { enabled: false } } }, SEM_LEGADO), false,
+  'clube de pelada simples pode desligar posição',
+);
+
+// Os presets precisam bater com os números que preenchem — senão o seletor
+// mente para o admin.
+assert.equal(FORMATOS.futsal5.players_per_team, 5, 'preset futsal = 5 por time');
+assert.equal(FORMATOS.society7.players_per_team, 7, 'preset society = 7 por time');
+assert.equal(FORMATOS.campo11.players_per_team, 11, 'preset campo = 11 por time');
+assert.equal(FORMATOS.custom.players_per_team, null, 'custom não sobrescreve o que o admin digitou');
+
+console.log('OK — +11 asserções. Tamanho do jogo, goleiros e posições também decidem comportamento.');
