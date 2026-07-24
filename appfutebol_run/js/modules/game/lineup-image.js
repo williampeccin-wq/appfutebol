@@ -19,23 +19,25 @@ import { rotuloDoTime, timesDoSorteio } from '../../domain/draw-teams.js';
 const W = 1080;
 const H = 1350;
 
+// Mesma paleta da interface (:root do app.css). A arte deixa de ser um campo
+// verde genérico e passa a parecer parte do Convocados: fundo marinho, linhas
+// em azul suave, dourado da marca.
 const COR = {
-  campo: '#1f7a44',
-  campoEscuro: '#1a6b3c',
-  linha: 'rgba(255,255,255,0.55)',
-  fundo: '#0c1626',
-  texto: '#ffffff',
-  timeA: '#f0c040',   // dourado da marca
-  timeB: '#7db8ff',
-  chip: 'rgba(8,18,32,0.72)',
-  muted: '#9fb2cc',
+  fundo: '#060a16',        // --hfc-navy-900
+  fundoTopo: '#0c1a38',    // --hfc-navy-800
+  faixa: 'rgba(255,255,255,0.028)',
+  linha: 'rgba(150,195,255,0.22)',   // --hfc-line, um pouco mais visível
+  texto: '#eef2f9',        // --hfc-text
+  muted: '#8b97b0',        // --hfc-text-muted
+  ouro: '#f0a500',         // --hfc-gold
+  chip: 'rgba(6,10,22,0.82)',
 };
 
 const ORDEM_LINHAS = ['gol', 'zag', 'meia', 'atk'];
 
 // Cores por time. As duas primeiras são as de sempre (dourado da marca e azul);
 // as demais entram só quando o clube joga com 3+.
-const CORES_DE_TIME = ['#f0c040', '#7db8ff', '#8ee59a', '#ff9d7a', '#d3a4ff', '#ffe08a'];
+const CORES_DE_TIME = ['#f0a500', '#8fb4ff', '#19c37d', '#ff9d7a', '#d3a4ff', '#ffc23d'];
 function corDoTime(indice) {
   return CORES_DE_TIME[indice % CORES_DE_TIME.length];
 }
@@ -66,11 +68,16 @@ function carregarFoto(url) {
 }
 
 function desenharCampo(ctx) {
-  ctx.fillStyle = COR.campo;
+  // Gradiente marinho igual ao fundo do app, em vez de gramado verde.
+  const fundo = ctx.createLinearGradient(0, 0, 0, H);
+  fundo.addColorStop(0, COR.fundoTopo);
+  fundo.addColorStop(0.55, COR.fundo);
+  fundo.addColorStop(1, COR.fundoTopo);
+  ctx.fillStyle = fundo;
   ctx.fillRect(0, 0, W, H);
 
-  // Faixas alternadas de grama (leitura de campo, sem pesar)
-  ctx.fillStyle = COR.campoEscuro;
+  // Faixas quase imperceptíveis: dão profundidade sem virar gramado.
+  ctx.fillStyle = COR.faixa;
   const faixa = H / 12;
   for (let i = 0; i < 12; i += 2) ctx.fillRect(0, i * faixa, W, faixa);
 
@@ -121,7 +128,7 @@ function desenharJogador(ctx, x, y, player, foto, cor, raio = RAIO) {
     const fw = foto.width * escala, fh = foto.height * escala;
     ctx.drawImage(foto, x - fw / 2, y - fh / 2, fw, fh);
   } else {
-    ctx.fillStyle = '#14263d';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';   // --hfc-glass
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
     ctx.fillStyle = cor;
     ctx.font = `bold ${Math.round(r * 0.85)}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
@@ -218,17 +225,58 @@ function layoutTime(players, topo, altura, sentido, porPosicao = true) {
   return { posicoes, raio: r };
 }
 
-function desenharCabecalho(ctx, titulo, subtitulo) {
-  ctx.fillStyle = 'rgba(8,18,32,0.78)';
+function desenharCabecalho(ctx, titulo, subtitulo, escudo) {
+  ctx.fillStyle = 'rgba(6,10,22,0.72)';
   ctx.fillRect(0, 0, W, 132);
-  ctx.textAlign = 'center';
+  ctx.strokeStyle = COR.linha;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 132); ctx.lineTo(W, 132); ctx.stroke();
+
+  // Com escudo, título e escudo andam juntos e CENTRADOS como um bloco só —
+  // centrar o texto e encostar o escudo na borda deixava o conjunto torto.
+  const alturaEscudo = 74;
+  ctx.font = 'bold 46px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+  const larguraTitulo = ctx.measureText(titulo).width;
+  const larguraBloco = escudo ? alturaEscudo + 18 + larguraTitulo : larguraTitulo;
+  const inicio = (W - larguraBloco) / 2;
+
+  if (escudo) {
+    const proporcao = (escudo.width || 1) / (escudo.height || 1);
+    ctx.drawImage(escudo, inicio, 52 - alturaEscudo / 2, alturaEscudo * proporcao, alturaEscudo);
+  }
+
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COR.texto;
-  ctx.font = 'bold 46px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-  ctx.fillText(titulo, W / 2, 52);
+  ctx.fillText(titulo, escudo ? inicio + alturaEscudo + 18 : inicio, 52);
+
+  ctx.textAlign = 'center';
   ctx.fillStyle = COR.muted;
   ctx.font = '28px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-  ctx.fillText(subtitulo, W / 2, 96);
+  ctx.fillText(subtitulo, W / 2, 100);
+}
+
+// Rodapé com a marca. É o que faz a imagem circular no WhatsApp levar o
+// endereço junto — quem vê a escalação de um amigo descobre de onde ela veio.
+function desenharRodape(ctx, temConvidado) {
+  const y = H - 46;
+  ctx.fillStyle = 'rgba(6,10,22,0.72)';
+  ctx.fillRect(0, y - 24, W, 70);
+  ctx.strokeStyle = COR.linha;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, y - 24); ctx.lineTo(W, y - 24); ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = COR.ouro;
+  ctx.font = 'bold 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+  ctx.fillText('convocados.app.br', W / 2, y + 2);
+
+  if (temConvidado) {
+    ctx.fillStyle = COR.muted;
+    ctx.font = '20px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    ctx.fillText('* convidado', W / 2, y + 30);
+  }
 }
 
 function rotuloTime(ctx, texto, y, cor) {
@@ -249,7 +297,12 @@ function formatarData(iso, hora) {
 
 // Gera a imagem da escalação. Devolve um Blob PNG, ou null se não houver
 // sorteio. `titulo` deixa o nome do clube parametrizável (multi-tenant).
-export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } = {}) {
+// Caminho resolvido a partir do MÓDULO, não da página. Com './img/...' o
+// escudo só carregava quando a página estava na raiz — qualquer outra rota (ou
+// uma página de teste em subpasta) ficava sem escudo, em silêncio.
+const ESCUDO_PADRAO = new URL('../../../img/convocados-crest.png', import.meta.url).href;
+
+export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', escudoUrl = ESCUDO_PADRAO } = {}) {
   const sort = snapshot?.game?.sort_result;
   const listas = timesDoSorteio(sort);
   if (!listas.some((t) => t.length)) return null;
@@ -272,7 +325,7 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } 
   // para o outro); com 3+ viram faixas empilhadas — não é um campo de verdade,
   // mas é honesto: o clube que joga em rodízio não tem "dois lados".
   const topo = 132;
-  const alturaUtil = H - topo - 40;
+  const alturaUtil = H - topo - 96;   // 96 = faixa do rodapé
   const faixa = alturaUtil / times.length;
   const layouts = times.map((time, i) => layoutTime(
     time,
@@ -286,9 +339,12 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } 
 
   // Carrega todas as fotos em paralelo — uma que falhe não derruba a imagem.
   const todas = posPorTime.flat();
-  const fotos = await Promise.all(todas.map((p) => carregarFoto(getPlayerPhoto(p.player))));
+  const [fotos, escudo] = await Promise.all([
+    Promise.all(todas.map((p) => carregarFoto(getPlayerPhoto(p.player)))),
+    carregarFoto(escudoUrl),   // nunca rejeita: sem escudo, o título fica sozinho
+  ]);
 
-  desenharCabecalho(ctx, titulo, formatarData(snapshot?.game?.game_date, snapshot?.game?.game_time));
+  desenharCabecalho(ctx, titulo, formatarData(snapshot?.game?.game_date, snapshot?.game?.game_time), escudo);
   times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i)));
 
   let cursor = 0;
@@ -299,12 +355,7 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } 
     });
   });
 
-  if (todas.some((p) => ehTemporario(p.player))) {
-    ctx.textAlign = 'center';
-    ctx.font = '22px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-    ctx.fillStyle = COR.muted;
-    ctx.fillText('* convidado', W / 2, H - 16);
-  }
+  desenharRodape(ctx, todas.some((p) => ehTemporario(p.player)));
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }

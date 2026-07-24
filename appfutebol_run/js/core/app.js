@@ -4871,6 +4871,43 @@ function buildTeamDrawShareText(snapshot) {
   ].join('\n');
 }
 
+// Mostra a imagem gerada e devolve `true` se o admin confirmou o envio.
+// Vive fora do #app (como os outros modais), então o re-render do poll não a
+// apaga no meio da conferência.
+function mostrarPreviaEscalacao(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-modal-overlay escalacao-previa-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-modal escalacao-previa" role="dialog" aria-modal="true" aria-label="Prévia da escalação">
+        <div class="confirm-modal-title">Confira antes de enviar</div>
+        <img class="escalacao-previa-img" src="${url}" alt="Prévia da escalação" />
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" data-previa="cancelar">Voltar e ajustar</button>
+          <button type="button" class="btn btn-primary" data-previa="enviar">Compartilhar</button>
+        </div>
+      </div>`;
+
+    const fechar = (enviou) => {
+      document.removeEventListener('keydown', aoTeclar);
+      URL.revokeObjectURL(url);   // sem isto o PNG fica preso na memória a cada prévia
+      overlay.remove();
+      resolve(enviou);
+    };
+    const aoTeclar = (e) => { if (e.key === 'Escape') fechar(false); };
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return fechar(false);
+      const botao = e.target.closest('[data-previa]');
+      if (botao) fechar(botao.dataset.previa === 'enviar');
+    });
+
+    document.addEventListener('keydown', aoTeclar);
+    document.body.appendChild(overlay);
+  });
+}
+
 async function shareTeamDrawImage() {
   const snapshot = getState();
   if (!snapshot?.game?.sort_result) {
@@ -4893,6 +4930,12 @@ async function shareTeamDrawImage() {
 
   const nomeArquivo = `times-${String(snapshot?.game?.game_date || 'jogo')}.png`;
   const file = new File([blob], nomeArquivo, { type: 'image/png' });
+
+  // PREVIEW ANTES DE ENVIAR. A imagem é o que vai para o grupo e não dá para
+  // "editar depois" — se saiu com alguém no time errado, o estrago já está no
+  // WhatsApp. Ver antes é barato e evita o reenvio constrangedor.
+  const enviar = await mostrarPreviaEscalacao(blob);
+  if (!enviar) return;
 
   // Celular: abre a folha de compartilhamento (WhatsApp direto).
   try {
