@@ -2505,6 +2505,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
+import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
 import { FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
@@ -4832,8 +4833,8 @@ function buildTeamDrawShareText(snapshot) {
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
   const game = getActiveGameFromSnapshot(snapshot);
   // Mesma força combinada do selo (nota + campeonato), normalizada no conjunto sorteado.
-  const drawnPlayers = [...(sortResult.team_a || []), ...(sortResult.team_b || [])]
-    .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String((entry && typeof entry === 'object') ? entry.id : entry)))
+  const drawnPlayers = timesDoSorteio(sortResult).flat()
+    .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String(idDaEntrada(entry))))
     .filter(Boolean);
   const { strengthOf } = buildStrengthResolver(drawnPlayers, snapshot);
   const isTempEntry = (p) => !!(p && (p.temporary || p.guest || p.rental_goalkeeper));
@@ -4865,10 +4866,7 @@ function buildTeamDrawShareText(snapshot) {
     '⚽ Times do Convocados',
     `Jogo: ${formatDate(game.game_date)} às ${game.game_time || '--:--'}`,
     '',
-    formatTeam('Time A', sortResult.team_a),
-    '',
-    formatTeam('Time B', sortResult.team_b),
-    '',
+    ...timesDoSorteio(sortResult).flatMap((time, i) => [formatTeam(`Time ${rotuloDoTime(i)}`, time), '']),
     '— via Convocados · convocados.app.br',
   ].join('\n');
 }
@@ -5336,7 +5334,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 
   const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
   const sortEntryIds = sortResult
-    ? new Set([...(sortResult.team_a || []), ...(sortResult.team_b || [])].map((entry) => String(getEntryId(entry))))
+    ? new Set(timesDoSorteio(sortResult).flat().map((entry) => String(getEntryId(entry))))
     : new Set();
 
   const confirmedIds = new Set(
@@ -5399,7 +5397,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
   // Força do time = índice combinado (nota de desempenho + pontuação no
   // campeonato), na MESMA base usada no sorteio (normalizado dentro do conjunto
   // sorteado). Convidados/goleiros de aluguel ficam de fora da média do selo.
-  const drawnPlayers = [...(sortResult.team_a || []), ...(sortResult.team_b || [])]
+  const drawnPlayers = timesDoSorteio(sortResult).flat()
     .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String(getEntryId(entry))))
     .filter(Boolean);
   const { strengthOf } = buildStrengthResolver(drawnPlayers, snapshot);
@@ -5413,13 +5411,17 @@ function renderTeamDraw(snapshot, currentPlayer) {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
 
+  const totalTimes = timesDoSorteio(sortResult).length;
+  // Com 2 times, mover = "mandar para o outro". Com 3+, o botão manda para o
+  // PRÓXIMO e dá a volta — por isso o rótulo é calculado, não fixo.
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
       <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<button type="button" class="team-strength-badge" data-action="open-strength-info" aria-label="O que é a força do time?">⚡ ${s.toFixed(1)} <span class="team-strength-info">ⓘ</span></button>` : ''; })()}</div>
       <div class="placeholder-list">
         ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
-          const targetLabel = teamKey === 'team_a' ? 'Time B' : 'Time A';
+          const indiceAtual = typeof teamKey === 'number' ? teamKey : (teamKey === 'team_b' ? 1 : 0);
+          const targetLabel = `Time ${rotuloDoTime((indiceAtual + 1) % Math.max(2, totalTimes))}`;
           return `
             <div class="placeholder-row team-draw-player-row">
               <div class="placeholder-main team-draw-player-main">
@@ -5457,8 +5459,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
         <div class="info-line">• Sorteado em: ${new Date(sortResult.created_at).toLocaleString('pt-BR')}</div>
       </div>
       <div class="team-draw-grid">
-        ${renderTeam('Time A', sortResult.team_a, 'team_a')}
-        ${renderTeam('Time B', sortResult.team_b, 'team_b')}
+        ${timesDoSorteio(sortResult).map((time, i) => renderTeam(`Time ${rotuloDoTime(i)}`, time, i)).join('')}
       </div>
 
       ${isAdmin && outsideDraw.length ? `
@@ -5475,8 +5476,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
                   </div>
                 </div>
                 <div class="weekly-player-meta draw-add-actions">
-                  <button class="btn btn-secondary btn-sm" type="button" data-action="add-player-to-draw" data-player-id="${player.id}" data-team="team_a">Time A</button>
-                  <button class="btn btn-secondary btn-sm" type="button" data-action="add-player-to-draw" data-player-id="${player.id}" data-team="team_b">Time B</button>
+                  ${timesDoSorteio(sortResult).map((_t, i) => `<button class="btn btn-secondary btn-sm" type="button" data-action="add-player-to-draw" data-player-id="${player.id}" data-team="${i}">Time ${rotuloDoTime(i)}</button>`).join('')}
                 </div>
               </div>
             `).join('')}

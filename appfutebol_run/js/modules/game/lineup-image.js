@@ -14,6 +14,7 @@
 // Sem foto (ou se a foto falhar), cai nas iniciais: a imagem nunca deixa de sair.
 
 import { getInitials, getPlayerPhoto } from '../players/players.service.js';
+import { rotuloDoTime, timesDoSorteio } from '../../domain/draw-teams.js';
 
 const W = 1080;
 const H = 1350;
@@ -31,6 +32,13 @@ const COR = {
 };
 
 const ORDEM_LINHAS = ['gol', 'zag', 'meia', 'atk'];
+
+// Cores por time. As duas primeiras são as de sempre (dourado da marca e azul);
+// as demais entram só quando o clube joga com 3+.
+const CORES_DE_TIME = ['#f0c040', '#7db8ff', '#8ee59a', '#ff9d7a', '#d3a4ff', '#ffe08a'];
+function corDoTime(indice) {
+  return CORES_DE_TIME[indice % CORES_DE_TIME.length];
+}
 
 function posicaoDe(player) {
   if (player?.rental_goalkeeper) return 'gol';
@@ -87,8 +95,19 @@ function desenharCampo(ctx) {
 
 const RAIO = 46;
 
-function desenharJogador(ctx, x, y, player, foto, cor) {
-  const r = RAIO;
+// Quebra a lista em N fileiras de tamanho parecido, preservando a ordem (que já
+// vem ordenada por posição, então goleiro aparece primeiro).
+function emFileiras(players, quantidade) {
+  if (!players.length) return [];
+  const n = Math.max(1, quantidade);
+  const porFileira = Math.ceil(players.length / n);
+  const fileiras = [];
+  for (let i = 0; i < players.length; i += porFileira) fileiras.push(players.slice(i, i + porFileira));
+  return fileiras;
+}
+
+function desenharJogador(ctx, x, y, player, foto, cor, raio = RAIO) {
+  const r = raio;
 
   // Avatar (círculo recortado) ou iniciais
   ctx.save();
@@ -105,7 +124,7 @@ function desenharJogador(ctx, x, y, player, foto, cor) {
     ctx.fillStyle = '#14263d';
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
     ctx.fillStyle = cor;
-    ctx.font = 'bold 40px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    ctx.font = `bold ${Math.round(r * 0.85)}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(getInitials(player?.name) || '?', x, y + 2);
@@ -121,7 +140,7 @@ function desenharJogador(ctx, x, y, player, foto, cor) {
 
   // Luva do goleiro
   if (posicaoDe(player) === 'gol') {
-    ctx.font = '30px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    ctx.font = `${Math.round(r * 0.65)}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('🧤', x + r - 8, y - r + 10);
@@ -130,23 +149,25 @@ function desenharJogador(ctx, x, y, player, foto, cor) {
   // Nome numa tarja (legível sobre qualquer parte do gramado)
   const nome = String(player?.name || 'Jogador').split(' ')[0];
   const rotulo = ehTemporario(player) ? `${nome}*` : nome;
-  ctx.font = 'bold 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+  const fonteNome = Math.max(14, Math.round(r * 0.56));
+  ctx.font = `bold ${fonteNome}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   // A tarja ENCOSTA na base do avatar (visual de escalação de TV) em vez de
   // ficar solta abaixo: economiza a altura que fazia o nome de uma fileira
   // invadir os avatares da fileira seguinte.
-  const larg = Math.max(ctx.measureText(rotulo).width + 26, 92);
+  const alturaTarja = fonteNome + 10;
+  const larg = Math.max(ctx.measureText(rotulo).width + 22, r * 2);
   const ty = y + r - 2;
   ctx.fillStyle = COR.chip;
   // roundRect é recente (Chrome 99+/Safari 16+): num Android antigo a imagem
   // inteira quebraria por causa da tarja. Canto reto é degradação aceitável.
   if (typeof ctx.roundRect === 'function') {
     ctx.beginPath();
-    ctx.roundRect(x - larg / 2, ty - 18, larg, 36, 10);
+    ctx.roundRect(x - larg / 2, ty - alturaTarja / 2, larg, alturaTarja, 10);
     ctx.fill();
   } else {
-    ctx.fillRect(x - larg / 2, ty - 18, larg, 36);
+    ctx.fillRect(x - larg / 2, ty - alturaTarja / 2, larg, alturaTarja);
   }
   ctx.fillStyle = COR.texto;
   ctx.fillText(rotulo, x, ty);
@@ -154,11 +175,24 @@ function desenharJogador(ctx, x, y, player, foto, cor) {
 
 // Distribui os jogadores de um time em linhas por posição, dentro da metade
 // do campo. `dePara` = 1 desenha de cima para baixo (Time A), -1 espelhado.
-function layoutTime(players, topo, altura, sentido) {
-  const grupos = ORDEM_LINHAS
-    .map((pos) => players.filter((p) => posicaoDe(p) === pos))
-    .filter((g) => g.length);
-  if (!grupos.length) return [];
+// `porPosicao=false` (3+ times): os jogadores viram fileiras corridas, sem
+// agrupar por posição. Com 3 times ninguém joga uma formação — é rodízio — e
+// insistir em 4 fileiras dentro de uma faixa que encolheu deixava os avatares
+// minúsculos e os nomes empilhados. Menos fileiras, mais espaço, mais legível.
+function layoutTime(players, topo, altura, sentido, porPosicao = true) {
+  const grupos = porPosicao
+    ? ORDEM_LINHAS.map((pos) => players.filter((p) => posicaoDe(p) === pos)).filter((g) => g.length)
+    : emFileiras(players, Math.min(2, Math.max(1, Math.ceil(players.length / 5))));
+  if (!grupos.length) return { posicoes: [], raio: RAIO };
+
+  // O RAIO É CALCULADO, não fixo. Com 3+ times a faixa de cada um encolhe, e um
+  // raio fixo fazia a tarja de nome de uma fileira invadir os avatares da
+  // seguinte — exatamente o que a renderização mostrou com 3 times.
+  // A largura também limita: muitos jogadores na mesma fileira se encostariam.
+  const porFileira = Math.max(...grupos.map((g) => g.length));
+  const cabeNaAltura = (altura / grupos.length) * 0.40;
+  const cabeNaLargura = ((W - 120) / Math.max(1, porFileira)) * 0.42;
+  const r = Math.max(18, Math.min(RAIO, cabeNaAltura, cabeNaLargura));
 
   const posicoes = [];
   // `altura / n` com o centro de cada faixa — não `altura / (n+1)`, que sobrava
@@ -168,15 +202,20 @@ function layoutTime(players, topo, altura, sentido) {
   grupos.forEach((grupo, i) => {
     const offset = passo * (i + 0.5);
     const y = sentido === 1 ? topo + offset : topo + altura - offset;
-    const larguraUtil = W - 200;
+    // Fileira CENTRADA, com espaçamento proporcional ao raio. Espalhar sempre
+    // até as bordas deixava dois jogadores em pontas opostas com um vazio
+    // enorme no meio — visível assim que o clube joga com 3 times.
+    // O espaçamento é limitado pela largura do CARD (avatar + tarja de nome),
+    // não só pelo avatar: tarjas de nomes longos se encostavam.
+    const larguraCard = Math.max(r * 2.4, 120);
+    const espacamento = Math.max(larguraCard, (W - 140) / Math.max(1, grupo.length));
+    const largura = Math.min(espacamento * (grupo.length - 1), W - 140);
+    const inicio = (W - largura) / 2;
     grupo.forEach((p, j) => {
-      const x = grupo.length === 1
-        ? W / 2
-        : 100 + (larguraUtil / (grupo.length - 1)) * j;
-      posicoes.push({ player: p, x, y });
+      posicoes.push({ player: p, x: grupo.length === 1 ? W / 2 : inicio + espacamento * j, y });
     });
   });
-  return posicoes;
+  return { posicoes, raio: r };
 }
 
 function desenharCabecalho(ctx, titulo, subtitulo) {
@@ -212,12 +251,12 @@ function formatarData(iso, hora) {
 // sorteio. `titulo` deixa o nome do clube parametrizável (multi-tenant).
 export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } = {}) {
   const sort = snapshot?.game?.sort_result;
-  if (!sort || (!sort.team_a?.length && !sort.team_b?.length)) return null;
+  const listas = timesDoSorteio(sort);
+  if (!listas.some((t) => t.length)) return null;
 
   const byId = new Map((snapshot.players || []).map((p) => [String(p.id), p]));
   const resolver = (entry) => (entry && typeof entry === 'object') ? entry : byId.get(String(entry));
-  const timeA = (sort.team_a || []).map(resolver).filter(Boolean);
-  const timeB = (sort.team_b || []).map(resolver).filter(Boolean);
+  const times = listas.map((time) => time.map(resolver).filter(Boolean));
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -229,26 +268,35 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO' } 
   ctx.fillRect(0, 0, W, H);
   desenharCampo(ctx);
 
-  // Faixas dos times, com folga reservada para os rótulos TIME A / TIME B.
+  // Uma faixa horizontal por time. Com 2 times é o campo clássico (um de frente
+  // para o outro); com 3+ viram faixas empilhadas — não é um campo de verdade,
+  // mas é honesto: o clube que joga em rodízio não tem "dois lados".
   const topo = 132;
-  const centro = H / 2;
-  const areaTopoA = topo + 46;
-  const areaAltura = centro - 13 - areaTopoA;
-  const areaTopoB = centro + 13;
-  const posA = layoutTime(timeA, areaTopoA, areaAltura, 1);
-  const posB = layoutTime(timeB, areaTopoB, areaAltura, -1);
+  const alturaUtil = H - topo - 40;
+  const faixa = alturaUtil / times.length;
+  const layouts = times.map((time, i) => layoutTime(
+    time,
+    topo + faixa * i + 40,
+    faixa - 46,
+    // Só o segundo time de um confronto de 2 é espelhado (fica "de frente").
+    (times.length === 2 && i === 1) ? -1 : 1,
+    times.length <= 2,
+  ));
+  const posPorTime = layouts.map((l) => l.posicoes);
 
   // Carrega todas as fotos em paralelo — uma que falhe não derruba a imagem.
-  const todas = [...posA, ...posB];
+  const todas = posPorTime.flat();
   const fotos = await Promise.all(todas.map((p) => carregarFoto(getPlayerPhoto(p.player))));
 
   desenharCabecalho(ctx, titulo, formatarData(snapshot?.game?.game_date, snapshot?.game?.game_time));
-  rotuloTime(ctx, 'TIME A', topo + 26, COR.timeA);
-  rotuloTime(ctx, 'TIME B', areaTopoB + areaAltura + 38, COR.timeB);
+  times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i)));
 
-  todas.forEach((p, i) => {
-    const cor = i < posA.length ? COR.timeA : COR.timeB;
-    desenharJogador(ctx, p.x, p.y, p.player, fotos[i], cor);
+  let cursor = 0;
+  posPorTime.forEach((posicoes, i) => {
+    posicoes.forEach((p) => {
+      desenharJogador(ctx, p.x, p.y, p.player, fotos[cursor], corDoTime(i), layouts[i].raio);
+      cursor += 1;
+    });
   });
 
   if (todas.some((p) => ehTemporario(p.player))) {

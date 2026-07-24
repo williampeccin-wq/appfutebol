@@ -6,7 +6,8 @@ import { getCachedRatings, playerRatingAverages } from '../../services/ratings.s
 import { calculateAnnualRanking } from '../championship/championship.service.js';
 import { isPro } from '../../domain/gating.js';
 import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
-import { goleirosPorJogo, usaPosicoes } from '../../domain/club-profile.js';
+import { goleirosPorJogo, timesPorJogo, usaPosicoes } from '../../domain/club-profile.js';
+import { comTimes, idDaEntrada, semJogador, timesDoSorteio } from '../../domain/draw-teams.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -77,20 +78,7 @@ function buildDrawRemovalPatch(snapshot, playerId, now = new Date().toISOString(
     return {};
   }
 
-  const targetId = String(playerId);
-  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
-  const removeFromTeam = (team) => (
-    Array.isArray(team)
-      ? team.filter((entry) => String(getEntryId(entry)) !== targetId)
-      : []
-  );
-
-  const adjustedDraw = {
-    ...sortResult,
-    team_a: removeFromTeam(sortResult.team_a),
-    team_b: removeFromTeam(sortResult.team_b),
-    adjusted_at: now,
-  };
+  const adjustedDraw = { ...semJogador(sortResult, playerId), adjusted_at: now };
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
   const updatedGame = {
@@ -429,18 +417,13 @@ function scrubPlayerFromGameResults(championship, gameKey, playerId) {
   const results = active.results.map((result) => {
     if (String(result?.game_key || '') !== String(gameKey)) return result;
     const inStatuses = result.statuses && Object.prototype.hasOwnProperty.call(result.statuses, pid);
-    const inTeams = (Array.isArray(result.team_a) && result.team_a.some((id) => String(id) === pid)) ||
-                    (Array.isArray(result.team_b) && result.team_b.some((id) => String(id) === pid));
+    const inTeams = timesDoSorteio(result).some((time) =>
+      time.some((entry) => String(idDaEntrada(entry)) === pid));
     if (!inStatuses && !inTeams) return result;
     changed = true;
     const statuses = { ...(result.statuses || {}) };
     delete statuses[pid];
-    return {
-      ...result,
-      statuses,
-      team_a: (Array.isArray(result.team_a) ? result.team_a : []).filter((id) => String(id) !== pid),
-      team_b: (Array.isArray(result.team_b) ? result.team_b : []).filter((id) => String(id) !== pid),
-    };
+    return { ...semJogador(result, pid), statuses };
   });
   return changed ? { championship: { ...championship, active: { ...active, results } }, changed: true } : { championship, changed: false };
 }
@@ -594,33 +577,31 @@ export function buildStrengthResolver(players = [], snapshot = getState()) {
   return { strengthOf, perfOf, champOf };
 }
 
-// Divide os confirmados em dois times equilibrados pelo ÍNDICE DE FORÇA
-// (nota de desempenho + pontuação no campeonato), mantendo a PARIDADE DE
-// POSIÇÃO como restrição rígida (cada posição é dividida o mais igual possível
-// entre os times). Dentro de cada posição, os jogadores entram do mais forte
-// para o mais fraco — com um leve "tremor" aleatório (±0.4) para que jogadores
-// de força parecida possam trocar de lado entre um sorteio e outro (os times não
-// saem idênticos toda semana), sem quebrar o equilíbrio.
-// `porPosicao=false`: clube que não usa posição (pelada simples). Sem isso, o
-// sorteio dividia por 'meia' para todo mundo — inofensivo, mas a paridade de
-// posição vira uma restrição fantasma que atrapalha o equilíbrio por nota.
-function balanceTeams(players, ratingOf = () => 0, porPosicao = true) {
-  const teamA = [];
-  const teamB = [];
-  const totals = { A: 0, B: 0 };
+// Divide os confirmados em N times equilibrados pelo ÍNDICE DE FORÇA (nota de
+// desempenho + pontuação no campeonato), mantendo a PARIDADE DE POSIÇÃO como
+// restrição rígida: cada posição é distribuída o mais igual possível entre os
+// times. Dentro de cada posição, os jogadores entram do mais forte para o mais
+// fraco — com um leve "tremor" aleatório (±0.4) para que jogadores de força
+// parecida troquem de lado entre um sorteio e outro (os times não saem
+// idênticos toda semana), sem quebrar o equilíbrio.
+//
+// A generalização de 2 para N preservou a ordem de critérios: paridade de
+// posição primeiro, depois soma das notas, depois tamanho. Com N=2 o resultado
+// é o mesmo de antes.
+//
+// `porPosicao=false`: clube que não usa posição (pelada simples). Sem isso a
+// paridade vira uma restrição fantasma que atrapalha o equilíbrio por nota.
+function balanceTeams(players, ratingOf = () => 0, porPosicao = true, quantidadeTimes = 2) {
+  const n = Math.max(1, Math.floor(Number(quantidadeTimes) || 2));
+  const times = Array.from({ length: n }, () => []);
+  const somas = Array.from({ length: n }, () => 0);
 
-  const buckets = {
-    gol: [],
-    zag: [],
-    meia: [],
-    atk: [],
-  };
-
+  const buckets = { gol: [], zag: [], meia: [], atk: [] };
   players.forEach((player) => {
     buckets[porPosicao ? getPositionBucket(player) : 'meia'].push(player);
   });
 
-  const countPos = (team, pos) => team.filter((p) => getPositionBucket(p) === pos).length;
+  const contaPos = (time, pos) => time.filter((p) => getPositionBucket(p) === pos).length;
 
   Object.keys(buckets).forEach((pos) => {
     const ordered = [...buckets[pos]].sort((a, b) => {
@@ -630,23 +611,25 @@ function balanceTeams(players, ratingOf = () => 0, porPosicao = true) {
     });
 
     ordered.forEach((player) => {
-      const cA = countPos(teamA, pos);
-      const cB = countPos(teamB, pos);
-
-      let target;
-      if (cA !== cB) target = cA < cB ? 'A' : 'B';                          // 1º: paridade de posição
-      else if (totals.A !== totals.B) target = totals.A <= totals.B ? 'A' : 'B'; // 2º: equilíbrio de nota
-      else target = teamA.length <= teamB.length ? 'A' : 'B';              // 3º: menor time
-
-      if (target === 'A') { teamA.push(player); totals.A += ratingOf(player); }
-      else { teamB.push(player); totals.B += ratingOf(player); }
+      // Escolhe o time "mais carente", na mesma ordem de critérios de antes:
+      // menos jogadores DESTA posição, depois menor soma de notas, depois menor
+      // tamanho. O empate cai sempre no time de índice menor, o que torna o
+      // sorteio determinístico dado o tremor — sem isso, times iguais ficariam
+      // à mercê da ordem de iteração.
+      let alvo = 0;
+      for (let i = 1; i < n; i += 1) {
+        const cAtual = contaPos(times[alvo], pos);
+        const cCandidato = contaPos(times[i], pos);
+        if (cCandidato !== cAtual) { if (cCandidato < cAtual) alvo = i; continue; }
+        if (somas[i] !== somas[alvo]) { if (somas[i] < somas[alvo]) alvo = i; continue; }
+        if (times[i].length < times[alvo].length) alvo = i;
+      }
+      times[alvo].push(player);
+      somas[alvo] += ratingOf(player);
     });
   });
 
-  return {
-    teamA: sortPlayersForDisplay(teamA),
-    teamB: sortPlayersForDisplay(teamB),
-  };
+  return times.map(sortPlayersForDisplay);
 }
 
 
@@ -699,20 +682,26 @@ export function drawTeams() {
   // balanceTeams) e sorteia aleatório dentro de cada posição (ratingOf = 0).
   const { strengthOf } = buildStrengthResolver(eligiblePlayers, snapshot);
   const ratingOf = isPro() ? strengthOf : () => 0;
-  const { teamA, teamB } = balanceTeams(eligiblePlayers, ratingOf, usaPosicoes(snapshot));
+  // Quantos times este clube joga. Mais de 2 exige gente suficiente: com 5
+  // confirmados e 3 times sairia um time de 1, o que não é jogo — cai para o
+  // número de times que o plantel comporta.
+  const timesDesejados = timesPorJogo(snapshot);
+  const timesPossiveis = Math.max(2, Math.min(timesDesejados, Math.floor(eligiblePlayers.length / 2)));
+  const listas = balanceTeams(eligiblePlayers, ratingOf, usaPosicoes(snapshot), timesPossiveis);
   const createdAt = new Date().toISOString();
-  
+
+  const paraEntrada = (player) => ((player.rental_goalkeeper || player.guest) ? player : player.id);
   const drawId = `draw_${gameKey}_${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const sortResult = {
+  // comTimes grava `teams` (a verdade) E `team_a`/`team_b` (compatibilidade com
+  // código antigo em cache) — ver domain/draw-teams.js.
+  const sortResult = comTimes({
     id: drawId,
     game_key: gameKey,
     game_date: game.game_date || '',
     game_time: game.game_time || '',
     created_at: createdAt,
     total_players: eligiblePlayers.length,
-    team_a: teamA.map((player) => (player.rental_goalkeeper || player.guest) ? player : player.id),
-    team_b: teamB.map((player) => (player.rental_goalkeeper || player.guest) ? player : player.id),
-  };
+  }, listas.map((time) => time.map(paraEntrada)));
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
 
@@ -727,6 +716,16 @@ export function drawTeams() {
 }
 
 
+// `alvo` é o ÍNDICE do time (0 = A, 1 = B, ...). Aceita as chaves antigas
+// ('team_a'/'team_b') porque a UI e chamadas em cache ainda as usam.
+function indiceDoTime(alvo) {
+  if (typeof alvo === 'number' && Number.isFinite(alvo)) return Math.max(0, Math.floor(alvo));
+  if (alvo === 'team_b') return 1;
+  if (alvo === 'team_a') return 0;
+  const n = Number(alvo);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
 export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
   const snapshot = getState();
   const game = activeGame(snapshot);
@@ -736,15 +735,11 @@ export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
     return { ok: false, message: 'Nenhum sorteio disponível para editar.' };
   }
 
-  const targetKey = targetTeamKey === 'team_b' ? 'team_b' : 'team_a';
-  const sourceKey = targetKey === 'team_a' ? 'team_b' : 'team_a';
-
-  const teamA = Array.isArray(sortResult.team_a) ? [...sortResult.team_a] : [];
-  const teamB = Array.isArray(sortResult.team_b) ? [...sortResult.team_b] : [];
-  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const listas = timesDoSorteio(sortResult).map((time) => [...time]);
+  const alvo = Math.min(indiceDoTime(targetTeamKey), Math.max(0, listas.length - 1));
   const targetId = String(playerId);
 
-  if ([...teamA, ...teamB].some((entry) => String(getEntryId(entry)) === targetId)) {
+  if (listas.some((time) => time.some((entry) => String(idDaEntrada(entry)) === targetId))) {
     return { ok: false, message: 'Jogador já está no sorteio.' };
   }
 
@@ -773,12 +768,8 @@ export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
       }
     : registeredPlayer.id;
 
-  const adjustedDraw = {
-    ...sortResult,
-    [targetKey]: targetKey === 'team_a' ? [...teamA, playerEntry] : [...teamB, playerEntry],
-    [sourceKey]: sourceKey === 'team_a' ? teamA : teamB,
-    adjusted_at: new Date().toISOString(),
-  };
+  listas[alvo] = [...listas[alvo], playerEntry];
+  const adjustedDraw = { ...comTimes(sortResult, listas), adjusted_at: new Date().toISOString() };
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
   const updatedGame = {
@@ -804,31 +795,29 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
     return { ok: false, message: 'Nenhum sorteio disponível para ajustar.' };
   }
 
-  const sourceKey = fromTeamKey === 'team_a' ? 'team_a' : fromTeamKey === 'team_b' ? 'team_b' : null;
+  const listas = timesDoSorteio(sortResult).map((time) => [...time]);
+  if (listas.length < 2) {
+    return { ok: false, message: 'É preciso ter pelo menos dois times para mover jogadores.' };
+  }
 
-  if (!sourceKey) {
+  const origem = indiceDoTime(fromTeamKey);
+  if (origem >= listas.length) {
     return { ok: false, message: 'Time de origem inválido.' };
   }
 
-  const targetKey = sourceKey === 'team_a' ? 'team_b' : 'team_a';
-  const sourceTeam = Array.isArray(sortResult[sourceKey]) ? [...sortResult[sourceKey]] : [];
-  const targetTeam = Array.isArray(sortResult[targetKey]) ? [...sortResult[targetKey]] : [];
-  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
-  const sourceIndex = sourceTeam.findIndex((entry) => String(getEntryId(entry)) === String(playerId));
-
-  if (sourceIndex === -1) {
+  const posicao = listas[origem].findIndex((entry) => String(idDaEntrada(entry)) === String(playerId));
+  if (posicao === -1) {
     return { ok: false, message: 'Jogador não encontrado no time informado.' };
   }
 
-  const [movedPlayerEntry] = sourceTeam.splice(sourceIndex, 1);
-  targetTeam.push(movedPlayerEntry);
+  // Com 2 times, mover = trocar de lado (comportamento de sempre). Com 3+,
+  // avança para o PRÓXIMO e dá a volta — assim um toque repetido passeia o
+  // jogador por todos os times, sem precisar de um seletor.
+  const destino = (origem + 1) % listas.length;
+  const [entrada] = listas[origem].splice(posicao, 1);
+  listas[destino].push(entrada);
 
-  const adjustedDraw = {
-    ...sortResult,
-    [sourceKey]: sourceTeam,
-    [targetKey]: targetTeam,
-    adjusted_at: new Date().toISOString(),
-  };
+  const adjustedDraw = { ...comTimes(sortResult, listas), adjusted_at: new Date().toISOString() };
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
 
   patchActiveGame(snapshot, {

@@ -225,6 +225,12 @@ export function limiteSugeridoDeJogo(state, options = null) {
   return jogadoresPorTime(state, options) * times;
 }
 
+/** Quantos times o sorteio deste clube divide. 2 é o default histórico. */
+export function timesPorJogo(state, options = null) {
+  const n = Number(getClubProfile(state, options).game.teams);
+  return Number.isFinite(n) && n >= 2 ? Math.floor(n) : 2;
+}
+
 /** O clube usa posição em campo? Clube de pelada simples pode não usar. */
 export function usaPosicoes(state, options = null) {
   return getClubProfile(state, options).positions.enabled !== false;
