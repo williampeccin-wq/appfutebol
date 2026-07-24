@@ -40,3 +40,20 @@ Duas regras que vieram de erro real nesta base:
   Para telas novas: extraia o template do `app.js`, avalie com dados de exemplo,
   sirva com o `app.css` real e olhe. Não é automático, mas é barato.
 - **O caminho completo com Supabase real.** O `fetch` é falso nas suítes.
+
+## Autoteste de ponta a ponta (`/autoteste.html`)
+
+As suítes acima usam `fetch` falso. Para exercitar o caminho REAL — gravar no
+Supabase, reler do servidor, conferir que o app enxerga — abra `/autoteste.html`
+**já logado** no Convocados.
+
+Ele grava um perfil bem diferente do default (futsal, 0 goleiros, churrasco
+desligado, pontuação 2/1/0/0), relê, confere, e **devolve a configuração
+original** — inclusive se estourar no meio (o restore roda no `catch`).
+
+Duas travas, em código e não em cuidado do operador:
+- recusa rodar se o Supabase configurado for o do **Harmonia de produção**;
+- recusa rodar sem sessão (não faz login sozinho).
+
+Não roda em CI: precisa de sessão autenticada. É o preço de testar o caminho de
+verdade sem guardar senha em segredo de repositório.

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autoteste da parametrização — Convocados</title>
+  <link rel="stylesheet" href="./css/app.css">
+  <script src="./env.js"></script>
+  <style>
+    body { background: #0b1220; color: #eef2f9; font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .sub { color: #8b97b0; font-size: 13px; margin: 0 0 16px; }
+    .linha { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 14px; align-items: baseline; }
+    .ok { color: #4ade80; } .falhou { color: #f87171; } .info { color: #8b97b0; }
+    .marca { width: 18px; flex: none; }
+    .detalhe { color: #f87171; font-size: 12px; padding: 2px 0 6px 26px; font-family: ui-monospace, monospace; }
+    .resumo { margin: 16px 0; padding: 12px; border-radius: 10px; font-weight: 600; }
+    .resumo.ok { background: rgba(74,222,128,.12); }
+    .resumo.falhou { background: rgba(248,113,113,.12); }
+    .aviso { background: rgba(240,192,64,.12); color: #f0c040; padding: 12px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; }
+    button { background: #f0c040; color: #12203a; border: 0; border-radius: 10px; padding: 12px 18px; font-weight: 700; font-size: 15px; cursor: pointer; }
+    .grupo { margin-top: 18px; font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: #8b97b0; }
+  </style>
+</head>
+<body>
+  <h1>Autoteste da parametrização</h1>
+  <p class="sub">Exercita o caminho REAL: grava o perfil no Supabase, relê do servidor e confere se o app enxerga. Depois devolve tudo como estava.</p>
+  <div id="topo"></div>
+  <div id="saida"></div>
+
+<script type="module">
+// AUTOTESTE DE PONTA A PONTA DA PARAMETRIZAÇÃO
+//
+// As suítes em tests/ cobrem funções puras com fetch falso. Esta página cobre o
+// que elas não alcançam: gravar de verdade, reler do servidor e conferir que o
+// app enxerga o que foi gravado — que é exatamente onde os bugs desta base
+// moram ("a tela diz salvo e o valor não foi").
+//
+// Precisa de uma sessão já iniciada: abra o app, faça login, e volte aqui.
+
+import { loadRemoteState, saveRemoteState, getSupabaseMeta } from './js/services/storage.supabase.js';
+import {
+  getClubProfile, goleirosPorJogo, isModuleOn, jogadoresPorTime,
+  limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo, usaPosicoes,
+} from './js/domain/club-profile.js';
+
+// TRAVA DE SEGURANÇA — não é cuidado do operador, é código.
+// Este teste GRAVA. Rodá-lo contra o Harmonia de produção mexeria na
+// configuração do clube real, com jogadores reais dependendo dela.
+const HARMONIA_PROD = 'kpgghcrmbkrwpvtegcjh';
+
+const topo = document.getElementById('topo');
+const saida = document.getElementById('saida');
+const meta = getSupabaseMeta();
+
+if (String(meta.url || '').includes(HARMONIA_PROD)) {
+  topo.innerHTML = `<div class="aviso"><strong>Bloqueado.</strong> Esta página está apontando para o Supabase do Harmonia de produção.
+    O autoteste grava configuração e não pode rodar contra o clube real. Use o Convocados.</div>`;
+} else if (!localStorage.getItem('harmonia_auth_session')) {
+  topo.innerHTML = `<div class="aviso"><strong>Faça login primeiro.</strong> Abra o app, entre com sua conta e volte a esta página —
+    o teste usa a sua sessão para gravar.</div>`;
+} else {
+  topo.innerHTML = `<div class="aviso">Vai gravar a configuração do clube neste banco (<code>${meta.url.replace('https://','').split('.')[0]}</code>)
+    e devolvê-la ao final. Não use no clube real.</div><p><button id="rodar">Rodar autoteste</button></p>`;
+  document.getElementById('rodar').addEventListener('click', rodar);
+}
+
+let passou = 0, falhou = 0;
+
+function grupo(titulo) {
+  saida.insertAdjacentHTML('beforeend', `<div class="grupo">${titulo}</div>`);
+}
+
+function conferir(descricao, obtido, esperado) {
+  const igual = JSON.stringify(obtido) === JSON.stringify(esperado);
+  igual ? passou++ : falhou++;
+  saida.insertAdjacentHTML('beforeend',
+    `<div class="linha"><span class="marca ${igual ? 'ok' : 'falhou'}">${igual ? '✓' : '✗'}</span><span>${descricao}</span></div>` +
+    (igual ? '' : `<div class="detalhe">esperado ${JSON.stringify(esperado)} · obtido ${JSON.stringify(obtido)}</div>`));
+}
+
+function nota(texto) {
+  saida.insertAdjacentHTML('beforeend', `<div class="linha"><span class="marca info">·</span><span class="info">${texto}</span></div>`);
+}
+
+async function rodar() {
+  document.getElementById('rodar').disabled = true;
+  saida.innerHTML = '';
+  passou = 0; falhou = 0;
+
+  // ---- 1) Estado atual, e o perfil que vamos devolver no fim.
+  grupo('Carga inicial');
+  const carga = await loadRemoteState();
+  conferir('o estado do clube carrega do servidor', carga.ok, true);
+  if (!carga.ok) return finalizar(null, null);
+
+  const perfilOriginal = carga.state.profile ? JSON.parse(JSON.stringify(carga.state.profile)) : null;
+  nota(`perfil atual: ${perfilOriginal ? 'existe' : 'ainda não existe (clube usa os defaults)'} · ${(carga.state.players || []).length} jogadores`);
+
+  try {
+    // ---- 2) Grava um perfil bem diferente do default, pelo MESMO caminho da tela.
+    grupo('Gravação pelo caminho da tela');
+    const campos = new Map(Object.entries({
+      format: 'futsal5',
+      players_per_team: '5',
+      goalkeepers_per_game: '0',
+      cadence: 'quinzenal',
+      day_of_week: '6',
+      mod_campeonato: 'on',        // churrasco e votação DESMARCADOS (ausentes)
+      pts_win: '2', pts_draw: '1', pts_loss: '0', pts_no_play: '0',
+    }));
+
+    const estado = JSON.parse(JSON.stringify(carga.state));
+    estado.profile = perfilDoFormulario(campos, getClubProfile(estado));
+    const gravacao = await saveRemoteState(estado);
+    conferir('a gravação foi aceita pelo servidor', gravacao.ok, true);
+    if (!gravacao.ok) nota(`motivo: ${gravacao.reason}`);
+
+    // ---- 3) Relê do servidor. É aqui que "salvou mas não foi" apareceria.
+    grupo('Releitura do servidor');
+    const recarga = await loadRemoteState();
+    conferir('o estado recarrega', recarga.ok, true);
+    conferir('o perfil voltou do servidor', !!recarga.state?.profile, true);
+
+    const s = recarga.state;
+    conferir('formato gravado', s.profile?.game?.format, 'futsal5');
+    conferir('jogadores por time gravado como número', s.profile?.game?.players_per_team, 5);
+    conferir('zero goleiros sobreviveu (não virou default)', s.profile?.game?.goalkeepers_per_game, 0);
+    conferir('cadência gravada', s.profile?.game?.cadence, 'quinzenal');
+    conferir('dia da semana gravado', s.profile?.game?.day_of_week, 6);
+    conferir('checkbox ausente gravou como desligado', s.profile?.modules?.churrasco, false);
+    conferir('checkbox marcado gravou como ligado', s.profile?.modules?.campeonato, true);
+    conferir('pontuação custom gravada', s.profile?.championship?.points, { win: 2, draw: 1, loss: 0, no_play: 0 });
+
+    // ---- 4) O app enxerga? Os mesmos acessores que a UI usa.
+    grupo('O app enxerga o que foi gravado');
+    conferir('goleiros por jogo = 0', goleirosPorJogo(s), 0);
+    conferir('jogadores por time = 5', jogadoresPorTime(s), 5);
+    conferir('limite sugerido do jogo = 10 (5 x 2 times)', limiteSugeridoDeJogo(s), 10);
+    conferir('churrasco desligado', isModuleOn(s, 'churrasco'), false);
+    conferir('campeonato ligado', isModuleOn(s, 'campeonato'), true);
+    conferir('posições desligadas', usaPosicoes(s), false);
+
+    // Quinzenal + sábado: a partir de hoje, o próximo sábado + 7 dias.
+    const hoje = new Date();
+    const esperada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    let delta = (6 - esperada.getDay() + 7) % 7 || 7;
+    esperada.setDate(esperada.getDate() + delta + 7);
+    const iso = `${esperada.getFullYear()}-${String(esperada.getMonth()+1).padStart(2,'0')}-${String(esperada.getDate()).padStart(2,'0')}`;
+    conferir('próxima data de jogo derivada da cadência', proximaDataDeJogo(s, hoje), iso);
+
+    // ---- 5) O que a tela NÃO controla não pode ter sido destruído.
+    grupo('Nada foi destruído junto');
+    conferir('os jogadores continuam lá', (s.players || []).length, (carga.state.players || []).length);
+    conferir('o campeonato continua lá', !!s.championship, !!carga.state.championship);
+    conferir('os jogos continuam lá', (s.games || []).length, (carga.state.games || []).length);
+
+    await restaurar(perfilOriginal);
+  } catch (erro) {
+    falhou++;
+    saida.insertAdjacentHTML('beforeend', `<div class="detalhe">ERRO INESPERADO: ${erro?.message || erro}</div>`);
+    await restaurar(perfilOriginal);   // nunca deixar o clube configurado errado
+  }
+
+  finalizar();
+}
+
+// A restauração roda mesmo se o teste explodir no meio. Um autoteste que deixa
+// o clube desconfigurado é pior do que não ter autoteste.
+async function restaurar(perfilOriginal) {
+  grupo('Devolvendo a configuração original');
+  const atual = await loadRemoteState();
+  if (!atual.ok) { conferir('releitura para restaurar', false, true); return; }
+
+  const estado = JSON.parse(JSON.stringify(atual.state));
+  estado.profile = perfilOriginal;
+  const volta = await saveRemoteState(estado);
+  conferir('a restauração foi gravada', volta.ok, true);
+
+  const conferencia = await loadRemoteState();
+  conferir('o perfil voltou a ser o original',
+    JSON.stringify(conferencia.state?.profile ?? null),
+    JSON.stringify(perfilOriginal ?? null));
+}
+
+function finalizar() {
+  const ok = falhou === 0;
+  saida.insertAdjacentHTML('beforeend',
+    `<div class="resumo ${ok ? 'ok' : 'falhou'}">${ok
+      ? `Tudo passou — ${passou} verificações.`
+      : `${falhou} falha(s) de ${passou + falhou} verificações.`}</div>`);
+  const botao = document.getElementById('rodar');
+  if (botao) botao.disabled = false;
+}
+</script>
+</body>
+</html>
