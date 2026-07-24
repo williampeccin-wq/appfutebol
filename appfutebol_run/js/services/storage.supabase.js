@@ -2,6 +2,15 @@ import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 import { assertCriticalOperationAllowed } from './environment.guard.js';
 
 let lastRemoteUpdatedAt = null;
+// Baseline SEPARADO dos objetos compartilhados (game_state + app_meta).
+// Não dá para reaproveitar o lastRemoteUpdatedAt na trava de concorrência: ele é
+// o máximo entre QUATRO tabelas (players/presence/game/meta), enquanto a
+// verificação de frescor lê só duas (game/meta). Bastava alguém confirmar
+// presença para o baseline ficar mais novo que o valor comparado, a subtração
+// dar negativo e a trava NUNCA disparar — foi assim que um cliente defasado
+// sobrescreveu app_meta e apagou um resultado de campeonato já lançado no
+// Harmonia (INCIDENTE 23/07). Baseline e comparação têm de medir a MESMA coisa.
+let lastSharedUpdatedAt = null;
 let lastSplitSnapshot = null;
 let lastSplitFingerprint = '';
 let gameStateHadVolatileDraw = false;
@@ -349,6 +358,22 @@ function stableStringify(value) {
   return JSON.stringify(value ?? null);
 }
 
+// Maior timestamp de uma lista, ignorando nulos. Compara por valor numérico e
+// não por texto: o Postgres omite dígitos à direita nos milissegundos
+// (".5+00" vs ".559+00"), e aí a ordem lexicográfica mente.
+function maxTimestamp(values) {
+  let best = null;
+  let bestMs = -Infinity;
+  for (const value of (values || [])) {
+    if (!value) continue;
+    const ms = new Date(value).getTime();
+    if (!Number.isFinite(ms) || ms <= bestMs) continue;
+    bestMs = ms;
+    best = value;
+  }
+  return best;
+}
+
 function snapshotFingerprint(parts) {
   return stableStringify({
     players: parts.players,
@@ -473,7 +498,12 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
 }
 
 function rememberSplitSnapshot(state, updatedAt = null) {
-  const parts = splitState(state);
+  rememberSplitParts(splitState(state), updatedAt);
+}
+
+// Mesmo efeito, mas a partir das `parts` já prontas — usado depois de um rebase,
+// quando o que foi gravado difere do estado que a UI tinha em mãos.
+function rememberSplitParts(parts, updatedAt = null) {
   lastSplitSnapshot = cloneJson(parts);
   lastSplitFingerprint = snapshotFingerprint(parts);
   lastRemoteUpdatedAt = updatedAt || lastRemoteUpdatedAt;
@@ -693,6 +723,11 @@ async function loadSplitState(config) {
 
   lastRemoteUpdatedAt = updatedValues.length ? updatedValues[updatedValues.length - 1] : null;
 
+  // Baseline da trava de concorrência: SÓ game_state + app_meta, as duas linhas
+  // únicas gravadas "inteiras" e, por isso, as únicas sujeitas a sobrescrita
+  // cega. Tem de espelhar exatamente o que o fetchSharedUpdatedAt lê.
+  lastSharedUpdatedAt = maxTimestamp([gameRow?.updated_at, metaRow?.updated_at]);
+
   if (!isValidSplitState(state)) {
     return {
       ok: false,
@@ -863,11 +898,18 @@ async function fetchSharedUpdatedAt(config) {
     requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
     requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=updated_at&limit=1`), { method: 'GET' }),
   ]);
-  const values = [];
-  if (gameRes?.ok && Array.isArray(gameRes.data) && gameRes.data[0]?.updated_at) values.push(gameRes.data[0].updated_at);
-  if (metaRes?.ok && Array.isArray(metaRes.data) && metaRes.data[0]?.updated_at) values.push(metaRes.data[0].updated_at);
-  values.sort();
-  return values.length ? values[values.length - 1] : null;
+  // Falha de leitura NÃO pode virar "nada mudou": devolver null aqui faria a
+  // trava ser pulada e liberaria justamente a sobrescrita cega que ela existe
+  // para impedir. Sinaliza o erro e deixa o chamador tratar.
+  if (!gameRes?.ok || !metaRes?.ok) return { ok: false, updatedAt: null };
+
+  return {
+    ok: true,
+    updatedAt: maxTimestamp([
+      Array.isArray(gameRes.data) ? gameRes.data[0]?.updated_at : null,
+      Array.isArray(metaRes.data) ? metaRes.data[0]?.updated_at : null,
+    ]),
+  };
 }
 
 async function saveSplitState(config, state) {
@@ -911,24 +953,110 @@ async function saveSplitState(config, state) {
 
   // Concorrência otimista para os objetos compartilhados (game/meta): se vamos
   // sobrescrever um deles e o remoto avançou além do que conhecemos (outro admin
-  // gravou), ABORTA e sinaliza conflito em vez de apagar a alteração do outro.
-  // Nossas próprias gravações avançam lastRemoteUpdatedAt, então saves
+  // gravou), REBASEIA a alteração local sobre o estado fresco em vez de carimbar
+  // o snapshot inteiro por cima. Só desiste (conflito) se nem o rebase for
+  // possível. Nossas próprias gravações avançam lastSharedUpdatedAt, então saves
   // sequenciais do mesmo usuário não geram falso-positivo.
   const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
-  if (touchesShared && lastRemoteUpdatedAt) {
+  if (touchesShared && lastSharedUpdatedAt) {
     const freshShared = await fetchSharedUpdatedAt(config);
+
+    // Não conseguimos ler o estado do servidor — não dá para afirmar que é
+    // seguro sobrescrever. Aborta como conflito.
+    if (!freshShared.ok) {
+      console.warn('[storage.supabase] não foi possível verificar o estado do servidor; abortando o save compartilhado.');
+      return { ok: false, conflict: true, reason: 'shared_freshness_unavailable' };
+    }
+
     // Compara por timestamp numérico (robusto a diferenças de formato/precisão
     // entre o que gravamos e o que o Postgres devolve). Só conflita se o remoto
-    // for MAIS NOVO que o último estado que conhecíamos — ou seja, outro cliente
+    // for MAIS NOVO que o baseline compartilhado — ou seja, outro cliente
     // gravou. Margem de 1s evita ruído de precisão.
-    const freshMs = freshShared ? new Date(freshShared).getTime() : 0;
-    const baseMs = new Date(lastRemoteUpdatedAt).getTime() || 0;
+    const freshMs = freshShared.updatedAt ? new Date(freshShared.updatedAt).getTime() : 0;
+    const baseMs = new Date(lastSharedUpdatedAt).getTime() || 0;
     if (freshMs && baseMs && freshMs - baseMs > 1000) {
-      console.warn('[storage.supabase] remoto avançou desde a última sync; abortando para não sobrescrever (conflito).');
-      return { ok: false, conflict: true, reason: 'remote_advanced' };
+      // Antes descartávamos a alteração local aqui. Isso destruía o trabalho do
+      // usuário mesmo quando os dois clientes mexeram em campos DIFERENTES (o
+      // caso comum: um lança resultado, outro confirma presença/abre jogo).
+      console.warn('[storage.supabase] remoto avançou desde a última sync; rebaseando a alteração local sobre o estado fresco.');
+      const rebased = await rebaseSharedParts(config, previousParts, parts);
+
+      if (!rebased.ok) {
+        console.warn('[storage.supabase] rebase impossível; abortando para não sobrescrever (conflito):', rebased.reason);
+        return { ok: false, conflict: true, reason: rebased.reason || 'remote_advanced' };
+      }
+
+      return await runSaveOperations(config, state, previousParts, rebased.parts, now, { rebased: true });
     }
   }
 
+  return await runSaveOperations(config, state, previousParts, parts, now, { rebased: false });
+}
+
+// Reaplica as alterações locais sobre o estado FRESCO do servidor, campo a
+// campo. Só sobrescreve o que este cliente realmente mudou em relação ao próprio
+// baseline; todo o resto vem do servidor. É o que separa "salvar minha edição"
+// de "carimbar meu snapshot inteiro por cima do de todo mundo".
+async function rebaseSharedParts(config, previousParts, parts) {
+  const clubKey = currentClubKey(config);
+  const [gameRes, metaRes] = await Promise.all([
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
+  ]);
+
+  if (!gameRes?.ok || !metaRes?.ok) return { ok: false, reason: 'rebase_read_failed' };
+
+  const remoteGame = Array.isArray(gameRes.data) ? (gameRes.data[0]?.data || null) : null;
+  const remoteMeta = Array.isArray(metaRes.data) ? (metaRes.data[0]?.data || null) : null;
+
+  // Sem estado remoto legível não há o que rebasear — e gravar por cima seria
+  // exatamente o apagão que estamos tentando impedir.
+  if (!remoteGame && !remoteMeta) return { ok: false, reason: 'rebase_remote_empty' };
+
+  const rebasedParts = {
+    ...parts,
+    game: remoteGame ? mergeChangedFields(remoteGame, previousParts?.game, parts.game) : parts.game,
+    meta: remoteMeta ? mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta) : parts.meta,
+  };
+
+  lastSharedUpdatedAt = maxTimestamp([
+    Array.isArray(gameRes.data) ? gameRes.data[0]?.updated_at : null,
+    Array.isArray(metaRes.data) ? metaRes.data[0]?.updated_at : null,
+  ]) || lastSharedUpdatedAt;
+
+  return { ok: true, parts: rebasedParts };
+}
+
+// Merge de 3 vias em um nível: parte do `base` (servidor) e sobrepõe apenas as
+// chaves em que `next` divergiu de `previous` (o que este cliente editou).
+// Chave que o cliente removeu sai do resultado.
+function mergeChangedFields(base, previous, next) {
+  if (!next || typeof next !== 'object' || Array.isArray(next)) return next;
+  if (!base || typeof base !== 'object' || Array.isArray(base)) return next;
+
+  const merged = { ...base };
+  const keys = new Set([...Object.keys(previous || {}), ...Object.keys(next)]);
+
+  for (const key of keys) {
+    const before = previous ? previous[key] : undefined;
+    const after = next[key];
+    if (stableStringify(before) === stableStringify(after)) continue;   // não mexemos
+    if (after === undefined) delete merged[key];
+    else merged[key] = after;
+  }
+
+  return merged;
+}
+
+async function runSaveOperations(config, state, previousParts, parts, now, { rebased = false } = {}) {
+  const operations = buildGranularOperations(config, previousParts, parts, now);
+
+  if (!operations.length) {
+    rememberSplitSnapshot(state, lastRemoteUpdatedAt || now);
+    return { ok: true, conflict: false, reason: 'split_no_changes', updatedAt: lastRemoteUpdatedAt };
+  }
+
+  const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
   const results = await Promise.all(operations.map((operation) => operation.run()));
   const failed = results.find((result) => !result.ok);
 
@@ -936,23 +1064,30 @@ async function saveSplitState(config, state) {
     return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}` };
   }
 
-  rememberSplitSnapshot(state, now);
+  // O baseline tem de refletir o que foi REALMENTE gravado. Depois de um rebase
+  // isso não é mais o `state` que a UI tinha em mãos.
+  rememberSplitParts(parts, now);
   gameStateHadVolatileDraw = false;
 
   // Re-ancora o baseline ao updated_at REAL do servidor (que pode diferir do
   // nosso `now` por trigger/precisão). Sem isso, o próximo save poderia
   // falso-conflitar consigo mesmo. Falha de leitura não é crítica: mantém `now`.
   if (touchesShared) {
+    lastSharedUpdatedAt = now;
     try {
       const serverUpdatedAt = await fetchSharedUpdatedAt(config);
-      if (serverUpdatedAt) lastRemoteUpdatedAt = serverUpdatedAt;
+      if (serverUpdatedAt.ok && serverUpdatedAt.updatedAt) {
+        lastRemoteUpdatedAt = serverUpdatedAt.updatedAt;
+        lastSharedUpdatedAt = serverUpdatedAt.updatedAt;
+      }
     } catch (_) {}
   }
 
   return {
     ok: true,
     conflict: false,
-    reason: 'split_granular_saved',
+    reason: rebased ? 'split_granular_saved_rebased' : 'split_granular_saved',
+    rebased,
     updatedAt: lastRemoteUpdatedAt,
     operations: operations.map((operation) => operation.type),
   };
@@ -1559,7 +1694,10 @@ export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
     ];
     lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
   }
+  // Este fluxo grava app_meta direto; sem avançar o baseline compartilhado o
+  // próximo save acharia que outro cliente mexeu e cairia em rebase à toa.
   lastRemoteUpdatedAt = now;
+  lastSharedUpdatedAt = now;
 
   return { ok: true, reason: 'deleted_player_restored_by_phone', player: savedPlayer, updatedAt: now };
 }

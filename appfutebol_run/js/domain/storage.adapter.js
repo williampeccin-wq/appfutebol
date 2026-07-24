@@ -165,6 +165,9 @@ function createHybridStorageAdapter() {
             { expectedUpdatedAt }
           );
 
+          // Chegar aqui significa que nem o rebase resolveu: a alteração NÃO
+          // está no servidor e o estado local será substituído pelo remoto —
+          // ou seja, o que o usuário acabou de fazer vai sumir da tela.
           if (result.conflict) {
             console.warn("[storage.adapter] remote conflict detected; local change was not pushed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-conflict", {
@@ -186,6 +189,9 @@ function createHybridStorageAdapter() {
           }
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
+          window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
+            detail: { reason: 'remote_save_queue_failed', conflict: false },
+          }));
           window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
             detail: { reason: 'remote_save_queue_failed' },
           }));
