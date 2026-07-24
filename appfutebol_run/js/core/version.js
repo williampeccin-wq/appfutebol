@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.145.0-paridade-com-producao';
+export const APP_VERSION = 'v1.146.0-pix-comprimido';

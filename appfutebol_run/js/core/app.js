@@ -4951,6 +4951,12 @@ async function copyPaymentsToClipboard() {
   }
 }
 
+// Teto de resolução do comprovante enviado à leitura por IA. 1568 é o mesmo
+// limite que a Anthropic aplica internamente: acima disso a imagem é reduzida
+// do lado dela, então enviar maior só gasta banda e tempo.
+const PIX_RECEIPT_MAX_SIZE = 1568;
+const PIX_RECEIPT_QUALITY = 0.85;   // comprovante é texto: qualidade acima da foto de avatar
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -5024,7 +5030,19 @@ function wireSelfPixReceipt(appElement) {
 
     let dataUrl;
     try {
-      dataUrl = await readFileAsDataUrl(file);
+      // Comprime ANTES de enviar. A foto vinha crua do celular (3–8 MB, +33% em
+      // base64) e era reenviada inteira à API de visão — a Anthropic reduz
+      // qualquer imagem para no máximo 1568px de lado antes de ler, então tudo
+      // acima disso era tráfego jogado fora, sem ganho de precisão.
+      // Best-effort: se a compressão falhar (formato exótico, canvas indisponível),
+      // manda a original. Este é o caminho pelo qual as pessoas PAGAM — ele não
+      // pode quebrar por causa de uma otimização.
+      try {
+        dataUrl = await readAndResizePlayerPhoto(file, PIX_RECEIPT_MAX_SIZE, PIX_RECEIPT_QUALITY);
+      } catch (_erroCompressao) {
+        dataUrl = null;
+      }
+      if (!dataUrl) dataUrl = await readFileAsDataUrl(file);
     } catch (_) {
       result.innerHTML = '<div class="pix-receipt-card"><p class="footer-note">Não consegui abrir a imagem.</p></div>';
       btn.disabled = false;
