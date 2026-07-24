@@ -6531,6 +6531,10 @@ body {
 .content--config .card-title,
 .content--config .game-config-summary-main strong,
 .content--config .create-game-summary strong,
+/* .form-label usa --gray-700 (nasceu para fundo claro). A aba config já
+   sobrescrevia .field-label e esqueceu o .form-label — os rótulos dos formulários
+   saíam quase invisíveis no card escuro. Mesma classe do .row-title no campeonato. */
+.content--config .form-label,
 .content--config .field-label { color: var(--hfc-text); }
 .content--config .game-config-summary-main span,
 .content--config .create-game-summary small,
@@ -7236,6 +7240,11 @@ body.vote-open { overflow: hidden; }
 @media (max-width: 420px) {
   .club-profile-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* O texto de apoio do card encostava no primeiro rótulo do formulário. */
+.club-profile-card .footer-note + .player-admin-form { margin-top: 14px; }
+.club-profile-card .form-group + .form-group,
+.club-profile-card .form-group { margin-top: 12px; }
 
 .club-profile-card .checkbox-row {
   display: flex;
