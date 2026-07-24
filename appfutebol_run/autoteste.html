@@ -40,9 +40,10 @@
 
 import { loadRemoteState, saveRemoteState, getSupabaseMeta } from './js/services/storage.supabase.js';
 import {
-  getClubProfile, goleirosPorJogo, isModuleOn, jogadoresPorTime,
-  limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo, usaPosicoes,
+  campeonatoDisponivel, getClubProfile, goleirosPorJogo, isModuleOn, jogadoresPorTime,
+  limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo, timesPorJogo, usaPosicoes,
 } from './js/domain/club-profile.js';
+import { quantidadeDeTimes, timesDoSorteio, totalDeJogadores } from './js/domain/draw-teams.js';
 
 // TRAVA DE SEGURANÇA — não é cuidado do operador, é código.
 // Este teste GRAVA. Rodá-lo contra o Harmonia de produção mexeria na
@@ -102,6 +103,7 @@ async function rodar() {
     grupo('Gravação pelo caminho da tela');
     const campos = new Map(Object.entries({
       format: 'futsal5',
+      teams: '3',
       players_per_team: '5',
       goalkeepers_per_game: '0',
       cadence: 'quinzenal',
@@ -126,6 +128,7 @@ async function rodar() {
     conferir('formato gravado', s.profile?.game?.format, 'futsal5');
     conferir('jogadores por time gravado como número', s.profile?.game?.players_per_team, 5);
     conferir('zero goleiros sobreviveu (não virou default)', s.profile?.game?.goalkeepers_per_game, 0);
+    conferir('número de times gravado', s.profile?.game?.teams, 3);
     conferir('cadência gravada', s.profile?.game?.cadence, 'quinzenal');
     conferir('dia da semana gravado', s.profile?.game?.day_of_week, 6);
     conferir('checkbox ausente gravou como desligado', s.profile?.modules?.churrasco, false);
@@ -136,10 +139,16 @@ async function rodar() {
     grupo('O app enxerga o que foi gravado');
     conferir('goleiros por jogo = 0', goleirosPorJogo(s), 0);
     conferir('jogadores por time = 5', jogadoresPorTime(s), 5);
-    conferir('limite sugerido do jogo = 10 (5 x 2 times)', limiteSugeridoDeJogo(s), 10);
+    conferir('times por jogo = 3', timesPorJogo(s), 3);
+    conferir('limite sugerido do jogo = 15 (5 x 3 times)', limiteSugeridoDeJogo(s), 15);
     conferir('churrasco desligado', isModuleOn(s, 'churrasco'), false);
     conferir('campeonato ligado', isModuleOn(s, 'campeonato'), true);
     conferir('posições desligadas', usaPosicoes(s), false);
+
+    // Rodízio: com 3+ times o campeonato fica indisponível, com motivo explícito.
+    const gate = campeonatoDisponivel(s);
+    conferir('campeonato indisponível com 3 times', gate.ok, false);
+    conferir('o motivo é o rodízio (não "módulo desligado")', gate.motivo, 'rodizio');
 
     // Quinzenal + sábado: a partir de hoje, o próximo sábado + 7 dias.
     const hoje = new Date();
@@ -149,10 +158,28 @@ async function rodar() {
     const iso = `${esperada.getFullYear()}-${String(esperada.getMonth()+1).padStart(2,'0')}-${String(esperada.getDate()).padStart(2,'0')}`;
     conferir('próxima data de jogo derivada da cadência', proximaDataDeJogo(s, hoje), iso);
 
-    // ---- 5) O que a tela NÃO controla não pode ter sido destruído.
+    // ---- 5) O sorteio que já existia continua legível no formato novo.
+    grupo('Sorteios já gravados');
+    const jogoComSorteio = (s.games || []).find((g) => g?.sort_result);
+    if (!jogoComSorteio) {
+      nota('nenhum sorteio gravado neste clube — nada a verificar aqui');
+    } else {
+      const sorteio = jogoComSorteio.sort_result;
+      const listas = timesDoSorteio(sorteio);
+      conferir('o sorteio antigo é lido como times', listas.length >= 1, true);
+      conferir('o total de jogadores do sorteio bate com os times somados',
+        totalDeJogadores(sorteio),
+        (sorteio.teams || [sorteio.team_a || [], sorteio.team_b || []]).flat().length);
+      nota(`sorteio de ${jogoComSorteio.game_date || '?'}: ${quantidadeDeTimes(sorteio)} time(s), ${totalDeJogadores(sorteio)} jogador(es)`);
+    }
+
+    // ---- 6) O que a tela NÃO controla não pode ter sido destruído.
     grupo('Nada foi destruído junto');
     conferir('os jogadores continuam lá', (s.players || []).length, (carga.state.players || []).length);
     conferir('o campeonato continua lá', !!s.championship, !!carga.state.championship);
+    conferir('os resultados do campeonato sobreviveram ao rodízio',
+      (s.championship?.active?.results || []).length,
+      (carga.state.championship?.active?.results || []).length);
     conferir('os jogos continuam lá', (s.games || []).length, (carga.state.games || []).length);
 
     await restaurar(perfilOriginal);
@@ -181,6 +208,9 @@ async function restaurar(perfilOriginal) {
   conferir('o perfil voltou a ser o original',
     JSON.stringify(conferencia.state?.profile ?? null),
     JSON.stringify(perfilOriginal ?? null));
+  // E o campeonato volta a ficar disponível — o gate é de exibição, não de dado.
+  conferir('o campeonato volta a ficar disponível ao sair do rodízio',
+    campeonatoDisponivel(conferencia.state).ok, true);
 }
 
 function finalizar() {

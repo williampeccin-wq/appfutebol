@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convocados — Gerencie seu clube de futebol amador</title>
+<meta name="description" content="Confirmação de presença, mensalidade, sorteio inteligente e campeonato. Tudo para o seu racha.">
+<meta property="og:title" content="Convocados — Gerencie seu clube de futebol amador">
+<meta property="og:description" content="Convoca. Joga. Resenha.">
+<meta property="og:image" content="/img/og-image.png">
+<meta property="og:url" content="https://convocados.app.br">
+<meta name="theme-color" content="#0C1A38">
+<link rel="icon" type="image/png" href="/img/icon-32.png">
+
+<!--
+  WAITLIST — tabela Supabase necessária:
+
+  CREATE TABLE waitlist (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    contact text NOT NULL,
+    created_at timestamptz DEFAULT now()
+  );
+  ALTER TABLE waitlist ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "insert only" ON waitlist FOR INSERT WITH CHECK (true);
+
+  Rodar em: supabase.com → SQL Editor do projeto DEV (fjnelycvneutmyzjrozs)
+  Em PROD (kpgghcrmbkrwpvtegcjh) rodar também antes de promover.
+-->
+
+<style>
+/* ─── TOKENS ───────────────────────────────────── */
+:root {
+  --navy:       #0C1A38;
+  --navy-mid:   #1A2F54;
+  --navy-light: #243760;
+  --gold:       #C9A227;
+  --gold-light: #E8C24A;
+  --paper:      #F5F2EC;
+  --white:      #FFFFFF;
+  --ink:        #0E1520;
+  --text:       #2C3547;
+  --muted:      #6B7A99;
+  --border:     #D9D4C7;
+  --surface:    #FFFFFF;
+
+  --ff-display: Impact, "Arial Narrow", "Haettenschweiler", Arial, sans-serif;
+  --ff-body:    -apple-system, "Segoe UI", system-ui, sans-serif;
+  --r:          8px;
+  --max:        1100px;
+}
+
+/* ─── RESET ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--ff-body);
+  background: var(--paper);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── UTILITY ──────────────────────────────────── */
+.container { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+/* ─── NAV ───────────────────────────────────────── */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(12, 26, 56, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(201,162,39,0.15);
+}
+.nav-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-logo-mark {
+  width: 32px; height: 32px;
+  background: var(--gold);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.nav-logo-name {
+  font-family: var(--ff-display);
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+.nav-cta {
+  background: var(--gold);
+  color: var(--navy);
+  font-family: var(--ff-body);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.nav-cta:hover { background: var(--gold-light); }
+
+/* ─── HERO ───────────────────────────────────────── */
+.hero {
+  min-height: 100dvh;
+  background: var(--navy);
+  display: flex;
+  align-items: center;
+  padding-top: 60px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle pitch pattern */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+/* Radial vignette over the pattern */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 60% 50%, transparent 30%, rgba(12,26,56,0.6) 100%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 60px 24px 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.hero-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 20px;
+}
+.hero-headline {
+  font-family: var(--ff-display);
+  font-size: clamp(52px, 7vw, 88px);
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin-bottom: 24px;
+}
+.hero-headline em {
+  color: var(--gold);
+  font-style: normal;
+}
+.hero-sub {
+  font-size: clamp(16px, 2vw, 18px);
+  color: rgba(255,255,255,0.55);
+  line-height: 1.6;
+  max-width: 440px;
+  margin-bottom: 36px;
+}
+
+/* WAITLIST FORM */
+.waitlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+.form-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 2px;
+}
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+.form-input {
+  flex: 1;
+  height: 50px;
+  background: rgba(255,255,255,0.07);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  padding: 0 16px;
+  font-size: 16px;
+  color: #fff;
+  outline: none;
+  font-family: var(--ff-body);
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.form-input::placeholder { color: rgba(255,255,255,0.25); }
+.form-input:focus { border-color: var(--gold); background: rgba(255,255,255,0.1); }
+.form-btn {
+  height: 50px;
+  padding: 0 24px;
+  background: var(--gold);
+  color: var(--navy);
+  border: none;
+  border-radius: 4px;
+  font-family: var(--ff-display);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.form-btn:hover { background: var(--gold-light); }
+.form-btn:active { transform: scale(0.98); }
+.form-btn:disabled { opacity: 0.6; cursor: default; }
+.form-hint {
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+}
+.form-success {
+  display: none;
+  background: rgba(74,222,128,0.1);
+  border: 1px solid rgba(74,222,128,0.25);
+  border-radius: 4px;
+  padding: 14px 16px;
+  color: #4ade80;
+  font-size: 14px;
+  font-weight: 600;
+}
+.form-error {
+  display: none;
+  font-size: 12px;
+  color: #f87171;
+}
+
+/* PHONE MOCKUP */
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+}
+.phone-device {
+  width: 260px;
+  height: 520px;
+  background: #0A0A14;
+  border-radius: 36px;
+  border: 3px solid #2A2A3E;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 40px 80px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.03);
+  position: relative;
+  overflow: hidden;
+}
+.phone-notch {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 90px; height: 28px;
+  background: #0A0A14;
+  border-radius: 0 0 18px 18px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.phone-camera { width: 10px; height: 10px; border-radius: 50%; background: #1A1A28; }
+.phone-speaker { width: 40px; height: 4px; border-radius: 2px; background: #1A1A28; }
+
+.phone-screen {
+  position: absolute;
+  inset: 0;
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Status bar */
+.status-bar {
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 20px 6px;
+  flex-shrink: 0;
+}
+.status-time {
+  font-family: var(--ff-body);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+}
+.status-icons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.status-icon {
+  width: 14px; height: 8px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 1px;
+}
+
+/* App header */
+.app-header {
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.app-header-left { display: flex; flex-direction: column; gap: 1px; }
+.app-club {
+  font-family: var(--ff-display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+.app-role {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.app-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  font-family: var(--ff-body);
+}
+
+/* App body */
+.app-body {
+  flex: 1;
+  padding: 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Game card */
+.game-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  border-top: 2px solid var(--gold);
+}
+.game-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.game-title {
+  font-family: var(--ff-display);
+  font-size: 16px;
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 1.05;
+  margin-bottom: 6px;
+}
+.game-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.game-meta-item {
+  font-size: 8px;
+  color: rgba(255,255,255,0.45);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Confirmed count */
+.confirmed-band {
+  background: rgba(201,162,39,0.08);
+  border: 1px solid rgba(201,162,39,0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.confirmed-num {
+  font-family: var(--ff-display);
+  font-size: 28px;
+  color: var(--gold);
+  line-height: 1;
+}
+.confirmed-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.confirm-btn {
+  background: var(--gold);
+  color: var(--navy);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: var(--ff-display);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Members */
+.members-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 4px;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.member-row:last-child { border-bottom: none; }
+.member-av {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--navy-mid);
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.member-name {
+  flex: 1;
+  font-size: 9px;
+  color: rgba(255,255,255,0.7);
+}
+.member-status {
+  font-size: 7px;
+  padding: 2px 5px;
+  border-radius: 2px;
+}
+.s-yes { background: rgba(74,222,128,0.12); color: #4ade80; }
+.s-no { background: rgba(239,68,68,0.12); color: #f87171; }
+.s-pending { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35); }
+
+/* Bottom nav */
+.app-nav {
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  padding: 8px 0 16px;
+  flex-shrink: 0;
+}
+.app-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.nav-icon { font-size: 16px; }
+.nav-text {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+}
+.app-nav-item.active .nav-text { color: var(--gold); }
+
+/* ─── PAIN SECTION ───────────────────────────────── */
+.pain {
+  background: var(--ink);
+  padding: 100px 0;
+}
+.section-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+}
+.section-title {
+  font-family: var(--ff-display);
+  font-size: clamp(32px, 5vw, 52px);
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 0.95;
+  margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 16px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.6;
+  max-width: 500px;
+  margin-bottom: 48px;
+}
+.pain-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.pain-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r);
+  padding: 24px 20px;
+}
+.pain-icon { font-size: 28px; margin-bottom: 16px; }
+.pain-title {
+  font-family: var(--ff-display);
+  font-size: 20px;
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+.pain-desc {
+  font-size: 14px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.6;
+}
+.pain-bridge {
+  margin-top: 48px;
+  text-align: center;
+  font-family: var(--ff-display);
+  font-size: clamp(24px, 4vw, 40px);
+  text-transform: uppercase;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+
+/* ─── FEATURES ───────────────────────────────────── */
+.features {
+  background: var(--paper);
+  padding: 100px 0;
+}
+.features-header { margin-bottom: 56px; }
+.features .section-title { color: var(--ink); }
+.features .section-sub { color: var(--muted); }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.feature-card:hover {
+  box-shadow: 0 8px 32px rgba(12,26,56,0.08);
+  transform: translateY(-2px);
+}
+.feature-icon-wrap {
+  width: 44px; height: 44px;
+  background: rgba(12,26,56,0.06);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.feature-title {
+  font-family: var(--ff-display);
+  font-size: 18px;
+  text-transform: uppercase;
+  color: var(--navy);
+  line-height: 1.1;
+}
+.feature-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  flex: 1;
+}
+.feature-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  align-self: flex-start;
+}
+.badge-free { background: rgba(12,26,56,0.07); color: var(--navy); }
+.badge-pro { background: rgba(201,162,39,0.15); color: #7A5A00; }
+
+/* ─── HOW IT WORKS ───────────────────────────────── */
+.how {
+  background: var(--navy);
+  padding: 100px 0;
+}
+.how .section-title { color: #fff; }
+.how .section-sub { color: rgba(255,255,255,0.45); }
+.how-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-top: 56px;
+}
+.how-step { display: flex; flex-direction: column; gap: 16px; }
+.step-num {
+  font-family: var(--ff-display);
+  font-size: 64px;
+  color: rgba(255,255,255,0.07);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.step-title {
+  font-family: var(--ff-display);
+  font-size: 22px;
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 1.1;
+}
+.step-desc {
+  font-size: 15px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.6;
+}
+.step-divider {
+  width: 32px; height: 3px;
+  background: var(--gold);
+  border-radius: 2px;
+}
+
+/* ─── WAITLIST SECTION ───────────────────────────── */
+.waitlist-section {
+  background: var(--paper);
+  padding: 100px 0;
+}
+.waitlist-box {
+  background: var(--navy);
+  border-radius: 16px;
+  padding: 64px 56px;
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  position: relative;
+  overflow: hidden;
+}
+.waitlist-box::before {
+  content: '';
+  position: absolute;
+  right: -60px; top: -60px;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: rgba(201,162,39,0.06);
+  pointer-events: none;
+}
+.waitlist-content { flex: 1; }
+.waitlist-content .section-title { color: #fff; margin-bottom: 12px; }
+.waitlist-content .section-sub { color: rgba(255,255,255,0.45); margin-bottom: 0; }
+.waitlist-form-wrap { flex: 1; }
+
+/* ─── FOOTER ─────────────────────────────────────── */
+.footer {
+  background: var(--ink);
+  padding: 48px 0;
+}
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.footer-brand {
+  font-family: var(--ff-display);
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+.footer-slogan {
+  font-size: 13px;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+.footer-links {
+  display: flex;
+  gap: 24px;
+}
+.footer-link {
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
+  transition: color 0.15s;
+}
+.footer-link:hover { color: var(--gold); }
+
+/* ─── RESPONSIVE ──────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .hero-sub { margin-left: auto; margin-right: auto; }
+  .waitlist-form { margin: 0 auto; }
+  .hero-visual { order: -1; }
+  .pain-cards { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .how-steps { grid-template-columns: 1fr; gap: 32px; }
+  .waitlist-box { flex-direction: column; gap: 32px; padding: 40px 28px; text-align: center; }
+  .waitlist-content .section-sub { margin-left: auto; margin-right: auto; }
+}
+@media (max-width: 600px) {
+  .features-grid { grid-template-columns: 1fr; }
+  .nav-logo-name { font-size: 15px; }
+  .footer-inner { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .form-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-mark">⚽</div>
+      <span class="nav-logo-name">Convocados</span>
+    </a>
+    <a href="#lista" class="nav-cta">Quero ser avisado</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <div class="hero-eyebrow">Para times de futebol amador</div>
+      <h1 class="hero-headline">Seu clube<br><em>organi</em><br><em>zado</em><br>de verdade.</h1>
+      <p class="hero-sub">Confirmação de presença, mensalidade, sorteio inteligente e campeonato. Tudo numa tela. Sem WhatsApp, sem planilha.</p>
+      <div class="waitlist-form" id="hero-form">
+        <div class="form-label">Seja um dos primeiros</div>
+        <div class="form-row">
+          <input
+            class="form-input"
+            type="tel"
+            id="hero-input"
+            placeholder="Seu celular (WhatsApp)"
+            autocomplete="tel"
+            inputmode="tel"
+          >
+          <button class="form-btn" onclick="submitWaitlist('hero-input','hero-success','hero-error','hero-btn')" id="hero-btn">Entrar</button>
+        </div>
+        <div class="form-success" id="hero-success">⚽ Anotado! Você será um dos primeiros a receber o acesso.</div>
+        <div class="form-error" id="hero-error"></div>
+        <p class="form-hint">Gratuito para começar. Sem spam.</p>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="phone-device">
+        <div class="phone-notch">
+          <div class="phone-camera"></div>
+          <div class="phone-speaker"></div>
+        </div>
+        <div class="phone-screen">
+          <div class="status-bar">
+            <span class="status-time">20:14</span>
+            <div class="status-icons">
+              <div class="status-icon" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5)"></div>
+              <div class="status-icon" style="width:14px;height:8px;border-radius:1px;background:rgba(255,255,255,0.5)"></div>
+              <div class="status-icon" style="width:20px;height:8px;border-radius:2px;background:rgba(255,255,255,0.5);position:relative;overflow:hidden;"><div style="position:absolute;left:1px;top:1px;bottom:1px;width:70%;background:rgba(255,255,255,0.7);border-radius:1px;"></div></div>
+            </div>
+          </div>
+          <div class="app-header">
+            <div class="app-header-left">
+              <span class="app-club">Harmonia FC</span>
+              <span class="app-role">Administrador</span>
+            </div>
+            <div class="app-avatar">W</div>
+          </div>
+          <div class="app-body">
+            <div class="game-card">
+              <div class="game-label">Próximo jogo</div>
+              <div class="game-title">Sexta · 20h</div>
+              <div class="game-meta">
+                <span class="game-meta-item">📍 Quadra do Mané</span>
+                <span class="game-meta-item">⚽ Society</span>
+              </div>
+            </div>
+            <div class="confirmed-band">
+              <div>
+                <div class="confirmed-num">14</div>
+                <div class="confirmed-label">Convocados na linha</div>
+              </div>
+              <div class="confirm-btn">Confirmar</div>
+            </div>
+            <div>
+              <div class="members-label">Últimas confirmações</div>
+              <div class="member-row">
+                <div class="member-av"></div>
+                <span class="member-name">Carlos Henrique</span>
+                <span class="member-status s-yes">Vai ✓</span>
+              </div>
+              <div class="member-row">
+                <div class="member-av"></div>
+                <span class="member-name">Rodrigo Silva</span>
+                <span class="member-status s-yes">Vai ✓</span>
+              </div>
+              <div class="member-row">
+                <div class="member-av"></div>
+                <span class="member-name">Thiago Alves</span>
+                <span class="member-status s-no">Não vai</span>
+              </div>
+              <div class="member-row">
+                <div class="member-av"></div>
+                <span class="member-name">Rafael Mendes</span>
+                <span class="member-status s-pending">Pendente</span>
+              </div>
+            </div>
+          </div>
+          <div class="app-nav">
+            <div class="app-nav-item active">
+              <span class="nav-icon">🏠</span>
+              <span class="nav-text">Início</span>
+            </div>
+            <div class="app-nav-item">
+              <span class="nav-icon">👥</span>
+              <span class="nav-text">Membros</span>
+            </div>
+            <div class="app-nav-item">
+              <span class="nav-icon">💰</span>
+              <span class="nav-text">Finanças</span>
+            </div>
+            <div class="app-nav-item">
+              <span class="nav-icon">🏆</span>
+              <span class="nav-text">Campeona.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PAIN -->
+<section class="pain">
+  <div class="container">
+    <div class="section-eyebrow">O problema que todo gestor conhece</div>
+    <h2 class="section-title">Como você<br>organiza seu<br>racha hoje?</h2>
+    <div class="pain-cards">
+      <div class="pain-card">
+        <div class="pain-icon">💬</div>
+        <div class="pain-title">Mensagem perdida no Zap</div>
+        <div class="pain-desc">Você manda a mensagem de confirmação e 3 horas depois ainda não sabe quem vai. Fica contando "vai", "talvez", e mensagem que não foi respondida.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">📊</div>
+        <div class="pain-title">Planilha de mensalidade</div>
+        <div class="pain-desc">Planilha desatualizada, quem pagou a mais não sabe, quem deve fica constrangido. Na hora de cobrar, você trava.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">🎲</div>
+        <div class="pain-title">Sorteio na hora</div>
+        <div class="pain-desc">Todo mundo reclamando que um time ficou muito forte. Você sorteia de novo, mais reclamação. Cinco minutos que poderiam ser um jogo.</div>
+      </div>
+    </div>
+    <p class="pain-bridge">Tem uma forma melhor.</p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="container">
+    <div class="features-header">
+      <div class="section-eyebrow">O app</div>
+      <h2 class="section-title" style="color:var(--ink)">Tudo que<br>seu clube<br>precisa.</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-wrap">✅</div>
+        <div class="feature-title">Confirmação de presença</div>
+        <div class="feature-desc">Um toque e o jogador confirma. Você vê a lista em tempo real — sem perguntar no grupo.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">💳</div>
+        <div class="feature-title">Carnê digital</div>
+        <div class="feature-desc">Cada membro tem seu carnê. Quem pagou, quem deve e quanto — sem constrangimento, sem esquecimento.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">🤖</div>
+        <div class="feature-title">PIX com IA</div>
+        <div class="feature-desc">O membro tira foto do comprovante, a IA lê o valor e a data, e o mês já aparece como pago. Zero digitação.</div>
+        <span class="feature-badge badge-pro">Pro</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">⚖️</div>
+        <div class="feature-title">Sorteio inteligente</div>
+        <div class="feature-desc">Times sorteados pela nota média de cada jogador. Os melhores distribuídos automaticamente. Ninguém reclama mais.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">🏆</div>
+        <div class="feature-title">Campeonato</div>
+        <div class="feature-desc">Crie fases, registre placares e acompanhe a tabela. Tudo dentro do app, sem planilha.</div>
+        <span class="feature-badge badge-pro">Pro</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">🔔</div>
+        <div class="feature-title">Push notification</div>
+        <div class="feature-desc">Aviso automático do jogo direto no celular de todos os membros. Ninguém esquece, ninguém fica sem saber o horário.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="container">
+    <div class="section-eyebrow">Como funciona</div>
+    <h2 class="section-title">Três passos<br>e seu clube<br>está rodando.</h2>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="step-num">01</div>
+        <div class="step-divider"></div>
+        <div class="step-title">Você cadastra o clube</div>
+        <div class="step-desc">Cria o clube, adiciona os membros com nome e posição. Leva menos de 5 minutos.</div>
+      </div>
+      <div class="how-step">
+        <div class="step-num">02</div>
+        <div class="step-divider"></div>
+        <div class="step-title">Os jogadores confirmam</div>
+        <div class="step-desc">Cada membro entra com o celular. Confirma presença, vê o carnê, recebe as notificações.</div>
+      </div>
+      <div class="how-step">
+        <div class="step-num">03</div>
+        <div class="step-divider"></div>
+        <div class="step-title">Sorteia e joga</div>
+        <div class="step-desc">Com a lista fechada, você sorteia os times. O resultado vai para todos via push. É só chegar e jogar.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST CTA -->
+<section class="waitlist-section" id="lista">
+  <div class="container">
+    <div class="waitlist-box">
+      <div class="waitlist-content">
+        <h2 class="section-title">Seja um dos<br>primeiros.</h2>
+        <p class="section-sub">O Convocados chega em breve para todos. Deixe seu contato e avisamos quando sua vaga estiver disponível.</p>
+      </div>
+      <div class="waitlist-form-wrap">
+        <div class="waitlist-form" id="wl-form">
+          <div class="form-label">Seu WhatsApp</div>
+          <div class="form-row">
+            <input
+              class="form-input"
+              type="tel"
+              id="wl-input"
+              placeholder="(48) 99999-9999"
+              autocomplete="tel"
+              inputmode="tel"
+            >
+            <button class="form-btn" onclick="submitWaitlist('wl-input','wl-success','wl-error','wl-btn')" id="wl-btn">Entrar na lista</button>
+          </div>
+          <div class="form-success" id="wl-success">⚽ Anotado! Você será um dos primeiros a receber o acesso.</div>
+          <div class="form-error" id="wl-error"></div>
+          <p class="form-hint">Sem spam. Avisamos uma vez quando lançar.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand">Convocados</div>
+        <div class="footer-slogan">Convoca · Joga · Resenha</div>
+      </div>
+      <div class="footer-links">
+        <a href="/landing.html#lista" class="footer-link">Lista de espera</a>
+        <a href="/politica-privacidade.html" class="footer-link">Privacidade</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+// Carrega config do Supabase (env.js já presente no mesmo servidor)
+let supabaseUrl = null;
+let supabaseKey = null;
+
+try {
+  const env = await import('/env.js');
+  const cfg = env.default || env;
+  supabaseUrl = cfg.SUPABASE_URL;
+  supabaseKey = cfg.SUPABASE_ANON_KEY;
+} catch {
+  // env.js não carregou — fallback silencioso (form mostra erro amigável)
+}
+
+window.submitWaitlist = async function(inputId, successId, errorId, btnId) {
+  const input   = document.getElementById(inputId);
+  const success = document.getElementById(successId);
+  const error   = document.getElementById(errorId);
+  const btn     = document.getElementById(btnId);
+
+  const contact = input.value.trim();
+  if (!contact) {
+    showError(error, 'Por favor, informe seu WhatsApp.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  error.style.display = 'none';
+
+  if (!supabaseUrl || !supabaseKey) {
+    // Sem config — simula sucesso (útil durante dev sem env.js na landing)
+    showSuccess(input, success, btn);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/waitlist`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ contact }),
+    });
+
+    if (res.ok || res.status === 201) {
+      showSuccess(input, success, btn);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      // Número duplicado é bem-vindo — trata como sucesso
+      if (res.status === 409 || body?.code === '23505') {
+        showSuccess(input, success, btn);
+      } else {
+        throw new Error(body?.message || `HTTP ${res.status}`);
+      }
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+    showError(error, 'Algo deu errado. Tente novamente.');
+    console.error('Waitlist error:', err);
+  }
+};
+
+function showSuccess(input, success, btn) {
+  input.style.display   = 'none';
+  btn.style.display     = 'none';
+  success.style.display = 'block';
+}
+function showError(el, msg) {
+  el.textContent    = msg;
+  el.style.display  = 'block';
+}
+</script>
+</body>
+</html>
