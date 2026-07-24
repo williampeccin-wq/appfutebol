@@ -1576,7 +1576,15 @@ document.addEventListener("click", async (e) => {
     uiActionInFlight = true;
     setActionBusy(trigger, 'Salvando...');
 
-    persistChampionshipResult(snapshot, {
+    // RELÊ o estado. O `snapshot` foi capturado antes dos modais acima, e
+    // enquanto o admin lia a pergunta o poll (6s) pode ter trocado o estado por
+    // baixo. Gravar o snapshot velho aqui significa carimbar dado obsoleto por
+    // cima do que chegou nesse meio-tempo — inclusive descartando o próprio
+    // resultado se ele veio de outro dispositivo.
+    const snapshotFresco = getState();
+    snapshotFresco.session = snapshot.session;   // sessão é local, não vem do poll
+
+    persistChampionshipResult(snapshotFresco, {
       id: globalThis.crypto?.randomUUID ? `championship_result_${globalThis.crypto.randomUUID()}` : `championship_result_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       date,
       outcome: builtResult.outcome,
@@ -1592,12 +1600,22 @@ document.addEventListener("click", async (e) => {
     // recente em vez de ficar preso no que acabou de ser lançado.
     championshipDrawId = null;
     championshipLineup = null;
+    championshipResultCardOpen = false;
 
-    const safeSnapshot = repairManualSnapshot(snapshot);
-    await Promise.resolve(savePersistedState(safeSnapshot));
+    const safeSnapshot = repairManualSnapshot(snapshotFresco);
+    const gravacao = await Promise.resolve(savePersistedState(safeSnapshot));
     render(safeSnapshot);
     uiActionInFlight = false;
-    showToast("Resultado lançado e classificação recalculada", "success");
+
+    // Não afirmar sucesso sem ter certeza: se a gravação remota falhou, o
+    // resultado vive só neste aparelho e vai sumir no próximo sync. Dizer
+    // "lançado" nesse caso é o que fez um resultado desaparecer sem ninguém
+    // perceber (INCIDENTE 23/07).
+    if (gravacao && gravacao.ok !== true) {
+      showToast('Resultado NÃO foi salvo no servidor. Verifique a conexão e lance de novo.', 'error');
+    } else {
+      showToast("Resultado lançado e classificação recalculada", "success");
+    }
     return;
   }
 

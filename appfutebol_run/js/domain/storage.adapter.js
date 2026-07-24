@@ -168,7 +168,7 @@ function createHybridStorageAdapter() {
             window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
               detail: { reason: result.reason, conflict: true },
             }));
-            return;
+            return { ok: false, conflict: true, reason: result.reason };
           }
 
           if (!result.ok) {
@@ -177,6 +177,11 @@ function createHybridStorageAdapter() {
               detail: { reason: result.reason, conflict: false },
             }));
           }
+
+          // O resultado PRECISA voltar para quem chamou. Antes esta cadeia
+          // resolvia `undefined` no sucesso e no erro, então quem gravava não
+          // tinha como saber se deu certo — e afirmava "salvo" de qualquer jeito.
+          return result;
         }).catch((error) => {
           console.warn("[storage.adapter] remote save queue failed:", error);
           window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
