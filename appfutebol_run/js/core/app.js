@@ -42,6 +42,13 @@ let championshipDrawId = null;
 // Estado (e não só o valor dos <select>) porque o app re-renderiza por innerHTML
 // a cada poll — sem isto o ajuste do admin sumia no meio da edição.
 let championshipLineup = null;
+// Mesmo motivo: o card "Lançar resultado" é um <details> e o re-render o fechava
+// a cada ajuste, obrigando o admin a reabrir e rolar até ele por jogador.
+let championshipResultCardOpen = false;
+// Foto escolhida e ainda não salva. Mora aqui, e não no dataset do <input>,
+// porque o re-render recria o input e levava o dataset junto — o Salvar então
+// não achava foto nenhuma e gravava o cadastro sem ela, dizendo "sucesso".
+let selfPhotoPending = '';
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 // Índice da dupla em edição inline no rodízio (-1 = nenhuma). É o único estado
@@ -741,9 +748,14 @@ function bindPlayerPhotoInput() {
         const currentSnapshot = structuredClone(getState());
         currentSnapshot.players = (currentSnapshot.players || []).map((player) => {
           if (String(player.id) !== String(editingPlayerId)) return player;
+          // photo_url tem prioridade sobre photoDataUrl no getPlayerPhoto: sem
+          // zerar a URL antiga, a foto recém-escolhida ficava guardada mas
+          // INVISÍVEL — a tela seguia mostrando a anterior. É o upload bem
+          // sucedido que repõe photo_url; se ele falhar, o base64 é o fallback.
           return {
             ...player,
             photoDataUrl: dataUrl,
+            photo_url: '',
           };
         });
 
@@ -787,6 +799,7 @@ function bindSelfPhotoInput() {
     try {
       const dataUrl = await readAndResizePlayerPhoto(file);
       input.dataset.photoDataUrl = dataUrl;
+      selfPhotoPending = dataUrl;   // sobrevive ao re-render; o dataset não
 
       const snapshot = structuredClone(getState());
       const currentPlayerId = snapshot.session?.playerId;
@@ -801,6 +814,7 @@ function bindSelfPhotoInput() {
         return {
           ...player,
           photoDataUrl: dataUrl,
+          photo_url: '',   // ver comentário no fluxo do admin acima
         };
       });
 
@@ -812,6 +826,7 @@ function bindSelfPhotoInput() {
     } catch (error) {
       input.value = '';
       input.dataset.photoDataUrl = '';
+      selfPhotoPending = '';
       showToast(error.message || 'Não foi possível carregar a foto.', 'error');
     }
   });
@@ -1248,6 +1263,7 @@ document.addEventListener("click", async (e) => {
     if (!currentPlayer) { showToast("Sessão inválida. Faça login novamente.", "error"); return; }
     selfProfileOpen = true;
     selfProfileEditOpen = false;
+    selfPhotoPending = '';
     if (snapshot.ui?.currentTab !== 'home') {
       patchState({ ui: { ...(snapshot.ui || {}), currentTab: 'home' } });
     } else {
@@ -1260,6 +1276,7 @@ document.addEventListener("click", async (e) => {
   if (action === "close-profile") {
     selfProfileOpen = false;
     selfProfileEditOpen = false;
+    selfPhotoPending = '';
     render(snapshot);
     return;
   }
@@ -1794,7 +1811,10 @@ if (action === "update-self-profile") {
   const phone = phoneValidation.digits;
   const birthDate = document.getElementById("self-birthdate")?.value?.trim();
   const positionInput = document.getElementById("self-position");
-  const rawSelfPhoto = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
+  // A memória de módulo vem PRIMEIRO: o dataset do input se perde em qualquer
+  // re-render (poll, sync, outra edição) e o Salvar acabava gravando o cadastro
+  // sem a foto, avisando "sucesso".
+  const rawSelfPhoto = selfPhotoPending || document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
   const selfPhotoDataUrl = rawSelfPhoto.startsWith("data:") ? rawSelfPhoto : ""; // só data: = foto nova
   const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
 
@@ -1853,6 +1873,7 @@ if (action === "update-self-profile") {
   replaceState(safeSnapshot);
   savePersistedState(safeSnapshot);
   selfProfileEditOpen = false;
+  selfPhotoPending = '';
   uiActionInFlight = false;
   showToast("Cadastro atualizado com sucesso", "success");
   return;
@@ -3426,7 +3447,7 @@ function bindCarneRotationDrag() {
 }
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; resetCarneRotationDraft(); await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; selfPhotoPending = ''; resetCarneRotationDraft(); await logout(); });
   bindPushOptin(currentPlayer);
   bindCarneRotationDrag();
   appElement.querySelector('#carne-rotation-start')?.addEventListener('change', (event) => {
@@ -3504,7 +3525,14 @@ function bindAppEvents(currentPlayer) {
   appElement.querySelector('#championship-draw-id')?.addEventListener('change', (event) => {
     championshipDrawId = event.target.value || null;
     championshipLineup = null;   // sorteio novo, escalação recomeça do sorteio
+    championshipResultCardOpen = true;
     render(getState());
+  });
+
+  // Abrir/fechar na mão manda no estado; sem isto o card reabriria sozinho no
+  // próximo render depois de o admin tê-lo fechado.
+  appElement.querySelector('.championship-result-card')?.addEventListener('toggle', (event) => {
+    championshipResultCardOpen = !!event.target.open;
   });
 
   // Ajuste de quem jogou. Lê o estado ATUAL da tela inteira (todos os selects)
@@ -3521,6 +3549,7 @@ function bindAppEvents(currentPlayer) {
     sel.addEventListener('change', () => {
       const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
       championshipLineup = { drawId, map: capturarEscalacao() };
+      championshipResultCardOpen = true;
       render(getState());
     });
   });
@@ -3532,6 +3561,7 @@ function bindAppEvents(currentPlayer) {
     if (!playerId) return;
     const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
     championshipLineup = { drawId, map: { ...capturarEscalacao(), [playerId]: 'a' } };
+    championshipResultCardOpen = true;
     render(getState());
   });
 
@@ -3852,7 +3882,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
         return renderCarneScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, carneRotation, carneDates, false, editingCarnePairIndex);
       }
     case 'championship':
-      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup);
+      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup, championshipResultCardOpen);
     case 'config':
       return renderConfig(snapshot, currentPlayer);
     case 'home':
@@ -4248,7 +4278,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
 }
 
 function renderChampionship(snapshot, currentPlayer) {
-  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup);
+  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup, championshipResultCardOpen);
 }
 
 function buildTeamDrawShareText(snapshot) {

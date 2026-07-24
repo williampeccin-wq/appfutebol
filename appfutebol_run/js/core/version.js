@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.113.0-gravacao-concorrente';
+export const APP_VERSION = 'v1.114.0-foto-e-ajuste-escalacao';

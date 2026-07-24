@@ -254,7 +254,7 @@ function renderLineupEditor(selectedDraw, players, lineup, ajustado) {
     </details>`;
 }
 
-function renderResultForm(snapshot, currentPlayer, selectedDrawId = null, lineupState = null) {
+function renderResultForm(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, cardOpen = false) {
   if (!canManageChampionship(currentPlayer)) return '';
 
   const players = getFootballPlayers(snapshot);
@@ -295,7 +295,10 @@ function renderResultForm(snapshot, currentPlayer, selectedDrawId = null, lineup
   }).join('');
 
   return `
-    <details class="card championship-result-card championship-result-card-v2 champ-collapse">
+    <!-- estado de aberto preservado entre renders: cada ajuste de escalação
+         re-renderiza a tela, e sem isto o card fechava a cada alteração — o
+         admin tinha de reabrir e rolar até aqui de novo a cada jogador. -->
+    <details class="card championship-result-card championship-result-card-v2 champ-collapse"${cardOpen ? ' open' : ''}>
       <summary class="champ-collapse-summary">
         <span class="card-title">🏆 Lançar resultado do jogo</span>
         <span class="champ-collapse-chevron" aria-hidden="true"></span>
@@ -491,7 +494,7 @@ function collapsibleCard({ title, note = '', body = '', open = false, extraClass
     </details>`;
 }
 
-export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null, lineupState = null) {
+export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, resultCardOpen = false) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
@@ -504,7 +507,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      ${renderResultForm(snapshot, currentPlayer, selectedDrawId, lineupState)}
+      ${renderResultForm(snapshot, currentPlayer, selectedDrawId, lineupState, resultCardOpen)}
 
       ${collapsibleCard({
         title: 'Classificação atual · Inverno 26',
