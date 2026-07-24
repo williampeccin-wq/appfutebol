@@ -125,6 +125,60 @@ export function getClubProfile(state, options = null) {
   };
 }
 
+/**
+ * Próxima data de jogo sugerida, a partir da cadência e do dia da semana do
+ * clube. Devolve '' quando o clube não tem periodicidade ('avulso') — nesse
+ * caso o admin digita a data, que é o comportamento correto para quem marca
+ * jogo sem regra fixa.
+ *
+ * `hoje` é injetado (não usa Date.now internamente) para ser testável.
+ */
+export function proximaDataDeJogo(state, hoje, options = null) {
+  const perfil = getClubProfile(state, options);
+  const { cadence, day_of_week: diaAlvo } = perfil.game;
+
+  if (cadence === 'avulso') return '';
+
+  const base = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  // Semanal e quinzenal: o próximo dia da semana configurado. "Hoje" não conta —
+  // quem está criando o jogo hoje quer o próximo, não o de agora.
+  if (cadence === 'semanal' || cadence === 'quinzenal') {
+    if (!Number.isFinite(Number(diaAlvo))) return '';
+    let delta = (Number(diaAlvo) - base.getDay() + 7) % 7;
+    if (delta === 0) delta = 7;
+    if (cadence === 'quinzenal') delta += 7;
+    base.setDate(base.getDate() + delta);
+    return isoDe(base);
+  }
+
+  // Mensal: mesmo dia da semana, no mês seguinte, mantendo a semana do mês
+  // (ex.: "2ª quarta") — é assim que os grupos costumam marcar, e não "dia 15".
+  if (cadence === 'mensal') {
+    if (!Number.isFinite(Number(diaAlvo))) return '';
+    const semanaDoMes = Math.floor((base.getDate() - 1) / 7);
+    const proximoMes = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+    let delta = (Number(diaAlvo) - proximoMes.getDay() + 7) % 7;
+    proximoMes.setDate(1 + delta + semanaDoMes * 7);
+    // Estourou o mês (5ª ocorrência que não existe): volta para a última.
+    if (proximoMes.getMonth() !== (base.getMonth() + 1) % 12) proximoMes.setDate(proximoMes.getDate() - 7);
+    return isoDe(proximoMes);
+  }
+
+  return '';
+}
+
+function isoDe(data) {
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${data.getFullYear()}-${mes}-${dia}`;
+}
+
+/** Horário padrão do jogo deste clube. */
+export function horarioPadraoDeJogo(state, options = null) {
+  return getClubProfile(state, options).game.default_time || '';
+}
+
 /** Módulo ligado para este clube? Usado para esconder abas e ações. */
 export function isModuleOn(state, moduleName, options = null) {
   const modules = getClubProfile(state, options).modules;

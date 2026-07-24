@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.147.0-config-legivel';
+export const APP_VERSION = 'v1.148.0-cadencia-viva';

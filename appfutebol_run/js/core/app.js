@@ -2486,7 +2486,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
-import { getClubProfile, isModuleOn } from '../domain/club-profile.js';
+import { getClubProfile, horarioPadraoDeJogo, isModuleOn, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -5500,6 +5500,10 @@ function renderConfig(snapshot, currentPlayer) {
 
   const game = getActiveGameFromSnapshot(snapshot) || {};
   const perfil = getClubProfile(snapshot);   // costumes deste clube (ver domain/club-profile.js)
+  // Data já preenchida a partir da cadência: o clube que joga toda quarta não
+  // precisa digitar a data toda semana. Vazio se o clube é 'avulso' — quem marca
+  // jogo sem regra fixa digita mesmo.
+  const proximaDataSugerida = proximaDataDeJogo(snapshot, new Date());
   const games = getCurrentGames(snapshot);
   // Lista enxuta: mostra futuros + o ativo + o último passado; os passados mais
   // antigos vão para um expander "Ver jogos anteriores". É SÓ exibição — nada é
@@ -5624,12 +5628,12 @@ function renderConfig(snapshot, currentPlayer) {
           <form id="create-game-form" class="player-admin-form game-config-form create-game-form">
             <label class="field-label">
               Data do novo jogo
-              <input class="input" type="date" name="game_date" value="" />
+              <input class="input" type="date" name="game_date" value="${proximaDataSugerida}" />
             </label>
 
             <label class="field-label">
               Hora do novo jogo
-              <input class="input" type="time" name="game_time" value="${game.game_time || ''}" />
+              <input class="input" type="time" name="game_time" value="${game.game_time || horarioPadraoDeJogo(snapshot)}" />
             </label>
 
             <label class="field-label">
