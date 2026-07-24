@@ -92,6 +92,14 @@ function currentClubKey(config) {
   return config.stateKey || 'default';
 }
 
+// TRUE quando o blob deste usuário ainda é o single-tenant ('default'), ou
+// seja, a instalação original — e não um clube criado no multi-tenant. Usado
+// para decidir se o dataset histórico legado se aplica.
+export function isLegacyBlobKey() {
+  const config = getConfig();
+  return currentClubKey(config) === (config.stateKey || 'default');
+}
+
 export function resetClubKeyCache() {
   clubKeyCache = { uid: null, key: null };
   clubInfoCache = { uid: null, info: null };

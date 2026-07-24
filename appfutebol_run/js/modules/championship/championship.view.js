@@ -373,9 +373,13 @@ function renderSimpleAnnualHistoryTable(rows) {
   `;
 }
 
-function renderHistoricalBlock(snapshot, ) {
-  const tournaments = getHistoricalTournaments();
-  const annual = getHistoricalAnnual();
+function renderHistoricalBlock(snapshot) {
+  // Passa o snapshot: o histórico estático pertence a um clube específico e só
+  // aparece para quem opta por ele no perfil.
+  const tournaments = getHistoricalTournaments(snapshot);
+  const annual = getHistoricalAnnual(snapshot);
+
+  if (!tournaments.length && !annual.length) return '';
 
   return `
     <section class="card">

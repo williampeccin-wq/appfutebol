@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.141.0-desacopla-jogo-ativo';
+export const APP_VERSION = 'v1.142.0-club-profile-f1';

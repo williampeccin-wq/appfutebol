@@ -1,5 +1,24 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { CHAMPIONSHIP_HISTORY } from './championship.history.js';
+import { getChampionshipLegacyDataset, getChampionshipPoints, getChampionshipSeason } from '../../domain/club-profile.js';
+import { isLegacyBlobKey } from '../../services/storage.supabase.js';
+
+// Identificador do único dataset histórico existente hoje (a planilha Rei da
+// Quadra do Harmonia). Um clube só enxerga estes dados se o PERFIL dele apontar
+// explicitamente para cá — ver domain/club-profile.js.
+const LEGACY_DATASET_ID = 'harmonia_rei_da_quadra';
+
+function profileOptions() {
+  // A leitura da key é best-effort: se o cache do clube ainda não resolveu, o
+  // pior caso é um clube legado não ver o histórico por um render — nunca o
+  // contrário (clube novo herdando dados alheios).
+  try { return { legacyBlob: isLegacyBlobKey() }; } catch (_) { return { legacyBlob: false }; }
+}
+
+// Este clube usa o dataset histórico do Harmonia?
+function usesLegacyDataset(snapshot) {
+  return getChampionshipLegacyDataset(snapshot, profileOptions()) === LEGACY_DATASET_ID;
+}
 
 export const ACTIVE_CHAMPIONSHIP = {
   id: 'inverno-2026',
@@ -23,10 +42,17 @@ export const TEAM_RESULT_OPTIONS = [
   { value: 'team_b', label: 'Time B venceu' },
 ];
 
+// Fallback: usado quando não há snapshot em mãos. A fonte real é o perfil.
 const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
   acc[option.value] = option.points;
   return acc;
 }, {});
+
+// Pontuação do clube. 3/2/1/0 é só o default — o perfil pode mudar.
+function pointsTableFor(snapshot) {
+  const p = getChampionshipPoints(snapshot, profileOptions());
+  return { win: p.win, draw: p.draw, loss: p.loss, no_play: p.no_play };
+}
 
 const IMPORTED_SHEET_NAME_ALIASES = {
   // De/para validado com a planilha Inverno 26.
@@ -234,6 +260,11 @@ function buildPlayerNameIndex(players) {
 }
 
 export function getImportedChampionshipResults(snapshot) {
+  // Sem opt-in explícito, nenhum clube herda as rodadas de outro. O casamento
+  // aqui é por NOME normalizado: sem esta porta, um jogador chamado "Junior"
+  // num clube novo receberia os pontos do Junior do Harmonia.
+  if (!usesLegacyDataset(snapshot)) return [];
+
   const players = getFootballPlayers(snapshot);
   const playerByName = buildPlayerNameIndex(players);
 
@@ -621,14 +652,15 @@ export function calculateCurrentRanking(snapshot) {
   const rowsById = new Map(players.map((player) => [String(player.id), buildEmptyRow(player)]));
   const results = getEffectiveChampionshipResults(snapshot);
   const removedByGameKey = buildRemovedByGameKey(snapshot);
+  const pontos = pointsTableFor(snapshot);   // 3/2/1/0 é default, não regra fixa
 
   results.forEach((result) => {
     const gameKey = String(result.game_key || '');
     const removedSet = gameKey ? removedByGameKey.get(gameKey) : null;
     rowsById.forEach((row, playerId) => {
       const rawStatus = (removedSet && removedSet.has(playerId)) ? 'no_play' : (result.statuses?.[playerId] || 'no_play');
-      const status = Object.prototype.hasOwnProperty.call(POINTS_BY_STATUS, rawStatus) ? rawStatus : 'no_play';
-      row.points += POINTS_BY_STATUS[status] || 0;
+      const status = Object.prototype.hasOwnProperty.call(pontos, rawStatus) ? rawStatus : 'no_play';
+      row.points += pontos[status] || 0;
 
       if (status === 'win') row.wins += 1;
       if (status === 'draw') row.draws += 1;
@@ -651,7 +683,8 @@ export function getResultSummary(result, players) {
   return counters;
 }
 
-export function getHistoricalTournaments() {
+export function getHistoricalTournaments(snapshot = null) {
+  if (snapshot && !usesLegacyDataset(snapshot)) return [];
   return (CHAMPIONSHIP_HISTORY.tournaments || [])
     .filter((tournament) => tournament.name !== ACTIVE_CHAMPIONSHIP.name)
     .map((tournament) => ({
@@ -668,7 +701,8 @@ export function getHistoricalTournaments() {
     }));
 }
 
-export function getHistoricalAnnual() {
+export function getHistoricalAnnual(snapshot = null) {
+  if (snapshot && !usesLegacyDataset(snapshot)) return [];
   return (CHAMPIONSHIP_HISTORY.annual || []).map((annual) => ({
     ...annual,
     rows: (annual.rows || []).map((row, index) => ({
@@ -690,7 +724,12 @@ function historicalTournamentPointsByName(tournamentName) {
 
 export function calculateAnnualRanking(snapshot) {
   const currentRanking = calculateCurrentRanking(snapshot);
-  const abertura26 = historicalTournamentPointsByName('Abertura 26');
+  // Idem: somar por nome vazaria pontos de outro clube — e este ranking
+  // alimenta o índice de força do sorteio, então o estrago passaria dos pontos
+  // para a divisão dos times.
+  const abertura26 = usesLegacyDataset(snapshot)
+    ? historicalTournamentPointsByName('Abertura 26')
+    : new Map();
   const rows = currentRanking.map((row) => ({
     player_id: row.player_id,
     name: row.name,
@@ -709,6 +748,7 @@ export function getActiveChampionshipMeta(snapshot) {
   const championship = getChampionshipState(snapshot);
   return {
     ...ACTIVE_CHAMPIONSHIP,
+    ...getChampionshipSeason(snapshot, profileOptions()),
     ...championship.active,
     ranking: calculateCurrentRanking(snapshot),
   };
