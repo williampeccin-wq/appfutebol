@@ -37,7 +37,18 @@ let editingPlayerId = null;
 // Sorteio escolhido no seletor de "lançar resultado". null = o mais recente.
 // Precisa ser estado (não só o valor do <select>): a data e as escalações
 // exibidas dependem dele, e o app re-renderiza por innerHTML a cada poll.
+// Foto escolhida e ainda não salva. Mora aqui, e não no dataset do <input>,
+// porque o re-render recria o input e levava o dataset junto — o Salvar então
+// não achava foto nenhuma e gravava o cadastro sem ela, dizendo "sucesso".
+let selfPhotoPending = '';
 let championshipDrawId = null;
+// Escalação AJUSTADA pelo admin ({ playerId: 'a'|'b'|'out' }). Estado, e não só
+// o valor dos <select>, porque o app re-renderiza por innerHTML a cada poll —
+// sem isto o ajuste sumia no meio da edição.
+let championshipLineup = null;
+// O card "Lançar resultado" é um <details>: o re-render o fechava a cada ajuste,
+// obrigando o admin a reabrir e rolar até ele por jogador.
+let championshipResultCardOpen = false;
 let selfProfileOpen = false;      // painel de perfil aberto (modo visualização)
 let selfProfileEditOpen = false;  // dentro do painel, formulário de edição aberto
 let selfDeleteOpen = false;       // dentro do painel, zona de exclusão de conta aberta
@@ -747,9 +758,14 @@ function bindPlayerPhotoInput() {
         const currentSnapshot = structuredClone(getState());
         currentSnapshot.players = (currentSnapshot.players || []).map((player) => {
           if (String(player.id) !== String(editingPlayerId)) return player;
+          // photo_url tem prioridade sobre photoDataUrl no getPlayerPhoto: sem
+          // zerar a URL antiga, a foto recém-escolhida ficava guardada mas
+          // INVISÍVEL — a tela seguia mostrando a anterior. É o upload bem
+          // sucedido que repõe photo_url; se ele falhar, o base64 é o fallback.
           return {
             ...player,
             photoDataUrl: dataUrl,
+            photo_url: '',
           };
         });
 
@@ -793,6 +809,7 @@ function bindSelfPhotoInput() {
     try {
       const dataUrl = await readAndResizePlayerPhoto(file);
       input.dataset.photoDataUrl = dataUrl;
+      selfPhotoPending = dataUrl;   // sobrevive ao re-render; o dataset não
 
       const snapshot = structuredClone(getState());
       const currentPlayerId = snapshot.session?.playerId;
@@ -807,6 +824,7 @@ function bindSelfPhotoInput() {
         return {
           ...player,
           photoDataUrl: dataUrl,
+          photo_url: '',   // ver comentário no fluxo do admin acima
         };
       });
 
@@ -1378,6 +1396,7 @@ document.addEventListener("click", async (e) => {
     if (!currentPlayer) { showToast("Sessão inválida. Faça login novamente.", "error"); return; }
     selfProfileOpen = true;
     selfProfileEditOpen = false;
+    selfPhotoPending = '';
     if (snapshot.ui?.currentTab !== 'home') {
       patchState({ ui: { ...(snapshot.ui || {}), currentTab: 'home' } });
     } else {
@@ -1390,6 +1409,7 @@ document.addEventListener("click", async (e) => {
   if (action === "close-profile") {
     selfProfileOpen = false;
     selfProfileEditOpen = false;
+    selfPhotoPending = '';
     selfDeleteOpen = false;
     render(snapshot);
     return;
@@ -1665,11 +1685,39 @@ document.addEventListener("click", async (e) => {
 
     const outcome = document.getElementById('championship-team-outcome')?.value;
     const drawId = document.getElementById('championship-draw-id')?.value || null;
-    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId);
+    const lineupMap = (championshipLineup && String(championshipLineup.drawId) === String(drawId))
+      ? championshipLineup.map
+      : null;
+    const builtResult = buildTeamResultStatuses(snapshot, outcome, drawId, lineupMap);
 
     if (!builtResult.ok) {
       showToast(builtResult.message || "Resultado inválido", "error");
       return;
+    }
+
+    // A data é digitável e o sorteio é escolhido à parte: dá para lançar o
+    // sorteio de um dia sob a data de outro. Avisa antes em vez de deixar passar.
+    if (builtResult.game_date && builtResult.game_date !== date) {
+      const seguir = await showConfirmModal({
+        title: 'Data diferente do sorteio',
+        message: `O sorteio escolhido é do dia ${formatDate(builtResult.game_date)}, mas você digitou ${formatDate(date)}. Lançar assim?`,
+        confirmText: 'Lançar mesmo assim',
+        cancelText: 'Rever',
+      });
+      if (!seguir) return;
+    }
+
+    // Gravar substitui qualquer resultado da MESMA rodada. Isso já acontecia,
+    // mas em silêncio: um lançamento apagava outro e ninguém ficava sabendo.
+    const substituido = findReplacedChampionshipResult(snapshot, { date, game_key: builtResult.game_key });
+    if (substituido) {
+      const seguir = await showConfirmModal({
+        title: 'Já existe resultado nesta rodada',
+        message: `O resultado de ${formatDate(substituido.date)} já foi lançado e será SUBSTITUÍDO por este. A classificação vai ser recalculada.`,
+        confirmText: 'Substituir',
+        cancelText: 'Cancelar',
+      });
+      if (!seguir) return;
     }
 
     uiActionInFlight = true;
@@ -1684,11 +1732,13 @@ document.addEventListener("click", async (e) => {
       team_a: builtResult.team_a,
       team_b: builtResult.team_b,
       statuses: builtResult.statuses,
+      lineup_adjusted: builtResult.lineup_adjusted,
     });
 
-    // Solta a seleção: lançado o resultado, o formulário volta ao sorteio mais
+    // Solta a seleção: lançado um resultado, o formulário volta ao sorteio mais
     // recente em vez de ficar preso no que acabou de ser lançado.
     championshipDrawId = null;
+    championshipLineup = null;
 
     const safeSnapshot = repairManualSnapshot(snapshot);
     await Promise.resolve(savePersistedState(safeSnapshot));
@@ -1934,7 +1984,10 @@ if (action === "update-self-profile") {
   const phone = phoneValidation.digits;
   const birthDate = document.getElementById("self-birthdate")?.value?.trim();
   const positionInput = document.getElementById("self-position");
-  const rawSelfPhoto = document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
+  // A memória de módulo vem PRIMEIRO: o dataset do input se perde em qualquer
+  // re-render (poll, sync, outra edição) e o Salvar acabava gravando o cadastro
+  // sem a foto, avisando "sucesso".
+  const rawSelfPhoto = selfPhotoPending || document.getElementById("self-photo")?.dataset?.photoDataUrl || "";
   const selfPhotoDataUrl = rawSelfPhoto.startsWith("data:") ? rawSelfPhoto : ""; // só data: = foto nova
   const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
 
@@ -1993,6 +2046,7 @@ if (action === "update-self-profile") {
   replaceState(safeSnapshot);
   savePersistedState(safeSnapshot);
   selfProfileEditOpen = false;
+  selfPhotoPending = '';
   uiActionInFlight = false;
   showToast("Cadastro atualizado com sucesso", "success");
   return;
@@ -2433,7 +2487,7 @@ import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publi
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { getClubProfile, isModuleOn } from '../domain/club-profile.js';
-import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
+import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
@@ -3813,7 +3867,7 @@ function bindCarneRotationDrag() {
 }
 
 function bindAppEvents(currentPlayer) {
-  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false; resetCarneRotationDraft(); await logout(); });
+  appElement.querySelector('#logout-button')?.addEventListener('click', async () => { selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false; selfPhotoPending = ''; resetCarneRotationDraft(); await logout(); });
 
   appElement.querySelector('#self-delete-confirm')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -3826,7 +3880,7 @@ function bindAppEvents(currentPlayer) {
       return;
     }
     // Sucesso: deleteOwnAccount já limpou a sessão e mudou p/ login; força o reset local.
-    selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false;
+    selfProfileOpen = false; selfProfileEditOpen = false; selfDeleteOpen = false; selfPhotoPending = '';
     showToast('Conta excluída.', 'success');
   });
   bindPushOptin(currentPlayer);
@@ -3900,18 +3954,57 @@ function bindAppEvents(currentPlayer) {
     showToast(result.message, result.ok ? 'success' : 'error');
   });
 
-  appElement.querySelector('#copy-draw-btn')?.addEventListener('click', () => {
-    copyTeamDrawToClipboard();
+  appElement.querySelector('#share-draw-btn')?.addEventListener('click', () => {
+    shareTeamDrawImage();
   });
 
   appElement.querySelector('#copy-payments-btn')?.addEventListener('click', () => {
     copyPaymentsToClipboard();
   });
 
-  // Trocar o sorteio re-renderiza a tela, para a DATA e as ESCALAÇÕES
-  // acompanharem a escolha (sem isto dava para lançar o jogo errado).
+  // Trocar o sorteio re-renderiza a tela, para que a DATA e as ESCALAÇÕES
+  // acompanhem a escolha. Sem isto o admin podia escolher o sorteio de um jogo
+  // e ver/lançar os dados de outro.
   appElement.querySelector('#championship-draw-id')?.addEventListener('change', (event) => {
     championshipDrawId = event.target.value || null;
+    championshipLineup = null;   // sorteio novo, escalação recomeça do sorteio
+    championshipResultCardOpen = true;
+    render(getState());
+  });
+
+  // Abrir/fechar na mão manda no estado; sem isto o card reabriria sozinho no
+  // próximo render depois de o admin tê-lo fechado.
+  appElement.querySelector('.championship-result-card')?.addEventListener('toggle', (event) => {
+    championshipResultCardOpen = !!event.target.open;
+  });
+
+  // Ajuste de quem jogou. Lê o estado ATUAL da tela inteira (todos os selects)
+  // em vez de aplicar um delta: assim o estado nunca fica dessincronizado do
+  // que o admin está vendo, mesmo com o re-render do poll no meio da edição.
+  const capturarEscalacao = () => {
+    const map = {};
+    appElement.querySelectorAll('[data-lineup-player]').forEach((sel) => {
+      map[sel.dataset.lineupPlayer] = sel.value;
+    });
+    return map;
+  };
+  appElement.querySelectorAll('[data-lineup-player]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
+      championshipLineup = { drawId, map: capturarEscalacao() };
+      championshipResultCardOpen = true;
+      render(getState());
+    });
+  });
+
+  // Substituto: entra já no Time A (o caso comum é repor quem desistiu); o
+  // admin troca para o Time B no próprio seletor da linha se for o caso.
+  appElement.querySelector('#championship-add-to-lineup')?.addEventListener('change', (event) => {
+    const playerId = event.target.value;
+    if (!playerId) return;
+    const drawId = appElement.querySelector('#championship-draw-id')?.value || championshipDrawId;
+    championshipLineup = { drawId, map: { ...capturarEscalacao(), [playerId]: 'a' } };
+    championshipResultCardOpen = true;
     render(getState());
   });
 
@@ -4286,7 +4379,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'championship':
       // Campeonato completo (Rei da Quadra + histórico) é Pro — Free vê o cadeado.
       if (!isPro()) return renderProLock({ title: 'Campeonato & Rei da Quadra', benefit: 'Lance resultados, acompanhe a classificação do Rei da Quadra e o histórico de campeões do grupo. Disponível no Pro.' });
-      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
+      return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup, championshipResultCardOpen);
     case 'finance':
       if (!isPro()) return renderProLock({ title: 'Controle financeiro', benefit: 'Livro-caixa do clube: mensalidade, despesas e demonstrativo — tudo num lugar só. Disponível no Pro.' });
       if (!canManageFinance(currentPlayer)) return renderPublicFinanceScreen(snapshot);
@@ -4706,7 +4799,7 @@ function renderWeeklyGame(snapshot, currentPlayer) {
 }
 
 function renderChampionship(snapshot, currentPlayer) {
-  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId);
+  return renderChampionshipScreen(snapshot, currentPlayer, championshipDrawId, championshipLineup, championshipResultCardOpen);
 }
 
 function buildTeamDrawShareText(snapshot) {
@@ -4757,37 +4850,56 @@ function buildTeamDrawShareText(snapshot) {
   ].join('\n');
 }
 
-async function copyTeamDrawToClipboard() {
+async function shareTeamDrawImage() {
   const snapshot = getState();
-  const text = buildTeamDrawShareText(snapshot);
-
-  if (!text) {
-    showToast('Nenhum sorteio disponível para copiar.', 'error');
+  if (!snapshot?.game?.sort_result) {
+    showToast('Nenhum sorteio disponível para compartilhar.', 'error');
     return;
   }
 
+  showToast('Gerando a imagem…');
+  let blob = null;
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      textarea.remove();
-    }
+    const { gerarImagemEscalacao } = await import('../modules/game/lineup-image.js');
+    blob = await gerarImagemEscalacao(snapshot, { titulo: 'ESCALAÇÃO' });
+  } catch (error) {
+    console.error('[escalacao] falha ao gerar imagem', error);
+  }
+  if (!blob) {
+    showToast('Não consegui gerar a imagem da escalação.', 'error');
+    return;
+  }
 
-    showToast('Times copiados.');
+  const nomeArquivo = `times-${String(snapshot?.game?.game_date || 'jogo')}.png`;
+  const file = new File([blob], nomeArquivo, { type: 'image/png' });
+
+  // Celular: abre a folha de compartilhamento (WhatsApp direto).
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;   // cancelar também cai aqui: nada a avisar
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') return;   // usuário cancelou
+    console.warn('[escalacao] share indisponível, baixando', error);
+  }
+
+  // Desktop / navegador sem Web Share de arquivo: baixa o PNG.
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Imagem da escalação baixada.');
   } catch (error) {
     console.error(error);
-    showToast('Não foi possível copiar automaticamente.', 'error');
+    showToast('Não foi possível compartilhar a imagem.', 'error');
   }
 }
-
 function buildPaymentsShareText(snapshot) {
   const players = (snapshot.players || [])
     .filter((player) => player && player.plays_football !== false && player.role !== 'carne')
@@ -5333,7 +5445,7 @@ function renderTeamDraw(snapshot, currentPlayer) {
 
       ${canManagePresenceAuthz(currentPlayer) ? `
         <div class="actions" style="margin-top:12px;">
-          <button class="btn btn-secondary" type="button" id="copy-draw-btn">Copiar times</button>
+          <button class="btn btn-secondary" type="button" id="share-draw-btn">📸 Compartilhar escalação</button>
           <button class="btn btn-secondary" type="button" id="clear-draw-btn">Limpar sorteio</button>
           <button class="btn btn-primary" type="button" id="draw-teams-btn">Sortear novamente</button>
         </div>

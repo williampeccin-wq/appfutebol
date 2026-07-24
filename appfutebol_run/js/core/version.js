@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.144.0-club-profile-f1-completa';
+export const APP_VERSION = 'v1.145.0-paridade-com-producao';

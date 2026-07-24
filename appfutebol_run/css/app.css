@@ -6138,6 +6138,12 @@ body {
   color: var(--hfc-text);
 }
 .content--championship .card-title { color: var(--hfc-text); }
+
+/* .row-title nasceu para fundo claro (#111827). As abas de fundo escuro
+   sobrescrevem uma a uma; o campeonato tinha ficado de fora, e o nome do
+   jogador em "Ajustar quem jogou" saía preto sobre o card escuro. */
+.content--championship .row-title { color: var(--hfc-text); }
+.content--championship .row-subtitle { color: var(--hfc-text-muted); }
 .content--championship .footer-note,
 .content--championship .empty-state { color: var(--hfc-text-muted); }
 

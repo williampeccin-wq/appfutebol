@@ -48,16 +48,21 @@ function pointsTableFor(snapshot) {
 
 const IMPORTED_SHEET_NAME_ALIASES = {
   // De/para validado com a planilha Inverno 26.
+  // ATENÇÃO: o alvo é o NOME DE EXIBIÇÃO ATUAL do jogador. Se alguém for
+  // renomeado no app, o alias quebra em silêncio e a pessoa deixa de pontuar nas
+  // rodadas importadas (foi o que aconteceu com Vinicius/Lucas/Samuel — os
+  // alvos antigos "Vinicius amigo Caue"/"Lucas Neto" não existiam mais).
   'ADRIANO': 'DANO',
   'CAUE': 'S2CANSADO',
-  'VINICIUS': 'VINICIUS AMIGO CAUE',
+  'VINICIUS': 'VINICIUS CAUE',   // era 'VINICIUS AMIGO CAUE' (renomeado); confirmado admin 23/07
   'ANDRE DAMS': 'ANDRE',
   'ANDRÉ DAMS': 'ANDRE',
-  'LUCAS SILVA': 'LUCAS NETO',
+  'LUCAS SILVA': 'LUKINHA',      // era 'LUCAS NETO' (renomeado p/ Lukinha😎, mesmo fone); o emoji é removido pelo normalizeName; confirmado admin 23/07
   'DAVID': 'DVD',
   'GEDE': 'GEDIEL',
   'NATAN': 'NATAN',
   'PAPAI PH': 'PH',
+  'SAMUEL': 'SAMUEL REIS',       // renomeado de 'Samuel'; confirmado admin 23/07
   'WILLIAM': 'WILLIAM',
 };
 
@@ -227,6 +232,9 @@ const IMPORTED_SHEET_ROUNDS = [
       'Vítor': 0,
       'Telo': 1,
       'Trocinho': 0,
+      // Jogou em 03/06 mas ficou de fora da planilha importada (por isso nunca
+      // pontuou nessa rodada). Confirmado pelo admin em 23/07/2026. 3 = vitória.
+      'Robson': 3,
     },
   },
 ];
@@ -345,7 +353,12 @@ export function isFootballPlayer(player) {
 export function normalizeName(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')      // remove acentos
+    // Remove emojis/pictogramas: um jogador com emoji no nome (ex.: "Lukinha\ud83d\ude0e")
+    // n\u00e3o casava com a planilha importada porque o emoji sobrevivia \u00e0
+    // normaliza\u00e7\u00e3o. Como isto roda nos DOIS lados da compara\u00e7\u00e3o, tirar n\u00e3o
+    // quebra nenhum casamento existente e conserta os nomes com emoji.
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}]/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toUpperCase();
@@ -393,11 +406,34 @@ export function getChampionshipState(snapshot) {
           team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
           team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
           statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
+          lineup_adjusted: result.lineup_adjusted === true,
         }))
         .filter((result) => result.date)
         .sort((left, right) => String(left.date).localeCompare(String(right.date))),
     },
   };
+}
+
+// Duas entradas são a MESMA rodada quando têm o mesmo id, quando são do mesmo
+// jogo (game_key), ou quando caem na mesma data. Gravar uma substitui a outra.
+//
+// O game_key entrou aqui porque relançar o mesmo jogo com a data corrigida
+// criava uma rodada duplicada em vez de corrigir a existente. A data continua
+// valendo para as rodadas antigas, que não têm game_key.
+function isSameRound(entry, candidate) {
+  if (String(entry?.id || '') === String(candidate?.id || '')) return true;
+  const entryGame = String(entry?.game_key || '');
+  const candidateGame = String(candidate?.game_key || '');
+  if (entryGame && candidateGame && entryGame === candidateGame) return true;
+  return String(entry?.date || '') === String(candidate?.date || '');
+}
+
+// Qual resultado JÁ LANÇADO seria substituído por este. A UI usa isto para
+// perguntar antes — a substituição era silenciosa, e um lançamento apagava
+// outro sem que ninguém percebesse (INCIDENTE 23/07).
+export function findReplacedChampionshipResult(snapshot, candidate) {
+  return getChampionshipState(snapshot).active.results
+    .find((entry) => !entry.imported && isSameRound(entry, candidate)) || null;
 }
 
 export function persistChampionshipResult(snapshot, result) {
@@ -412,12 +448,10 @@ export function persistChampionshipResult(snapshot, result) {
     team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
     team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
     statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
+    lineup_adjusted: result.lineup_adjusted === true,
   };
 
-  const results = championship.active.results.filter((entry) => (
-    String(entry.id) !== String(normalizedResult.id) &&
-    String(entry.date) !== String(normalizedResult.date)
-  ));
+  const results = championship.active.results.filter((entry) => !isSameRound(entry, normalizedResult));
   results.push(normalizedResult);
 
   snapshot.championship = {
@@ -514,12 +548,12 @@ function normalizeDrawEntry(draw, fallbackId = '') {
 // Sorteios disponíveis para lançar resultado. Varre TODOS os jogos, não só o
 // ativo: cada jogo guarda o próprio `sort_result`/`draw_history`, e ler apenas
 // o ativo fazia o resultado do jogo ANTERIOR virar inalcançável assim que um
-// novo jogo era aberto (o novo nasce sem sorteio → lista vazia → "faça o sorteio
-// antes de lançar o resultado"). Como a abertura do próximo jogo é automática
-// (cron `auto-open-games`, 2 dias antes), a janela para lançar fechava sozinha
-// toda semana. Aqui a votação de desempenho abre no lançamento do resultado, então
-// isto também tirava a votação inteira do jogo. Ordenação por created_at desc
-// preservada — o caso normal continua trazendo o sorteio mais recente primeiro.
+// novo jogo era aberto (o novo nasce sem sorteio → lista vazia → o app dizia
+// "faça o sorteio antes de lançar o resultado"). Como a abertura do próximo
+// jogo é automática (cron `auto-open-games`, 2 dias antes), a janela para
+// lançar fechava sozinha toda semana — foi o que deixou 15/07 e 22/07 sem
+// resultado no campeonato. A ordenação por created_at desc é preservada, então
+// o caso normal continua trazendo o sorteio mais recente primeiro.
 export function getChampionshipDrawOptions(snapshot) {
   const options = [];
   const pushDraw = (draw, fallbackId) => {
@@ -529,20 +563,22 @@ export function getChampionshipDrawOptions(snapshot) {
     options.push(normalized);
   };
 
-  // O ativo primeiro, com os ids de fallback históricos ('current_draw'/
-  // 'draw_history_N') preservados p/ não invalidar resultados já lançados.
+  const collectFrom = (game, prefix) => {
+    if (!game || typeof game !== 'object') return;
+    pushDraw(game.sort_result, `${prefix}_draw`);
+    (Array.isArray(game.draw_history) ? game.draw_history : [])
+      .forEach((draw, index) => pushDraw(draw, `${prefix}_history_${index}`));
+  };
+
+  // O ativo primeiro (mantém os ids de fallback históricos p/ não invalidar
+  // resultados já lançados que referenciam 'current_draw'/'draw_history_N').
   const active = snapshot?.game || {};
   pushDraw(active.sort_result, 'current_draw');
   (Array.isArray(active.draw_history) ? active.draw_history : []).forEach((draw, index) => pushDraw(draw, `draw_history_${index}`));
 
   // Depois todos os demais jogos do histórico.
   const games = Array.isArray(snapshot?.games) ? snapshot.games : [];
-  games.forEach((game) => {
-    if (!game || typeof game !== 'object') return;
-    const prefix = String(game.game_key || game.id || game.game_date || 'game');
-    pushDraw(game.sort_result, `${prefix}_draw`);
-    (Array.isArray(game.draw_history) ? game.draw_history : []).forEach((draw, index) => pushDraw(draw, `${prefix}_history_${index}`));
-  });
+  games.forEach((game) => collectFrom(game, String(game?.game_key || game?.id || game?.game_date || 'game')));
 
   return options.sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')));
 }
@@ -560,7 +596,23 @@ export function getActiveDrawTeams(snapshot, drawId = null) {
   return selected;
 }
 
-export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
+// Escalação REAL do jogo, a partir do sorteio: { playerId: 'a' | 'b' }.
+// Convidado / goleiro alugado não entram — o sorteio embute o objeto do jogador
+// (sem id persistente) e o campeonato só pontua jogador registrado.
+export function buildLineupFromDraw(draw) {
+  const map = {};
+  const add = (arr, side) => (Array.isArray(arr) ? arr : []).forEach((v) => {
+    if (typeof v === 'string' || typeof v === 'number') map[String(v)] = side;
+  });
+  add(draw?.team_a, 'a');
+  add(draw?.team_b, 'b');
+  return map;
+}
+
+// `lineup` permite corrigir o que o sorteio não sabe: quem desistiu em cima da
+// hora, quem entrou no lugar, quem saiu no meio. Sem ele, vale o sorteio.
+// Formato: { playerId: 'a' | 'b' | 'out' } — 'out' (ou ausente) = não jogou.
+export function buildTeamResultStatuses(snapshot, outcome, drawId = null, lineup = null) {
   const draw = getActiveDrawTeams(snapshot, drawId);
   if (!draw.ok) return { ok: false, message: draw.message };
 
@@ -578,26 +630,30 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     });
   };
 
-  if (validOutcome === 'draw') {
-    assignTeam(draw.team_a, 'draw');
-    assignTeam(draw.team_b, 'draw');
-  } else if (validOutcome === 'team_a') {
-    assignTeam(draw.team_a, 'win');
-    assignTeam(draw.team_b, 'loss');
-  } else if (validOutcome === 'team_b') {
-    assignTeam(draw.team_a, 'loss');
-    assignTeam(draw.team_b, 'win');
+  // A escalação ajustada manda; sem ajuste, vale o sorteio. Só entram ids que
+  // são jogador registrado — convidado/goleiro alugado não pontuam (o sorteio
+  // embute o objeto do jogador, sem id persistente, e String(obj) virava
+  // "[object Object]" no registro antigo).
+  const lineupAdjusted = !!(lineup && typeof lineup === 'object' && Object.keys(lineup).length);
+  const map = lineupAdjusted ? lineup : buildLineupFromDraw(draw);
+  const isPlayer = (id) => Object.prototype.hasOwnProperty.call(statuses, String(id));
+  const teamA = Object.keys(map).filter((id) => map[id] === 'a' && isPlayer(id));
+  const teamB = Object.keys(map).filter((id) => map[id] === 'b' && isPlayer(id));
+
+  if (!teamA.length && !teamB.length) {
+    return { ok: false, message: 'Nenhum jogador registrado na escalação. Ajuste quem jogou antes de lançar.' };
   }
 
-  // team_a/team_b do sorteio podem conter OBJETOS (goleiro alugado/convidado não
-  // têm id persistente — o draw embute o player inteiro; ver game.service
-  // balanceTeams). Ao gravar o resultado, String(obj) virava "[object Object]".
-  // Como o campeonato só pontua jogador REGISTRADO (statuses são por id),
-  // guardamos APENAS ids primitivos; convidado/goleiro-alugado ficam fora do
-  // registro do resultado (não pontuam mesmo).
-  const onlyPlayerIds = (arr) => (Array.isArray(arr) ? arr : [])
-    .filter((x) => typeof x === 'string' || typeof x === 'number')
-    .map(String);
+  if (validOutcome === 'draw') {
+    assignTeam(teamA, 'draw');
+    assignTeam(teamB, 'draw');
+  } else if (validOutcome === 'team_a') {
+    assignTeam(teamA, 'win');
+    assignTeam(teamB, 'loss');
+  } else if (validOutcome === 'team_b') {
+    assignTeam(teamA, 'loss');
+    assignTeam(teamB, 'win');
+  }
 
   return {
     ok: true,
@@ -606,9 +662,12 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null) {
     game_key: draw.game_key || null,
     game_date: draw.game_date || null,
     game_time: draw.game_time || null,
-    team_a: onlyPlayerIds(draw.team_a),
-    team_b: onlyPlayerIds(draw.team_b),
+    team_a: teamA,
+    team_b: teamB,
     statuses,
+    // Marca que o admin declarou explicitamente quem jogou. A classificação usa
+    // isto para NÃO deixar a heurística de remoção sobrescrever a declaração.
+    lineup_adjusted: lineupAdjusted,
   };
 }
 
@@ -648,7 +707,13 @@ export function calculateCurrentRanking(snapshot) {
 
   results.forEach((result) => {
     const gameKey = String(result.game_key || '');
-    const removedSet = gameKey ? removedByGameKey.get(gameKey) : null;
+    // A rede de segurança existe para resultados lançados ANTES de o admin
+    // remover alguém da escalação — dados já gravados que ninguém revisou.
+    // Quando o admin declarou explicitamente quem jogou ("Ajustar quem jogou"),
+    // a declaração dele é a verdade: sem esta ressalva, um substituto que havia
+    // cancelado e acabou entrando em campo tinha os pontos zerados em silêncio,
+    // exatamente o caso que motivou o editor de escalação.
+    const removedSet = (gameKey && result.lineup_adjusted !== true) ? removedByGameKey.get(gameKey) : null;
     rowsById.forEach((row, playerId) => {
       const rawStatus = (removedSet && removedSet.has(playerId)) ? 'no_play' : (result.statuses?.[playerId] || 'no_play');
       const status = Object.prototype.hasOwnProperty.call(pontos, rawStatus) ? rawStatus : 'no_play';

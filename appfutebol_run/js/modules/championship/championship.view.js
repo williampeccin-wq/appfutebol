@@ -16,6 +16,7 @@ import {
   getChampionshipDrawOptions,
   getTeamOutcomeLabel,
   getManualChampionshipResults,
+  buildLineupFromDraw,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml } from '../players/players.service.js';
@@ -198,7 +199,62 @@ function renderRoundMatrix(snapshot) {
   `;
 }
 
-function renderResultForm(snapshot, currentPlayer, selectedDrawId = null) {
+// Editor de "quem realmente jogou". O sorteio é a intenção; o jogo é a
+// realidade — alguém desiste em cima da hora, entra um substituto, outro sai no
+// meio. Sem isto, o resultado atribuía vitória/derrota a quem nem apareceu (e
+// não havia como dar 0 a um jogador específico, nem incluir o substituto).
+// `lineup` é { playerId: 'a' | 'b' | 'out' }.
+function renderLineupEditor(selectedDraw, players, lineup, ajustado) {
+  const nomeDe = new Map(players.map((p) => [String(p.id), p.name || 'Jogador']));
+  const naEscalacao = Object.keys(lineup).filter((id) => nomeDe.has(id));
+  const ordenar = (ids) => ids.slice().sort((a, b) =>
+    String(nomeDe.get(a)).localeCompare(String(nomeDe.get(b)), 'pt-BR'));
+
+  const linha = (id) => {
+    const v = lineup[id] || 'out';
+    return `
+      <div class="player-compact-row" role="row">
+        <div class="player-compact-main"><div class="player-compact-text">
+          <div class="row-title">${escapeHtml(nomeDe.get(id))}</div>
+        </div></div>
+        <div class="player-compact-right">
+          <select class="championship-control-v2" data-lineup-player="${escapeHtml(id)}" aria-label="Time de ${escapeHtml(nomeDe.get(id))}">
+            <option value="a"${v === 'a' ? ' selected' : ''}>Time A</option>
+            <option value="b"${v === 'b' ? ' selected' : ''}>Time B</option>
+            <option value="out"${v === 'out' ? ' selected' : ''}>Não jogou</option>
+          </select>
+        </div>
+      </div>`;
+  };
+
+  // Quem pode ser adicionado: jogador registrado que não está na escalação.
+  const fora = ordenar(players.map((p) => String(p.id)).filter((id) => !(id in lineup)));
+  const nA = naEscalacao.filter((id) => lineup[id] === 'a').length;
+  const nB = naEscalacao.filter((id) => lineup[id] === 'b').length;
+  const nOut = naEscalacao.filter((id) => lineup[id] === 'out').length;
+
+  return `
+    <details class="championship-teams-result-details championship-teams-result-details-v2"${ajustado ? ' open' : ''}>
+      <summary>
+        <span>Ajustar quem jogou${ajustado ? ' · ajustado' : ''}</span>
+        <small>${nA} x ${nB}${nOut ? ` · ${nOut} fora` : ''}</small>
+      </summary>
+      <p class="footer-note" style="margin:6px 0 10px;">Quem desistiu em cima da hora fica como <strong>Não jogou</strong> (0 ponto). Se entrou alguém no lugar, adicione abaixo e escolha o time. Convidados não pontuam e não aparecem aqui.</p>
+      <div class="player-compact-list" role="table" aria-label="Quem jogou">
+        ${ordenar(naEscalacao).map(linha).join('')}
+      </div>
+      ${fora.length ? `
+        <label class="championship-field-v2" style="margin-top:10px;">
+          <span>Adicionar jogador que não estava no sorteio</span>
+          <select id="championship-add-to-lineup" class="championship-control-v2">
+            <option value="">Selecione…</option>
+            ${fora.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(nomeDe.get(id))}</option>`).join('')}
+          </select>
+        </label>` : ''}
+    </details>`;
+}
+
+function renderResultForm(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, cardOpen = false) {
   if (!canManageChampionship(currentPlayer)) return '';
 
   const players = getFootballPlayers(snapshot);
@@ -216,13 +272,20 @@ function renderResultForm(snapshot, currentPlayer, selectedDrawId = null) {
       </section>`;
   }
 
-  // O sorteio ESCOLHIDO no seletor comanda a tela (data + escalações). Antes era
-  // sempre `draws[0]` (o mais recente) e o <select> só era lido no submit: dava
-  // para escolher o sorteio de um jogo e ver/gravar os dados de outro. Ficava
+  // O sorteio ESCOLHIDO no seletor comanda a tela. Antes era sempre `draws[0]`
+  // (o mais recente), então trocar o seletor não mexia na data nem nas
+  // escalações exibidas: dava para escolher o sorteio de um jogo e ver os times
+  // de outro — e a data ia para o resultado com o valor errado. Ficava
   // invisível enquanto a lista só tinha sorteios do mesmo jogo.
   const selectedDraw = (selectedDrawId && draws.find((draw) => String(draw.id) === String(selectedDrawId))) || draws[0];
   const playerById = new Map(players.map((player) => [String(player.id), player]));
   const selectedDate = selectedDraw.date || (selectedDraw.created_at ? new Date(selectedDraw.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  // Escalação: o ajuste do admin vale, mas só enquanto for do MESMO sorteio —
+  // trocar de sorteio recomeça do zero (senão o ajuste de um jogo vazaria pro
+  // outro, que é a classe de bug que acabamos de consertar aqui).
+  const ajustado = !!(lineupState && String(lineupState.drawId) === String(selectedDraw.id));
+  const lineup = ajustado ? lineupState.map : buildLineupFromDraw(selectedDraw);
+
   const manualResults = getManualChampionshipResults(snapshot);
   const existingResult = manualResults.find((result) => String(result.draw_id || '') === String(selectedDraw.id || '') || String(result.date || '') === String(selectedDate));
 
@@ -232,7 +295,10 @@ function renderResultForm(snapshot, currentPlayer, selectedDrawId = null) {
   }).join('');
 
   return `
-    <details class="card championship-result-card championship-result-card-v2 champ-collapse">
+    <!-- estado de aberto preservado entre renders: cada ajuste de escalação
+         re-renderiza a tela, e sem isto o card fechava a cada alteração — o
+         admin tinha de reabrir e rolar até aqui de novo a cada jogador. -->
+    <details class="card championship-result-card championship-result-card-v2 champ-collapse"${cardOpen ? ' open' : ''}>
       <summary class="champ-collapse-summary">
         <span class="card-title">🏆 Lançar resultado do jogo</span>
         <span class="champ-collapse-chevron" aria-hidden="true"></span>
@@ -280,6 +346,8 @@ function renderResultForm(snapshot, currentPlayer, selectedDrawId = null) {
           <div class="championship-team-result-box"><div class="championship-team-label">Time B</div><div class="championship-team-player-list">${renderTeamPlayers(selectedDraw.team_b)}</div></div>
         </div>
       </details>
+
+      ${renderLineupEditor(selectedDraw, players, lineup, ajustado)}
 
       <button class="btn btn-primary championship-save-result-btn-v2" type="button" data-action="save-championship-result">Salvar resultado</button>
 
@@ -430,7 +498,7 @@ function collapsibleCard({ title, note = '', body = '', open = false, extraClass
     </details>`;
 }
 
-export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null) {
+export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, resultCardOpen = false) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
@@ -443,7 +511,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
-      ${renderResultForm(snapshot, currentPlayer, selectedDrawId)}
+      ${renderResultForm(snapshot, currentPlayer, selectedDrawId, lineupState, resultCardOpen)}
 
       ${collapsibleCard({
         title: 'Classificação atual · Inverno 26',
