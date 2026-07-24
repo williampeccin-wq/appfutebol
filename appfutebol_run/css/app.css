@@ -7214,3 +7214,27 @@ body.vote-open { overflow: hidden; }
   margin-top: 8px;
 }
 .pro-lock-inline > div { flex: 1; min-width: 140px; }
+
+/* "Como o clube joga" (Config) — os quatro campos de pontuação lado a lado,
+   quebrando em duas linhas no celular em vez de espremerem. */
+.club-profile-points {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+.club-profile-points label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.club-profile-points small { color: var(--hfc-text-muted, #8b97b0); font-size: 12px; }
+.club-profile-points .input { width: 100%; text-align: center; }
+
+@media (max-width: 420px) {
+  .club-profile-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.club-profile-card .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.club-profile-card .checkbox-row input { width: auto; margin: 0; }

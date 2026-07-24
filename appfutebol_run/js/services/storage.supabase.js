@@ -299,6 +299,7 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     championship: meta.championship || null,
     games,
     active_game_id: meta.active_game_id || activeGame?.game_key || game?.game_key || null,
+    profile: meta.profile || null,
     carne: visibleCarne,
     notifications: Array.isArray(meta.notifications) ? meta.notifications : [],
     // Configuração global do clube. Migração: se ainda não existir em meta,
@@ -334,6 +335,7 @@ function splitState(state) {
       championship: state.championship || null,
       games: Array.isArray(state.games) ? state.games : [],
       active_game_id: state.active_game_id || normalizedGame?.game_key || null,
+      profile: state.profile || null,
       carne: Array.isArray(state.carne) ? state.carne : [],
       notifications: Array.isArray(state.notifications) ? state.notifications : [],
       settings: {

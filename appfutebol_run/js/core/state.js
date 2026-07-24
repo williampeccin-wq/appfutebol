@@ -12,6 +12,9 @@ export const state = {
   active_game_id: null,
   confirmations: [],
   championship: null,
+  // Perfil do clube (como ESTE clube joga). null = usa os defaults. Ver
+  // domain/club-profile.js.
+  profile: null,
   carne: [],
   notifications: [],
   // Configurações globais do clube (não por jogo). Ex.: vencimento único da mensalidade.
@@ -47,6 +50,7 @@ export function replaceState(nextState) {
   state.active_game_id = safeState.active_game_id || null;
   state.confirmations = Array.isArray(safeState.confirmations) ? safeState.confirmations : [];
   state.championship = safeState.championship || null;
+  state.profile = safeState.profile || null;
   state.carne = Array.isArray(safeState.carne) ? safeState.carne : [];
   state.notifications = Array.isArray(safeState.notifications) ? safeState.notifications : [];
   state.settings = (safeState.settings && typeof safeState.settings === 'object') ? { ...safeState.settings } : { mens_expire_date: '' };
@@ -91,6 +95,9 @@ export function patchState(patch) {
   if (Object.prototype.hasOwnProperty.call(patch, 'deleted_player_phones')) {
     state.deleted_player_phones = Array.isArray(patch.deleted_player_phones) ? patch.deleted_player_phones.map((phone) => String(phone || '').replace(/\D/g, '')).filter(Boolean) : [];
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'profile')) {
+    state.profile = patch.profile || null;
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'carne')) {
     state.carne = Array.isArray(patch.carne) ? patch.carne : [];
   }
@@ -113,6 +120,7 @@ export function patchState(patch) {
   state.active_game_id = repaired.state.active_game_id || null;
   state.confirmations = Array.isArray(repaired.state.confirmations) ? repaired.state.confirmations : [];
   state.championship = repaired.state.championship || null;
+  state.profile = repaired.state.profile || null;
   state.carne = Array.isArray(repaired.state.carne) ? repaired.state.carne : [];
   state.notifications = Array.isArray(repaired.state.notifications) ? repaired.state.notifications : [];
   state.settings = (repaired.state.settings && typeof repaired.state.settings === 'object') ? { ...repaired.state.settings } : (state.settings || { mens_expire_date: '' });

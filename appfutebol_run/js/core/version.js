@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.143.0-gravacao-concorrente';
+export const APP_VERSION = 'v1.144.0-club-profile-f1-completa';

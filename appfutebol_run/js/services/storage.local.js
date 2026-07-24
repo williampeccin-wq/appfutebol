@@ -57,6 +57,7 @@ const defaultSeed = {
     closed: false,
     ranking: [],
   },
+  profile: null,
   carne: [],
   notifications: [],
   ui: {
@@ -213,6 +214,7 @@ function normalizeData(data) {
             : structuredClone(defaultSeed.championship.ranking),
         }
       : structuredClone(defaultSeed.championship),
+    profile: source.profile || null,
     carne: Array.isArray(source.carne)
       ? source.carne.map((entry) => ({
           ...entry,
@@ -249,6 +251,7 @@ function buildMergedData(parsed) {
             : structuredClone(seed.championship.ranking),
         }
       : structuredClone(seed.championship),
+    profile: parsed.profile || seed.profile || null,
     carne: Array.isArray(parsed.carne) ? parsed.carne : structuredClone(seed.carne),
     notifications: Array.isArray(parsed.notifications) ? parsed.notifications : structuredClone(seed.notifications),
   };

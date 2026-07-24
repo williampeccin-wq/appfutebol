@@ -1,23 +1,15 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { CHAMPIONSHIP_HISTORY } from './championship.history.js';
 import { getChampionshipLegacyDataset, getChampionshipPoints, getChampionshipSeason } from '../../domain/club-profile.js';
-import { isLegacyBlobKey } from '../../services/storage.supabase.js';
 
 // Identificador do único dataset histórico existente hoje (a planilha Rei da
 // Quadra do Harmonia). Um clube só enxerga estes dados se o PERFIL dele apontar
 // explicitamente para cá — ver domain/club-profile.js.
 const LEGACY_DATASET_ID = 'harmonia_rei_da_quadra';
 
-function profileOptions() {
-  // A leitura da key é best-effort: se o cache do clube ainda não resolveu, o
-  // pior caso é um clube legado não ver o histórico por um render — nunca o
-  // contrário (clube novo herdando dados alheios).
-  try { return { legacyBlob: isLegacyBlobKey() }; } catch (_) { return { legacyBlob: false }; }
-}
-
 // Este clube usa o dataset histórico do Harmonia?
 function usesLegacyDataset(snapshot) {
-  return getChampionshipLegacyDataset(snapshot, profileOptions()) === LEGACY_DATASET_ID;
+  return getChampionshipLegacyDataset(snapshot) === LEGACY_DATASET_ID;
 }
 
 export const ACTIVE_CHAMPIONSHIP = {
@@ -50,7 +42,7 @@ const POINTS_BY_STATUS = RESULT_OPTIONS.reduce((acc, option) => {
 
 // Pontuação do clube. 3/2/1/0 é só o default — o perfil pode mudar.
 function pointsTableFor(snapshot) {
-  const p = getChampionshipPoints(snapshot, profileOptions());
+  const p = getChampionshipPoints(snapshot);
   return { win: p.win, draw: p.draw, loss: p.loss, no_play: p.no_play };
 }
 
@@ -748,7 +740,7 @@ export function getActiveChampionshipMeta(snapshot) {
   const championship = getChampionshipState(snapshot);
   return {
     ...ACTIVE_CHAMPIONSHIP,
-    ...getChampionshipSeason(snapshot, profileOptions()),
+    ...getChampionshipSeason(snapshot),
     ...championship.active,
     ranking: calculateCurrentRanking(snapshot),
   };

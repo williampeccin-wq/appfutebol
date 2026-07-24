@@ -17,6 +17,16 @@
 //    EXCETO no dataset histórico (ver abaixo), que é fato de um clube só.
 // 3. Uma porta de leitura. Ninguém lê o blob cru; tudo passa por getClubProfile.
 
+import { isLegacyBlobKey } from '../services/storage.supabase.js';
+
+// Resolve sozinho se este é o blob da instalação original. Sem isto, todo
+// chamador teria de repetir o try/catch — e bastava um esquecer para um clube
+// novo herdar dado alheio. O default de um erro aqui é o lado SEGURO (não é
+// legado), então falha de leitura nunca vira vazamento.
+export function currentProfileOptions() {
+  try { return { legacyBlob: isLegacyBlobKey() }; } catch (_) { return { legacyBlob: false }; }
+}
+
 // Defaults estruturais: são os valores que o app já pratica hoje. Um clube sem
 // perfil continua idêntico ao que era.
 export const DEFAULT_PROFILE = {
@@ -97,7 +107,8 @@ function mergeSection(base, override) {
  * Harmonia não for gravado, ele continua vendo o próprio histórico. Clube novo
  * nasce com club_id e nunca passa por aqui.
  */
-export function getClubProfile(state, { legacyBlob = false } = {}) {
+export function getClubProfile(state, options = null) {
+  const { legacyBlob = false } = options || currentProfileOptions();
   const stored = isPlainObject(state?.profile) ? state.profile : null;
 
   const championshipDefaults = {
@@ -115,18 +126,18 @@ export function getClubProfile(state, { legacyBlob = false } = {}) {
 }
 
 /** Módulo ligado para este clube? Usado para esconder abas e ações. */
-export function isModuleOn(state, moduleName, options = {}) {
+export function isModuleOn(state, moduleName, options = null) {
   const modules = getClubProfile(state, options).modules;
   return modules[moduleName] !== false;
 }
 
 /** Temporada corrente do campeonato do clube. */
-export function getChampionshipSeason(state, options = {}) {
+export function getChampionshipSeason(state, options = null) {
   return getClubProfile(state, options).championship.season;
 }
 
 /** Pontuação por resultado do clube (3/2/1/0 por padrão). */
-export function getChampionshipPoints(state, options = {}) {
+export function getChampionshipPoints(state, options = null) {
   return getClubProfile(state, options).championship.points;
 }
 
@@ -134,6 +145,6 @@ export function getChampionshipPoints(state, options = {}) {
  * Qual dataset histórico importado este clube usa (ou null).
  * Ver o comentário em DEFAULT_PROFILE.championship.legacy_dataset.
  */
-export function getChampionshipLegacyDataset(state, options = {}) {
+export function getChampionshipLegacyDataset(state, options = null) {
   return getClubProfile(state, options).championship.legacy_dataset || null;
 }

@@ -283,7 +283,14 @@ Deno.serve(async (req) => {
   // composeState fabrica os defaults a partir do {} (clube vazio, sem jogos/config).
   if (clubMode === "create") {
     const nowIso = new Date().toISOString();
-    const seedMeta = await admin.from("app_meta").insert({ key: clubId, data: {}, updated_at: nowIso });
+    // Semeia um PERFIL explícito. Hoje o clube novo já não herda nada (o blob
+    // dele tem key=club_id, e a ponte do dataset legado só vale para a key
+    // 'default'), mas gravar o perfil torna isso determinístico em vez de
+    // depender da forma da key — e marca o clube como já inicializado.
+    // Só o schema_version: todo o resto vem dos defaults, e o admin ajusta em
+    // Config > "Como o clube joga".
+    const seedProfile = { schema_version: 1 };
+    const seedMeta = await admin.from("app_meta").insert({ key: clubId, data: { profile: seedProfile }, updated_at: nowIso });
     if (seedMeta.error) console.error("[register] seed app_meta:", seedMeta.error.message);
     const seedGame = await admin.from("game_state").insert({ key: clubId, data: {}, updated_at: nowIso });
     if (seedGame.error) console.error("[register] seed game_state:", seedGame.error.message);

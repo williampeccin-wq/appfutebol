@@ -2432,6 +2432,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
+import { getClubProfile, isModuleOn } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -3028,6 +3029,8 @@ function getInGamePlayers(snapshot, game) {
 
 async function maybeShowPerfVote(snapshot, currentPlayer) {
   if (!isVotingEnabled()) { unmountPerfVote(); return; }
+  // Clube que não vota não recebe o modal bloqueante.
+  if (!isModuleOn(snapshot, 'votacao_desempenho')) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
   // Desacoplado do jogo ativo: vale o jogo cuja janela está aberta.
   const game = getGameWithOpenVoteWindow(snapshot, (g) => getPerfWindow(snapshot, g))
@@ -3381,7 +3384,12 @@ function renderInner(snapshot) {
 
   const requestedTab = snapshot.ui.currentTab || 'home';
   const blockedTab = (requestedTab === 'config' && !canAccessConfig(currentPlayer))
-    || (requestedTab === 'finance' && !canManageFinance(currentPlayer) && !isPro());
+    || (requestedTab === 'finance' && !canManageFinance(currentPlayer) && !isPro())
+    // Módulo desligado no perfil do clube: a aba some da navegação, mas o
+    // estado pode ter ficado apontando para ela (o admin desligou o módulo com
+    // a aba aberta, ou o link veio de outro lugar).
+    || (requestedTab === 'carne' && !isModuleOn(snapshot, 'churrasco'))
+    || (requestedTab === 'championship' && !isModuleOn(snapshot, 'campeonato'));
   const activeTab = blockedTab ? 'home' : requestedTab;
   ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
   if (activeTab === 'finance') {
@@ -3418,7 +3426,7 @@ ${confirmedCount} / ${maxPlayers} jogadores de linha confirmados
 ${renderTab(snapshot, activeTab, currentPlayer)}
     </main>
 
-    ${renderBottomNav(activeTab, currentPlayer)}
+    ${renderBottomNav(activeTab, currentPlayer, snapshot)}
   `;
 
   bindAppEvents(currentPlayer);
@@ -4092,6 +4100,51 @@ function bindAppEvents(currentPlayer) {
     });
   }
 
+  const clubProfileForm = appElement.querySelector('#club-profile-form');
+  if (clubProfileForm) {
+    clubProfileForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!requireAdmin(getState(), 'Apenas administrador pode configurar o clube')) return;
+      const f = new FormData(clubProfileForm);
+      const inteiro = (nome, padrao) => {
+        const n = Number(f.get(nome));
+        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : padrao;
+      };
+
+      const next = structuredClone(getState());
+      const atual = getClubProfile(next);
+      // Grava o perfil COMPLETO (defaults + o que mudou). O acessor tolera
+      // perfil parcial, mas gravar inteiro deixa explícito no banco o que o
+      // clube pratica — e tira a instalação legada da ponte do dataset.
+      next.profile = {
+        ...atual,
+        schema_version: 1,
+        game: { ...atual.game, cadence: String(f.get('cadence') || atual.game.cadence), day_of_week: inteiro('day_of_week', atual.game.day_of_week) },
+        modules: {
+          ...atual.modules,
+          churrasco: f.get('mod_churrasco') === 'on',
+          campeonato: f.get('mod_campeonato') === 'on',
+          votacao_desempenho: f.get('mod_votacao') === 'on',
+        },
+        championship: {
+          ...atual.championship,
+          points: {
+            win: inteiro('pts_win', atual.championship.points.win),
+            draw: inteiro('pts_draw', atual.championship.points.draw),
+            loss: inteiro('pts_loss', atual.championship.points.loss),
+            no_play: inteiro('pts_no_play', atual.championship.points.no_play),
+          },
+        },
+      };
+
+      const safeSnapshot = repairManualSnapshot(next);
+      replaceState(safeSnapshot);
+      savePersistedState(safeSnapshot);
+      render(safeSnapshot);
+      showToast('Configuração do clube salva.');
+    });
+  }
+
   const mensalidadeForm = appElement.querySelector('#mensalidade-config-form');
   if (mensalidadeForm) {
     mensalidadeForm.addEventListener('submit', (event) => {
@@ -4191,14 +4244,17 @@ const BOTTOM_NAV_ICONS = {
   config: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
 };
 
-function renderBottomNav(activeTab, currentPlayer) {
+function renderBottomNav(activeTab, currentPlayer, snapshot) {
+  // Nem todo clube faz churrasco toda semana nem roda campeonato. O que o clube
+  // não usa some da navegação em vez de virar uma aba vazia que ele precisa
+  // aprender a ignorar. Clube sem perfil = tudo ligado, como sempre foi.
   const items = [
     ['home', 'Home'],
     ['weekly_game', 'Jogo da semana'],
     ['players', 'Jogadores'],
-    ['carne', 'Churrasco'],
-    ['championship', 'Campeonato'],
   ];
+  if (isModuleOn(snapshot, 'churrasco')) items.push(['carne', 'Churrasco']);
+  if (isModuleOn(snapshot, 'campeonato')) items.push(['championship', 'Campeonato']);
   if (canManageFinance(currentPlayer) || isPro()) items.push(['finance', 'Financeiro']);
   if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
 
@@ -5313,6 +5369,7 @@ function renderConfig(snapshot, currentPlayer) {
   }
 
   const game = getActiveGameFromSnapshot(snapshot) || {};
+  const perfil = getClubProfile(snapshot);   // costumes deste clube (ver domain/club-profile.js)
   const games = getCurrentGames(snapshot);
   // Lista enxuta: mostra futuros + o ativo + o último passado; os passados mais
   // antigos vão para um expander "Ver jogos anteriores". É SÓ exibição — nada é
@@ -5470,6 +5527,48 @@ function renderConfig(snapshot, currentPlayer) {
             </div>
           </form>
         </details>
+      </section>
+
+      <section class="card club-profile-card">
+        <div class="card-title">Como o clube joga</div>
+        <p class="footer-note">O app nasceu com os costumes de um clube só. Aqui você diz os do seu: o que não usar some da navegação, e a pontuação do campeonato deixa de ser fixa.</p>
+        <form id="club-profile-form" class="player-admin-form game-config-form">
+          <label class="form-group">
+            <span class="form-label">Com que frequência vocês jogam</span>
+            <select name="cadence" class="input">
+              ${[['semanal', 'Toda semana'], ['quinzenal', 'A cada 15 dias'], ['mensal', 'Uma vez por mês'], ['avulso', 'Sem periodicidade']]
+                .map(([v, l]) => `<option value="${v}" ${perfil.game.cadence === v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </label>
+
+          <label class="form-group">
+            <span class="form-label">Dia da semana</span>
+            <select name="day_of_week" class="input">
+              ${['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+                .map((l, i) => `<option value="${i}" ${Number(perfil.game.day_of_week) === i ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </label>
+
+          <div class="form-group">
+            <span class="form-label">O que o clube usa</span>
+            <label class="checkbox-row"><input type="checkbox" name="mod_churrasco" ${perfil.modules.churrasco ? 'checked' : ''} /> <span>Churrasco e rodízio de duplas</span></label>
+            <label class="checkbox-row"><input type="checkbox" name="mod_campeonato" ${perfil.modules.campeonato ? 'checked' : ''} /> <span>Campeonato e classificação</span></label>
+            <label class="checkbox-row"><input type="checkbox" name="mod_votacao" ${perfil.modules.votacao_desempenho ? 'checked' : ''} /> <span>Votação de desempenho</span></label>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">Pontuação do campeonato</span>
+            <div class="club-profile-points">
+              <label><small>Vitória</small><input type="number" name="pts_win" class="input" min="0" max="99" value="${perfil.championship.points.win}" /></label>
+              <label><small>Empate</small><input type="number" name="pts_draw" class="input" min="0" max="99" value="${perfil.championship.points.draw}" /></label>
+              <label><small>Derrota</small><input type="number" name="pts_loss" class="input" min="0" max="99" value="${perfil.championship.points.loss}" /></label>
+              <label><small>Não jogou</small><input type="number" name="pts_no_play" class="input" min="0" max="99" value="${perfil.championship.points.no_play}" /></label>
+            </div>
+            <p class="footer-note">Mudar a pontuação recalcula a classificação inteira, inclusive as rodadas já lançadas.</p>
+          </div>
+
+          <button class="btn-primary" type="submit">Salvar</button>
+        </form>
       </section>
 
       <section class="card mensalidade-config-card">

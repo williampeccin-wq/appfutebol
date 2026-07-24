@@ -38,14 +38,20 @@ const clube = (profile) => ({
 
 // ---------------------------------------------------------------- defaults
 
-const padrao = getClubProfile({});
+const padrao = getClubProfile({}, { legacyBlob: false });
 assert.equal(padrao.game.teams, 2, 'o default estrutural continua o de hoje');
 assert.equal(padrao.game.cadence, 'semanal', 'cadência default é a atual');
 assert.deepEqual(padrao.championship.points, { win: 3, draw: 2, loss: 1, no_play: 0 }, 'pontuação default é a atual');
 assert.equal(padrao.championship.legacy_dataset, null, 'o dataset histórico NÃO pode vir ligado por omissão');
 
+// A ponte: só a instalação original (blob legado, sem perfil) enxerga o dataset.
+assert.equal(getClubProfile({}, { legacyBlob: true }).championship.legacy_dataset, 'harmonia_rei_da_quadra',
+  'a instalação legada continua enxergando o próprio histórico');
+assert.equal(getClubProfile({ profile: { schema_version: 1 } }, { legacyBlob: true }).championship.legacy_dataset, null,
+  'assim que o perfil existe, a ponte sai de cena e vale o que o perfil diz');
+
 // Perfil parcial não zera o resto.
-const parcial = getClubProfile({ profile: { modules: { carne: false } } });
+const parcial = getClubProfile({ profile: { modules: { carne: false } } }, { legacyBlob: false });
 assert.equal(parcial.modules.carne, false, 'o que o clube declarou vale');
 assert.equal(parcial.modules.campeonato, true, 'o que ele não declarou vem do default');
 assert.equal(parcial.game.teams, 2, 'seção não declarada fica intacta');
@@ -91,4 +97,4 @@ const futsal = { profile: { championship: { points: { win: 2, draw: 1, loss: 0, 
 assert.deepEqual(getChampionshipPoints(futsal), { win: 2, draw: 1, loss: 0, no_play: 0 },
   'clube que pontua diferente não fica preso ao 3/2/1/0');
 
-console.log('OK — 17 asserções. Clube novo não herda dado nem costume; a instalação legada segue intacta.');
+console.log('OK — 19 asserções. Clube novo não herda dado nem costume; a instalação legada segue intacta.');
