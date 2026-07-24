@@ -2506,7 +2506,7 @@ import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publi
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
-import { FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
+import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -3483,7 +3483,7 @@ function renderInner(snapshot) {
     // estado pode ter ficado apontando para ela (o admin desligou o módulo com
     // a aba aberta, ou o link veio de outro lugar).
     || (requestedTab === 'carne' && !isModuleOn(snapshot, 'churrasco'))
-    || (requestedTab === 'championship' && !isModuleOn(snapshot, 'campeonato'));
+    || (requestedTab === 'championship' && !campeonatoDisponivel(snapshot).ok);
   const activeTab = blockedTab ? 'home' : requestedTab;
   ensureRatingsLoaded(); // carrega as notas (uma vez) p/ rankings + áurea em todo lugar
   if (activeTab === 'finance') {
@@ -4371,7 +4371,7 @@ function renderBottomNav(activeTab, currentPlayer, snapshot) {
     ['players', 'Jogadores'],
   ];
   if (isModuleOn(snapshot, 'churrasco')) items.push(['carne', 'Churrasco']);
-  if (isModuleOn(snapshot, 'campeonato')) items.push(['championship', 'Campeonato']);
+  if (campeonatoDisponivel(snapshot).ok) items.push(['championship', 'Campeonato']);
   if (canManageFinance(currentPlayer) || isPro()) items.push(['finance', 'Financeiro']);
   if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
 
@@ -5704,6 +5704,7 @@ function renderConfig(snapshot, currentPlayer) {
           <div class="form-group">
             <span class="form-label">Tamanho do jogo</span>
             <div class="club-profile-points">
+              <label><small>Times no sorteio</small><input type="number" name="teams" class="input" min="2" max="6" value="${perfil.game.teams}" /></label>
               <label><small>Jogadores por time</small><input type="number" name="players_per_team" class="input" min="1" max="30" value="${perfil.game.players_per_team}" /></label>
               <label><small>Goleiros no jogo</small><input type="number" name="goalkeepers_per_game" class="input" min="0" max="4" value="${perfil.game.goalkeepers_per_game}" /></label>
             </div>
@@ -5734,7 +5735,9 @@ function renderConfig(snapshot, currentPlayer) {
             <label class="checkbox-row"><input type="checkbox" name="usa_posicoes" ${perfil.positions.enabled !== false ? 'checked' : ''} /> <span>Posição em campo (goleiro, zagueiro…)</span></label>
           </div>
 
-          <p class="footer-note">O sorteio é sempre de <strong>2 times</strong>. Mais times exige mudar como o sorteio é guardado — está no plano, ainda não disponível.</p>
+          <p class="footer-note">${Number(perfil.game.teams) > 2
+            ? '⚠️ Com mais de 2 times o jogo vira rodízio, e a noite tem várias partidas. O <strong>campeonato fica indisponível</strong> para este clube e a aba some — os resultados já lançados não são apagados, voltam se você retornar para 2 times.'
+            : 'Mais de 2 times = rodízio. Nesse formato o campeonato fica indisponível, porque uma noite passa a ter várias partidas em vez de um resultado.'}</p>
 
           <div class="form-group">
             <span class="form-label">Pontuação do campeonato</span>

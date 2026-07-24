@@ -231,6 +231,22 @@ export function timesPorJogo(state, options = null) {
   return Number.isFinite(n) && n >= 2 ? Math.floor(n) : 2;
 }
 
+/**
+ * O campeonato está disponível para este clube?
+ *
+ * Com 3+ times em rodízio, uma noite tem VÁRIAS partidas (A×B, vencedor×C…) e o
+ * campeonato modela "um resultado por jogo, um vencedor". Em vez de achatar a
+ * realidade — dizendo que um time que ganhou 2 de 3 é igual a um que perdeu
+ * todas — o módulo fica indisponível e a aba some, como já acontece com quem
+ * desliga o módulo. Os resultados já lançados NÃO são apagados: voltar para 2
+ * times traz o campeonato de volta como estava.
+ */
+export function campeonatoDisponivel(state, options = null) {
+  if (!isModuleOn(state, 'campeonato', options)) return { ok: false, motivo: 'modulo_desligado' };
+  if (timesPorJogo(state, options) > 2) return { ok: false, motivo: 'rodizio' };
+  return { ok: true, motivo: null };
+}
+
 /** O clube usa posição em campo? Clube de pelada simples pode não usar. */
 export function usaPosicoes(state, options = null) {
   return getClubProfile(state, options).positions.enabled !== false;
@@ -275,6 +291,7 @@ export function perfilDoFormulario(campos, perfilAtual) {
     game: {
       ...atual.game,
       format: texto('format', atual.game.format),
+      teams: Math.max(2, inteiro('teams', atual.game.teams)),
       players_per_team: inteiro('players_per_team', atual.game.players_per_team),
       goalkeepers_per_game: inteiro('goalkeepers_per_game', atual.game.goalkeepers_per_game),
       cadence: texto('cadence', atual.game.cadence),

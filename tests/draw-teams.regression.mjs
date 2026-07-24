@@ -160,3 +160,37 @@ assert.ok(Math.min(...tamanhosPoucos) >= 2,
 assert.equal(totalDeJogadores(poucos.sortResult), 5, 'mesmo reduzindo times, ninguém fica de fora');
 
 console.log('OK — +11 asserções. drawTeams divide em N times sem perder nem duplicar jogador.');
+
+// ---------------------------------------------------------------- campeonato x rodízio
+//
+// Decisão de produto (24/07): com 3+ times o campeonato fica INDISPONÍVEL, em
+// vez de achatar a realidade dizendo que um time que ganhou 2 de 3 partidas é
+// igual a um que perdeu todas. O que não pode acontecer é o dado ser apagado —
+// voltar para 2 times tem de trazer o campeonato de volta como estava.
+
+const { campeonatoDisponivel, perfilDoFormulario, getClubProfile, timesPorJogo } =
+  await import('../appfutebol_run/js/domain/club-profile.js');
+
+const SEM = { legacyBlob: false };
+const comTimesConfig = (n, extra = {}) => ({ profile: { schema_version: 1, game: { teams: n }, ...extra } });
+
+assert.equal(campeonatoDisponivel({}, SEM).ok, true, 'clube padrão (2 times) tem campeonato');
+assert.equal(campeonatoDisponivel(comTimesConfig(2), SEM).ok, true, '2 times: campeonato disponível');
+assert.equal(campeonatoDisponivel(comTimesConfig(3), SEM).ok, false, '3 times: campeonato indisponível');
+assert.equal(campeonatoDisponivel(comTimesConfig(3), SEM).motivo, 'rodizio',
+  'o motivo é explícito, para a UI poder explicar');
+assert.equal(campeonatoDisponivel(comTimesConfig(2, { modules: { campeonato: false } }), SEM).motivo,
+  'modulo_desligado', 'módulo desligado é um motivo diferente de rodízio');
+
+// Ligar e desligar o rodízio NÃO pode destruir nada: o gate é de exibição.
+const clube3 = comTimesConfig(3);
+clube3.championship = { active: { id: 't', results: [{ id: 'r1', date: '2026-07-22' }] } };
+assert.equal(clube3.championship.active.results.length, 1,
+  'os resultados continuam no estado mesmo com o campeonato indisponível');
+
+// O formulário respeita o mínimo de 2 — "1 time" não é sorteio.
+const perfilForm = perfilDoFormulario(new Map(Object.entries({ teams: '1' })), getClubProfile({}, SEM));
+assert.equal(perfilForm.game.teams, 2, 'o formulário não aceita menos de 2 times');
+assert.equal(timesPorJogo(comTimesConfig(4), SEM), 4, 'o clube de 4 times é lido como 4');
+
+console.log('OK — +8 asserções. Rodízio esconde o campeonato sem apagar dado.');
