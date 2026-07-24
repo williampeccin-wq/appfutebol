@@ -7061,3 +7061,17 @@ body.vote-open { overflow: hidden; }
   50% { box-shadow: 0 0 0 2px var(--hfc-gold, #f0a500), 0 0 20px 6px rgba(240, 165, 0, 0.72); }
 }
 @media (prefers-reduced-motion: reduce) { .avatar.avatar-aura { animation: none; } }
+
+/* Prévia da escalação antes de compartilhar. A imagem é alta (1080x1350), então
+   limita pela ALTURA da viewport — limitar só a largura estourava a tela no
+   celular e escondia os botões. */
+.escalacao-previa { max-width: min(92vw, 460px); }
+.escalacao-previa-img {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: 12px;
+  margin: 10px 0 4px;
+  background: #060a16;
+}
