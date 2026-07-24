@@ -51,10 +51,6 @@ function posicaoDe(player) {
   return 'meia';
 }
 
-function ehTemporario(player) {
-  return !!(player?.temporary || player?.guest || player?.rental_goalkeeper);
-}
-
 // Carrega a foto. Nunca rejeita: sem foto o desenho usa iniciais.
 function carregarFoto(url) {
   return new Promise((resolve) => {
@@ -155,7 +151,7 @@ function desenharJogador(ctx, x, y, player, foto, cor, raio = RAIO) {
 
   // Nome numa tarja (legível sobre qualquer parte do gramado)
   const nome = String(player?.name || 'Jogador').split(' ')[0];
-  const rotulo = ehTemporario(player) ? `${nome}*` : nome;
+  const rotulo = nome;   // sem marcador de convidado — o admin pediu a arte limpa
   const fonteNome = Math.max(14, Math.round(r * 0.56));
   ctx.font = `bold ${fonteNome}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
   ctx.textAlign = 'center';
@@ -258,7 +254,7 @@ function desenharCabecalho(ctx, titulo, subtitulo, escudo) {
 
 // Rodapé com a marca. É o que faz a imagem circular no WhatsApp levar o
 // endereço junto — quem vê a escalação de um amigo descobre de onde ela veio.
-function desenharRodape(ctx, temConvidado) {
+function desenharRodape(ctx) {
   const y = H - 46;
   ctx.fillStyle = 'rgba(6,10,22,0.72)';
   ctx.fillRect(0, y - 24, W, 70);
@@ -271,12 +267,6 @@ function desenharRodape(ctx, temConvidado) {
   ctx.fillStyle = COR.ouro;
   ctx.font = 'bold 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
   ctx.fillText('convocados.app.br', W / 2, y + 2);
-
-  if (temConvidado) {
-    ctx.fillStyle = COR.muted;
-    ctx.font = '20px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-    ctx.fillText('* convidado', W / 2, y + 30);
-  }
 }
 
 function rotuloTime(ctx, texto, y, cor) {
@@ -355,7 +345,7 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
     });
   });
 
-  desenharRodape(ctx, todas.some((p) => ehTemporario(p.player)));
+  desenharRodape(ctx);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
