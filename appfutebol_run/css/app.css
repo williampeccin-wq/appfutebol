@@ -7253,3 +7253,15 @@ body.vote-open { overflow: hidden; }
   margin-top: 6px;
 }
 .club-profile-card .checkbox-row input { width: auto; margin: 0; }
+
+/* Aviso do rodízio: fica colado ao campo que o provoca ("Times no sorteio"),
+   com uma barra lateral que o separa do texto de apoio comum — senão some no
+   meio dos outros footer-note do card. */
+.club-profile-card .club-profile-alerta {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--hfc-gold, #f0c040);
+  background: rgba(240, 192, 64, 0.10);
+  border-radius: 0 8px 8px 0;
+  color: var(--hfc-text);
+}

@@ -5708,6 +5708,9 @@ function renderConfig(snapshot, currentPlayer) {
               <label><small>Jogadores por time</small><input type="number" name="players_per_team" class="input" min="1" max="30" value="${perfil.game.players_per_team}" /></label>
               <label><small>Goleiros no jogo</small><input type="number" name="goalkeepers_per_game" class="input" min="0" max="4" value="${perfil.game.goalkeepers_per_game}" /></label>
             </div>
+            ${Number(perfil.game.teams) > 2
+              ? `<p class="footer-note club-profile-alerta">⚠️ Com mais de 2 times o jogo vira <strong>rodízio</strong>: a noite tem várias partidas em vez de um resultado. Por isso o <strong>campeonato fica indisponível</strong> e a aba some. Os resultados já lançados não são apagados — voltam se você retornar para 2 times.</p>`
+              : '<small class="footer-note">Mais de 2 times = rodízio, e nesse formato o campeonato fica indisponível.</small>'}
             <small class="footer-note">Goleiros = 0 para clube que não usa goleiro fixo. Jogadores por time sugere o limite ao criar um jogo.</small>
           </div>
 
@@ -5735,9 +5738,6 @@ function renderConfig(snapshot, currentPlayer) {
             <label class="checkbox-row"><input type="checkbox" name="usa_posicoes" ${perfil.positions.enabled !== false ? 'checked' : ''} /> <span>Posição em campo (goleiro, zagueiro…)</span></label>
           </div>
 
-          <p class="footer-note">${Number(perfil.game.teams) > 2
-            ? '⚠️ Com mais de 2 times o jogo vira rodízio, e a noite tem várias partidas. O <strong>campeonato fica indisponível</strong> para este clube e a aba some — os resultados já lançados não são apagados, voltam se você retornar para 2 times.'
-            : 'Mais de 2 times = rodízio. Nesse formato o campeonato fica indisponível, porque uma noite passa a ter várias partidas em vez de um resultado.'}</p>
 
           <div class="form-group">
             <span class="form-label">Pontuação do campeonato</span>

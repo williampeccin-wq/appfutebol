@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.156.0-autoteste-f2';
+export const APP_VERSION = 'v1.157.0-aviso-no-lugar';
