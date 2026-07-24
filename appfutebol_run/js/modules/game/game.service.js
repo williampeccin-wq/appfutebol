@@ -825,14 +825,17 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
   return { ok: true, message: 'Jogador movido.' };
 }
 
+// Limpa APENAS o sorteio ativo. O draw_history fica: resultados de campeonato já
+// lançados guardam o draw_id, e apagar o histórico fazia esses resultados
+// apontarem para um sorteio inexistente — a escalação de origem sumia da
+// auditoria e o seletor de lançamento não conseguia mais exibi-la.
 export function clearTeamDraw() {
   const snapshot = getState();
   const game = activeGame(snapshot);
   patchActiveGame(snapshot, {
     ...game,
     sort_result: null,
-    draw_history: [],
   });
 
-  return { ok: true, message: 'Sorteio limpo.' };
+  return { ok: true, message: 'Sorteio limpo. O histórico de sorteios foi preservado.' };
 }

@@ -383,11 +383,34 @@ export function getChampionshipState(snapshot) {
           team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
           team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
           statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
+          lineup_adjusted: result.lineup_adjusted === true,
         }))
         .filter((result) => result.date)
         .sort((left, right) => String(left.date).localeCompare(String(right.date))),
     },
   };
+}
+
+// Duas entradas são a MESMA rodada quando têm o mesmo id, quando são do mesmo
+// jogo (game_key), ou quando caem na mesma data. Gravar uma substitui a outra.
+//
+// O game_key entrou aqui porque relançar o mesmo jogo com a data corrigida
+// criava uma rodada duplicada em vez de corrigir a existente. A data continua
+// valendo para as rodadas antigas, que não têm game_key.
+function isSameRound(entry, candidate) {
+  if (String(entry?.id || '') === String(candidate?.id || '')) return true;
+  const entryGame = String(entry?.game_key || '');
+  const candidateGame = String(candidate?.game_key || '');
+  if (entryGame && candidateGame && entryGame === candidateGame) return true;
+  return String(entry?.date || '') === String(candidate?.date || '');
+}
+
+// Qual resultado JÁ LANÇADO seria substituído por este. A UI usa isto para
+// perguntar antes — a substituição era silenciosa, e um lançamento apagava
+// outro sem que ninguém percebesse (INCIDENTE 23/07).
+export function findReplacedChampionshipResult(snapshot, candidate) {
+  return getChampionshipState(snapshot).active.results
+    .find((entry) => !entry.imported && isSameRound(entry, candidate)) || null;
 }
 
 export function persistChampionshipResult(snapshot, result) {
@@ -402,12 +425,10 @@ export function persistChampionshipResult(snapshot, result) {
     team_a: Array.isArray(result.team_a) ? result.team_a.map(String) : [],
     team_b: Array.isArray(result.team_b) ? result.team_b.map(String) : [],
     statuses: result.statuses && typeof result.statuses === 'object' ? { ...result.statuses } : {},
+    lineup_adjusted: result.lineup_adjusted === true,
   };
 
-  const results = championship.active.results.filter((entry) => (
-    String(entry.id) !== String(normalizedResult.id) &&
-    String(entry.date) !== String(normalizedResult.date)
-  ));
+  const results = championship.active.results.filter((entry) => !isSameRound(entry, normalizedResult));
   results.push(normalizedResult);
 
   snapshot.championship = {
@@ -590,9 +611,8 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null, lineup
   // são jogador registrado — convidado/goleiro alugado não pontuam (o sorteio
   // embute o objeto do jogador, sem id persistente, e String(obj) virava
   // "[object Object]" no registro antigo).
-  const map = (lineup && typeof lineup === 'object' && Object.keys(lineup).length)
-    ? lineup
-    : buildLineupFromDraw(draw);
+  const lineupAdjusted = !!(lineup && typeof lineup === 'object' && Object.keys(lineup).length);
+  const map = lineupAdjusted ? lineup : buildLineupFromDraw(draw);
   const isPlayer = (id) => Object.prototype.hasOwnProperty.call(statuses, String(id));
   const teamA = Object.keys(map).filter((id) => map[id] === 'a' && isPlayer(id));
   const teamB = Object.keys(map).filter((id) => map[id] === 'b' && isPlayer(id));
@@ -622,6 +642,9 @@ export function buildTeamResultStatuses(snapshot, outcome, drawId = null, lineup
     team_a: teamA,
     team_b: teamB,
     statuses,
+    // Marca que o admin declarou explicitamente quem jogou. A classificação usa
+    // isto para NÃO deixar a heurística de remoção sobrescrever a declaração.
+    lineup_adjusted: lineupAdjusted,
   };
 }
 
@@ -660,7 +683,13 @@ export function calculateCurrentRanking(snapshot) {
 
   results.forEach((result) => {
     const gameKey = String(result.game_key || '');
-    const removedSet = gameKey ? removedByGameKey.get(gameKey) : null;
+    // A rede de segurança existe para resultados lançados ANTES de o admin
+    // remover alguém da escalação — dados já gravados que ninguém revisou.
+    // Quando o admin declarou explicitamente quem jogou ("Ajustar quem jogou"),
+    // a declaração dele é a verdade: sem esta ressalva, um substituto que havia
+    // cancelado e acabou entrando em campo tinha os pontos zerados em silêncio,
+    // exatamente o caso que motivou o editor de escalação.
+    const removedSet = (gameKey && result.lineup_adjusted !== true) ? removedByGameKey.get(gameKey) : null;
     rowsById.forEach((row, playerId) => {
       const rawStatus = (removedSet && removedSet.has(playerId)) ? 'no_play' : (result.statuses?.[playerId] || 'no_play');
       const status = Object.prototype.hasOwnProperty.call(POINTS_BY_STATUS, rawStatus) ? rawStatus : 'no_play';

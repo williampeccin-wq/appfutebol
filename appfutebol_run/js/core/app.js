@@ -1548,6 +1548,31 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
+    // A data é digitável e o sorteio é escolhido à parte: dá para lançar o
+    // sorteio de um dia sob a data de outro. Avisa antes em vez de deixar passar.
+    if (builtResult.game_date && builtResult.game_date !== date) {
+      const seguir = await showConfirmModal({
+        title: 'Data diferente do sorteio',
+        message: `O sorteio escolhido é do dia ${formatDate(builtResult.game_date)}, mas você digitou ${formatDate(date)}. Lançar assim?`,
+        confirmText: 'Lançar mesmo assim',
+        cancelText: 'Rever',
+      });
+      if (!seguir) return;
+    }
+
+    // Gravar substitui qualquer resultado da MESMA rodada. Isso já acontecia,
+    // mas em silêncio: um lançamento apagava outro e ninguém ficava sabendo.
+    const substituido = findReplacedChampionshipResult(snapshot, { date, game_key: builtResult.game_key });
+    if (substituido) {
+      const seguir = await showConfirmModal({
+        title: 'Já existe resultado nesta rodada',
+        message: `O resultado de ${formatDate(substituido.date)} já foi lançado e será SUBSTITUÍDO por este. A classificação vai ser recalculada.`,
+        confirmText: 'Substituir',
+        cancelText: 'Cancelar',
+      });
+      if (!seguir) return;
+    }
+
     uiActionInFlight = true;
     setActionBusy(trigger, 'Salvando...');
 
@@ -1560,6 +1585,7 @@ document.addEventListener("click", async (e) => {
       team_a: builtResult.team_a,
       team_b: builtResult.team_b,
       statuses: builtResult.statuses,
+      lineup_adjusted: builtResult.lineup_adjusted,
     });
 
     // Solta a seleção: lançado um resultado, o formulário volta ao sorteio mais
@@ -2243,7 +2269,7 @@ import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, con
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
-import { buildTeamResultStatuses, deleteChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
+import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';

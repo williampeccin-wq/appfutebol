@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.114.0-foto-e-ajuste-escalacao';
+export const APP_VERSION = 'v1.115.0-pontuacao-fiel';
