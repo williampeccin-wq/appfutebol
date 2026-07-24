@@ -98,3 +98,33 @@ assert.deepEqual(getChampionshipPoints(futsal), { win: 2, draw: 1, loss: 0, no_p
   'clube que pontua diferente não fica preso ao 3/2/1/0');
 
 console.log('OK — 19 asserções. Clube novo não herda dado nem costume; a instalação legada segue intacta.');
+
+// ---------------------------------------------------------------- jargão do clube
+//
+// Achado ao ver a tela do Resenha FC (segundo clube real no convocados-prod):
+// mesmo sem herdar os DADOS do Harmonia, a tela ainda contava a história dele —
+// "Inverno 2026" como temporada e "Importado da planilha Rei da Quadra" no
+// rodapé. Vazamento de convenção, não de dado, mas igualmente errado para um
+// clube que nunca ouviu falar de Rei da Quadra.
+
+const { getChampionshipSeason } = await import('../appfutebol_run/js/domain/club-profile.js');
+
+const temporadaPadrao = getChampionshipSeason({}, { legacyBlob: false });
+assert.notEqual(temporadaPadrao.id, 'inverno-2026',
+  'clube novo não pode nascer com a temporada do Harmonia');
+assert.equal(temporadaPadrao.label, 'Temporada atual',
+  'o default da temporada é genérico');
+
+// A instalação legada mantém a dela pela ponte — a correção não pode custar o
+// nome do campeonato de quem já usa.
+assert.equal(getChampionshipSeason({}, { legacyBlob: true }).label, 'Inverno 2026',
+  'a instalação legada mantém a própria temporada');
+
+// E um clube que definiu a sua vê a sua.
+assert.equal(
+  getChampionshipSeason({ profile: { championship: { season: { label: 'Verão 2027' } } } }, { legacyBlob: false }).label,
+  'Verão 2027',
+  'o clube que nomeia a própria temporada vê o nome dele',
+);
+
+console.log('OK — +4 asserções. A tela para de contar a história de um clube para os outros.');

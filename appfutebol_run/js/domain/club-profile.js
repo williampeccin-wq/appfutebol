@@ -60,14 +60,17 @@ export const DEFAULT_PROFILE = {
     enabled: true,
     title: 'Rei da Quadra',
     points: { win: 3, draw: 2, loss: 1, no_play: 0 },
-    // Temporada corrente. Fica no perfil (por clube) e não mais em código.
+    // Temporada corrente do clube. O DEFAULT é genérico de propósito: antes era
+    // 'Inverno 2026' — a temporada do Harmonia — e todo clube novo abria o
+    // campeonato vendo o nome da estação de outro grupo. O clube define a sua
+    // no perfil; a instalação legada mantém a dela pela ponte.
     season: {
-      id: 'inverno-2026',
-      name: 'Inverno 26',
-      label: 'Inverno 2026',
-      year: 2026,
-      start_date: '2026-05-01',
-      end_date: '2026-08-31',
+      id: 'temporada-atual',
+      name: 'Temporada atual',
+      label: 'Temporada atual',
+      year: null,
+      start_date: '',
+      end_date: '',
     },
     // Dataset histórico importado de planilha. É FATO DE UM CLUBE ESPECÍFICO —
     // rodadas reais, com nomes reais de pessoas reais.
@@ -79,6 +82,17 @@ export const DEFAULT_PROFILE = {
     // estranho. Não é uma convenção que dá para herdar por engano.
     legacy_dataset: null,
   },
+};
+
+// Temporada da instalação original. Fica aqui, e não no DEFAULT, porque é fato
+// de um clube só — ver o comentário em `season`.
+const LEGACY_SEASON = {
+  id: 'inverno-2026',
+  name: 'Inverno 26',
+  label: 'Inverno 2026',
+  year: 2026,
+  start_date: '2026-05-01',
+  end_date: '2026-08-31',
 };
 
 function isPlainObject(value) {
@@ -111,9 +125,15 @@ export function getClubProfile(state, options = null) {
   const { legacyBlob = false } = options || currentProfileOptions();
   const stored = isPlainObject(state?.profile) ? state.profile : null;
 
+  // Ponte da instalação legada: enquanto o clube original (blob sob a key
+  // 'default') não tiver perfil gravado, ele continua vendo o próprio histórico
+  // E o nome da própria temporada. Clube novo nasce com club_id e nunca passa
+  // por aqui — ele vê os defaults genéricos.
+  const ehLegadoSemPerfil = !stored && legacyBlob;
   const championshipDefaults = {
     ...DEFAULT_PROFILE.championship,
-    legacy_dataset: (!stored && legacyBlob) ? 'harmonia_rei_da_quadra' : DEFAULT_PROFILE.championship.legacy_dataset,
+    legacy_dataset: ehLegadoSemPerfil ? 'harmonia_rei_da_quadra' : DEFAULT_PROFILE.championship.legacy_dataset,
+    season: ehLegadoSemPerfil ? LEGACY_SEASON : DEFAULT_PROFILE.championship.season,
   };
 
   return {

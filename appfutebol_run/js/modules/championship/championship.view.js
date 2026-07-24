@@ -1,3 +1,4 @@
+import { getChampionshipPoints } from '../../domain/club-profile.js';
 import {
   ACTIVE_CHAMPIONSHIP,
   TEAM_RESULT_OPTIONS,
@@ -10,6 +11,7 @@ import {
   getHistoricalTournaments,
   getResultSummary,
   getEffectiveChampionshipResults,
+  getImportedChampionshipResults,
   buildRemovedByGameKey,
   getResultAuditRows,
   getActiveDrawTeams,
@@ -365,7 +367,7 @@ function renderResultsHistory(snapshot, currentPlayer) {
         <span class="champ-collapse-chevron" aria-hidden="true"></span>
       </summary>
       <div class="champ-collapse-body">
-      <p class="footer-note">Cada rodada abaixo é usada para calcular a classificação. A importação inicial veio da planilha Rei da Quadra.</p>
+      <p class="footer-note">Cada rodada abaixo é usada para calcular a classificação.${getImportedChampionshipResults(snapshot).length ? ' A importação inicial veio da planilha Rei da Quadra.' : ''}</p>
       ${results.length ? `
         <div class="championship-audit-list">
           ${results.slice().reverse().map((result) => {
@@ -502,20 +504,26 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const resultCount = getEffectiveChampionshipResults(snapshot).length;
+  // A pontuação e a origem dos dados são POR CLUBE: um clube que não usa o
+  // dataset importado não pode ler "importado da planilha Rei da Quadra", e um
+  // que pontua 2/1/0 não pode ver "3 vitória · 2 empate".
+  const p = getChampionshipPoints(snapshot);
+  const temImportacao = getImportedChampionshipResults(snapshot).length > 0;
 
   return `
     <section class="section-stack championship-screen">
       <section class="hero-card championship-hero championship-hero-current">
         <div class="hero-label">Campeonato atual</div>
-        <div class="hero-date">${ACTIVE_CHAMPIONSHIP.label}</div>
-        <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
+        <div class="hero-date">${escapeHtml(activeMeta.label || activeMeta.name || ACTIVE_CHAMPIONSHIP.label)}</div>
+        <div class="hero-meta">${(activeMeta.start_date && activeMeta.end_date)
+          ? `${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ` : ''}${resultCount} jogo(s) lançado(s)</div>
       </section>
 
       ${renderResultForm(snapshot, currentPlayer, selectedDrawId, lineupState, resultCardOpen)}
 
       ${collapsibleCard({
         title: 'Classificação atual · Inverno 26',
-        note: 'Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.',
+        note: `Pontos por rodada (${p.win} vitória · ${p.draw} empate · ${p.loss} derrota · ${p.no_play} não jogou).${temImportacao ? ' Importado da planilha Rei da Quadra +' : ' Calculado a partir dos'} resultados lançados no app.`,
         body: renderRoundMatrix(snapshot),
         open: true,
       })}

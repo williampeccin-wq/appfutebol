@@ -380,6 +380,7 @@ export function getChampionshipState(snapshot) {
     ? snapshot.championship
     : {};
   const active = source.active && typeof source.active === 'object' ? source.active : {};
+  const temporada = getChampionshipSeason(snapshot);
   const rawResults = Array.isArray(active.results)
     ? active.results
     : Array.isArray(source.results)
@@ -388,12 +389,15 @@ export function getChampionshipState(snapshot) {
 
   return {
     ...source,
+    // O fallback vem da TEMPORADA DO CLUBE, não da constante do Harmonia. Antes
+    // um clube novo abria o campeonato como "Inverno 2026 · 01/05 até 31/08" —
+    // o calendário de outro grupo, que ele nunca definiu.
     active: {
-      id: active.id || ACTIVE_CHAMPIONSHIP.id,
-      name: active.name || ACTIVE_CHAMPIONSHIP.name,
-      year: active.year || ACTIVE_CHAMPIONSHIP.year,
-      start_date: active.start_date || ACTIVE_CHAMPIONSHIP.start_date,
-      end_date: active.end_date || ACTIVE_CHAMPIONSHIP.end_date,
+      id: active.id || temporada.id,
+      name: active.name || temporada.name,
+      year: active.year || temporada.year,
+      start_date: active.start_date || temporada.start_date,
+      end_date: active.end_date || temporada.end_date,
       results: rawResults
         .filter((result) => result && typeof result === 'object')
         .map((result, index) => ({
