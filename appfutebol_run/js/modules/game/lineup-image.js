@@ -254,7 +254,7 @@ function desenharCabecalho(ctx, titulo, subtitulo, escudo) {
 
 // Rodapé com a marca. É o que faz a imagem circular no WhatsApp levar o
 // endereço junto — quem vê a escalação de um amigo descobre de onde ela veio.
-function desenharRodape(ctx) {
+function desenharRodape(ctx, marca) {
   const y = H - 46;
   ctx.fillStyle = 'rgba(6,10,22,0.72)';
   ctx.fillRect(0, y - 24, W, 70);
@@ -266,7 +266,7 @@ function desenharRodape(ctx) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COR.ouro;
   ctx.font = 'bold 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-  ctx.fillText('convocados.app.br', W / 2, y + 2);
+  ctx.fillText(marca, W / 2, y + 2);
 }
 
 function rotuloTime(ctx, texto, y, cor) {
@@ -292,7 +292,7 @@ function formatarData(iso, hora) {
 // uma página de teste em subpasta) ficava sem escudo, em silêncio.
 const ESCUDO_PADRAO = new URL('../../../img/convocados-crest.png', import.meta.url).href;
 
-export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', escudoUrl = ESCUDO_PADRAO } = {}) {
+export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', escudoUrl = ESCUDO_PADRAO, marcaRodape = 'convocados.app.br' } = {}) {
   const sort = snapshot?.game?.sort_result;
   const listas = timesDoSorteio(sort);
   if (!listas.some((t) => t.length)) return null;
@@ -345,7 +345,7 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
     });
   });
 
-  desenharRodape(ctx);
+  desenharRodape(ctx, marcaRodape);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }

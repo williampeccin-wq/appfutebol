@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.159.0-escalacao-sem-asterisco';
+export const APP_VERSION = 'v1.160.0-escalacao-marca-parametrizavel';
