@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.161.0-cadastro-e-contraste-raiz';
+export const APP_VERSION = 'v1.162.0-player-club-id';

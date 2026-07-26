@@ -777,6 +777,16 @@ async function deleteRow(config, table, column, value) {
 }
 
 function buildGranularOperations(config, previousParts, nextParts, now) {
+  // club_id do clube atual para carimbar nas gravações de player. SEM isto, o
+  // upsert cai no DEFAULT do schema (o clube legado) e a RLS rejeita com 403 —
+  // a linha proposta no INSERT precisa ter um club_id que o admin enxergue.
+  // Só no multi-tenant: no single-tenant (key='default') a coluna não existe.
+  // INCIDENTE 26/07: admin de clube novo não conseguia gravar NENHUM jogador
+  // (aprovar cadastro, editar, adicionar) — bloqueador de fundação do onboarding.
+  const clubKeyParaRls = currentClubKey(config);
+  const clubIdField = (clubKeyParaRls && clubKeyParaRls !== (config.stateKey || 'default'))
+    ? { club_id: clubKeyParaRls }
+    : {};
   const operations = [];
   const previousPlayers = indexBy(previousParts?.players || [], (player) => player.id);
   const nextPlayers = indexBy(nextParts.players, (player) => player.id);
@@ -800,6 +810,7 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
           id,
           auth_user_id: authUserId,
           is_admin: isAdmin,
+          ...clubIdField,
           data: {
             ...player,
             id,
