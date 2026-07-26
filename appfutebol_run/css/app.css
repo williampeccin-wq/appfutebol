@@ -5453,9 +5453,29 @@ body {
 /* ---------- LOGIN (Stadium Glass) ---------- */
 .login-screen {
   background: radial-gradient(130% 70% at 50% -8%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 42%, var(--hfc-navy-900) 100%);
+  color: var(--hfc-text);   /* RAIZ do contraste: texto claro herdavel (ver comentario abaixo) */
   position: relative;
   overflow: hidden;
 }
+
+/* CORRECAO DE RAIZ DO CONTRASTE (26/07/2026)
+   O body herda color:#111827 (escuro), pensado para um tema claro que nao
+   existe mais — o app e todo escuro. Isso fazia CADA texto solto herdar escuro
+   e sumir; o remedio ate aqui era sobrescrever tela a tela (70 ocorrencias de
+   color: var(--hfc-text)), e sempre escapava uma (auth: spans de consentimento,
+   aviso de menor, termos). Agora os containers de tela dark ESTABELECEM a cor
+   clara como heranca. Componentes de fundo claro (input branco, badge) declaram
+   a propria cor escura e vencem por especificidade. */
+.login-screen,
+.content {
+  color: var(--hfc-text);
+}
+.login-screen a,
+.content a { color: var(--hfc-gold-200); }
+.login-screen .footer-note,
+.login-screen small,
+.content .footer-note,
+.content small { color: var(--hfc-text-muted); }
 .login-screen::before {
   content: '';
   position: absolute;

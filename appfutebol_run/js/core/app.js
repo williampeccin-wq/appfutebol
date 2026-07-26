@@ -3598,7 +3598,7 @@ function bindAuthEvents() {
         : 'Peça o código ao administrador. Você entra como pendente até ele aprovar.';
     };
     clubTabs.forEach((b) => b.addEventListener('click', () => setClubMode(b.getAttribute('data-club-mode'))));
-    setClubMode('create');
+    setClubMode('join');   // entrar por código é o caso comum; criar clube é do admin
 
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault();

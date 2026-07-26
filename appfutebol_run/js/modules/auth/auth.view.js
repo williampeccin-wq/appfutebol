@@ -90,13 +90,13 @@ function renderRegisterForm() {
       <div class="form-group">
         <label class="form-label">Seu clube</label>
         <div class="auth-tabs" style="margin-bottom:8px;">
-          <button class="auth-tab is-active" type="button" data-club-mode="create">Criar um clube</button>
-          <button class="auth-tab" type="button" data-club-mode="join">Entrar com código</button>
+          <button class="auth-tab is-active" type="button" data-club-mode="join">Entrar com código</button>
+          <button class="auth-tab" type="button" data-club-mode="create">Criar um clube</button>
         </div>
-        <input type="hidden" id="register-club-mode" name="clubMode" value="create">
-        <input class="input" id="register-club-name" name="clubName" type="text" autocapitalize="words" enterkeyhint="next" placeholder="Nome do clube (ex.: Pelada da Firma)">
-        <input class="input" id="register-invite-code" name="inviteCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" placeholder="Código do clube (ex.: ABC234)" style="display:none;text-transform:uppercase;">
-        <small class="field-hint" id="register-club-hint">Você vira o administrador do clube.</small>
+        <input type="hidden" id="register-club-mode" name="clubMode" value="join">
+        <input class="input" id="register-club-name" name="clubName" type="text" autocapitalize="words" enterkeyhint="next" placeholder="Nome do clube (ex.: Pelada da Firma)" style="display:none;">
+        <input class="input" id="register-invite-code" name="inviteCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" placeholder="Código do clube (ex.: ABC234)" style="text-transform:uppercase;">
+        <small class="field-hint" id="register-club-hint">Peça o código ao administrador. Você entra como pendente até ele aprovar.</small>
       </div>
 
       <div class="form-group">

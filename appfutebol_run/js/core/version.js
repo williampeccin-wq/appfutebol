@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.160.0-escalacao-marca-parametrizavel';
+export const APP_VERSION = 'v1.161.0-cadastro-e-contraste-raiz';
