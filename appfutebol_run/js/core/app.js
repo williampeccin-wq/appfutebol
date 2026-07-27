@@ -4749,6 +4749,33 @@ function renderPresenceList(snapshot, currentPlayer) {
     </div>
   `;
 
+  const renderPendingGoalkeeperRow = (player) => `
+    <div class="weekly-player-row goalkeeper-player-row">
+      <div class="players-switch-player">
+        ${renderAvatarForApp(player)}
+        <div>
+          <div class="row-title">${escapeHtml(player.name)}</div>
+          <div class="row-subtitle">Goleiro · ${formatPhone(player.phone)}</div>
+        </div>
+      </div>
+      <div class="weekly-player-meta">
+        ${adminMode ? `
+          <button
+            class="switch-control switch-control-inline is-off"
+            type="button"
+            data-action="admin-add-to-game"
+            data-id="${player.id}"
+            aria-pressed="false"
+            title="Incluir goleiro no jogo"
+          >
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label is-neutral">Fora</span>
+          </button>
+        ` : '<span class="tag is-neutral">Fora</span>'}
+      </div>
+    </div>
+  `;
+
   const renderRentalGoalkeeperRow = (entry) => `
     <div class="weekly-player-row goalkeeper-player-row rental-goalkeeper-row">
       <div class="players-switch-player">
@@ -4801,7 +4828,7 @@ function renderPresenceList(snapshot, currentPlayer) {
         ${pendingGoalkeepers.length ? `
           <div class="goalkeeper-pending-list">
             <div class="weekly-presence-subtitle">Goleiros cadastrados ainda fora</div>
-            ${pendingGoalkeepers.map((player) => renderWeeklyRow(player, false)).join('')}
+            ${pendingGoalkeepers.map(renderPendingGoalkeeperRow).join('')}
           </div>
         ` : ''}
       </div>
