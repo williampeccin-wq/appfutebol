@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.162.0-player-club-id';
+export const APP_VERSION = 'v1.163.0-pending-goalkeeper-row-fix';
