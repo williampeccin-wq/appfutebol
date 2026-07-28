@@ -21,7 +21,7 @@ import {
   buildLineupFromDraw,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
-import { getAvatarHtml } from '../players/players.service.js';
+import { getAvatarHtml, isoToDisplay } from '../players/players.service.js';
 import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
 import { isVotingEnabled } from '../../core/flags.js';
 
@@ -330,7 +330,7 @@ function renderResultForm(snapshot, currentPlayer, selectedDrawId = null, lineup
 
         <label class="championship-field-v2">
           <span>Data do jogo</span>
-          <input id="championship-result-date" class="championship-control-v2" type="date" value="${selectedDate}">
+          <input id="championship-result-date" class="championship-control-v2" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(selectedDate)}">
         </label>
 
         <label class="championship-field-v2">

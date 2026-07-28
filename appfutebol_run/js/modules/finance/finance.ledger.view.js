@@ -2,6 +2,7 @@
 // (finance.ledger.service). Ver docs/finance-design.md e o mock aprovado.
 
 import { getCachedLedger, getLedgerStatus, ledgerSummary, collectionThisMonth, pendingMembersThisMonth, getPublicSummary } from './finance.ledger.service.js';
+import { isoToDisplay } from '../players/players.service.js';
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -171,7 +172,7 @@ export function renderFinanceScreen(snapshot, _currentPlayer, refYm) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
           <input id="fin-amount" class="input" type="text" inputmode="numeric" data-mask="currency" placeholder="Valor · 0,00" autocomplete="off" />
-          <input id="fin-date" class="input" type="date" value="${todayLocalIso()}" aria-label="Data" />
+          <input id="fin-date" class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(todayLocalIso())}" aria-label="Data" />
         </div>
         <input id="fin-desc" class="input" type="text" placeholder="Descrição (ex.: aluguel da quadra)" style="margin-top:10px;" />
         <button class="btn btn-primary" type="button" data-action="finance-submit" style="width:100%;margin-top:12px;">Adicionar lançamento</button>

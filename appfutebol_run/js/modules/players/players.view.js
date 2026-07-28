@@ -8,6 +8,7 @@ import {
   isAdmin,
   isConfirmed,
   isCurrentPlayer,
+  isoToDisplay,
   listCarneOnly,
   listJogadores,
   listPlayers,
@@ -122,7 +123,7 @@ function renderPlayerManagementCard(currentPlayer) {
       <div class="player-admin-form">
         <input id="new-name" class="input" type="text" placeholder="Nome" />
         <input id="new-phone" class="input" type="tel" placeholder="Telefone" />
-        <input id="new-birthdate" class="input" type="date" />
+        <input id="new-birthdate" class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask />
 
         <label class="player-photo-upload">
           <span class="player-photo-preview" id="new-photo-preview">Foto</span>
@@ -381,7 +382,7 @@ function renderCarneScheduleForm(currentPlayer, orderedPlayers) {
       <div class="card-title" id="carne-schedule-form-title">Cadastrar dupla do churrasco</div>
       <div class="player-admin-form carne-schedule-form">
         <input id="carne-schedule-id" type="hidden" value="" />
-        <input id="carne-schedule-date" class="input" type="date" />
+        <input id="carne-schedule-date" class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask />
         <select id="carne-schedule-player-1" class="input">
           <option value="">Responsável 1</option>
           ${renderPlayerOptions(orderedPlayers)}
@@ -561,7 +562,7 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
 
       <label class="field-label">
         Próxima quarta (data da dupla do topo)
-        <input id="carne-rotation-start" class="input" type="date" value="${rotation?.start_date || ''}" />
+        <input id="carne-rotation-start" class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(rotation?.start_date || '')}" />
       </label>
 
       <div class="carne-rotation-list">${listHtml}</div>

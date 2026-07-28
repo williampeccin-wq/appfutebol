@@ -113,7 +113,7 @@ function renderRegisterForm() {
 
         <div class="form-group">
           <label class="form-label" for="register-birthdate">Nascimento</label>
-          <input class="input" id="register-birthdate" name="birthDate" type="date" autocomplete="bday" required>
+          <input class="input" id="register-birthdate" name="birthDate" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask required>
         </div>
       </div>
 
