@@ -90,6 +90,22 @@ export function formatBirthDate(value) {
   return raw;
 }
 
+export function isoToDisplay(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+export function displayToIso(display) {
+  if (!display) return '';
+  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  const day = parseInt(m[1], 10), month = parseInt(m[2], 10), year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 
 export function getPlayerPhoto(player) {
   // Preferir a URL no Storage (cacheável, fora do payload do poll); base64 é

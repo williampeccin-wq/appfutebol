@@ -57,6 +57,32 @@ let editingCarnePairIndex = -1;
 
 
 let uiActionInFlight = false;
+
+function isoToDisplay(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function displayToIso(display) {
+  if (!display) return '';
+  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  const day = parseInt(m[1], 10), month = parseInt(m[2], 10), year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+document.addEventListener('input', (e) => {
+  if (!e.target.matches('[data-date-mask]')) return;
+  const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+  let v = raw;
+  if (raw.length > 4) v = raw.slice(0, 2) + '/' + raw.slice(2, 4) + '/' + raw.slice(4);
+  else if (raw.length > 2) v = raw.slice(0, 2) + '/' + raw.slice(2);
+  e.target.value = v;
+});
+
 // Quantos ciclos de sync seguidos foram pulados por causa de uiActionInFlight.
 // Teto de segurança para a flag não conseguir travar a sincronização para
 // sempre caso vaze ligada. 5 ciclos x 6s = ~30s, bem acima de qualquer upload
@@ -705,7 +731,7 @@ function hydratePlayerEditForm(playerToEdit) {
 
   nameInput.value = playerToEdit.name || "";
   phoneInput.value = playerToEdit.phone || "";
-  birthDateInput.value = playerToEdit.birthDate || "";
+  birthDateInput.value = isoToDisplay(playerToEdit.birthDate || "");
   roleInput.value = playerToEdit.plays_football === false ? "carne" : "player";
   roleInput.dispatchEvent(new Event("change", { bubbles: true }));
   positionInput.value = playerToEdit.position || "meia";
@@ -866,7 +892,7 @@ function renderSelfProfileEditCardForHome(activePlayer) {
 
           <label class="form-group">
             <span class="form-label">Nascimento</span>
-            <input id="self-birthdate" class="input" type="date" value="${escapeHtml(activePlayer.birthDate || '')}" />
+            <input id="self-birthdate" class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask autocomplete="bday" value="${escapeHtml(isoToDisplay(activePlayer.birthDate || ''))}" />
           </label>
 
           <label class="player-photo-upload self-photo-upload">
@@ -1323,7 +1349,7 @@ document.addEventListener("click", async (e) => {
     }
 
     const scheduleId = document.getElementById('carne-schedule-id')?.value?.trim();
-    const date = document.getElementById('carne-schedule-date')?.value?.trim();
+    const date = displayToIso(document.getElementById('carne-schedule-date')?.value?.trim());
     const player1Id = document.getElementById('carne-schedule-player-1')?.value?.trim();
     const player2Id = document.getElementById('carne-schedule-player-2')?.value?.trim();
 
@@ -1395,7 +1421,7 @@ document.addEventListener("click", async (e) => {
     if (!idInput || !dateInput || !player1Input || !player2Input) return;
 
     idInput.value = entry.id;
-    dateInput.value = entry.date;
+    dateInput.value = isoToDisplay(entry.date);
     player1Input.value = entry.player1_id;
     player2Input.value = entry.player2_id;
     if (title) title.textContent = 'Editando dupla da carne';
@@ -1536,7 +1562,7 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
-    const date = document.getElementById('championship-result-date')?.value?.trim();
+    const date = displayToIso(document.getElementById('championship-result-date')?.value?.trim());
     if (!date) {
       showToast("Informe a data do jogo", "error");
       return;
@@ -1660,7 +1686,8 @@ document.addEventListener("click", async (e) => {
   const name = document.getElementById("new-name")?.value?.trim();
   const phoneRaw = document.getElementById("new-phone")?.value?.trim();
   const phone = normalizeAdminPhone(phoneRaw);
-  const birthDate = document.getElementById("new-birthdate")?.value?.trim();
+  const birthDateRaw = document.getElementById("new-birthdate")?.value?.trim();
+  const birthDate = displayToIso(birthDateRaw);
   const role = document.getElementById("new-role")?.value;
   const position = document.getElementById("new-position")?.value;
   const is_admin = document.getElementById("new-admin")?.checked;
@@ -1672,10 +1699,16 @@ document.addEventListener("click", async (e) => {
   const rawNewPhoto = document.getElementById("new-photo")?.dataset?.photoDataUrl || "";
   const photoDataUrl = rawNewPhoto.startsWith("data:") ? rawNewPhoto : "";
 
-  if (!name || !phone || !birthDate) {
+  if (!name || !phone) {
     clearActionBusy(trigger);
     uiActionInFlight = false;
-    alert("Nome, telefone e data de nascimento são obrigatórios");
+    alert("Nome e telefone são obrigatórios");
+    return;
+  }
+  if (!birthDate) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert(birthDateRaw ? "Data de nascimento inválida. Use DD/MM/AAAA" : "Data de nascimento é obrigatória");
     return;
   }
 
@@ -1859,7 +1892,8 @@ if (action === "update-self-profile") {
   const name = document.getElementById("self-name")?.value?.trim();
   const phoneValidation = validatePhoneWithDDD(document.getElementById("self-phone")?.value);
   const phone = phoneValidation.digits;
-  const birthDate = document.getElementById("self-birthdate")?.value?.trim();
+  const birthDateRawSelf = document.getElementById("self-birthdate")?.value?.trim();
+  const birthDate = displayToIso(birthDateRawSelf);
   const positionInput = document.getElementById("self-position");
   // A memória de módulo vem PRIMEIRO: o dataset do input se perde em qualquer
   // re-render (poll, sync, outra edição) e o Salvar acabava gravando o cadastro
@@ -1868,10 +1902,16 @@ if (action === "update-self-profile") {
   const selfPhotoDataUrl = rawSelfPhoto.startsWith("data:") ? rawSelfPhoto : ""; // só data: = foto nova
   const position = currentPlayer.plays_football === false ? currentPlayer.position : normalizeSelfPosition(positionInput?.value);
 
-  if (!name || !phone || !birthDate) {
+  if (!name || !phone) {
     clearActionBusy(trigger);
     uiActionInFlight = false;
-    alert("Nome, telefone e data de nascimento são obrigatórios");
+    alert("Nome e telefone são obrigatórios");
+    return;
+  }
+  if (!birthDate) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    alert(birthDateRawSelf ? "Data de nascimento inválida. Use DD/MM/AAAA" : "Data de nascimento é obrigatória");
     return;
   }
 
@@ -2379,7 +2419,7 @@ function formatAutoOpenLabel(at) {
 function readAutoOpenFromForm(formData) {
   if (formData.get('auto_open_enabled') !== 'on') return '';
   const raw = String(formData.get('auto_open_at') || '').trim();
-  return raw || computeDefaultAutoOpen(String(formData.get('game_date') || ''));
+  return raw || computeDefaultAutoOpen(displayToIso(String(formData.get('game_date') || '')));
 }
 
 const appElement = document.getElementById('app');
@@ -3269,7 +3309,7 @@ function bindAuthEvents() {
       const result = await register({
         name: formData.get('name'),
         phone: formData.get('phone'),
-        birthDate: formData.get('birthDate'),
+        birthDate: displayToIso(String(formData.get('birthDate') || '')),
         role: formData.get('role'),
         position: formData.get('position'),
         password: formData.get('password'),
@@ -3519,7 +3559,7 @@ function bindAppEvents(currentPlayer) {
   bindCarneRotationDrag();
   appElement.querySelector('#carne-rotation-start')?.addEventListener('change', (event) => {
     const view = carneEditingView();
-    view.start_date = event.target.value || view.start_date;
+    view.start_date = displayToIso(event.target.value) || view.start_date;
     commitCarneRotation(view);
   });
 
@@ -3726,7 +3766,7 @@ function bindAppEvents(currentPlayer) {
         ...(existingGame || {}),
         id: originalGameKey,
         game_key: originalGameKey,
-        game_date: String(formData.get('game_date') || ''),
+        game_date: displayToIso(String(formData.get('game_date') || '')),
         game_time: String(formData.get('game_time') || ''),
         max_players: maxPlayers,
         open: formData.get('open') === 'on',
@@ -3766,7 +3806,7 @@ function bindAppEvents(currentPlayer) {
 
       const formData = new FormData(createGameForm);
       const maxPlayers = Number(formData.get('max_players'));
-      const gameDate = String(formData.get('game_date') || '');
+      const gameDate = displayToIso(String(formData.get('game_date') || ''));
       const gameTime = String(formData.get('game_time') || '');
 
       if (!gameDate) {
@@ -3823,7 +3863,7 @@ function bindAppEvents(currentPlayer) {
       event.preventDefault();
       if (!requireAdmin(getState(), 'Apenas administrador pode alterar a mensalidade')) return;
       const formData = new FormData(mensalidadeForm);
-      const mensExpireDate = String(formData.get('mens_expire_date') || '').slice(0, 10);
+      const mensExpireDate = displayToIso(String(formData.get('mens_expire_date') || ''));
       const rawMode = String(formData.get('mens_enforcement_mode') || '');
       const mensMode = [MENSALIDADE_MODES.PARTIAL, MENSALIDADE_MODES.TOTAL].includes(rawMode) ? rawMode : MENSALIDADE_MODES.NONE;
       const mensAmount = Math.max(0, Number(formData.get('mens_amount')) || 0);
@@ -5163,7 +5203,7 @@ function renderConfig(snapshot, currentPlayer) {
 
           <label class="field-label">
             Data do jogo
-            <input class="input" type="date" name="game_date" value="${item.game_date || ''}" />
+            <input class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask name="game_date" value="${isoToDisplay(item.game_date || '')}" />
           </label>
 
           <label class="field-label">
@@ -5253,7 +5293,7 @@ function renderConfig(snapshot, currentPlayer) {
           <form id="create-game-form" class="player-admin-form game-config-form create-game-form">
             <label class="field-label">
               Data do novo jogo
-              <input class="input" type="date" name="game_date" value="" />
+              <input class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask name="game_date" value="" />
             </label>
 
             <label class="field-label">
@@ -5294,7 +5334,7 @@ function renderConfig(snapshot, currentPlayer) {
         <form id="mensalidade-config-form" class="player-admin-form game-config-form">
           <label class="field-label">
             Data de vencimento
-            <input class="input" type="date" name="mens_expire_date" value="${snapshot.settings?.mens_expire_date || ''}" />
+            <input class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask name="mens_expire_date" value="${isoToDisplay(snapshot.settings?.mens_expire_date || '')}" />
           </label>
 
           <label class="field-label">
