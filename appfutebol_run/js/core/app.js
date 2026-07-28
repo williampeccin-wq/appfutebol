@@ -3661,7 +3661,7 @@ function bindAuthEvents() {
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
       const result = await register({
         name: formData.get('name'),
-        phone: formData.get('phone'),
+        phone: String(formData.get('phone') || '').replace(/\D/g, ''),
         birthDate: displayToIso(String(formData.get('birthDate') || '')),
         role: formData.get('role'),
         position: formData.get('position'),
