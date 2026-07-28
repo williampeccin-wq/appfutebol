@@ -458,7 +458,7 @@ function validatePhoneWithDDD(value) {
 }
 
 function bindPhoneOnlyInputs() {
-  document.querySelectorAll('input[type="tel"]').forEach((input) => {
+  document.querySelectorAll('input[type="tel"]:not([data-date-mask])').forEach((input) => {
     if (input.dataset.phoneOnlyBound === '1') return;
     input.dataset.phoneOnlyBound = '1';
     input.inputMode = 'numeric';
