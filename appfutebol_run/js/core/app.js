@@ -3850,7 +3850,12 @@ async function bindPushControl(card, currentPlayer) {
     } else {
       statusLine.textContent = 'Desativado';
       showButton('Ativar');
-      showHint(state.iosNeedsInstall ? 'No iPhone, ative com o app aberto pela Tela de Início.' : 'Receba um aviso quando as inscrições abrirem.');
+      // Admin recebe o motivo que mais lhe importa (aprovar quem pede para
+      // entrar); os demais, o aviso de inscrições.
+      const offHint = authzIsAdmin(currentPlayer)
+        ? 'Receba um aviso quando alguém pedir para entrar no grupo e quando as inscrições abrirem.'
+        : 'Receba um aviso quando as inscrições abrirem.';
+      showHint(state.iosNeedsInstall ? 'No iPhone, ative com o app aberto pela Tela de Início.' : offHint);
     }
   };
   refresh(state);
@@ -4444,9 +4449,41 @@ function renderTab(snapshot, activeTab, currentPlayer) {
   }
 }
 
+// Card da Home: avisa o admin, sem depender de push, que há gente pedindo para
+// entrar. Se o push ainda não foi ligado, empurra o admin a ligá-lo (o toggle
+// "Avisos no celular" está logo abaixo nesta mesma tela).
+function renderPendingApprovalsHomeCard(pendingApprovals) {
+  const n = pendingApprovals.length;
+  if (!n) return '';
+  const names = pendingApprovals.slice(0, 3).map((p) => escapeHtml(p.name || 'Sem nome')).join(', ');
+  const extra = n > 3 ? ` +${n - 3}` : '';
+  return `
+    <section class="home-v2-card home-v2-pending-card">
+      <div class="home-v2-card-head">
+        <div>
+          <strong>Cadastros aguardando</strong>
+          <span>${n === 1 ? 'Uma pessoa pediu' : `${n} pessoas pediram`} para entrar no grupo</span>
+        </div>
+        <span class="home-v2-pending-badge">${n}</span>
+      </div>
+      <p class="home-v2-pending-names">${names}${extra}</p>
+      <button class="home-v2-primary home-v2-pending-cta" type="button" data-tab="players">Ver e aprovar</button>
+      ${isPushOnboarded() ? '' : `
+      <p class="home-v2-pending-nudge">🔔 Ligue os <strong>Avisos no celular</strong> nesta tela para ser avisado na hora que alguém pedir para entrar.</p>`}
+    </section>
+  `;
+}
+
 function renderHome(snapshot, currentPlayer) {
   const workingSnapshot = snapshot;
   const activePlayer = workingSnapshot.players.find((player) => String(player.id) === String(currentPlayer.id)) || currentPlayer;
+
+  // Cadastros aguardando aprovação (auto-cadastro por código). Só o admin vê, e
+  // só quando há alguém pendente — vira um card na Home para o pedido não ficar
+  // escondido na aba Jogadores. Complementa o push disparado no register-player.
+  const pendingApprovals = authzIsAdmin(activePlayer)
+    ? workingSnapshot.players.filter((player) => player && player.pending === true)
+    : [];
 
   const gameView = buildGameView(workingSnapshot, activePlayer.id);
   const game = gameView.game;
@@ -4725,6 +4762,8 @@ function renderHome(snapshot, currentPlayer) {
         ${(game && game.game_date) ? '<button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>' : ''}
       </section>
       `}
+
+      ${renderPendingApprovalsHomeCard(pendingApprovals)}
 
       <section class="home-v2-card">
         <div class="home-v2-card-head">

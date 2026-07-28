@@ -5678,6 +5678,37 @@ body {
   background: rgba(143, 180, 255, 0.16);
   color: var(--hfc-accent-blue);
 }
+.content--home .home-v2-pending-card {
+  border: 1px solid rgba(240, 192, 64, 0.42);
+  background: rgba(240, 165, 0, 0.07);
+}
+.home-v2-pending-badge {
+  flex: none;
+  min-width: 30px; height: 30px; padding: 0 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-weight: 800; font-size: 15px;
+  background: var(--hfc-gold, #f0a500); color: #12203a;
+}
+.home-v2-pending-names {
+  margin: 10px 0 0;
+  color: var(--hfc-text-muted);
+  font-size: 14px;
+}
+.home-v2-pending-cta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+}
+.home-v2-pending-nudge {
+  margin: 12px 0 0;
+  font-size: 13px; line-height: 1.45;
+  color: var(--hfc-text);
+  background: rgba(240, 165, 0, 0.12);
+  border-left: 3px solid var(--hfc-gold, #f0a500);
+  border-radius: 0 8px 8px 0;
+  padding: 9px 11px;
+}
+.home-v2-pending-nudge strong { color: var(--hfc-gold-200, #ffd479); }
 .content--home .home-v2-confirmed-group {
   background: var(--hfc-glass-2);
   border: 1px solid var(--hfc-glass-border);
