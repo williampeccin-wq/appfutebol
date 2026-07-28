@@ -2543,6 +2543,8 @@ import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinanc
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
+// TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
+import { logAppOpen, logTab } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
@@ -3997,6 +3999,9 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
+  // TEMPORÁRIO (piloto): registra que o app foi aberto (throttle interno de 5min).
+  logAppOpen(currentPlayer);
+
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -4004,7 +4009,10 @@ function bindAppEvents(currentPlayer) {
       const nextTab = button.dataset.tab;
       patchState({ ui: { currentTab: nextTab } });
       // Ao trocar de aba, volta ao topo (padrão de navegação web/SPA).
-      if (previousTab !== nextTab) window.scrollTo({ top: 0 });
+      if (previousTab !== nextTab) {
+        window.scrollTo({ top: 0 });
+        logTab(currentPlayer, nextTab); // TEMPORÁRIO (piloto)
+      }
     });
   });
 

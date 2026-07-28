@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.164.0-home-pending-approvals-card';
+export const APP_VERSION = 'v1.165.0-activity-log-temp';
