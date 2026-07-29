@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.165.0-activity-log-temp';
+export const APP_VERSION = 'v1.166.0-vapid-rotate';
