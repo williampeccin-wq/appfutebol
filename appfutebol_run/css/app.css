@@ -5709,6 +5709,24 @@ body {
   padding: 9px 11px;
 }
 .home-v2-pending-nudge strong { color: var(--hfc-gold-200, #ffd479); }
+
+/* Biblioteca de uniformes (Config) + seletor por time (sorteio) */
+.uniforms-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.uniform-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: 10px;
+  border: 1px solid var(--hfc-glass-border, rgba(255,255,255,.10));
+  background: var(--hfc-glass-2, rgba(255,255,255,.04));
+}
+.uniform-thumb {
+  width: 34px; height: 46px; flex: none;
+  object-fit: cover; object-position: top;   /* mostra a camisa (topo do kit) */
+  border-radius: 6px; background: rgba(255,255,255,.06);
+}
+.uniform-name { flex: 1; min-width: 0; font-weight: 600; color: var(--hfc-text); }
+.uniform-add-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.uniform-add-form .input { flex: 1; min-width: 150px; }
+.team-uniform-select { margin-top: 8px; width: 100%; }
 .content--home .home-v2-confirmed-group {
   background: var(--hfc-glass-2);
   border: 1px solid var(--hfc-glass-border);

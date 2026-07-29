@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.167.0-vapid-rotate-2';
+export const APP_VERSION = 'v1.168.1-votacao-pos-resultado';

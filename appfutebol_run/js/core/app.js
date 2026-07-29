@@ -1228,6 +1228,26 @@ function resetCarneScheduleForm() {
   if (saveButton) saveButton.textContent = 'Salvar dupla';
 }
 
+// Atribuição de uniforme a um time do sorteio (select). Grava em
+// game.sort_result.uniforms[idx]; a imagem da escalação lê dali.
+document.addEventListener("change", (e) => {
+  const sel = e.target.closest('[data-action="set-team-uniform"]');
+  if (!sel) return;
+  if (!requireAdmin(getState(), 'Apenas administrador pode definir o uniforme')) return;
+  const idx = Number(sel.dataset.team);
+  if (!Number.isInteger(idx)) return;
+  const val = sel.value || null;
+  const next = structuredClone(getState());
+  const game = next.game;
+  if (!game || !game.sort_result) return;
+  const uniforms = Array.isArray(game.sort_result.uniforms) ? game.sort_result.uniforms.slice() : [];
+  uniforms[idx] = val;
+  game.sort_result.uniforms = uniforms;
+  const key = String(game.game_key || game.id || '');
+  next.games = (next.games || []).map((g) => String(g.game_key || g.id || '') === key ? game : g);
+  replaceState(repairManualSnapshot(next));
+});
+
 document.addEventListener("click", async (e) => {
   const trigger = e.target.closest("[data-action]");
   if (!trigger) return;
@@ -1266,6 +1286,20 @@ document.addEventListener("click", async (e) => {
         else { showToast('Não deu pra salvar o lançamento. Tente de novo.', 'error'); }
       })
       .catch(() => { trigger.disabled = false; showToast('Falha ao salvar o lançamento.', 'error'); });
+    return;
+  }
+
+  if (action === "remove-uniform") {
+    e.preventDefault();
+    if (!requireAdmin(getState(), 'Apenas administrador pode mexer nos uniformes')) return;
+    const uid = trigger.dataset.id;
+    if (!uid) return;
+    const next = structuredClone(getState());
+    const uniforms = ((next.settings && next.settings.uniforms) || []).filter((u) => String(u.id) !== String(uid));
+    next.settings = { ...(next.settings || {}), uniforms };
+    replaceState(repairManualSnapshot(next));
+    showToast('Uniforme removido.', 'success');
+    render(getState());
     return;
   }
 
@@ -1789,6 +1823,21 @@ document.addEventListener("click", async (e) => {
       showToast('Resultado NÃO foi salvo no servidor. Verifique a conexão e lance de novo.', 'error');
     } else {
       showToast("Resultado lançado e classificação recalculada", "success");
+      // Dispara votação de desempenho imediatamente após o resultado ser salvo,
+      // em vez de depender do cron que só roda 1h após o início do jogo.
+      // Fire-and-forget: não bloqueia nem mostra erro ao admin se falhar.
+      if (builtResult.game_key && SUPABASE_CONFIG?.url) {
+        try {
+          const token = JSON.parse(localStorage.getItem('harmonia_auth_session') || 'null')?.access_token || null;
+          if (token) {
+            fetch(`${SUPABASE_CONFIG.url}/functions/v1/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ action: 'trigger_voting', kind: 'desempenho', game_key: builtResult.game_key }),
+            }).catch(() => {});
+          }
+        } catch (_) { /* fire-and-forget */ }
+      }
     }
     return;
   }
@@ -4117,7 +4166,8 @@ function bindAppEvents(currentPlayer) {
 
   appElement.querySelector('#add-guest-player-btn')?.addEventListener('click', () => {
     const input = document.getElementById('guest-player-name');
-    const result = addGuestPlayer(input?.value || '');
+    const positionSel = document.getElementById('guest-player-position');
+    const result = addGuestPlayer(input?.value || '', positionSel?.value || 'meia');
     if (result.ok && input) input.value = '';
     const safeSnapshot = repairManualSnapshot(getState());
     savePersistedState(safeSnapshot);
@@ -4363,6 +4413,40 @@ function bindAppEvents(currentPlayer) {
       showToast(`${label}: ${toggle.checked ? 'ligado' : 'desligado'}.`, 'success');
     });
   });
+
+  // Biblioteca de uniformes: o botão dispara o file input; ao escolher a foto,
+  // comprime (mesmo padrão do avatar) e grava em settings.uniforms.
+  const uniformAddBtn = appElement.querySelector('#uniform-add-btn');
+  const uniformFileInput = appElement.querySelector('#uniform-file');
+  if (uniformAddBtn && uniformFileInput) {
+    uniformAddBtn.addEventListener('click', () => {
+      const name = (appElement.querySelector('#uniform-name')?.value || '').trim();
+      if (!name) { showToast('Dê um nome ao uniforme antes de escolher a foto.', 'error'); return; }
+      uniformFileInput.click();
+    });
+    uniformFileInput.addEventListener('change', async () => {
+      const file = uniformFileInput.files && uniformFileInput.files[0];
+      if (!file) return;
+      if (!requireAdmin(getState(), 'Apenas administrador pode cadastrar uniforme')) return;
+      const name = (appElement.querySelector('#uniform-name')?.value || '').trim() || 'Uniforme';
+      uniformAddBtn.disabled = true;
+      try {
+        const dataUrl = await readAndResizePlayerPhoto(file, 420, 0.8);
+        const next = structuredClone(getState());
+        const uniforms = Array.isArray(next.settings && next.settings.uniforms) ? next.settings.uniforms : [];
+        uniforms.push({ id: `unif_${Date.now()}_${Math.random().toString(16).slice(2)}`, name, photo: dataUrl });
+        next.settings = { ...(next.settings || {}), uniforms };
+        replaceState(repairManualSnapshot(next));
+        showToast('Uniforme adicionado. 👕', 'success');
+        render(getState());
+      } catch (err) {
+        showToast('Não consegui processar a imagem. Tente outra.', 'error');
+      } finally {
+        uniformAddBtn.disabled = false;
+        uniformFileInput.value = '';
+      }
+    });
+  }
 
   const notificationsForm = appElement.querySelector('#notifications-config-form');
   if (notificationsForm) {
@@ -5347,7 +5431,7 @@ function renderPresenceList(snapshot, currentPlayer) {
         <div class="avatar guest-avatar">👤</div>
         <div>
           <div class="row-title">${escapeHtml(entry.name)}</div>
-          <div class="row-subtitle">Convidado · temporário deste jogo</div>
+          <div class="row-subtitle">Convidado${entry.position ? ' · ' + escapeHtml(getPositionLabel(entry.position)) : ''} · temporário deste jogo</div>
         </div>
       </div>
       <div class="weekly-player-meta">
@@ -5405,6 +5489,12 @@ function renderPresenceList(snapshot, currentPlayer) {
           ? `<p class="footer-note">Linha completa (${lineUsed}/${lineMax}). ${guestPlayers.length ? 'O(s) convidado(s) acima já está(ão) dentro. ' : ''}Para adicionar outro, remova um jogador ou convidado.</p>`
           : `<div class="rental-goalkeeper-form">
               <input id="guest-player-name" class="input" type="text" placeholder="Nome do convidado" />
+              <select id="guest-player-position" class="input" aria-label="Posição do convidado">
+                <option value="meia">Meia</option>
+                <option value="zag">Zagueiro</option>
+                <option value="atk">Atacante</option>
+                <option value="gol">Goleiro</option>
+              </select>
               <button id="add-guest-player-btn" class="btn btn-secondary" type="button">Adicionar convidado</button>
             </div>`) : ''}
       </div>
@@ -5476,6 +5566,10 @@ function renderTeamDraw(snapshot, currentPlayer) {
   const gameKey = getGameKey(game);
   const confirmedCount = buildGameView(snapshot, currentPlayer?.id || null).confirmedCount;
   const isAdmin = authzIsAdmin(currentPlayer);
+
+  // Uniformes: biblioteca do clube (settings) + o que cada time usa neste sorteio.
+  const uniformLib = Array.isArray(snapshot.settings?.uniforms) ? snapshot.settings.uniforms : [];
+  const assignedUniforms = Array.isArray(sortResult?.uniforms) ? sortResult.uniforms : [];
 
   const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
   const sortEntryIds = sortResult
@@ -5562,6 +5656,14 @@ function renderTeamDraw(snapshot, currentPlayer) {
   const renderTeam = (title, entries, teamKey) => `
     <div class="team-draw-box">
       <div class="team-draw-title">${title}${(() => { const s = teamStrength(entries); return s !== null ? `<button type="button" class="team-strength-badge" data-action="open-strength-info" aria-label="O que é a força do time?">⚡ ${s.toFixed(1)} <span class="team-strength-info">ⓘ</span></button>` : ''; })()}</div>
+      ${isAdmin && uniformLib.length ? (() => {
+        const idx = typeof teamKey === 'number' ? teamKey : (teamKey === 'team_b' ? 1 : 0);
+        const atual = String(assignedUniforms[idx] || '');
+        return `<select class="input team-uniform-select" data-action="set-team-uniform" data-team="${idx}" aria-label="Uniforme do ${escapeHtml(title)}">
+          <option value="">👕 Uniforme…</option>
+          ${uniformLib.map((u) => `<option value="${escapeHtml(String(u.id))}" ${atual === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name || 'Uniforme')}</option>`).join('')}
+        </select>`;
+      })() : ''}
       <div class="placeholder-list">
         ${sortDrawEntriesForDisplay(entries || [], playerById).map((entry) => {
           const { id, player } = resolveDrawEntry(entry);
@@ -5831,6 +5933,25 @@ function renderConfig(snapshot, currentPlayer) {
             </div>
           </form>
         </details>
+      </section>
+
+      <section class="card uniforms-config-card">
+        <div class="card-title">👕 Uniformes do clube</div>
+        <p class="footer-note">Cadastre as fotos dos uniformes (pode ser o kit inteiro — recorto a camisa). No sorteio você escolhe qual time usa qual, e o selo aparece na imagem da escalação pro WhatsApp.</p>
+        <div class="uniforms-list">
+          ${(Array.isArray(snapshot.settings?.uniforms) ? snapshot.settings.uniforms : []).map((u) => `
+            <div class="uniform-item">
+              <img class="uniform-thumb" src="${escapeHtml(u.photo || '')}" alt="${escapeHtml(u.name || '')}" />
+              <span class="uniform-name">${escapeHtml(u.name || 'Uniforme')}</span>
+              <button class="btn btn-secondary btn-sm" type="button" data-action="remove-uniform" data-id="${escapeHtml(String(u.id))}">Remover</button>
+            </div>
+          `).join('') || '<div class="empty-inline">Nenhum uniforme cadastrado ainda.</div>'}
+        </div>
+        <div class="uniform-add-form">
+          <input id="uniform-name" class="input" type="text" placeholder="Nome (ex: Preto, Listrado)" maxlength="24" />
+          <input id="uniform-file" type="file" accept="image/*" hidden />
+          <button class="btn btn-secondary" type="button" id="uniform-add-btn">📷 Foto + adicionar</button>
+        </div>
       </section>
 
       <section class="card club-profile-card">
