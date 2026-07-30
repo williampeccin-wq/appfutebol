@@ -269,12 +269,46 @@ function desenharRodape(ctx, marca) {
   ctx.fillText(marca, W / 2, y + 2);
 }
 
-function rotuloTime(ctx, texto, y, cor) {
+function rotuloTime(ctx, texto, y, cor, uniforme) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = 'bold 30px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
   ctx.fillStyle = cor;
   ctx.fillText(texto, W / 2, y);
+
+  // Selo do uniforme do time, à DIREITA do rótulo (espaço vago da faixa).
+  // Os uploads costumam ser mockups de KIT COMPLETO (camisa+calção+meião
+  // empilhados). A camisa identifica o time, então recorto só o topo do mockup.
+  // Se a imagem já for ~quadrada (só a camisa), uso inteira.
+  if (uniforme) {
+    const iw = uniforme.width || 1;
+    const ih = uniforme.height || 1;
+    const ehKitCompleto = ih / iw > 1.4;
+    const sx = 0;
+    const sy = ehKitCompleto ? ih * 0.02 : 0;
+    const sw = iw;
+    const sh = ehKitCompleto ? ih * 0.44 : ih;   // camisa ≈ topo 44%
+    const alturaSelo = 78;
+    const larguraSelo = alturaSelo * (sw / sh);
+    const larguraTexto = ctx.measureText(texto).width;
+    const x = W / 2 + larguraTexto / 2 + 16;
+    const yTopo = y - alturaSelo / 2;
+    const r = 12;
+    const traca = () => {
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(x, yTopo, larguraSelo, alturaSelo, r);
+      else ctx.rect(x, yTopo, larguraSelo, alturaSelo);
+    };
+    ctx.save();
+    traca();
+    ctx.clip();
+    ctx.drawImage(uniforme, sx, sy, sw, sh, x, yTopo, larguraSelo, alturaSelo);
+    ctx.restore();
+    traca();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.stroke();
+  }
 }
 
 function formatarData(iso, hora) {
@@ -327,15 +361,22 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
   ));
   const posPorTime = layouts.map((l) => l.posicoes);
 
+  // Uniforme atribuído a cada time no sorteio (biblioteca do clube em settings).
+  const bibliotecaUnif = Array.isArray(snapshot?.settings?.uniforms) ? snapshot.settings.uniforms : [];
+  const unifPorId = new Map(bibliotecaUnif.map((u) => [String(u.id), u]));
+  const unifDoTime = Array.isArray(sort?.uniforms) ? sort.uniforms : [];
+  const fotosUnifPorTime = times.map((_t, i) => unifPorId.get(String(unifDoTime[i]))?.photo || null);
+
   // Carrega todas as fotos em paralelo — uma que falhe não derruba a imagem.
   const todas = posPorTime.flat();
-  const [fotos, escudo] = await Promise.all([
+  const [fotos, escudo, uniformes] = await Promise.all([
     Promise.all(todas.map((p) => carregarFoto(getPlayerPhoto(p.player)))),
     carregarFoto(escudoUrl),   // nunca rejeita: sem escudo, o título fica sozinho
+    Promise.all(fotosUnifPorTime.map((src) => carregarFoto(src))),
   ]);
 
   desenharCabecalho(ctx, titulo, formatarData(snapshot?.game?.game_date, snapshot?.game?.game_time), escudo);
-  times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i)));
+  times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i), uniformes[i]));
 
   let cursor = 0;
   posPorTime.forEach((posicoes, i) => {

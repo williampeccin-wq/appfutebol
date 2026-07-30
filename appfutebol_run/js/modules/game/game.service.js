@@ -168,7 +168,7 @@ export function getActiveGuestPlayers() {
   return getGuestPlayers(activeGame(getState()));
 }
 
-export function addGuestPlayer(name = '') {
+export function addGuestPlayer(name = '', position = 'meia') {
   const snapshot = getState();
   const game = activeGame(snapshot);
   const cleanName = String(name || '').trim();
@@ -179,12 +179,16 @@ export function addGuestPlayer(name = '') {
     return { ok: false, message: 'Jogo lotado: limite de jogadores de linha atingido.' };
   }
 
+  // Posição do convidado: entra no sorteio (paridade por posição) e no lugar
+  // certo na imagem da escalação. Default 'meia' se vier algo inválido.
+  const cleanPosition = ['gol', 'zag', 'meia', 'atk'].includes(position) ? position : 'meia';
   const current = getGuestPlayers(game);
   const entry = {
     id: `guest_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     name: cleanName,
     guest: true,
     temporary: true,
+    position: cleanPosition,
     created_at: new Date().toISOString(),
   };
 
@@ -665,7 +669,7 @@ export function drawTeams() {
   const guestPlayers = getGuestPlayers(game).map((entry) => ({
     id: entry.id,
     name: entry.name,
-    position: 'meia',
+    position: ['gol', 'zag', 'meia', 'atk'].includes(entry.position) ? entry.position : 'meia',
     plays_football: true,
     role: 'player',
     temporary: true,

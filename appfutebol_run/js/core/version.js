@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.163.1-date-text-input';
+export const APP_VERSION = 'v1.164.0-uniforme-e-posicao-convidado';
