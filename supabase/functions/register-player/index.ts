@@ -49,7 +49,12 @@ async function notifyAdminsOfRegistration(admin: any, playerName: string, clubId
         await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, notification);
       } catch (err) {
         const statusCode = (err as { statusCode?: number })?.statusCode;
-        if (statusCode === 404 || statusCode === 410) {
+        const body = String((err as { body?: string })?.body || "");
+        // Inscrição morta: endpoint sumiu (404/410) OU está presa numa chave VAPID
+        // antiga (400 VapidPkHashMismatch, resquício de rotação de chave). Remove
+        // para não tentar enviar para ela eternamente — ela se recria no próximo
+        // "Ativar" do dono, já com a chave atual.
+        if (statusCode === 404 || statusCode === 410 || (statusCode === 400 && /VapidPkHashMismatch/i.test(body))) {
           await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
         }
       }
