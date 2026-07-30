@@ -449,7 +449,7 @@ function validatePhoneWithDDD(value) {
 }
 
 function bindPhoneOnlyInputs() {
-  document.querySelectorAll('input[type="tel"]').forEach((input) => {
+  document.querySelectorAll('input[type="tel"]:not([data-date-mask])').forEach((input) => {
     if (input.dataset.phoneOnlyBound === '1') return;
     input.dataset.phoneOnlyBound = '1';
     input.inputMode = 'numeric';
@@ -2453,7 +2453,7 @@ function formatAutoOpenLabel(at) {
 function readAutoOpenFromForm(formData) {
   if (formData.get('auto_open_enabled') !== 'on') return '';
   const raw = String(formData.get('auto_open_at') || '').trim();
-  return raw || computeDefaultAutoOpen(displayToIso(String(formData.get('game_date') || '')));
+  return raw || computeDefaultAutoOpen(String(formData.get('game_date') || ''));
 }
 
 const appElement = document.getElementById('app');
@@ -3342,7 +3342,7 @@ function bindAuthEvents() {
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Criando...'; }
       const result = await register({
         name: formData.get('name'),
-        phone: formData.get('phone'),
+        phone: String(formData.get('phone') || '').replace(/\D/g, ''),
         birthDate: displayToIso(String(formData.get('birthDate') || '')),
         role: formData.get('role'),
         position: formData.get('position'),
@@ -3801,7 +3801,7 @@ function bindAppEvents(currentPlayer) {
         ...(existingGame || {}),
         id: originalGameKey,
         game_key: originalGameKey,
-        game_date: displayToIso(String(formData.get('game_date') || '')),
+        game_date: String(formData.get('game_date') || ''),
         game_time: String(formData.get('game_time') || ''),
         max_players: maxPlayers,
         open: formData.get('open') === 'on',
@@ -3841,7 +3841,7 @@ function bindAppEvents(currentPlayer) {
 
       const formData = new FormData(createGameForm);
       const maxPlayers = Number(formData.get('max_players'));
-      const gameDate = displayToIso(String(formData.get('game_date') || ''));
+      const gameDate = String(formData.get('game_date') || '');
       const gameTime = String(formData.get('game_time') || '');
 
       if (!gameDate) {
@@ -5290,7 +5290,7 @@ function renderConfig(snapshot, currentPlayer) {
 
           <label class="field-label">
             Data do jogo
-            <input class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask name="game_date" value="${isoToDisplay(item.game_date || '')}" />
+            <input class="input" type="date" name="game_date" value="${item.game_date || ''}" />
           </label>
 
           <label class="field-label">
@@ -5380,7 +5380,7 @@ function renderConfig(snapshot, currentPlayer) {
           <form id="create-game-form" class="player-admin-form game-config-form create-game-form">
             <label class="field-label">
               Data do novo jogo
-              <input class="input" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask name="game_date" value="" />
+              <input class="input" type="date" name="game_date" value="" />
             </label>
 
             <label class="field-label">
