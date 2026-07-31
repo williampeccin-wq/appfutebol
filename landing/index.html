@@ -174,6 +174,28 @@ a { color: inherit; text-decoration: none; }
 }
 .form-error { display: none; margin-top: 4px; font-size: 11px; color: #f87171; }
 
+/* ── INSTAGRAM CTA ── */
+.hero-ig-cta { margin-top: 20px; }
+.hero-ig-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.2em;
+  text-transform: uppercase; color: rgba(255,255,255,0.28);
+  display: block; margin-bottom: 8px;
+}
+.hero-ig-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 600; color: var(--gold);
+  border-bottom: 1px solid rgba(240,165,0,0.3); padding-bottom: 2px;
+  transition: border-color 0.15s;
+}
+.hero-ig-link:hover { border-color: var(--gold); }
+.cta-ig-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 20px; font-weight: 700; color: var(--gold);
+  border-bottom: 1.5px solid rgba(240,165,0,0.3); padding-bottom: 3px;
+  transition: border-color 0.15s;
+}
+.cta-ig-link:hover { border-color: var(--gold); }
+
 /* ── PHONE MOCKUP ── */
 .hero-visual { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
 .phone-device {
@@ -374,14 +396,10 @@ a { color: inherit; text-decoration: none; }
       <h1 class="hero-headline">Seu clube<br><em>organi</em><br><em>zado</em><br>de verdade.</h1>
       <p class="hero-sub">Confirmação de presença, mensalidade, sorteio inteligente e campeonato. Tudo numa tela. Sem WhatsApp, sem planilha.</p>
       <a href="#download" class="play-badge">↓ Disponível no Google Play</a>
-      <div class="hero-waitlist-label">Ou deixe seu contato</div>
-      <div class="form-row">
-        <input class="form-input" type="tel" id="hero-input" placeholder="Seu celular (WhatsApp)" autocomplete="tel" inputmode="tel">
-        <button class="form-btn" id="hero-btn" onclick="submitWaitlist('hero-input','hero-success','hero-error','hero-btn')">Entrar</button>
+      <div class="hero-ig-cta">
+        <span class="hero-ig-label">Siga no Instagram</span>
+        <a href="https://www.instagram.com/convocados.app" class="hero-ig-link" target="_blank" rel="noopener">📸 @convocados.app</a>
       </div>
-      <div class="form-success" id="hero-success">⚽ Anotado! Você será um dos primeiros a receber novidades.</div>
-      <div class="form-error" id="hero-error"></div>
-      <p class="form-hint">Sem spam. Avisamos quando tiver novidade.</p>
     </div>
 
     <div class="hero-visual">
@@ -506,6 +524,24 @@ a { color: inherit; text-decoration: none; }
         <div class="feature-desc">Aviso automático do jogo direto no celular de todos os membros. Ninguém esquece o horário.</div>
         <span class="feature-badge badge-free">Grátis</span>
       </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">📊</div>
+        <div class="feature-title">Despesas e receitas</div>
+        <div class="feature-desc">Registre entradas e saídas do clube. Saiba exatamente quanto tem no caixa — sem planilha, sem confusão no grupo.</div>
+        <span class="feature-badge badge-pro">Pro</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">⭐</div>
+        <div class="feature-title">Avaliação de desempenho</div>
+        <div class="feature-desc">Após cada jogo, avalie o desempenho de cada jogador. A nota alimenta o sorteio inteligente e mantém o ranking atualizado.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap">🍖</div>
+        <div class="feature-title">Avaliação do churrasco</div>
+        <div class="feature-desc">O mais importante do futebol amador. Avalie o churrasco pós-jogo e descubra de uma vez quem manda de verdade na grelha.</div>
+        <span class="feature-badge badge-free">Grátis</span>
+      </div>
     </div>
   </div>
 </section>
@@ -543,18 +579,12 @@ a { color: inherit; text-decoration: none; }
       <div class="cta-content">
         <div class="section-eyebrow">Disponível agora</div>
         <h2 class="section-title">Baixa e<br>convoca<br>a galera.</h2>
-        <p class="section-sub">Gratuito para começar. Acesso antecipado no Google Play.</p>
+        <p class="section-sub">Gratuito. Acesso antecipado no Google Play.</p>
       </div>
       <div class="cta-form-wrap">
         <a href="#" class="cta-play-btn">↓ Baixar no Google Play</a>
-        <div class="cta-divider">ou receba novidades por WhatsApp</div>
-        <div class="form-row">
-          <input class="form-input" type="tel" id="wl-input" placeholder="(48) 99999-9999" autocomplete="tel" inputmode="tel">
-          <button class="form-btn" id="wl-btn" onclick="submitWaitlist('wl-input','wl-success','wl-error','wl-btn')">Entrar na lista</button>
-        </div>
-        <div class="form-success" id="wl-success">⚽ Anotado! Você será um dos primeiros a receber novidades.</div>
-        <div class="form-error" id="wl-error"></div>
-        <p class="form-hint">Sem spam. Avisamos quando tiver novidade.</p>
+        <div class="cta-divider">siga no Instagram</div>
+        <a href="https://www.instagram.com/convocados.app" class="cta-ig-link" target="_blank" rel="noopener">📸 @convocados.app</a>
       </div>
     </div>
   </div>
@@ -575,44 +605,5 @@ a { color: inherit; text-decoration: none; }
   </div>
 </footer>
 
-<script type="module">
-let supabaseUrl = null, supabaseKey = null;
-try {
-  const env = await import('/env.js');
-  const cfg = env.default || env;
-  supabaseUrl = cfg.SUPABASE_URL;
-  supabaseKey = cfg.SUPABASE_ANON_KEY;
-} catch { /* sem env.js — fallback silencioso */ }
-
-window.submitWaitlist = async function(inputId, successId, errorId, btnId) {
-  const input   = document.getElementById(inputId);
-  const success = document.getElementById(successId);
-  const error   = document.getElementById(errorId);
-  const btn     = document.getElementById(btnId);
-  const contact = input.value.trim();
-  if (!contact) { showError(error, 'Por favor, informe seu WhatsApp.'); return; }
-  btn.disabled = true;
-  btn.textContent = 'Enviando...';
-  error.style.display = 'none';
-  if (!supabaseUrl || !supabaseKey) { showSuccess(input, success, btn); return; }
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/waitlist`, {
-      method: 'POST',
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ contact }),
-    });
-    if (res.ok || res.status === 201) { showSuccess(input, success, btn); return; }
-    const body = await res.json().catch(() => ({}));
-    if (res.status === 409 || body?.code === '23505') { showSuccess(input, success, btn); return; }
-    throw new Error(body?.message || `HTTP ${res.status}`);
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = btnId === 'hero-btn' ? 'Entrar' : 'Entrar na lista';
-    showError(error, 'Algo deu errado. Tente novamente.');
-  }
-};
-function showSuccess(input, success, btn) { input.style.display = 'none'; btn.style.display = 'none'; success.style.display = 'block'; }
-function showError(el, msg) { el.textContent = msg; el.style.display = 'block'; }
-</script>
 </body>
 </html>
