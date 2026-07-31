@@ -567,7 +567,7 @@ function renderAvatarForApp(player, extraClass = '') {
   }
 
   if (photo) {
-    return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${photo}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
+    return `<div class="avatar avatar-photo ${extraClass}${aura}"><img src="${escapeHtml(photo)}" alt="Foto de ${escapeHtml(player?.name || 'jogador')}" loading="lazy" /></div>`;
   }
 
   return `<div class="avatar ${extraClass}${aura}">${initials}</div>`;
@@ -3971,9 +3971,14 @@ function bindAppEvents(currentPlayer) {
       uniformAddBtn.disabled = true;
       try {
         const dataUrl = await readAndResizePlayerPhoto(file, 420, 0.8);
+        // Vai pro Storage (bucket público player-photos, como as fotos de
+        // jogador) — guardamos só a URL, NÃO o base64 no blob (evita inchaço).
+        const unifId = `unif_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const up = await uploadPlayerPhoto(dataUrl, unifId);
+        if (!up.ok) { showToast('Não consegui subir a imagem do uniforme. Tente de novo.', 'error'); return; }
         const next = structuredClone(getState());
         const uniforms = Array.isArray(next.settings && next.settings.uniforms) ? next.settings.uniforms : [];
-        uniforms.push({ id: `unif_${Date.now()}_${Math.random().toString(16).slice(2)}`, name, photo: dataUrl });
+        uniforms.push({ id: unifId, name, photo: up.url });
         next.settings = { ...(next.settings || {}), uniforms };
         replaceState(repairManualSnapshot(next));
         showToast('Uniforme adicionado. 👕', 'success');
@@ -4229,8 +4234,8 @@ function renderHome(snapshot, currentPlayer) {
     ...homeRentalGoalkeepers.map((entry) => '<span class="home-v2-avatar home-v2-rental-goalie-avatar">🧤</span>')
   ].join('');
   const homeGoalkeeperNames = [
-    ...homeGoalkeepers.map((player) => player.name),
-    ...homeRentalGoalkeepers.map((entry) => String(entry.name || '') + ' (aluguel)')
+    ...homeGoalkeepers.map((player) => escapeHtml(player.name || '')),
+    ...homeRentalGoalkeepers.map((entry) => escapeHtml(String(entry.name || '')) + ' (aluguel)')
   ].filter(Boolean).join(', ') || 'Nenhum goleiro confirmado';
   const homeNoticeItems = [
     carneNotification ? {
@@ -5527,7 +5532,7 @@ function renderConfig(snapshot, currentPlayer) {
           <p class="footer-note">Mensagem fixa que aparece na home de todos (não é push).</p>
           <form id="notifications-config-form" class="player-admin-form notifications-config-form">
             <label class="field-label config-notifications-field">
-              <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${adminNotification}</textarea>
+              <textarea class="input notification-textarea" name="admin_notification" rows="4" placeholder="Ex.: recado sobre churrasco, pagamento, uniforme ou qualquer aviso geral.">${escapeHtml(adminNotification)}</textarea>
             </label>
             <div class="player-admin-actions game-config-actions">
               <button class="btn btn-primary" type="submit">Salvar recado</button>
