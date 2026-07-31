@@ -1,0 +1,486 @@
+<title>Convocados — O app do seu time</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  img { display: block; max-width: 100%; }
+
+  :root {
+    --navy-900: #0d1f3c;
+    --navy-800: #1a3a6e;
+    --navy-700: #234b8d;
+    --navy-mid:  #102650;
+    --gold:      #f0a500;
+    --gold-bg:   rgba(240, 165, 0, 0.10);
+    --gold-border: rgba(240, 165, 0, 0.22);
+    --text:      #ffffff;
+    --muted:     rgba(255, 255, 255, 0.52);
+    --border:    rgba(255, 255, 255, 0.09);
+    --display:   'Impact', 'Haettenschweiler', 'Arial Black', sans-serif;
+    --body:      -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --r:         10px;
+  }
+
+  body {
+    background: var(--navy-900);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.65;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2.5rem;
+    background: rgba(13, 31, 60, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wordmark {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .wordmark em { font-style: normal; color: var(--gold); }
+
+  .nav-cta {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    transition: opacity 0.15s;
+  }
+
+  .nav-cta:hover { opacity: 0.65; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 9rem 2rem 5rem;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--navy-900) 0%, var(--navy-mid) 100%);
+  }
+
+  /* Subtle diagonal jersey-fabric pattern */
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent 0,
+      transparent 28px,
+      rgba(255,255,255,0.018) 28px,
+      rgba(255,255,255,0.018) 29px
+    );
+    pointer-events: none;
+  }
+
+  /* Pitch center circle */
+  .pitch-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: clamp(260px, 54vw, 540px);
+    height: clamp(260px, 54vw, 540px);
+    border: 1px solid rgba(240, 165, 0, 0.08);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .pitch-ring::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px; height: 10px;
+    background: rgba(240, 165, 0, 0.25);
+    border-radius: 50%;
+  }
+
+  /* Outer ring */
+  .pitch-ring-outer {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: clamp(440px, 80vw, 820px);
+    height: clamp(440px, 80vw, 820px);
+    border: 1px solid rgba(240, 165, 0, 0.035);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.9rem;
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 2.25rem;
+  }
+
+  .dot {
+    width: 5px; height: 5px;
+    background: var(--gold);
+    border-radius: 50%;
+    animation: blink 2.5s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
+  }
+
+  .hero h1 {
+    font-family: var(--display);
+    font-size: clamp(4.5rem, 18vw, 11.5rem);
+    line-height: 0.87;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text);
+    text-wrap: balance;
+    margin-bottom: 1.75rem;
+  }
+
+  .hero-sub {
+    font-size: clamp(1rem, 2.1vw, 1.2rem);
+    color: var(--muted);
+    max-width: 44ch;
+    margin-bottom: 2.75rem;
+    line-height: 1.65;
+  }
+
+  .hero-ctas {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--body);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: var(--r);
+    text-decoration: none;
+    padding: 0.85rem 1.85rem;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+
+  .btn:hover { transform: translateY(-2px); }
+
+  .btn-gold {
+    background: var(--gold);
+    color: var(--navy-900);
+  }
+
+  .btn-gold:hover {
+    box-shadow: 0 8px 28px rgba(240, 165, 0, 0.35);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    border-color: rgba(255,255,255,0.28);
+    color: var(--text);
+  }
+
+  /* ── LAYOUT ── */
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 5.5rem 2.5rem;
+  }
+
+  .section-border { border-top: 1px solid var(--border); }
+
+  .eyebrow {
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.7rem;
+  }
+
+  .section-title {
+    font-family: var(--display);
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+    line-height: 0.92;
+    text-transform: uppercase;
+    color: var(--text);
+    text-wrap: balance;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-sub {
+    color: var(--muted);
+    font-size: 1.05rem;
+    max-width: 48ch;
+    margin-bottom: 3.5rem;
+    line-height: 1.65;
+  }
+
+  /* ── FEATURES GRID ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--r) + 2px);
+    overflow: hidden;
+  }
+
+  .feat {
+    background: var(--navy-800);
+    padding: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.15s;
+  }
+
+  .feat::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: transparent;
+    transition: background 0.15s;
+  }
+
+  .feat:hover { background: var(--navy-700); }
+  .feat:hover::before { background: var(--gold); }
+
+  .feat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.85rem;
+    display: block;
+  }
+
+  .feat-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.35rem;
+  }
+
+  .feat-body {
+    font-size: 0.855rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── STEPS ── */
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 3rem 2rem;
+  }
+
+  .step-num {
+    font-family: var(--display);
+    font-size: 4.5rem;
+    line-height: 1;
+    color: rgba(240, 165, 0, 0.13);
+    margin-bottom: 0.9rem;
+    user-select: none;
+  }
+
+  .step-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.35rem;
+  }
+
+  .step-body {
+    font-size: 0.855rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── CTA FINAL ── */
+  .cta-wrap { text-align: center; }
+  .cta-wrap .section-sub { margin-left: auto; margin-right: auto; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  footer p {
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  footer .wordmark { font-size: 1rem; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    nav { padding: 0.9rem 1.25rem; }
+    .wrap { padding: 4rem 1.25rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dot { animation: none; }
+    .btn, .feat, .feat::before { transition: none; }
+  }
+</style>
+
+<nav>
+  <a href="#" class="wordmark">Convoca<em>dos</em></a>
+  <a href="#download" class="nav-cta">Baixar no Google Play →</a>
+</nav>
+
+<main>
+
+  <section class="hero" aria-label="Hero">
+    <div class="pitch-ring-outer" aria-hidden="true"></div>
+    <div class="pitch-ring" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <div class="pill">
+        <span class="dot" aria-hidden="true"></span>
+        Disponível no Google Play
+      </div>
+      <h1>Convocados</h1>
+      <p class="hero-sub">O app que organiza sua pelada. Confirme presença, sorteie os times e gerencie seu grupo — sem confusão no WhatsApp.</p>
+      <div class="hero-ctas">
+        <a href="#download" class="btn btn-gold">↓ Baixar o app</a>
+        <a href="#funcionalidades" class="btn btn-ghost">Ver funcionalidades</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-border" id="funcionalidades" aria-label="Funcionalidades">
+    <div class="wrap">
+      <p class="eyebrow">Funcionalidades</p>
+      <h2 class="section-title">Tudo que sua<br>pelada precisa</h2>
+      <p class="section-sub">Sem planilha, sem grupo de WhatsApp caótico. Um app feito do jeito certo para o futebol amador.</p>
+      <div class="features-grid">
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">✅</span>
+          <div class="feat-title">Confirmar presença</div>
+          <p class="feat-body">Um toque e tá convocado. O admin vê em tempo real quem confirmou e quem está na fila.</p>
+        </div>
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">🎲</span>
+          <div class="feat-title">Sorteio de times</div>
+          <p class="feat-body">Sorteio automático com os jogadores confirmados. Duplas fixas são respeitadas.</p>
+        </div>
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">⏳</span>
+          <div class="feat-title">Lista de espera</div>
+          <p class="feat-body">Jogo cheio? Entra na fila. Se alguém cancelar, você é notificado automaticamente.</p>
+        </div>
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">🏆</span>
+          <div class="feat-title">Campeonatos</div>
+          <p class="feat-body">Crie campeonatos internos, registre resultados e acompanhe a tabela de classificação.</p>
+        </div>
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">💳</span>
+          <div class="feat-title">Gestão financeira</div>
+          <p class="feat-body">Controle de carnê e mensalidades. Saiba na hora quem pagou e quem está devendo.</p>
+        </div>
+        <div class="feat">
+          <span class="feat-icon" aria-hidden="true">📸</span>
+          <div class="feat-title">Perfil do jogador</div>
+          <p class="feat-body">Foto, histórico de presenças e aniversários. Seu grupo organizado de um jeito que a galera vai amar.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-border" aria-label="Como funciona">
+    <div class="wrap">
+      <p class="eyebrow">Como funciona</p>
+      <h2 class="section-title">Simples<br>assim</h2>
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-num" aria-hidden="true">01</div>
+          <div class="step-title">Admin cria o grupo e configura o jogo</div>
+          <p class="step-body">Cadastra os jogadores, define data, horário e o limite de vagas. Leva dois minutos.</p>
+        </div>
+        <div class="step">
+          <div class="step-num" aria-hidden="true">02</div>
+          <div class="step-title">Jogadores confirmam presença no app</div>
+          <p class="step-body">Recebem notificação, abrem o app e clicam em confirmar. Fila automática se lotar.</p>
+        </div>
+        <div class="step">
+          <div class="step-num" aria-hidden="true">03</div>
+          <div class="step-title">App cuida do resto</div>
+          <p class="step-body">Sorteio de times, lista para WhatsApp, histórico de jogos — tudo organizado.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-border cta-wrap" id="download" aria-label="Download">
+    <div class="wrap">
+      <p class="eyebrow">Disponível agora</p>
+      <h2 class="section-title">Baixa e convoca<br>a galera</h2>
+      <p class="section-sub">Gratuito para experimentar. Disponível no Google Play em acesso antecipado.</p>
+      <a href="#" class="btn btn-gold" style="font-size:1rem; padding:0.95rem 2.25rem; margin:0 auto;">
+        ↓ Baixar no Google Play
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <a href="#" class="wordmark">Convoca<em>dos</em></a>
+  <p>© 2025 Convocados · Feito para a pelada de todo brasileiro</p>
+</footer>
