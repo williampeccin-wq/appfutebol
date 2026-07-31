@@ -199,78 +199,181 @@ a { color: inherit; text-decoration: none; }
 /* ── PHONE MOCKUP ── */
 .hero-visual { display: flex; justify-content: center; align-items: center; padding: 20px 0; }
 .phone-device {
-  width: 260px; height: 520px; background: #080f1c;
-  border-radius: 36px; border: 3px solid #1e2d4a;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 40px 80px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.03);
+  width: 264px; height: 528px; background: #060c18;
+  border-radius: 38px; border: 3px solid #1a2840;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 40px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.03);
   position: relative; overflow: hidden;
 }
 .phone-notch {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  width: 90px; height: 26px; background: #080f1c;
+  width: 90px; height: 26px; background: #060c18;
   border-radius: 0 0 16px 16px; z-index: 10;
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.phone-camera { width: 8px; height: 8px; border-radius: 50%; background: #131d2e; }
-.phone-speaker { width: 36px; height: 3px; border-radius: 2px; background: #131d2e; }
+.phone-camera { width: 8px; height: 8px; border-radius: 50%; background: #101e30; }
+.phone-speaker { width: 36px; height: 3px; border-radius: 2px; background: #101e30; }
 .phone-screen {
-  position: absolute; inset: 0; background: var(--navy);
+  position: absolute; inset: 0; background: #0a1628;
   display: flex; flex-direction: column; overflow: hidden;
 }
+
+/* status bar */
 .status-bar {
-  height: 42px; display: flex; align-items: flex-end; justify-content: space-between;
-  padding: 0 18px 5px; flex-shrink: 0;
+  height: 36px; display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 16px 5px; flex-shrink: 0;
 }
-.status-time { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.8); }
+.status-time { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.85); }
 .status-icons { display: flex; gap: 4px; align-items: center; }
-.status-icon { width: 14px; height: 7px; background: rgba(255,255,255,0.55); border-radius: 1px; }
-.app-header {
-  background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+.status-icon { width: 14px; height: 7px; background: rgba(255,255,255,0.5); border-radius: 1px; }
+
+/* real app header */
+.app-header-real {
+  padding: 7px 12px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
 }
-.app-header-left { display: flex; flex-direction: column; gap: 1px; }
-.app-club { font-family: var(--ff-display); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #fff; }
-.app-role { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
-.app-avatar {
-  width: 28px; height: 28px; border-radius: 50%; background: var(--gold);
+.app-logo-badge {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--gold); display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.app-header-text { flex: 1; }
+.app-name-real {
+  font-family: var(--ff-display); font-size: 12px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #fff; display: block; line-height: 1.15;
+}
+.app-subrole { font-size: 7px; color: rgba(255,255,255,0.38); display: block; }
+.app-avatar-wp {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,0.88);
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: var(--navy);
+  font-size: 10px; font-weight: 700; color: #0a1628; flex-shrink: 0;
 }
-.app-body { flex: 1; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
-.game-card {
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 8px; padding: 11px 13px; border-top: 2px solid var(--gold);
+
+/* body */
+.app-body-real { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+
+/* today card */
+.today-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 10px; padding: 10px 12px; position: relative; overflow: hidden; flex-shrink: 0;
 }
-.game-label { font-size: 8px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 3px; }
-.game-title { font-family: var(--ff-display); font-size: 16px; text-transform: uppercase; color: #fff; line-height: 1.05; margin-bottom: 5px; }
-.game-meta { display: flex; gap: 8px; flex-wrap: wrap; }
-.game-meta-item { font-size: 8px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 3px; }
-.confirmed-band {
-  background: rgba(240,165,0,0.07); border: 1px solid rgba(240,165,0,0.18);
-  border-radius: 6px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between;
+.today-card::before {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 80% at 85% 50%, rgba(26,58,110,0.6) 0%, transparent 60%),
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: auto, 20px 20px, 20px 20px;
 }
-.confirmed-num { font-family: var(--ff-display); font-size: 28px; color: var(--gold); line-height: 1; }
-.confirmed-label { font-size: 7px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-top: 2px; }
-.confirm-btn {
-  background: var(--gold); color: var(--navy); border-radius: 4px; padding: 6px 11px;
-  font-family: var(--ff-display); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em;
+.today-label {
+  font-size: 6px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 2px; position: relative;
 }
-.members-label { font-size: 7px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 4px; }
-.member-row { display: flex; align-items: center; gap: 7px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-.member-row:last-child { border-bottom: none; }
-.member-av { width: 18px; height: 18px; border-radius: 50%; background: var(--navy-mid); flex-shrink: 0; border: 1px solid rgba(255,255,255,0.09); }
-.member-name { flex: 1; font-size: 9px; color: rgba(255,255,255,0.68); }
-.member-status { font-size: 7px; padding: 2px 5px; border-radius: 2px; }
-.s-yes  { background: rgba(74,222,128,0.12); color: #4ade80; }
-.s-no   { background: rgba(239,68,68,0.12);  color: #f87171; }
-.s-wait { background: rgba(240,165,0,0.12);  color: var(--gold); }
-.app-nav {
-  background: rgba(0,0,0,0.28); border-top: 1px solid rgba(255,255,255,0.05);
-  display: flex; padding: 8px 0 14px; flex-shrink: 0;
+.today-date {
+  font-family: var(--ff-display); font-size: 20px; color: #fff;
+  line-height: 1.05; position: relative;
 }
-.app-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.nav-icon { font-size: 15px; }
-.nav-label { font-size: 6px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.28); }
-.app-nav-item.active .nav-label { color: var(--gold); }
+.today-meta { font-size: 7px; color: rgba(255,255,255,0.42); margin-bottom: 5px; position: relative; }
+.confirmed-big { display: flex; align-items: baseline; gap: 0; position: relative; }
+.conf-num { font-family: var(--ff-display); font-size: 28px; color: #fff; line-height: 1; }
+.conf-total { font-family: var(--ff-display); font-size: 18px; color: rgba(255,255,255,0.32); }
+.conf-label {
+  font-size: 6px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.4); margin-bottom: 5px; position: relative;
+}
+.progress-bar-wrap {
+  height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 3px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, var(--gold) 0%, #4ade80 100%);
+  border-radius: 2px;
+}
+.progress-legend {
+  display: flex; justify-content: space-between;
+  font-size: 6px; color: rgba(255,255,255,0.28); margin-bottom: 7px;
+}
+.today-actions { display: flex; gap: 6px; }
+.btn-cancel {
+  flex: 1; height: 24px; background: var(--gold); color: #060c18;
+  border: none; border-radius: 12px; font-size: 7px; font-weight: 700;
+  font-family: var(--ff-body); cursor: default;
+}
+.btn-view {
+  flex: 1; height: 24px;
+  background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.75);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  font-size: 7px; font-weight: 600; font-family: var(--ff-body); cursor: default;
+}
+
+/* stats row */
+.stats-row { display: flex; gap: 5px; flex-shrink: 0; }
+.stat {
+  flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 7px; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.stat-num { font-family: var(--ff-display); font-size: 11px; color: #fff; line-height: 1; }
+.stat-lbl { font-size: 5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.28); text-align: center; }
+
+/* players */
+.players-section {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px; padding: 8px 10px; flex-shrink: 0;
+}
+.players-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1px; }
+.players-title { font-size: 10px; font-weight: 700; color: #fff; }
+.lista-btn {
+  font-size: 7px; font-weight: 700; padding: 2px 8px;
+  background: rgba(240,165,0,0.16); color: var(--gold);
+  border-radius: 8px;
+}
+.players-sub { font-size: 6px; color: rgba(255,255,255,0.28); margin-bottom: 6px; }
+.players-label {
+  font-size: 6px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 6px;
+}
+.avatars-row { display: flex; gap: 4px; align-items: center; }
+.av {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.14); flex-shrink: 0; overflow: hidden;
+}
+/* avatar "photo" — silhueta CSS */
+.av-photo {
+  background: linear-gradient(170deg, #2d4f7a 0%, #1a3558 100%);
+  position: relative;
+}
+.av-photo::before {
+  content: ''; position: absolute;
+  top: 3px; left: 50%; transform: translateX(-50%);
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(190,210,230,0.72);
+}
+.av-photo::after {
+  content: ''; position: absolute;
+  bottom: -3px; left: 50%; transform: translateX(-50%);
+  width: 18px; height: 14px; border-radius: 50% 50% 0 0;
+  background: rgba(190,210,230,0.55);
+}
+.av-1 { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.av-2 { background: linear-gradient(135deg, #059669, #047857); }
+.av-3 { background: linear-gradient(135deg, #d97706, #b45309); }
+.av-4 { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.av-5 { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+.av-more {
+  font-size: 7px; font-weight: 700; color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.06); border: 1.5px dashed rgba(255,255,255,0.14);
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+}
+
+/* bottom nav */
+.app-nav-real {
+  background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex; padding: 8px 0 13px; flex-shrink: 0;
+}
+.nav-item-r { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 14px; opacity: 0.3; }
+.nav-item-r.active { opacity: 1; }
 
 /* ── PAIN ── */
 .pain { background: var(--ink); padding: 100px 0; }
@@ -407,49 +510,69 @@ a { color: inherit; text-decoration: none; }
         <div class="phone-notch"><div class="phone-camera"></div><div class="phone-speaker"></div></div>
         <div class="phone-screen">
           <div class="status-bar">
-            <span class="status-time">20:14</span>
+            <span class="status-time">14:13</span>
             <div class="status-icons">
               <div class="status-icon" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5)"></div>
               <div class="status-icon"></div>
-              <div class="status-icon" style="position:relative;overflow:hidden;"><div style="position:absolute;left:1px;top:1px;bottom:1px;width:68%;background:rgba(255,255,255,.7);border-radius:1px"></div></div>
+              <div class="status-icon" style="position:relative;overflow:hidden;"><div style="position:absolute;left:1px;top:1px;bottom:1px;width:75%;background:rgba(255,255,255,.7);border-radius:1px"></div></div>
             </div>
           </div>
-          <div class="app-header">
-            <div class="app-header-left">
-              <span class="app-club">Harmonia FC</span>
-              <span class="app-role">Administrador</span>
+          <div class="app-header-real">
+            <div class="app-logo-badge">⚽</div>
+            <div class="app-header-text">
+              <span class="app-name-real">Convocados</span>
+              <span class="app-subrole">Administrador</span>
             </div>
-            <div class="app-avatar">W</div>
+            <div class="app-avatar-wp">WP</div>
           </div>
-          <div class="app-body">
-            <div class="game-card">
-              <div class="game-label">Próximo jogo</div>
-              <div class="game-title">Sexta · 20h</div>
-              <div class="game-meta">
-                <span class="game-meta-item">📍 Quadra do Mané</span>
-                <span class="game-meta-item">⚽ Society</span>
+          <div class="app-body-real">
+            <div class="today-card">
+              <div class="today-label">Hoje no Convocados</div>
+              <div class="today-date">18/10/2026</div>
+              <div class="today-meta">20:00 · Aberto</div>
+              <div class="confirmed-big">
+                <div class="conf-num">10<span class="conf-total">/10</span></div>
+              </div>
+              <div class="conf-label">Confirmados de linha</div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill"></div></div>
+              <div class="progress-legend"><span>100% preenchido</span><span>0 vagas</span></div>
+              <div class="today-actions">
+                <button class="btn-cancel">Cancelar presença</button>
+                <button class="btn-view">Ver jogo</button>
               </div>
             </div>
-            <div class="confirmed-band">
-              <div>
-                <div class="confirmed-num">14</div>
-                <div class="confirmed-label">Convocados na linha</div>
-              </div>
-              <div class="confirm-btn">Confirmar</div>
+            <div class="stats-row">
+              <div class="stat"><div class="stat-num">10</div><div class="stat-lbl">Linha</div></div>
+              <div class="stat"><div class="stat-num">0/2</div><div class="stat-lbl">Goleiros</div></div>
+              <div class="stat"><div class="stat-num">5</div><div class="stat-lbl">Fila</div></div>
+              <div class="stat"><div class="stat-num" style="font-size:8px">Aberto</div><div class="stat-lbl">Status</div></div>
             </div>
-            <div>
-              <div class="members-label">Últimas confirmações</div>
-              <div class="member-row"><div class="member-av"></div><span class="member-name">Carlos Henrique</span><span class="member-status s-yes">Vai ✓</span></div>
-              <div class="member-row"><div class="member-av"></div><span class="member-name">Rodrigo Silva</span><span class="member-status s-yes">Vai ✓</span></div>
-              <div class="member-row"><div class="member-av"></div><span class="member-name">Thiago Alves</span><span class="member-status s-no">Não vai</span></div>
-              <div class="member-row"><div class="member-av"></div><span class="member-name">Rafael Mendes</span><span class="member-status s-wait">Na fila</span></div>
+            <div class="players-section">
+              <div class="players-header">
+                <span class="players-title">Convocados</span>
+                <span class="lista-btn">Lista</span>
+              </div>
+              <div class="players-sub">0 vagas de linha</div>
+              <div class="players-label">Linha (10)</div>
+              <div class="avatars-row">
+                <div class="av av-photo"></div>
+                <div class="av av-1"></div>
+                <div class="av av-2"></div>
+                <div class="av av-3"></div>
+                <div class="av av-4"></div>
+                <div class="av av-5"></div>
+                <div class="av av-more">+4</div>
+              </div>
             </div>
           </div>
-          <div class="app-nav">
-            <div class="app-nav-item active"><span class="nav-icon">🏠</span><span class="nav-label">Início</span></div>
-            <div class="app-nav-item"><span class="nav-icon">👥</span><span class="nav-label">Membros</span></div>
-            <div class="app-nav-item"><span class="nav-icon">💰</span><span class="nav-label">Finanças</span></div>
-            <div class="app-nav-item"><span class="nav-icon">🏆</span><span class="nav-label">Campeona.</span></div>
+          <div class="app-nav-real">
+            <div class="nav-item-r active">🏠</div>
+            <div class="nav-item-r">⭐</div>
+            <div class="nav-item-r">👥</div>
+            <div class="nav-item-r">⚔️</div>
+            <div class="nav-item-r">🏆</div>
+            <div class="nav-item-r">💰</div>
+            <div class="nav-item-r">⚙️</div>
           </div>
         </div>
       </div>
