@@ -171,15 +171,30 @@ export function addGuestPlayer(name = '', position = 'meia') {
   const cleanName = String(name || '').trim();
   if (!cleanName) return { ok: false, message: 'Informe o nome do convidado.' };
 
-  const confirmations = normalizeConfirmationSegments(scopedConfirmations(snapshot), snapshot.players || []);
-  if (isGameFull(game, confirmations)) {
-    return { ok: false, message: 'Jogo lotado: limite de jogadores de linha atingido.' };
-  }
-
   // Posição do convidado: entra no sorteio (paridade por posição) e no lugar
   // certo na imagem da escalação. Default 'meia' se vier algo inválido.
   const cleanPosition = ['gol', 'zag', 'meia', 'atk'].includes(position) ? position : 'meia';
   const current = getGuestPlayers(game);
+
+  if (cleanPosition === 'gol') {
+    // Goleiro respeita o TETO DE GOLEIROS (não a vaga de linha), junto com os
+    // goleiros de aluguel e os goleiros-convidados já no jogo.
+    const teto = goleirosPorJogo(snapshot);
+    if (teto <= 0) {
+      return { ok: false, message: 'Este clube não usa goleiro fixo. Ajuste em Config › Como o clube joga.' };
+    }
+    const rentalGks = getRentalGoalkeepers(game).length;
+    const guestGks = current.filter((g) => ['gol', 'goleiro'].includes(String(g?.position || '').toLowerCase())).length;
+    if (rentalGks + guestGks >= teto) {
+      return { ok: false, message: `Limite de ${teto} goleiro(s) atingido.` };
+    }
+  } else {
+    // Linha: respeita a lotação de linha.
+    const confirmations = normalizeConfirmationSegments(scopedConfirmations(snapshot), snapshot.players || []);
+    if (isGameFull(game, confirmations)) {
+      return { ok: false, message: 'Jogo lotado: limite de jogadores de linha atingido.' };
+    }
+  }
   const entry = {
     id: `guest_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     name: cleanName,
@@ -705,6 +720,9 @@ export function drawTeams() {
     game_time: game.game_time || '',
     created_at: createdAt,
     total_players: eligiblePlayers.length,
+    // Preserva o uniforme atribuído a cada time (índice estável: Time A, B…) —
+    // sortear de novo não deve zerar a escolha de uniforme.
+    ...(Array.isArray(game.sort_result?.uniforms) ? { uniforms: game.sort_result.uniforms } : {}),
   }, listas.map((time) => time.map(paraEntrada)));
 
   const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];

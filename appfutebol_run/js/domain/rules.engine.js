@@ -72,9 +72,12 @@ export function getLineConfirmedCount(confirmations = []) {
 
 export function isGameFull(game, confirmations = []) {
   const lineConfirmedCount = getLineConfirmedCount(confirmations);
-  // Convidados (adicionados pelo admin, só nome) ocupam vaga de LINHA, igual a
-  // um confirmado — por isso entram na conta do máximo.
-  const guestCount = Array.isArray(game?.guest_players) ? game.guest_players.length : 0;
+  // Convidados de LINHA ocupam vaga, igual a um confirmado. Convidado GOLEIRO
+  // não entra na conta de linha (ele conta contra o teto de goleiros, checado
+  // no addGuestPlayer).
+  const guestCount = Array.isArray(game?.guest_players)
+    ? game.guest_players.filter((g) => !['gol', 'goleiro'].includes(String(g?.position || '').toLowerCase())).length
+    : 0;
   const maxPlayers = Number(game?.max_players || 0);
   return maxPlayers > 0 && (lineConfirmedCount + guestCount) >= maxPlayers;
 }

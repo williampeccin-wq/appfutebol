@@ -311,6 +311,8 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
       mens_amount: Number(meta.settings?.mens_amount) || 0,
       mens_beneficiary: String(meta.settings?.mens_beneficiary || ''),
       notifications: (meta.settings?.notifications && typeof meta.settings.notifications === 'object') ? meta.settings.notifications : {},
+      // Biblioteca de uniformes do clube (photo = URL do Storage, não base64).
+      uniforms: Array.isArray(meta.settings?.uniforms) ? meta.settings.uniforms : [],
     },
     deleted_player_ids: deletedPlayerIds,
     deleted_player_phones: deletedPlayerPhones,
@@ -345,6 +347,8 @@ function splitState(state) {
         mens_amount: Number(state.settings?.mens_amount) || 0,
         mens_beneficiary: String(state.settings?.mens_beneficiary || ''),
         notifications: (state.settings?.notifications && typeof state.settings.notifications === 'object') ? state.settings.notifications : {},
+        // Biblioteca de uniformes do clube (photo = URL do Storage, não base64).
+        uniforms: Array.isArray(state.settings?.uniforms) ? state.settings.uniforms : [],
       },
       deleted_player_ids: Array.isArray(state.deleted_player_ids) ? state.deleted_player_ids.map((id) => String(id)) : [],
       deleted_player_phones: Array.isArray(state.deleted_player_phones) ? state.deleted_player_phones.map((phone) => String(phone)) : [],

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.168.2-game-date-calendar';
+export const APP_VERSION = 'v1.169.0-audit-lote1-xss-uniforme-storage';
