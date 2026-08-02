@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>OG Image — 1200×630</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; background: #0C1A38; }
+
+  .card {
+    width: 1200px;
+    height: 630px;
+    background: #0C1A38;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    font-family: Impact, "Arial Narrow", "Haettenschweiler", Arial, sans-serif;
+  }
+
+  /* Diagonal accent */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -60px;
+    width: 520px; height: 860px;
+    background: #1A2F54;
+    transform: rotate(-8deg);
+    transform-origin: center;
+  }
+
+  /* Gold top stripe */
+  .stripe {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #C9A227 0%, #E8C24A 50%, #C9A227 100%);
+  }
+
+  /* Left content */
+  .left {
+    position: relative;
+    z-index: 2;
+    padding: 0 0 0 80px;
+    flex: 1;
+  }
+
+  .eyebrow {
+    font-size: 16px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin-bottom: 20px;
+  }
+
+  .brand {
+    font-size: 120px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 0.88;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-accent {
+    color: #C9A227;
+  }
+
+  .slogan {
+    margin-top: 32px;
+    font-size: 28px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-weight: 300;
+  }
+
+  .url {
+    margin-top: 40px;
+    font-size: 18px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #C9A227;
+    opacity: 0.8;
+  }
+
+  /* Right crest area */
+  .right {
+    position: relative;
+    z-index: 2;
+    width: 380px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 60px;
+  }
+
+  .crest {
+    width: 260px;
+    height: 300px;
+    position: relative;
+  }
+
+  /* Shield SVG */
+  .shield-svg {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="stripe"></div>
+
+  <div class="left">
+    <div class="eyebrow">Futebol amador organizado</div>
+    <div class="brand">Con<span class="brand-accent">vo</span><br>ca<span class="brand-accent">dos</span></div>
+    <div class="slogan">Convoca · Joga · Resenha</div>
+    <div class="url">convocados.app.br</div>
+  </div>
+
+  <div class="right">
+    <!-- Crest geométrico (substitua pelo PNG real: <img src="../../appfutebol_run/img/convocados-crest.png"> ) -->
+    <svg class="shield-svg" viewBox="0 0 260 300" xmlns="http://www.w3.org/2000/svg">
+      <!-- Outer shield -->
+      <path d="M130 8 L248 50 L248 160 Q248 240 130 292 Q12 240 12 160 L12 50 Z"
+            fill="#1A2F54" stroke="#C9A227" stroke-width="4"/>
+      <!-- Inner border -->
+      <path d="M130 22 L236 60 L236 158 Q236 226 130 274 Q24 226 24 158 L24 60 Z"
+            fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+      <!-- Vertical stripe left -->
+      <path d="M80 22 L80 270 Q55 258 36 238 L36 60 Z" fill="rgba(255,255,255,0.06)"/>
+      <!-- Vertical stripe right -->
+      <path d="M180 22 L180 270 Q205 258 224 238 L224 60 Z" fill="rgba(255,255,255,0.06)"/>
+
+      <!-- Stars -->
+      <text x="92" y="68" font-size="22" fill="#C9A227" text-anchor="middle">★</text>
+      <text x="168" y="68" font-size="22" fill="#C9A227" text-anchor="middle">★</text>
+
+      <!-- Football -->
+      <circle cx="130" cy="118" r="34" fill="#fff" stroke="#1A2F54" stroke-width="2"/>
+      <path d="M130 84 L140 100 L130 116 L120 100 Z" fill="#1A2F54"/>
+      <path d="M130 152 L140 136 L130 120 L120 136 Z" fill="#1A2F54"/>
+      <path d="M96 118 L112 108 L128 118 L112 128 Z" fill="#1A2F54"/>
+      <path d="M164 118 L148 108 L132 118 L148 128 Z" fill="#1A2F54"/>
+
+      <!-- Banner -->
+      <rect x="52" y="188" width="156" height="36" rx="2" fill="#C9A227"/>
+      <rect x="52" y="188" width="156" height="4" fill="#B08C1A"/>
+      <text x="130" y="212" font-family="Impact, Arial Narrow, Arial" font-size="18"
+            fill="#0C1A38" text-anchor="middle" letter-spacing="2">CONVOCADOS</text>
+
+      <!-- Bottom stripes -->
+      <path d="M80 224 L80 270 Q100 278 130 282 Q160 278 180 270 L180 224 Z"
+            fill="rgba(255,255,255,0.08)"/>
+      <path d="M100 224 L100 278 L115 281 L115 224 Z" fill="rgba(255,255,255,0.06)"/>
+      <path d="M145 224 L145 281 L160 278 L160 224 Z" fill="rgba(255,255,255,0.06)"/>
+    </svg>
+  </div>
+</div>
+</body>
+</html>

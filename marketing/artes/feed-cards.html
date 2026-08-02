@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Feed Cards 1×1 — 1080×1080 cada</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    padding: 40px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .guide {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 32px;
+    line-height: 1.6;
+    max-width: 700px;
+  }
+  .guide strong { color: #aaa; }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 540px);
+    gap: 24px;
+  }
+  /* Each card renders at 540px but represents 1080×1080 (50% scale for preview) */
+  .card-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card-num {
+    color: #555;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* THE CARD — 540px preview of 1080×1080 */
+  .card {
+    width: 540px;
+    height: 540px;
+    position: relative;
+    overflow: hidden;
+    background: #0C1A38;
+    font-family: Impact, "Arial Narrow", "Haettenschweiler", Arial, sans-serif;
+    flex-shrink: 0;
+  }
+
+  /* GOLD TOP STRIPE */
+  .card .stripe {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #C9A227, #E8C24A, #C9A227);
+    z-index: 10;
+  }
+
+  /* GRADIENT BG VARIANTS */
+  .card.v-diagonal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #0C1A38 40%, #1A3060 100%);
+  }
+  .card.v-radial::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 70% 30%, #1A3060 0%, #0C1A38 60%);
+  }
+  .card.v-split::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 50%; height: 100%;
+    background: #C9A227;
+  }
+  .card.v-dark::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #071028;
+  }
+
+  /* CONTENT */
+  .card .inner {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 32px 36px;
+  }
+  .card.v-split .inner {
+    justify-content: center;
+  }
+
+  .card .eyebrow {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin-bottom: 8px;
+  }
+  .card.v-split .eyebrow { color: #0C1A38; opacity: 0.7; }
+
+  .card .headline {
+    font-size: clamp(36px, 8vw, 52px);
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .card.v-split .headline { color: #0C1A38; }
+
+  .card .headline em {
+    color: #C9A227;
+    font-style: normal;
+  }
+  .card.v-split .headline em { color: #fff; background: #0C1A38; padding: 0 4px; }
+
+  .card .sub {
+    margin-top: 14px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  .card.v-split .sub { color: rgba(12,26,56,0.55); }
+
+  .card .logo {
+    position: absolute;
+    bottom: 18px;
+    right: 24px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .card.v-split .logo { color: rgba(12,26,56,0.3); }
+
+  /* ICON watermark */
+  .card .icon-bg {
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 200px;
+    opacity: 0.06;
+    z-index: 1;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  /* BOTTOM ACCENT LINE */
+  .card .accent-line {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(201, 162, 39, 0.3);
+  }
+
+  /* Gold bar (left) */
+  .card .gold-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 5px;
+    background: #C9A227;
+  }
+
+  /* Card 5 — PIX specific */
+  .pix-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(201,162,39,0.15);
+    border: 1px solid rgba(201,162,39,0.3);
+    border-radius: 2px;
+    padding: 4px 10px;
+    margin-top: 12px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #C9A227;
+  }
+
+  /* Card 7 — notification style */
+  .notif-bubble {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 16px;
+    max-width: 320px;
+  }
+  .notif-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .notif-text {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .notif-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .notif-body {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+  }
+
+  /* Card 9 — carnê visual */
+  .carne-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .carne-ticket {
+    width: 28px; height: 36px;
+    border-radius: 3px;
+    border: 1.5px solid rgba(201,162,39,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system,"Segoe UI",sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(201,162,39,0.5);
+  }
+  .carne-ticket.paid {
+    background: rgba(201,162,39,0.15);
+    border-color: #C9A227;
+    color: #C9A227;
+  }
+  .carne-ticket.overdue {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.4);
+    color: rgba(239,68,68,0.6);
+  }
+</style>
+</head>
+<body>
+<div class="guide">
+  <strong>10 Feed Cards · 1080×1080 px</strong><br>
+  Para exportar: abra no Chrome → F12 → Device Toolbar → defina 540×540 → Print → Salvar como PDF, ou use <code>Cmd+Shift+4</code> para capturar cada card individualmente.<br>
+  Cada card representa 1080×1080 px renderizado a 50% para preview. Para exportar em resolução total, mude a escala abaixo para 100% (largura 1080px).
+</div>
+
+<div class="cards-grid">
+
+  <!-- 01 -->
+  <div class="card-wrap">
+    <div class="card-num">01 · Confirmação de presença</div>
+    <div class="card v-diagonal">
+      <div class="stripe"></div>
+      <div class="gold-bar"></div>
+      <div class="icon-bg">📱</div>
+      <div class="inner">
+        <div class="eyebrow">Futebol amador</div>
+        <div class="headline">Chega de<br>confirmar<br>presença<br>no <em>Zap.</em></div>
+        <div class="sub">O racha organizado começa aqui.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <div class="card-wrap">
+    <div class="card-num">02 · Visibilidade do jogo</div>
+    <div class="card v-radial">
+      <div class="stripe"></div>
+      <div class="icon-bg">⚽</div>
+      <div class="inner">
+        <div class="eyebrow">Sexta é dia de racha</div>
+        <div class="headline">Você sabe<br>quem vai<br>jogar <em>hoje?</em></div>
+        <div class="sub">Lista de confirmados em tempo real. Sem precisar perguntar.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+      <div class="accent-line"></div>
+    </div>
+  </div>
+
+  <!-- 03 -->
+  <div class="card-wrap">
+    <div class="card-num">03 · Mensalidade</div>
+    <div class="card v-dark">
+      <div class="stripe"></div>
+      <div class="gold-bar"></div>
+      <div class="icon-bg">💰</div>
+      <div class="inner">
+        <div class="eyebrow">Gestão do clube</div>
+        <div class="headline">Mensali<br>dade em<br>dia. <em>Sem</em><br><em>frio na</em><br><em>barriga.</em></div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <div class="card-wrap">
+    <div class="card-num">04 · Sorteio inteligente</div>
+    <div class="card v-diagonal">
+      <div class="stripe"></div>
+      <div class="icon-bg">🎲</div>
+      <div class="inner">
+        <div class="eyebrow">Sorteio inteligente</div>
+        <div class="headline">Times<br><em>equili</em><br><em>brados.</em><br>Sorteio<br>por nota.</div>
+        <div class="sub">Os melhores distribuídos automaticamente.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div class="card-wrap">
+    <div class="card-num">05 · PIX com IA</div>
+    <div class="card v-radial">
+      <div class="stripe"></div>
+      <div class="icon-bg">🤖</div>
+      <div class="inner">
+        <div class="eyebrow">IA no seu clube</div>
+        <div class="headline">Foto do<br>compro<br>vante.<br><em>App abona</em><br><em>na hora.</em></div>
+        <div class="pix-check">✓ PIX detectado — mensalidade de junho</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div class="card-wrap">
+    <div class="card-num">06 · Campeonato</div>
+    <div class="card v-split">
+      <div class="stripe"></div>
+      <div class="inner">
+        <div class="eyebrow">Campeonato</div>
+        <div class="headline">Tabela.<br>Chave.<br><em>Placar.</em><br>Sem<br>planilha.</div>
+        <div class="sub">O campeonato do seu racha, organizado de verdade.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 07 -->
+  <div class="card-wrap">
+    <div class="card-num">07 · Push notification</div>
+    <div class="card v-dark">
+      <div class="stripe"></div>
+      <div class="gold-bar"></div>
+      <div class="inner">
+        <div class="eyebrow">Notificações push</div>
+        <div class="headline">Push às<br>6h da<br>manhã.<br><em>Ninguém</em><br><em>esquece.</em></div>
+        <div class="notif-bubble">
+          <div class="notif-icon">⚽</div>
+          <div class="notif-text">
+            <div class="notif-title">Convocados · Harmonia FC</div>
+            <div class="notif-body">Racha hoje às 20h. Você confirmou sua presença?</div>
+          </div>
+        </div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="card-wrap">
+    <div class="card-num">08 · Proposta de valor</div>
+    <div class="card v-radial">
+      <div class="stripe"></div>
+      <div class="icon-bg">🏆</div>
+      <div class="inner">
+        <div class="eyebrow">Seu clube merece mais</div>
+        <div class="headline">O seu<br>racha é<br><em>profis</em><br><em>sional.</em></div>
+        <div class="sub">Gerencie membros, mensalidades e campeonatos. Num só lugar.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+      <div class="accent-line"></div>
+    </div>
+  </div>
+
+  <!-- 09 -->
+  <div class="card-wrap">
+    <div class="card-num">09 · Carnê digital</div>
+    <div class="card v-diagonal">
+      <div class="stripe"></div>
+      <div class="gold-bar"></div>
+      <div class="inner">
+        <div class="eyebrow">Carnê digital</div>
+        <div class="headline">Quem<br>deve,<br><em>sabe</em><br><em>que deve.</em></div>
+        <div class="carne-row">
+          <div class="carne-ticket paid">JAN</div>
+          <div class="carne-ticket paid">FEV</div>
+          <div class="carne-ticket paid">MAR</div>
+          <div class="carne-ticket overdue">ABR</div>
+          <div class="carne-ticket">MAI</div>
+          <div class="carne-ticket">JUN</div>
+          <div class="carne-ticket">JUL</div>
+        </div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+  <!-- 10 -->
+  <div class="card-wrap">
+    <div class="card-num">10 · Slogan / Institucional</div>
+    <div class="card v-dark">
+      <div class="stripe"></div>
+      <div class="inner" style="justify-content:center;align-items:center;text-align:center;">
+        <div class="eyebrow" style="text-align:center;margin-bottom:20px;">convocados.app.br</div>
+        <div class="headline" style="font-size:62px;text-align:center;line-height:1.05">
+          <em>Convoca.</em><br>Joga.<br><em>Resenha.</em>
+        </div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

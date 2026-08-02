@@ -67,6 +67,12 @@ function financeAddYm(ym, delta) {
 
 let uiActionInFlight = false;
 
+// Superadmin
+let superAdminMode = false;
+let superAdminClubs = null;       // null = não carregado ainda; [] = carregado e vazio
+let superAdminLoading = false;
+let superAdminEditingClubId = null;
+
 function isoToDisplay(iso) {
   if (!iso) return '';
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -1262,6 +1268,36 @@ document.addEventListener("click", async (e) => {
     e.preventDefault();
     const feature = trigger.dataset.feature || "esse recurso";
     showToast(`${feature} é do plano Pro (R$ 39,90/mês pro grupo todo). O pagamento chega já já — por enquanto, fala com a gente pra ativar. 👊`, 'info');
+    return;
+  }
+
+  // Superadmin: abre formulário inline de edição de plano
+  if (action === "superadmin-edit-club") {
+    e.preventDefault();
+    superAdminEditingClubId = trigger.dataset.clubId || null;
+    render(getState());
+    return;
+  }
+
+  // Superadmin: cancela edição
+  if (action === "superadmin-cancel-edit") {
+    e.preventDefault();
+    superAdminEditingClubId = null;
+    render(getState());
+    return;
+  }
+
+  // Superadmin: recarrega lista de clubes
+  if (action === "superadmin-reload") {
+    e.preventDefault();
+    superAdminLoading = true;
+    superAdminEditingClubId = null;
+    render(getState());
+    fetchAllClubsForSuperAdmin().then((clubs) => {
+      superAdminClubs = clubs;
+      superAdminLoading = false;
+      render(getState());
+    });
     return;
   }
 
@@ -2572,7 +2608,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, getClubInfo, getCurrentClubId } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, getClubInfo, getCurrentClubId, fetchSuperAdminStatus, fetchAllClubsForSuperAdmin, updateClubPlan } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession, deleteOwnAccount } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
@@ -2581,6 +2617,7 @@ import { renderPlayersScreen, renderCarneScreen } from '../modules/players/playe
 import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finance/finance.ledger.view.js';
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
+import { renderSuperAdminScreen } from '../modules/superadmin/superadmin.view.js';
 import { isPro, renderProLock, renderProLockInline } from '../domain/gating.js';
 import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
 import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
@@ -2798,6 +2835,14 @@ async function initInner() {
   //    então o cliente anônimo não faz mais nenhuma leitura REST. Isso permite
   //    dropar as policies de SELECT anônimo (players/app_meta/game/presence).
   await restoreSession();
+
+  // Superadmin: verifica silenciosamente (best-effort, não bloqueia o boot)
+  fetchSuperAdminStatus().then((ok) => {
+    if (ok !== superAdminMode) {
+      superAdminMode = ok;
+      render(getState());
+    }
+  });
 
   lastDomainFingerprint = getDomainFingerprint(getState());
 
@@ -4061,6 +4106,15 @@ function bindAppEvents(currentPlayer) {
       if (previousTab !== nextTab) {
         window.scrollTo({ top: 0 });
         logTab(currentPlayer, nextTab); // TEMPORÁRIO (piloto)
+        if (nextTab === 'superadmin' && superAdminMode && superAdminClubs === null) {
+          superAdminLoading = true;
+          render(getState());
+          fetchAllClubsForSuperAdmin().then((clubs) => {
+            superAdminClubs = clubs;
+            superAdminLoading = false;
+            render(getState());
+          });
+        }
       }
     });
   });
@@ -4453,6 +4507,37 @@ function bindAppEvents(currentPlayer) {
     });
   }
 
+  // Superadmin: submissão do formulário de edição de plano
+  const superAdminForm = appElement.querySelector('[data-superadmin-save]');
+  if (superAdminForm) {
+    superAdminForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const clubId = superAdminForm.dataset.superadminSave;
+      if (!clubId) return;
+      const fd = new FormData(superAdminForm);
+      const plan     = String(fd.get('plan') || 'free');
+      const proUntil = String(fd.get('pro_until') || '').trim() || null;
+      const notes    = String(fd.get('notes') || '').trim() || null;
+      const btn = superAdminForm.querySelector('[type="submit"]');
+      if (btn) btn.disabled = true;
+      const res = await updateClubPlan(clubId, { plan, proUntil, notes });
+      if (btn) btn.disabled = false;
+      if (res.ok) {
+        showToast(`Plano ${plan === 'pro' ? 'Pro' : 'Free'} salvo.`, 'success');
+        superAdminEditingClubId = null;
+        // Atualiza o cache local da lista sem recarregar tudo
+        if (superAdminClubs) {
+          superAdminClubs = superAdminClubs.map((c) =>
+            c.id === clubId ? { ...c, plan, pro_until: proUntil, notes } : c
+          );
+        }
+      } else {
+        showToast('Erro ao salvar o plano. Tente de novo.', 'error');
+      }
+      render(getState());
+    });
+  }
+
   const notificationsForm = appElement.querySelector('#notifications-config-form');
   if (notificationsForm) {
     notificationsForm.addEventListener('submit', (event) => {
@@ -4482,6 +4567,7 @@ function renderNavButton(tab, label, activeTab) {
 }
 
 const BOTTOM_NAV_ICONS = {
+  superadmin: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>',
   home: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>',
   weekly_game: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="12,8.8 15,11 13.9,14.6 10.1,14.6 9,11" fill="currentColor" stroke="currentColor"/><path d="M12 8.8V3"/><path d="M15 11l5.6-1.8"/><path d="M13.9 14.6l3.4 4.7"/><path d="M10.1 14.6l-3.4 4.7"/><path d="M9 11 3.4 9.2"/></svg>',
   players: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 13.7a5.5 5.5 0 0 1 3.5 6.3"/></svg>',
@@ -4504,6 +4590,7 @@ function renderBottomNav(activeTab, currentPlayer, snapshot) {
   if (campeonatoDisponivel(snapshot).ok) items.push(['championship', 'Campeonato']);
   if (canManageFinance(currentPlayer) || isPro()) items.push(['finance', 'Financeiro']);
   if (canAccessConfig(currentPlayer)) items.push(['config', 'Config']);
+  if (superAdminMode) items.push(['superadmin', 'Admin']);
 
   return `
     <nav class="bottom-nav" aria-label="Navegação principal">
@@ -4540,6 +4627,9 @@ function renderTab(snapshot, activeTab, currentPlayer) {
       return renderFinanceScreen(snapshot, currentPlayer, financeEffectiveYm());
     case 'config':
       return renderConfig(snapshot, currentPlayer);
+    case 'superadmin':
+      if (!superAdminMode) return renderHome(snapshot, currentPlayer);
+      return renderSuperAdminScreen(superAdminClubs || [], superAdminEditingClubId, superAdminLoading || superAdminClubs === null);
     case 'home':
     default:
       return renderHome(snapshot, currentPlayer);

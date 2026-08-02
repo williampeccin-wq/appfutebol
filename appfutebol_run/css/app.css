@@ -7348,3 +7348,19 @@ body.vote-open { overflow: hidden; }
   margin: 10px 0 4px;
   background: #060a16;
 }
+
+/* Painel Superadmin */
+.superadmin-clubs-list { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 24px; }
+.superadmin-refresh-row { padding: 4px 16px 12px; }
+.superadmin-club-card { padding: 14px 16px; }
+.superadmin-club-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.superadmin-club-info { display: flex; flex-direction: column; gap: 4px; }
+.superadmin-club-name { font-size: 15px; }
+.superadmin-club-meta { font-size: 12px; color: var(--hfc-text-muted, #888); display: flex; flex-wrap: wrap; gap: 4px; }
+.superadmin-notes { font-size: 12px; color: var(--hfc-text-muted, #888); font-style: italic; margin: 4px 0 0; }
+.superadmin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: .5px; flex-shrink: 0; }
+.superadmin-badge--pro  { background: var(--hfc-gold, #f0c040); color: #1a1a1a; }
+.superadmin-badge--free { background: var(--hfc-surface2, #2a2a3a); color: var(--hfc-text-muted, #888); }
+.superadmin-edit-btn { margin-top: 8px; }
+.superadmin-edit-form { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.superadmin-form-actions { display: flex; gap: 8px; }

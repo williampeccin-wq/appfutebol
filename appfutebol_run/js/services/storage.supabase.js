@@ -1719,6 +1719,62 @@ export async function restoreDeletedPlayerByPhone(phone, updates = {}) {
   return { ok: true, reason: 'deleted_player_restored_by_phone', player: savedPlayer, updatedAt: now };
 }
 
+// ---------------------------------------------------------------------------
+// Superadmin
+// ---------------------------------------------------------------------------
+
+// Verifica se o usuário logado é superadmin (existe linha em public.superadmins).
+export async function fetchSuperAdminStatus() {
+  if (!isSupabaseConfigured()) return false;
+  const config = getConfig();
+  const uid = getCurrentAuthUserId();
+  if (!uid) return false;
+  try {
+    const res = await requestJson(
+      config,
+      tableUrl(config, 'superadmins', `auth_user_id=eq.${encodeURIComponent(uid)}&select=auth_user_id&limit=1`),
+      { method: 'GET' }
+    );
+    return Array.isArray(res.data) && res.data.length > 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Lista todos os clubes com contagem de jogadores (apenas superadmin enxerga tudo).
+export async function fetchAllClubsForSuperAdmin() {
+  if (!isSupabaseConfigured()) return [];
+  const config = getConfig();
+  try {
+    const res = await requestJson(
+      config,
+      tableUrl(config, 'clubs', 'select=id,name,plan,plan_status,pro_until,invite_code,owner_auth_user_id,created_at,notes,players(count)&order=created_at.desc'),
+      { method: 'GET' }
+    );
+    return Array.isArray(res.data) ? res.data : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+// Atualiza plan/pro_until/notes de um clube (apenas superadmin tem policy de UPDATE).
+export async function updateClubPlan(clubId, { plan, proUntil, notes }) {
+  if (!isSupabaseConfigured()) return { ok: false, reason: 'not_configured' };
+  const config = getConfig();
+  const payload = { plan, pro_until: proUntil || null };
+  if (notes !== undefined) payload.notes = notes;
+  const res = await requestNoContent(
+    config,
+    tableUrl(config, 'clubs', `id=eq.${encodeURIComponent(clubId)}`),
+    { method: 'PATCH', body: JSON.stringify(payload) }
+  );
+  // Invalida o cache local se for o clube do usuário logado
+  if (clubKeyCache.key === clubId && clubInfoCache.info) {
+    clubInfoCache = { uid: null, info: null };
+  }
+  return { ok: res.ok, status: res.status };
+}
+
 export function getSupabaseMeta() {
   const config = getConfig();
   return {

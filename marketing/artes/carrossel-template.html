@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Carrossel Template — 1080×1080 cada slide</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    padding: 40px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .guide {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 8px;
+    line-height: 1.6;
+    max-width: 700px;
+  }
+  .guide strong { color: #aaa; }
+  .guide code {
+    background: #222;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #C9A227;
+  }
+  .series-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin: 24px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #222;
+  }
+  .slides-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+  .slide-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .slide-num {
+    color: #444;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* SLIDE = 270px preview of 1080×1080 (25% scale) */
+  .slide {
+    width: 270px;
+    height: 270px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+    font-family: Impact, "Arial Narrow", "Haettenschweiler", Arial, sans-serif;
+  }
+
+  /* ── CAPA (slide 1) ── navy, headline grande */
+  .slide-capa {
+    background: #0C1A38;
+  }
+  .slide-capa::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(145deg, #0C1A38 50%, #1A3060 100%);
+  }
+  .slide-capa .stripe {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #C9A227, #E8C24A, #C9A227);
+    z-index: 10;
+  }
+  .slide-capa .inner {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 22px 24px;
+  }
+  .slide-capa .series-tag {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin-bottom: 10px;
+  }
+  .slide-capa .headline {
+    font-size: 36px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 0.95;
+  }
+  .slide-capa .headline em { color: #C9A227; font-style: normal; }
+  .slide-capa .sub {
+    margin-top: 10px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 9px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.5;
+  }
+  .slide-capa .swipe-hint {
+    position: absolute;
+    bottom: 14px;
+    right: 16px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.25);
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: 0.08em;
+  }
+  .slide-capa .logo {
+    position: absolute;
+    bottom: 14px;
+    left: 16px;
+    font-size: 8px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+  }
+
+  /* ── PASSO (slides 2–N) ── fundo branco/claro, header navy */
+  .slide-passo {
+    background: #F5F2EC;
+  }
+  .slide-passo .header {
+    background: #0C1A38;
+    padding: 10px 16px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .slide-passo .step-label {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #C9A227;
+  }
+  .slide-passo .step-progress {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 8px;
+    color: rgba(255,255,255,0.3);
+    font-variant-numeric: tabular-nums;
+  }
+  .slide-passo .step-title {
+    font-size: 18px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1.0;
+    margin-top: 4px;
+  }
+  .slide-passo .body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .step-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .step-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #C9A227;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: #0C1A38;
+    margin-top: 1px;
+  }
+  .step-dot.done {
+    background: #1A3060;
+    color: #C9A227;
+  }
+  .step-text {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 10px;
+    color: #1B1F2E;
+    line-height: 1.45;
+  }
+  .step-text strong { font-weight: 700; color: #0C1A38; }
+
+  /* Screen mockup inside step */
+  .screen-mock {
+    background: #0C1A38;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-top: 4px;
+  }
+  .screen-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .screen-row:last-child { border-bottom: none; }
+  .screen-avatar {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: rgba(201,162,39,0.3);
+    flex-shrink: 0;
+  }
+  .screen-name {
+    font-size: 8px;
+    color: rgba(255,255,255,0.7);
+    flex: 1;
+  }
+  .screen-badge {
+    font-size: 7px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(74,222,128,0.15);
+    color: #4ade80;
+  }
+  .screen-badge.out {
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+  }
+
+  /* ── CTA (último slide) ── navy, call to action */
+  .slide-cta {
+    background: #0C1A38;
+  }
+  .slide-cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 70%, #1A3060 0%, #0C1A38 60%);
+  }
+  .slide-cta .stripe {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #C9A227, #E8C24A, #C9A227);
+    z-index: 10;
+  }
+  .slide-cta .inner {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 22px;
+  }
+  .slide-cta .cta-eyebrow {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #C9A227;
+    margin-bottom: 10px;
+  }
+  .slide-cta .cta-headline {
+    font-size: 28px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1.0;
+    margin-bottom: 14px;
+  }
+  .slide-cta .cta-btn {
+    background: #C9A227;
+    color: #0C1A38;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 2px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    margin-bottom: 12px;
+  }
+  .slide-cta .cta-url {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 8px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<div class="guide">
+  <strong>Template de Carrossel · Série A — "Como confirmar presença no Convocados"</strong><br>
+  Cada slide = 1080×1080 px (exibido a 25% para preview). Duplique a série para novos temas — troque apenas os textos dos slides de passo.<br>
+  Temas prontos para reutilizar: <code>Mensalidade</code> · <code>Sorteio de times</code> · <code>Criar campeonato</code> · <code>Lançar PIX</code>
+</div>
+
+<div class="series-label">Série A — Como confirmar presença (6 slides)</div>
+<div class="slides-row">
+
+  <!-- CAPA -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 1 · Capa</div>
+    <div class="slide slide-capa">
+      <div class="stripe"></div>
+      <div class="inner">
+        <div class="series-tag">Passo a passo · Confirmação</div>
+        <div class="headline">Como<br>organizar<br>o <em>racha</em><br>em 3 min.</div>
+        <div class="sub">Do convite à lista de confirmados — tudo dentro do Convocados.</div>
+      </div>
+      <div class="logo">CONVOCADOS</div>
+      <div class="swipe-hint">Arraste →</div>
+    </div>
+  </div>
+
+  <!-- PASSO 1 -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 2 · Passo 1</div>
+    <div class="slide slide-passo">
+      <div class="header">
+        <div>
+          <div class="step-label">Passo 1 de 4</div>
+          <div class="step-title">Abra<br>o app</div>
+        </div>
+        <div class="step-progress">2/6</div>
+      </div>
+      <div class="body">
+        <div class="step-item">
+          <div class="step-dot">1</div>
+          <div class="step-text">Baixe o <strong>Convocados</strong> e entre com seu número de celular.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">2</div>
+          <div class="step-text">Na tela inicial você verá <strong>o próximo jogo</strong> do seu clube.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">3</div>
+          <div class="step-text">Toque em <strong>"Confirmar presença"</strong> — leva menos de 1 segundo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSO 2 -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 3 · Passo 2</div>
+    <div class="slide slide-passo">
+      <div class="header">
+        <div>
+          <div class="step-label">Passo 2 de 4</div>
+          <div class="step-title">Veja quem<br>confirmou</div>
+        </div>
+        <div class="step-progress">3/6</div>
+      </div>
+      <div class="body">
+        <div class="step-item">
+          <div class="step-dot done">✓</div>
+          <div class="step-text">A <strong>lista de convocados</strong> atualiza em tempo real para todos.</div>
+        </div>
+        <div class="screen-mock">
+          <div class="screen-row"><div class="screen-avatar"></div><div class="screen-name">Carlos Henrique</div><div class="screen-badge">✓ Vai</div></div>
+          <div class="screen-row"><div class="screen-avatar"></div><div class="screen-name">Rodrigo Silva</div><div class="screen-badge">✓ Vai</div></div>
+          <div class="screen-row"><div class="screen-avatar"></div><div class="screen-name">Thiago Alves</div><div class="screen-badge out">✗ Não vai</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSO 3 -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 4 · Passo 3</div>
+    <div class="slide slide-passo">
+      <div class="header">
+        <div>
+          <div class="step-label">Passo 3 de 4</div>
+          <div class="step-title">Admin<br>sorteia os<br>times</div>
+        </div>
+        <div class="step-progress">4/6</div>
+      </div>
+      <div class="body">
+        <div class="step-item">
+          <div class="step-dot">1</div>
+          <div class="step-text">O admin toca em <strong>"Sortear times"</strong> com os confirmados.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">2</div>
+          <div class="step-text">O app usa a <strong>nota média de cada jogador</strong> para equilibrar os times automaticamente.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">3</div>
+          <div class="step-text">Resultado enviado via <strong>push notification</strong> — todo mundo já sabe o time antes de chegar.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSO 4 -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 5 · Passo 4</div>
+    <div class="slide slide-passo">
+      <div class="header">
+        <div>
+          <div class="step-label">Passo 4 de 4</div>
+          <div class="step-title">Compartilha<br>e joga</div>
+        </div>
+        <div class="step-progress">5/6</div>
+      </div>
+      <div class="body">
+        <div class="step-item">
+          <div class="step-dot">1</div>
+          <div class="step-text">Toque em <strong>"Compartilhar"</strong> para mandar os times no grupo.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">2</div>
+          <div class="step-text">O texto já vem formatado com nomes, posições e <strong>assinatura do Convocados</strong>.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-dot">3</div>
+          <div class="step-text"><strong>Pronto.</strong> Vai jogar.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="slide-wrap">
+    <div class="slide-num">Slide 6 · CTA</div>
+    <div class="slide slide-cta">
+      <div class="stripe"></div>
+      <div class="inner">
+        <div class="cta-eyebrow">Baixe grátis</div>
+        <div class="cta-headline">Seu racha<br>organizado<br>hoje.</div>
+        <div class="cta-btn">Baixar o Convocados</div>
+        <div class="cta-url">convocados.app.br</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="guide" style="margin-top: 0;">
+  <strong>Como duplicar para outro tema:</strong><br>
+  1. Troque o texto da <code>Capa</code> → novo problema ("Como lançar uma mensalidade")<br>
+  2. Atualize os <code>Passos 1–4</code> com o novo fluxo<br>
+  3. O slide de CTA é sempre o mesmo — não precisa mudar
+</div>
+
+</body>
+</html>
