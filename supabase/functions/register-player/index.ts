@@ -17,6 +17,46 @@ const TECHNICAL_EMAIL_DOMAIN = "harmonia.app";
 // Limite de membros do plano GRÁTIS (clube Pro é ilimitado). Server-side.
 const FREE_MEMBER_LIMIT = 25;
 
+// Rate-limit por IP: no máx RL_MAX cadastros por IP dentro de RL_WINDOW_MIN.
+// Generoso o bastante para não pegar rajada legítima (rede/NAT compartilhado de
+// carrier pega vários usuários no mesmo IP), apertado para matar criação em massa.
+const RL_WINDOW_MIN = 60;
+const RL_MAX = 30;
+
+// IP do cliente. Edge Function atrás de proxy: o real vem no x-forwarded-for
+// (primeiro da lista); cf-connecting-ip como reforço.
+function clientIp(req: Request): string {
+  const xff = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return xff || req.headers.get("cf-connecting-ip") || "unknown";
+}
+
+// TRUE quando o IP estourou o teto na janela → a chamada deve ser barrada (429).
+// FAIL-OPEN: qualquer erro de infra (tabela ausente, leitura falha) NUNCA bloqueia
+// um cadastro legítimo — só loga. Ordem de deploy (migration antes/depois) não
+// quebra nada. Também mitiga o oráculo de telefone: sem sondar rápido, sem enumerar.
+// deno-lint-ignore no-explicit-any
+async function isRateLimited(admin: any, ip: string): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - RL_WINDOW_MIN * 60_000).toISOString();
+    const { count, error } = await admin
+      .from("register_rate_limit")
+      .select("id", { count: "exact", head: true })
+      .eq("ip", ip).gte("created_at", since);
+    if (error) { console.warn("[register] rate-limit read:", error.message); return false; }
+    if ((count || 0) >= RL_MAX) return true;
+    await admin.from("register_rate_limit").insert({ ip });
+    // Limpeza oportunista (~5% das chamadas): remove tentativas com +1 dia.
+    if (Math.random() < 0.05) {
+      const old = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+      await admin.from("register_rate_limit").delete().lt("created_at", old);
+    }
+    return false;
+  } catch (err) {
+    console.warn("[register] rate-limit:", String(err));
+    return false;
+  }
+}
+
 // Avisa os admins (push) que caiu um auto-cadastro aguardando aprovação.
 // Best-effort: qualquer falha aqui NÃO quebra o cadastro. Reusa os secrets VAPID
 // já configurados para a função send-push.
@@ -161,6 +201,13 @@ Deno.serve(async (req) => {
   }
   if (clubMode === "join" && inviteCode.length < 4) {
     return json({ ok: false, error: "missing_invite_code", message: "Informe o código do clube." });
+  }
+
+  // --- Rate-limit por IP (antes de qualquer leitura/escrita real). Freia criação
+  // em massa de contas/clubes e enumeração de telefones. Passa só depois da
+  // validação de input, para erros de formulário não queimarem a cota. ---
+  if (await isRateLimited(admin, clientIp(req))) {
+    return json({ ok: false, error: "rate_limited", message: "Muitas tentativas deste dispositivo. Aguarde alguns minutos e tente de novo." }, 429);
   }
 
   // --- 1) Telefone duplicado? (MVP: telefone é GLOBAL = 1 conta = 1 clube) ---
