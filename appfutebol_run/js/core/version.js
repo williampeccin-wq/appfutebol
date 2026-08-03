@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.169.0-audit-lote1-xss-uniforme-storage';
+export const APP_VERSION = 'v1.170.0-fix-presenca-club-id-rls';

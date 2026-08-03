@@ -765,6 +765,20 @@ async function upsertRow(config, table, payload, onConflict = null) {
 
 async function upsertPresenceConfirmation(config, confirmation, now, gameKey) {
   const payload = presencePayloadFromConfirmation(confirmation, now, gameKey);
+
+  // Carimba club_id para a RLS RESTRICTIVE tenant_isolation_presence
+  // (with_check: club_id = ANY(current_club_ids())). SEM isto, o INSERT cai no
+  // DEFAULT do schema (clube legado), current_club_ids() do usuário não inclui
+  // esse clube e o servidor rejeita com 403 — presença não salva em NENHUM clube
+  // novo (só no clube legado o default batia). É o MESMO fix já aplicado a
+  // players em buildGranularOperations (INCIDENTE 26/07); presence_confirmations
+  // tinha ficado de fora. Só no multi-tenant (key != 'default'); no single-tenant
+  // a coluna não é carimbada.
+  const clubKeyParaRls = currentClubKey(config);
+  if (clubKeyParaRls && clubKeyParaRls !== (config.stateKey || 'default')) {
+    payload.club_id = clubKeyParaRls;
+  }
+
   const result = await upsertRow(config, SPLIT_TABLES.presence, payload, 'game_key,player_id');
 
   if (!result.ok) {
