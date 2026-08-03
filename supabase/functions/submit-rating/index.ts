@@ -30,13 +30,6 @@ function corsHeaders(req: Request): Record<string, string> {
   return h;
 }
 
-// Início do jogo em ms (UTC) a partir de data+hora locais (BRT, -03:00).
-function gameStartMs(date: string, time: string): number {
-  const d = String(date || "").slice(0, 10);
-  const t = String(time || "").slice(0, 5);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{2}:\d{2}$/.test(t)) return NaN;
-  return Date.parse(`${d}T${t}:00-03:00`);
-}
 function churrascoOpenMs(date: string): number {
   const d = String(date || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return NaN;
@@ -123,9 +116,19 @@ Deno.serve(async (req) => {
   let confirmedIds: Set<string> | null = null;
   if (kind === "desempenho") {
     const perfHours = Number(settings.ratings_perf_window_hours) || 0;
-    const start = gameStartMs(String(game.game_date || ""), String(game.game_time || ""));
-    if (!start || perfHours <= 0) return json({ ok: false, error: "voting_closed" }, 403);
-    const open = start + 3600_000;
+    if (perfHours <= 0) return json({ ok: false, error: "voting_closed" }, 403);
+    const gameDate = String(game.game_date || "").slice(0, 10);
+    if (!gameDate) return json({ ok: false, error: "voting_closed" }, 403);
+    // Janela abre quando o admin LANÇA o resultado — espelha getPerfWindow() no cliente.
+    const active = ((data.championship || {}) as Record<string, unknown>).active as Record<string, unknown> | null;
+    const results = Array.isArray(active?.results) ? active!.results as Array<Record<string, unknown>> : [];
+    const resultMs = results
+      .filter((r) => String(r?.date || "").slice(0, 10) === gameDate)
+      .map((r) => Date.parse(String(r?.created_at || "")))
+      .filter((ms) => Number.isFinite(ms))
+      .sort((a, b) => b - a)[0];
+    if (!resultMs) return json({ ok: false, error: "voting_closed" }, 403);
+    const open = resultMs;
     const close = open + perfHours * 3600_000;
     if (nowMs < open || nowMs > close) return json({ ok: false, error: "voting_closed" }, 403);
     // Quem jogou (confirmado neste jogo). Aceita os dois formatos de confirmação
