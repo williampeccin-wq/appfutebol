@@ -59,71 +59,58 @@ técnica que atrapalha qualquer mudança futura.
 
 ## 4. Plano priorizado
 
-### Seguro agora (no-op / additivo) — ✅ feito ou pode rodar a qualquer momento
-- [x] Versionar `harmonia_is_own_player_id` (migration criada; rodar é no-op).
-- [ ] Escrever a migration que versiona as permissivas `harmonia_presence_*` que estão
-      só na prod (DROP IF EXISTS + CREATE, dentro de transação = atômico e no-op contra
-      prod). SQL abaixo, pronto. Torna o repo capaz de reproduzir a presença funcional.
+### Seguro / baixo risco — migrations AUTORADAS (aplicar quando quiser)
+- [x] **Versionar `harmonia_is_own_player_id`** → `20260803000000_version_harmonia_is_own_player_id.sql`
+      (no-op contra prod).
+- [x] **Versionar as permissivas `harmonia_presence_*`** → `20260803020000_version_presence_permissives.sql`
+      (no-op contra prod; torna o repo capaz de reproduzir a presença funcional).
+- [x] **L2 — revogar `grant all to anon`** em finance_entries/finance_public
+      (confirmado presente nas migrations 20260717; RLS já barra anon, é defesa em
+      profundidade) → em `20260803030000_lote2_hardening.sql`.
+- [x] **Dropar tabelas mortas** `confirmations` + `app_state` (0 linhas, sem
+      tenant_isolation, nenhum caminho de código as usa — verificado) → mesmo arquivo
+      `20260803030000_lote2_hardening.sql`.
 
-```sql
--- [SEGURO/idempotente] versiona as permissivas de presence_confirmations.
--- begin/commit obrigatório: mantém o DROP+CREATE atômico (sem janela em que a
--- policy some durante uso ativo). Rodar como um bloco único.
-begin;
+> **Como aplicar:** `supabase db push` (aplica as migrations novas em ordem) OU colar
+> cada arquivo no SQL Editor. As de versionamento são no-op; a de hardening muda prod
+> (baixo risco). Testar presença + um fluxo de admin logo depois.
 
-drop policy if exists harmonia_presence_read_authenticated on public.presence_confirmations;
-create policy harmonia_presence_read_authenticated on public.presence_confirmations
-  for select to authenticated using (true);
-
-drop policy if exists harmonia_presence_insert_admin_or_self on public.presence_confirmations;
-create policy harmonia_presence_insert_admin_or_self on public.presence_confirmations
-  for insert to authenticated
-  with check (harmonia_is_admin() or harmonia_is_own_player_id(player_id));
-
-drop policy if exists harmonia_presence_update_admin_or_self on public.presence_confirmations;
-create policy harmonia_presence_update_admin_or_self on public.presence_confirmations
-  for update to authenticated
-  using      (harmonia_is_admin() or harmonia_is_own_player_id(player_id))
-  with check (harmonia_is_admin() or harmonia_is_own_player_id(player_id));
-
-drop policy if exists harmonia_presence_delete_admin_or_self on public.presence_confirmations;
-create policy harmonia_presence_delete_admin_or_self on public.presence_confirmations
-  for delete to authenticated
-  using (harmonia_is_admin() or harmonia_is_own_player_id(player_id));
-
-commit;
+### Captura COMPLETA de reprodutibilidade (recomendado) — `supabase db pull`
+Em vez de transcrever à mão todas as ~60 policies (propenso a erro), a forma correta de
+fechar "o repo reproduz o banco" é o CLI (já instalado, 2.101.0):
+```bash
+supabase link --project-ref nwsnakzttmvuyejbfzom   # pede a senha do DB (você digita)
+supabase db pull                                    # gera migration com o schema vivo
 ```
+Isso versiona fielmente TODO o schema atual (policies, funções, triggers, grants) numa
+migration única — inclusive as ~30 policies órfãs da geração antiga. Revisar o diff antes
+de commitar.
 
-### [REVISAR — pós-janela de teste] muda produção
+### [REVISAR — pós-janela / go-live] muda produção, exige cuidado
 
-**4a. Dropar tabelas mortas** (0 linhas, não criadas por migration, não usadas pelo app —
-o app usa `presence_confirmations` e `app_meta`/`game_state`). Remove o landmine de
-vazamento entre clubes de vez:
+**Deduplicar policies (3 gerações).** Manter UMA geração por comando (a `harmonia_*_admin_or_self`,
+mais correta) e dropar as outras duas. ⚠️ **Verificar equivalência policy a policy antes de
+dropar** — permissivas se somam (OR), dropar a errada remove acesso legítimo. Banco calmo +
+testar admin/não-admin logo após. Melhor DEPOIS do `db pull` (para ter o baseline fiel).
 
-```sql
--- [REVISAR] tabelas legadas vazias
-drop table if exists public.confirmations;
-drop table if exists public.app_state;
-```
+**M2 — activity_log.** INSERT com `with check(true)` deixa qualquer autenticado forjar
+club_id/player_id/name. **Risco real hoje: BAIXO** — a tabela **não tem policy de SELECT**,
+então ninguém lê via API (só você, via dashboard/service_role); o único risco é poluição por
+inserção forjada, não vazamento de PII. É telemetria **temporária** (app_open/tab, ver
+`js/services/activity-log.js`). Plano correto: **REMOVER o tracking do cliente antes do
+go-live** (não agora — perde a visibilidade dos testadores no piloto).
 
-**4b. Deduplicar policies** — manter UMA geração por comando (a `harmonia_*_admin_or_self`,
-mais correta) e dropar as outras duas. ⚠️ **Verificar equivalência policy a policy antes
-de dropar** (garantir que a permissiva mantida cobre o caso de uso); permissivas se somam,
-então dropar a errada pode remover acesso legítimo. Fazer com o banco calmo e testar
-escrita/leitura de admin e de não-admin logo após.
+**Defesa em profundidade (opcional).** Espelhar o anti-escalada de `is_admin` no `with_check`
+das policies de `players` (hoje só nos triggers). Só robustez — não fecha buraco explorável.
 
-**4c. Defesa em profundidade (opcional, baixa prioridade):** espelhar o invariante
-anti-escalada de `is_admin` no `with_check` das policies de `players` (hoje só nos
-triggers). Só robustez — não fecha buraco explorável.
-
-## 5. Fora do escopo desta auditoria (verificar depois)
-- Grants a `anon` em finance_entries/finance_public (auditoria L2/L3/L4) — checar
-  `information_schema.role_table_grants` (as *policies* são todas `{authenticated}`, mas
-  grants são camada separada da RLS).
+## 5. Verificado / sem ação necessária
+- **L3** (RESTRICTIVE só `to authenticated`) — fica **subsumido pelo L2**: revogado o grant
+  anon, o anon nem alcança a tabela; ampliar a RESTRICTIVE para `public` seria redundante.
+- **L4** (comentário enganoso em finance_public) — cosmético; finance_public carrega
+  player_id/devedores por design (PII intra-clube), protegido por tenant_isolation + admin.
 - `ratings`/`pix_receipts`/`push_log` têm **só** a RESTRICTIVE, sem permissiva → travadas
-  para `authenticated`. OK **se** só forem escritas por Edge Function (service_role) e não
-  lidas direto pelo cliente. Confirmar que nenhum caminho do cliente lê/escreve essas
-  tabelas diretamente (o esperado: ratings/pix vão no blob; push_log é server-side).
+  para `authenticated`. OK: são escritas por Edge Function (service_role, ignora RLS) e não
+  lidas direto pelo cliente (ratings/pix vão no blob; push_log é server-side). Sem ação.
 
 ---
 Relacionado: `migrations/20260711000000_multitenant_p2_rls.sql`, memória `[[club-id-stamp-rls]]`.
