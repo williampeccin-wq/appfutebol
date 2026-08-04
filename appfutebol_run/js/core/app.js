@@ -2355,7 +2355,7 @@ import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/c
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
-import { getMensalidadeMode, MENSALIDADE_MODES } from "../domain/rules.engine.js";
+import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
@@ -3905,7 +3905,12 @@ function bindAppEvents(currentPlayer) {
       const mensBeneficiary = String(formData.get('mens_beneficiary') || '').trim();
       const goalkeepersPay = formData.get('goalkeepers_pay') === 'on';
       const next = structuredClone(getState());
+      const oldExpireDate = String(next.settings?.mens_expire_date || '').slice(0, 10);
       next.settings = { ...(next.settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary, goalkeepers_pay: goalkeepersPay };
+      // Nova data de vencimento = novo período de cobrança: zera mens_ok de todos.
+      if (mensExpireDate && mensExpireDate !== oldExpireDate) {
+        (next.players || []).forEach((p) => { p.mens_ok = false; });
+      }
       // Aplica em massa: liga/desliga a cobrança em TODOS os goleiros atuais
       // (exceção individual continua possível pelo checkbox na edição do jogador).
       (next.players || []).forEach((p) => {
@@ -3919,7 +3924,8 @@ function bindAppEvents(currentPlayer) {
       savePersistedState(safeSnapshot);
       render(safeSnapshot);
       const modeLabel = mensMode === MENSALIDADE_MODES.TOTAL ? 'Bloqueio total' : mensMode === MENSALIDADE_MODES.PARTIAL ? 'Bloqueio parcial' : 'Sem bloqueio';
-      showToast(`Mensalidade salva. Regra: ${modeLabel}.`);
+      const resetMsg = (mensExpireDate && mensExpireDate !== oldExpireDate) ? ' Todos ficaram pendentes para o novo período.' : '';
+      showToast(`Mensalidade salva. Regra: ${modeLabel}.${resetMsg}`);
     });
   }
 
@@ -4401,10 +4407,10 @@ function renderProfilePanel(activePlayer) {
       <div class="profile-view-rows">
         <div class="profile-view-row"><span>Telefone</span><strong>${escapeHtml(formatPhone(activePlayer.phone || '')) || '—'}</strong></div>
         <div class="profile-view-row"><span>Nascimento</span><strong>${(() => { const m = String(activePlayer.birthDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : (escapeHtml(activePlayer.birthDate || '') || '—'); })()}</strong></div>
-        ${carneOnly ? '' : `<div class="profile-view-row"><span>Mensalidade</span><strong class="tag ${activePlayer.mens_ok ? 'is-ok' : 'is-warn'}">${activePlayer.mens_ok ? 'Em dia' : 'Pendente'}</strong></div>`}
+        ${carneOnly ? '' : `<div class="profile-view-row"><span>Mensalidade</span><strong class="tag ${isMensOkEffective(activePlayer, game) ? 'is-ok' : 'is-warn'}">${isMensOkEffective(activePlayer, game) ? 'Em dia' : 'Pendente'}</strong></div>`}
       </div>
 
-      ${(!carneOnly && activePlayer.mens_ok !== true) ? `
+      ${(!carneOnly && !isMensOkEffective(activePlayer, game)) ? `
         <div class="self-pix-block">
           ${activePlayer.mens_review ? `
             <p class="footer-note">📨 Comprovante enviado — aguardando o administrador confirmar.</p>
@@ -4610,9 +4616,10 @@ function buildPaymentsShareText(snapshot) {
   const players = (snapshot.players || [])
     .filter((player) => player && player.plays_football !== false && player.role !== 'carne')
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'));
-  const unpaid = players.filter((player) => player.mens_ok !== true);
-  const paid = players.filter((player) => player.mens_ok === true);
   const due = String(snapshot.settings?.mens_expire_date || '').slice(0, 10);
+  const sharePeriodGame = { mens_expire_date: due };
+  const unpaid = players.filter((player) => !isMensOkEffective(player, sharePeriodGame));
+  const paid = players.filter((player) => isMensOkEffective(player, sharePeriodGame));
   const list = (arr) => (arr.length ? arr.map((player, index) => `${index + 1}. ${player.name}`).join('\n') : '—');
 
   return [
@@ -4817,7 +4824,7 @@ function renderPresenceList(snapshot, currentPlayer) {
         </div>
       </div>
       <div class="weekly-player-meta">
-        <span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>
+        <span class="tag ${isMensOkEffective(player, game) ? 'is-ok' : 'is-warn'}">${isMensOkEffective(player, game) ? 'Pago' : 'Pendente'}</span>
         ${adminMode ? `
           <button
             class="switch-control switch-control-inline ${confirmed ? 'is-on' : 'is-off'}"
@@ -5553,7 +5560,7 @@ function buildMensalidadeMeta(game, currentPlayer, mode = MENSALIDADE_MODES.NONE
     };
   }
 
-  if (currentPlayer.mens_ok !== true) {
+  if (!isMensOkEffective(currentPlayer, game)) {
     // A consequência da pendência depende da regra do clube (modo).
     let consequence;
     if (mode === MENSALIDADE_MODES.TOTAL) {
