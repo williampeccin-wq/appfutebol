@@ -43,6 +43,13 @@ export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateStri
   return String(referenceDate) > dueDate;
 }
 
+// Um pagamento registrado num período anterior não vale para o período atual.
+// Retorna false quando o vencimento já passou, independente de mens_ok ser true.
+export function isMensOkEffective(player, game) {
+  if (!player?.mens_ok) return false;
+  return !isAfterMensalidadeDueDate(game);
+}
+
 // Bloqueia a CONFIRMAÇÃO de presença de inadimplente. Vale tanto no modo
 // 'partial' quanto 'total' (ambos impedem inadimplente de confirmar). No modo
 // 'none' nunca bloqueia.

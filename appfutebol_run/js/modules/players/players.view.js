@@ -17,19 +17,20 @@ import { getCachedRatings, duoRatingAverages } from '../../services/ratings.serv
 import { isVotingEnabled } from '../../core/flags.js';
 import { isMensalidadeExempt } from '../../domain/authz.js';
 import { isPro } from '../../domain/gating.js';
+import { isMensOkEffective } from '../../domain/rules.engine.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
 }
 
-function isFinancePending(player) {
-  return !isMensalidadeExempt(player) && !player?.mens_ok;
+function isFinancePending(player, game) {
+  return !isMensalidadeExempt(player) && !isMensOkEffective(player, game);
 }
 
-function renderFinanceControls(player, currentPlayer) {
+function renderFinanceControls(player, currentPlayer, game) {
   if (isMensalidadeExempt(player)) return '<span class="switch-placeholder">—</span>';
 
-  const isPaid = !isFinancePending(player);
+  const isPaid = !isFinancePending(player, game);
   const action = isPaid ? 'mark-debt' : 'mark-paid';
   const label = isPaid ? 'Pago' : 'Pendente';
 
@@ -209,10 +210,11 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   // garantir que todos sejam editáveis aqui na aba Jogadores.
   const carneOnly = activePlayers.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isMensalidadeExempt(player));
-  const emDia = jogadoresFinanceiros.filter((player) => !!player.mens_ok).length;
-  const pendentes = jogadoresFinanceiros.filter((player) => !player.mens_ok).length;
-  const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
   const mensDue = String(snapshot?.settings?.mens_expire_date || '').slice(0, 10);
+  const periodGame = { mens_expire_date: mensDue };
+  const emDia = jogadoresFinanceiros.filter((player) => isMensOkEffective(player, periodGame)).length;
+  const pendentes = jogadoresFinanceiros.filter((player) => !isMensOkEffective(player, periodGame)).length;
+  const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
   const mensDueLabel = mensDue ? mensDue.split('-').reverse().join('/') : 'não definido';
 
   return `
@@ -676,6 +678,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   const carneOnly = isCarneOnly(player);
   const access = admin ? (player.auth_user_id ? 'Acesso criado' : 'Sem acesso') : '';
   const subtitle = `${carneOnly ? 'Somente churrasco' : getPositionLabel(player.position)}${access ? ` · ${access}` : ''}`;
+  const rowPeriodGame = { mens_expire_date: String(snapshot?.settings?.mens_expire_date || '').slice(0, 10) };
 
   return `
     <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
@@ -687,7 +690,7 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
         </div>
       </div>
       <div class="player-compact-right">
-        ${carneOnly ? '' : renderFinanceControls(player, currentPlayer)}
+        ${carneOnly ? '' : renderFinanceControls(player, currentPlayer, rowPeriodGame)}
         ${admin ? `
           <div class="carne-edit-actions">
             <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar" aria-label="Editar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
