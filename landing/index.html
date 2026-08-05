@@ -409,6 +409,13 @@ a { color: inherit; text-decoration: none; }
 .feature-badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; align-self: flex-start; }
 .badge-free { background: rgba(13,31,60,0.07); color: var(--navy); }
 .badge-pro  { background: rgba(240,165,0,0.14); color: #7a5a00; }
+.feat-block { margin-top: 48px; }
+.feat-block-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.feat-block-badge { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 4px; }
+.feat-block-label { font-size: 14px; color: var(--muted); }
+.feat-price-anchor { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--navy-mid); font-variant-numeric: tabular-nums; }
+.feat-block-pro { background: rgba(13,31,60,0.038); border-radius: 12px; padding: 32px 32px 40px; margin-top: 64px; }
+.feature-card-pro { border-top: 2px solid rgba(240,165,0,0.4); }
 
 /* ── HOW ── */
 .how { background: var(--navy); padding: 100px 0; }
@@ -610,63 +617,164 @@ a { color: inherit; text-decoration: none; }
   <div class="container">
     <div class="section-eyebrow">O app</div>
     <h2 class="section-title" style="color:var(--navy)">Tudo que<br>seu clube<br>precisa.</h2>
-    <p class="section-sub" style="color:var(--muted);margin-bottom:48px">Sem planilha, sem grupo de WhatsApp caótico. Um app feito do jeito certo para o futebol amador.</p>
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon-wrap">✅</div>
-        <div class="feature-title">Confirmação de presença</div>
-        <div class="feature-desc">Um toque e o jogador confirma. Você vê a lista em tempo real — sem perguntar no grupo.</div>
-        <span class="feature-badge badge-free">Grátis</span>
+    <p class="section-sub" style="color:var(--muted);margin-bottom:48px">Sem planilha, sem grupo de WhatsApp caótico. Um app feito para o futebol amador de verdade.</p>
+
+    <!-- ── GRÁTIS ── -->
+    <div class="feat-block">
+      <div class="feat-block-head">
+        <span class="feat-block-badge badge-free">Grátis</span>
+        <span class="feat-block-label">Disponível para todo clube que começar</span>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">💳</div>
-        <div class="feature-title">Carnê digital</div>
-        <div class="feature-desc">Cada membro tem seu carnê. Quem pagou, quem deve e quanto — sem constrangimento, sem esquecimento.</div>
-        <span class="feature-badge badge-free">Grátis</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">🤖</div>
-        <div class="feature-title">PIX com IA</div>
-        <div class="feature-desc">O membro tira foto do comprovante, a IA lê o valor e a data, e o mês já aparece como pago. Zero digitação.</div>
-        <span class="feature-badge badge-pro">Pro</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">⚖️</div>
-        <div class="feature-title">Sorteio inteligente</div>
-        <div class="feature-desc">Times sorteados pela nota média de cada jogador. Os melhores distribuídos automaticamente. Ninguém reclama mais.</div>
-        <span class="feature-badge badge-free">Grátis</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">🏆</div>
-        <div class="feature-title">Campeonato</div>
-        <div class="feature-desc">Crie fases, registre placares e acompanhe a tabela. Tudo dentro do app, sem planilha.</div>
-        <span class="feature-badge badge-pro">Pro</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">🔔</div>
-        <div class="feature-title">Push notification</div>
-        <div class="feature-desc">Aviso automático do jogo direto no celular de todos os membros. Ninguém esquece o horário.</div>
-        <span class="feature-badge badge-free">Grátis</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">📊</div>
-        <div class="feature-title">Despesas e receitas</div>
-        <div class="feature-desc">Registre entradas e saídas do clube. Saiba exatamente quanto tem no caixa — sem planilha, sem confusão no grupo.</div>
-        <span class="feature-badge badge-pro">Pro</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">⭐</div>
-        <div class="feature-title">Avaliação de desempenho</div>
-        <div class="feature-desc">Após cada jogo, avalie o desempenho de cada jogador. A nota alimenta o sorteio inteligente e mantém o ranking atualizado.</div>
-        <span class="feature-badge badge-free">Grátis</span>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon-wrap">🍖</div>
-        <div class="feature-title">Avaliação do churrasco</div>
-        <div class="feature-desc">O mais importante do futebol amador. Avalie o churrasco pós-jogo e descubra de uma vez quem manda de verdade na grelha.</div>
-        <span class="feature-badge badge-free">Grátis</span>
+      <div class="features-grid">
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">📋</div>
+          <div class="feature-title">Confirmação de presença</div>
+          <div class="feature-desc">Um toque e o jogador confirma. Você vê a lista em tempo real — sem ficar perguntando no grupo.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">⏳</div>
+          <div class="feature-title">Fila de espera automática</div>
+          <div class="feature-desc">Lista lotou? Quem desistir libera a vaga automaticamente para o próximo da fila. Sem você precisar controlar nada.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🤝</div>
+          <div class="feature-title">Convidados e goleiro avulso</div>
+          <div class="feature-desc">Adicione quem não é membro fixo sem burocracia. Convidado e goleiro de aluguel entram no jogo sem precisar de cadastro.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">💬</div>
+          <div class="feature-title">Compartilhar lista e times</div>
+          <div class="feature-desc">Com a lista fechada, manda tudo pro grupo em um toque: quem vai, quem ficou na fila e os times sorteados.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🔔</div>
+          <div class="feature-title">Notificações automáticas</div>
+          <div class="feature-desc">Todo membro recebe push quando as inscrições abrem e quando os times saem. Ninguém fica de fora por não ter visto a mensagem.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">⚖️</div>
+          <div class="feature-title">Sorteio por posição</div>
+          <div class="feature-desc">Times montados respeitando goleiros, zagueiros e atacantes. Ninguém fica com quatro goleiros num lado só.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">⭐</div>
+          <div class="feature-title">Avaliação de desempenho</div>
+          <div class="feature-desc">Após cada jogo, os membros se avaliam. A nota fica no perfil de cada jogador e alimenta o ranking do clube.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🍖</div>
+          <div class="feature-title">Avaliação do churrasco</div>
+          <div class="feature-desc">Notas anônimas para o churrasco pós-jogo. Descubra de uma vez quem manda na grelha — e quem nunca deveria chegar perto.</div>
+          <span class="feature-badge badge-free">Grátis</span>
+        </div>
+
       </div>
     </div>
+
+    <!-- ── PRO ── -->
+    <div class="feat-block feat-block-pro">
+      <div class="feat-block-head">
+        <span class="feat-block-badge badge-pro">Pro</span>
+        <span class="feat-block-label">Recursos exclusivos para grupos que levam a sério</span>
+        <span class="feat-price-anchor">R$&nbsp;39,90/mês · por clube</span>
+      </div>
+      <div class="features-grid">
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">⏰</div>
+          <div class="feature-title">Abertura automática de Presença</div>
+          <div class="feature-desc">Configure dia e horário fixo. O app abre as inscrições automaticamente a cada jogo — sem você precisar lembrar de entrar.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">🧠</div>
+          <div class="feature-title">Sorteio inteligente por nível</div>
+          <div class="feature-desc">Times montados pela nota média real de cada jogador. Os fortes distribuídos automaticamente — ninguém vai para o lado do monstro sozinho.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">🤖</div>
+          <div class="feature-title">PIX com IA</div>
+          <div class="feature-desc">O membro tira foto do comprovante. A IA lê o valor e a data, e o mês já aparece como pago. Zero digitação, zero confusão.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">💰</div>
+          <div class="feature-title">Gestão de mensalidade</div>
+          <div class="feature-desc">Defina valor e vencimento. Veja quem pagou e quem deve. Bloqueie automaticamente o inadimplente de confirmar presença no jogo.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">📢</div>
+          <div class="feature-title">Lembrete de inadimplência</div>
+          <div class="feature-desc">O app identifica quem está atrasado e manda o lembrete automaticamente. Você não precisa cobrar ninguém pessoalmente.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">📊</div>
+          <div class="feature-title">Livro-caixa do clube</div>
+          <div class="feature-desc">Registre entradas e saídas. Veja o saldo em tempo real. Transparência financeira para todos os admins — sem planilha.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">🏆</div>
+          <div class="feature-title">Campeonato & Rei da Quadra</div>
+          <div class="feature-desc">Crie fases, registre placares e acompanhe a tabela. O Rei da Quadra acumula pontos de campeonato no histórico do clube.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">🍖</div>
+          <div class="feature-title">Rodízio da carne</div>
+          <div class="feature-desc">O app sorteia e organiza as duplas responsáveis pelo churrasco em sistema de rodízio. Ninguém esquece de quem é a vez — e ninguém fica de fora.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">👥</div>
+          <div class="feature-title">Membros ilimitados</div>
+          <div class="feature-desc">O Grátis suporta até 25 membros. No Pro o grupo cresce sem limite — ideal para clubes com lista de espera de entrada.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">🔑</div>
+          <div class="feature-title">Múltiplos administradores</div>
+          <div class="feature-desc">Distribua a gestão entre vários membros. Cada admin pode abrir jogos, gerenciar presenças e acompanhar o financeiro.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+        <div class="feature-card feature-card-pro">
+          <div class="feature-icon-wrap">📅</div>
+          <div class="feature-title">Histórico completo</div>
+          <div class="feature-desc">Todos os jogos, presenças e movimentações financeiras do clube — para sempre. O Grátis guarda apenas os últimos 3 jogos.</div>
+          <span class="feature-badge badge-pro">Pro</span>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </section>
 
