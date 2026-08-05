@@ -417,6 +417,48 @@ a { color: inherit; text-decoration: none; }
 .feat-block-pro { background: rgba(13,31,60,0.038); border-radius: 12px; padding: 32px 32px 40px; margin-top: 64px; }
 .feature-card-pro { border-top: 2px solid rgba(240,165,0,0.4); }
 
+/* ── PRICING ── */
+.pricing { background: var(--navy); padding: 100px 0; }
+.pricing-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 40px rgba(0,0,0,0.4); margin-top: 8px; }
+.pricing-table { width: 100%; min-width: 560px; border-collapse: collapse; }
+col.pc-feat { width: 54%; }
+col.pc-free { width: 20%; }
+col.pc-pro  { width: 26%; }
+.pt-feat-head { background: rgba(255,255,255,0.04); padding: 1.5rem 1.375rem 1.125rem; vertical-align: bottom; }
+.pt-free-head { background: rgba(255,255,255,0.06); padding: 1.5rem 1rem 1.125rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.pt-pro-head  { background: #0a1830; padding: 1.25rem 1rem 1.125rem; text-align: center; border-top: 3px solid var(--gold); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.pt-plan-name  { display: block; font-family: var(--ff-display); font-size: 1.1rem; text-transform: uppercase; color: rgba(255,255,255,0.85); margin-bottom: .2rem; }
+.pt-plan-price { display: block; font-size: 1.625rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; color: rgba(255,255,255,0.9); }
+.pt-plan-mo    { display: block; font-size: .72rem; color: rgba(255,255,255,0.3); margin-top: .2rem; margin-bottom: .15rem; }
+.pt-plan-tag   { display: block; font-size: .75rem; color: rgba(255,255,255,0.3); }
+.pt-badge { display: inline-block; font-size: .6rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; background: var(--gold); color: var(--navy); padding: .2rem .6rem; border-radius: 100px; margin-bottom: .5rem; }
+.pt-cat td { padding: .4rem 1.375rem; font-size: .62rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.pt-cat td:first-child { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.35); }
+.pt-cat td:nth-child(2) { background: rgba(255,255,255,0.03); border-left: 1px solid rgba(255,255,255,0.05); }
+.pt-cat td:nth-child(3) { background: rgba(8,20,48,0.6); border-left: 1px solid rgba(255,255,255,0.04); }
+.pt-row td { padding: .7rem 1.375rem; font-size: .85rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; color: rgba(255,255,255,0.6); }
+.pt-row td:first-child { background: rgba(255,255,255,0.02); }
+.pt-row:nth-child(even) td:first-child { background: rgba(255,255,255,0.04); }
+.pt-row td:nth-child(2) { background: rgba(255,255,255,0.03); text-align: center; border-left: 1px solid rgba(255,255,255,0.05); }
+.pt-row:nth-child(even) td:nth-child(2) { background: rgba(255,255,255,0.05); }
+.pt-row td:nth-child(3) { background: rgba(8,20,48,0.5); text-align: center; border-left: 1px solid rgba(255,255,255,0.04); border-bottom-color: rgba(255,255,255,0.03) !important; }
+.pt-row:nth-child(even) td:nth-child(3) { background: rgba(8,20,48,0.7); }
+.pt-ck    { font-size: .95rem; font-weight: 700; }
+.pt-ck-f  { color: rgba(255,255,255,0.45); }
+.pt-ck-p  { color: var(--gold); }
+.pt-ds    { color: rgba(255,255,255,0.15); font-size: .95rem; }
+.pt-lim   { font-size: .8rem; font-weight: 600; color: rgba(255,255,255,0.4); }
+.pt-val   { font-size: .8rem; font-weight: 700; color: #ffc533; }
+.pt-cta td { padding: 1.25rem 1.375rem 1.5rem; border-bottom: none; }
+.pt-cta td:first-child { background: rgba(255,255,255,0.02); }
+.pt-cta td:nth-child(2) { background: rgba(255,255,255,0.03); border-left: 1px solid rgba(255,255,255,0.05); text-align: center; }
+.pt-cta td:nth-child(3) { background: #0a1830; border-left: 1px solid rgba(255,255,255,0.04); text-align: center; }
+.pt-btn { display: inline-block; width: 100%; padding: .65rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 700; text-align: center; text-decoration: none; transition: filter .15s; }
+.pt-btn:hover { filter: brightness(1.1); }
+.pt-btn-free { border: 1.5px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.6); }
+.pt-btn-pro  { background: var(--gold); color: var(--navy); }
+@media (max-width: 900px) { .pricing { padding: 72px 0; } }
+
 /* ── HOW ── */
 .how { background: var(--navy); padding: 100px 0; }
 .how .section-title { color: #fff; }
@@ -775,6 +817,79 @@ a { color: inherit; text-decoration: none; }
       </div>
     </div>
 
+  </div>
+</section>
+
+<section class="pricing" id="planos">
+  <div class="container">
+    <div class="section-eyebrow">Planos</div>
+    <h2 class="section-title" style="color:#fff">Comece grátis,<br>evolua com<br>o grupo.</h2>
+    <p class="section-sub" style="color:rgba(255,255,255,0.42)">Sem contratos. Cancele a qualquer hora.</p>
+
+    <div class="pricing-wrap">
+      <table class="pricing-table">
+        <colgroup>
+          <col class="pc-feat">
+          <col class="pc-free">
+          <col class="pc-pro">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="pt-feat-head"></th>
+            <th class="pt-free-head">
+              <span class="pt-plan-name">Grátis</span>
+              <span class="pt-plan-price">R$ 0</span>
+              <span class="pt-plan-mo">/mês</span>
+              <span class="pt-plan-tag">Para começar</span>
+            </th>
+            <th class="pt-pro-head">
+              <span class="pt-badge">Mais popular</span>
+              <span class="pt-plan-name" style="color:var(--gold)">Pro</span>
+              <span class="pt-plan-price" style="color:var(--gold)">R$ 39,90</span>
+              <span class="pt-plan-mo">/mês · por clube</span>
+              <span class="pt-plan-tag">Para grupos sérios</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pt-cat"><td>Equipe</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>Membros</td><td><span class="pt-lim">Até 25</span></td><td><span class="pt-val">Ilimitados</span></td></tr>
+          <tr class="pt-row"><td>Administradores</td><td><span class="pt-lim">1</span></td><td><span class="pt-val">Múltiplos</span></td></tr>
+
+          <tr class="pt-cat"><td>Organização de Jogos</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>Criar jogo + confirmação de presença</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Fila de espera automática</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Convidados e goleiro de aluguel</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Compartilhar lista no WhatsApp</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Abertura automática da janela de Presença</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+
+          <tr class="pt-cat"><td>Sorteio de Times</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>Balanceado por posição</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Sorteio inteligente por nível de jogo</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+
+          <tr class="pt-cat"><td>Financeiro</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>PIX automático com leitura por IA</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Gestão de mensalidade: valor, vencimento e bloqueio</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Lembrete automático de inadimplência</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Livro-caixa do clube: entradas, saídas e saldo</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+
+          <tr class="pt-cat"><td>Campeonato &amp; Diversão</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>Campeonato &amp; Rei da Quadra</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Avaliações de desempenho</td><td><span class="pt-ck pt-ck-f">✓</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+          <tr class="pt-row"><td>Rodízio da carne (duplas do churrasco)</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+
+          <tr class="pt-cat"><td>Histórico</td><td></td><td></td></tr>
+          <tr class="pt-row"><td>Histórico de jogos</td><td><span class="pt-lim">Últimos 3</span></td><td><span class="pt-val">Completo</span></td></tr>
+          <tr class="pt-row"><td>Histórico de presença e financeiro</td><td><span class="pt-ds">—</span></td><td><span class="pt-ck pt-ck-p">✓</span></td></tr>
+
+          <tr class="pt-cta">
+            <td></td>
+            <td><a href="#download" class="pt-btn pt-btn-free">Baixar grátis</a></td>
+            <td><a href="#download" class="pt-btn pt-btn-pro">Assinar o Pro</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>
 
