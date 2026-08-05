@@ -4883,14 +4883,14 @@ function renderHome(snapshot, currentPlayer) {
         ${renderPushOptinInner()}
       </section>`}
 
-      ${renderProfilePanel(activePlayer)}
+      ${renderProfilePanel(activePlayer, game)}
     </section>
   `;
 }
 
 // Painel de perfil (abre pelo avatar do header). Modo VER por padrão; o botão
 // "Editar cadastro" abre o formulário (renderSelfProfileEditCardForHome).
-function renderProfilePanel(activePlayer) {
+function renderProfilePanel(activePlayer, game) {
   if (!selfProfileOpen) return '';
   if (selfProfileEditOpen) return renderSelfProfileEditCardForHome(activePlayer);
 
