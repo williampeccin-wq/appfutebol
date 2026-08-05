@@ -15,6 +15,7 @@
 
 import { getInitials, getPlayerPhoto } from '../players/players.service.js';
 import { rotuloDoTime, timesDoSorteio } from '../../domain/draw-teams.js';
+import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
 
 const W = 1080;
 const H = 1350;
@@ -269,46 +270,91 @@ function desenharRodape(ctx, marca) {
   ctx.fillText(marca, W / 2, y + 2);
 }
 
-function rotuloTime(ctx, texto, y, cor, uniforme) {
+function rotuloTime(ctx, texto, y, cor) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = 'bold 30px -apple-system, Segoe UI, Roboto, Arial, sans-serif';
   ctx.fillStyle = cor;
   ctx.fillText(texto, W / 2, y);
+}
 
-  // Selo do uniforme do time, à DIREITA do rótulo (espaço vago da faixa).
-  // Os uploads costumam ser mockups de KIT COMPLETO (camisa+calção+meião
-  // empilhados). A camisa identifica o time, então recorto só o topo do mockup.
-  // Se a imagem já for ~quadrada (só a camisa), uso inteira.
-  if (uniforme) {
+const ALTURA_SELO_UNIF = 130;
+const LARGURA_MAX_UNIF = Math.round(ALTURA_SELO_UNIF * 0.82);
+
+// Calcula o yTopo do uniforme de cada time: Time 0 → próximo à linha de fundo
+// superior (Goal A), Time N-1 → próximo à linha de fundo inferior (Goal B).
+// Com 3+ times os intermediários ficam nas divisórias de faixa.
+function yUniforme(indice, total, topo, alturaUtil) {
+  if (total === 1) return topo + alturaUtil - ALTURA_SELO_UNIF - 12;
+  if (indice === 0) return topo + 12;
+  if (indice === total - 1) return topo + alturaUtil - ALTURA_SELO_UNIF - 12;
+  const faixa = alturaUtil / total;
+  return topo + faixa * indice + 12;
+}
+
+// Uniforme de cada time próximo à sua linha de fundo, no lado DIREITO do campo.
+function desenharUniformesCanto(ctx, uniformes, cores, topo, alturaUtil) {
+  const m = 36;
+  const xDireita = W - m - 10;
+  const total = uniformes.length;
+
+  uniformes.forEach((uniforme, i) => {
+    if (!uniforme) return;
     const iw = uniforme.width || 1;
     const ih = uniforme.height || 1;
     const ehKitCompleto = ih / iw > 1.4;
     const sx = 0;
     const sy = ehKitCompleto ? ih * 0.02 : 0;
     const sw = iw;
-    const sh = ehKitCompleto ? ih * 0.44 : ih;   // camisa ≈ topo 44%
-    const alturaSelo = 78;
-    const larguraSelo = alturaSelo * (sw / sh);
-    const larguraTexto = ctx.measureText(texto).width;
-    const x = W / 2 + larguraTexto / 2 + 16;
-    const yTopo = y - alturaSelo / 2;
-    const r = 12;
+    const sh = ehKitCompleto ? ih * 0.44 : ih;
+    const aspecto = sw / sh;
+    const largura = Math.min(ALTURA_SELO_UNIF * aspecto, LARGURA_MAX_UNIF);
+    const altura = largura / aspecto;
+    const yTopo = yUniforme(i, total, topo, alturaUtil);
+    const xEsq = xDireita - largura;
+    const r = 14;
     const traca = () => {
       ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') ctx.roundRect(x, yTopo, larguraSelo, alturaSelo, r);
-      else ctx.rect(x, yTopo, larguraSelo, alturaSelo);
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(xEsq, yTopo, largura, altura, r);
+      else ctx.rect(xEsq, yTopo, largura, altura);
     };
     ctx.save();
     traca();
     ctx.clip();
-    ctx.drawImage(uniforme, sx, sy, sw, sh, x, yTopo, larguraSelo, alturaSelo);
+    ctx.drawImage(uniforme, sx, sy, sw, sh, xEsq, yTopo, largura, altura);
     ctx.restore();
     traca();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = cores[i] || 'rgba(255,255,255,0.7)';
     ctx.stroke();
-  }
+  });
+}
+
+// Média do time: círculo na cor do time no lado ESQUERDO, na mesma altura do
+// uniforme oposto — cria simetria visual dentro de cada faixa de campo.
+function desenharMediaTime(ctx, media, indice, total, cor, topo, alturaUtil) {
+  if (media === null) return;
+  const m = 36;
+  const raio = 44;
+  const x = m + 10 + raio;
+  const yTopo = yUniforme(indice, total, topo, alturaUtil);
+  const yCenter = yTopo + ALTURA_SELO_UNIF / 2;
+
+  ctx.beginPath();
+  ctx.arc(x, yCenter, raio, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(6,10,22,0.72)';
+  ctx.fill();
+  ctx.strokeStyle = cor;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = cor;
+  ctx.font = `bold 18px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+  ctx.fillText('★', x, yCenter - 15);
+  ctx.font = `bold 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+  ctx.fillText(media.toFixed(1), x, yCenter + 10);
 }
 
 function formatarData(iso, hora) {
@@ -375,8 +421,20 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
     Promise.all(fotosUnifPorTime.map((src) => carregarFoto(src))),
   ]);
 
+  const notasAvg = playerRatingAverages(getCachedRatings());
+  // Média por time: ignora convidados e goleiros de aluguel (sem histórico).
+  const mediaTimes = times.map((time) => {
+    const vals = time
+      .filter((p) => !p?.temporary && !p?.guest && !p?.rental_goalkeeper)
+      .map((p) => notasAvg[String(p?.id)])
+      .filter((r) => r && r.votes > 0)
+      .map((r) => r.avg);
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  });
+
   desenharCabecalho(ctx, titulo, formatarData(snapshot?.game?.game_date, snapshot?.game?.game_time), escudo);
-  times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i), uniformes[i]));
+  times.forEach((_t, i) => rotuloTime(ctx, `TIME ${rotuloDoTime(i)}`, topo + faixa * i + 22, corDoTime(i)));
 
   let cursor = 0;
   posPorTime.forEach((posicoes, i) => {
@@ -386,6 +444,9 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
     });
   });
 
+  const coresDosTimes = times.map((_, i) => corDoTime(i));
+  desenharUniformesCanto(ctx, uniformes, coresDosTimes, topo, alturaUtil);
+  mediaTimes.forEach((media, i) => desenharMediaTime(ctx, media, i, times.length, corDoTime(i), topo, alturaUtil));
   desenharRodape(ctx, marcaRodape);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
