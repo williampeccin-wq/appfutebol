@@ -74,8 +74,7 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-logo { display: flex; align-items: center; gap: 10px; }
 .nav-logo-mark {
-  width: 32px; height: 32px; background: var(--gold); border-radius: 6px;
-  display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 6px; overflow: hidden; flex-shrink: 0;
 }
 .nav-logo-name {
   font-family: var(--ff-display); font-size: 18px;
@@ -232,9 +231,7 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
 }
 .app-logo-badge {
-  width: 28px; height: 28px; border-radius: 7px;
-  background: var(--gold); display: flex; align-items: center; justify-content: center;
-  font-size: 15px; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 7px; overflow: hidden; flex-shrink: 0;
 }
 .app-header-text { flex: 1; }
 .app-name-real {
@@ -549,7 +546,7 @@ col.pc-pro  { width: 26%; }
 <nav class="nav">
   <div class="nav-inner">
     <a href="/" class="nav-logo">
-      <div class="nav-logo-mark">⚽</div>
+      <div class="nav-logo-mark"><img src="../appfutebol_run/img/icon-192.png" alt="Convocados" width="32" height="32" style="display:block;width:100%;height:100%;object-fit:cover;"></div>
       <span class="nav-logo-name">Convocados</span>
     </a>
     <a href="#download" class="nav-cta">Baixar o app</a>
@@ -584,7 +581,7 @@ col.pc-pro  { width: 26%; }
             </div>
           </div>
           <div class="app-header-real">
-            <div class="app-logo-badge">⚽</div>
+            <div class="app-logo-badge"><img src="../appfutebol_run/img/icon-192.png" alt="Convocados" width="28" height="28" style="display:block;width:100%;height:100%;object-fit:cover;"></div>
             <div class="app-header-text">
               <span class="app-name-real">Convocados</span>
               <span class="app-subrole">Administrador</span>
@@ -948,7 +945,7 @@ col.pc-pro  { width: 26%; }
       <div class="cta-form-wrap">
         <a href="#" class="cta-play-btn">↓ Baixar no Google Play</a>
         <div class="cta-divider">iPhone</div>
-        <a href="https://convocados.app.br/appfutebol_run/" target="_blank" rel="noopener" class="cta-ios-btn"> Abrir no Safari e instalar</a>
+        <a href="https://convocados.app.br/" target="_blank" rel="noopener" class="cta-ios-btn"> Abrir no Safari e instalar</a>
         <p class="cta-ios-steps">Safari → Compartilhar → Adicionar à Tela de Início</p>
         <div class="cta-divider">siga no Instagram</div>
         <a href="https://www.instagram.com/convocados.app" class="cta-ig-link" target="_blank" rel="noopener">📸 @convocados.app</a>
