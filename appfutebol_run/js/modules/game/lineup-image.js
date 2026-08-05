@@ -15,7 +15,7 @@
 
 import { getInitials, getPlayerPhoto } from '../players/players.service.js';
 import { rotuloDoTime, timesDoSorteio } from '../../domain/draw-teams.js';
-import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
+import { buildStrengthResolver } from './game.service.js';
 
 const W = 1080;
 const H = 1350;
@@ -421,14 +421,12 @@ export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', e
     Promise.all(fotosUnifPorTime.map((src) => carregarFoto(src))),
   ]);
 
-  const notasAvg = playerRatingAverages(getCachedRatings());
-  // Média por time: ignora convidados e goleiros de aluguel (sem histórico).
+  const { strengthOf } = buildStrengthResolver(times.flat(), snapshot);
+  // Mesma métrica do selo "⚡" no Sorteio: força normalizada dentro do plantel.
   const mediaTimes = times.map((time) => {
     const vals = time
       .filter((p) => !p?.temporary && !p?.guest && !p?.rental_goalkeeper)
-      .map((p) => notasAvg[String(p?.id)])
-      .filter((r) => r && r.votes > 0)
-      .map((r) => r.avg);
+      .map((p) => strengthOf(p));
     if (!vals.length) return null;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   });
