@@ -493,6 +493,20 @@ col.pc-pro  { width: 26%; }
 }
 .cta-play-btn:hover { background: var(--gold-dim); }
 .cta-divider { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 12px; }
+.cta-ios-btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1.5px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.65);
+  font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 6px;
+  margin-bottom: 8px; transition: border-color 0.15s, color 0.15s; letter-spacing: 0.01em;
+}
+.cta-ios-btn:hover { border-color: rgba(255,255,255,0.45); color: #fff; }
+.cta-ios-steps { font-size: 11px; color: rgba(255,255,255,0.25); margin-bottom: 20px; letter-spacing: 0.04em; }
+.ios-hint {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
+  padding: 9px 16px; margin-bottom: 28px; transition: color 0.15s, border-color 0.15s;
+}
+.ios-hint:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.32); }
 
 /* ── FOOTER ── */
 .footer { background: var(--ink); padding: 48px 0; }
@@ -550,6 +564,7 @@ col.pc-pro  { width: 26%; }
       <h1 class="hero-headline">Seu clube<br><em>organi</em><br><em>zado</em><br>de verdade.</h1>
       <p class="hero-sub">Confirmação de presença, mensalidade, sorteio inteligente e campeonato. Tudo numa tela. Sem WhatsApp, sem planilha.</p>
       <a href="#download" class="play-badge">↓ Disponível no Google Play</a>
+      <a href="#download" class="ios-hint"> iPhone? Instale pelo Safari</a>
       <div class="hero-ig-cta">
         <span class="hero-ig-label">Siga no Instagram</span>
         <a href="https://www.instagram.com/convocados.app" class="hero-ig-link" target="_blank" rel="noopener">📸 @convocados.app</a>
@@ -928,10 +943,13 @@ col.pc-pro  { width: 26%; }
       <div class="cta-content">
         <div class="section-eyebrow">Disponível agora</div>
         <h2 class="section-title">Baixa e<br>convoca<br>a galera.</h2>
-        <p class="section-sub">Gratuito. Acesso antecipado no Google Play.</p>
+        <p class="section-sub">Gratuito. Android no Google Play. iPhone via Safari.</p>
       </div>
       <div class="cta-form-wrap">
         <a href="#" class="cta-play-btn">↓ Baixar no Google Play</a>
+        <div class="cta-divider">iPhone</div>
+        <a href="https://convocados.app.br/appfutebol_run/" target="_blank" rel="noopener" class="cta-ios-btn"> Abrir no Safari e instalar</a>
+        <p class="cta-ios-steps">Safari → Compartilhar → Adicionar à Tela de Início</p>
         <div class="cta-divider">siga no Instagram</div>
         <a href="https://www.instagram.com/convocados.app" class="cta-ig-link" target="_blank" rel="noopener">📸 @convocados.app</a>
       </div>
