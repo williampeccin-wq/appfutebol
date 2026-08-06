@@ -7164,6 +7164,24 @@ body.vote-open { overflow: hidden; }
 .player-compact-row:last-child { border-bottom: 0; }
 .player-compact-row.is-current { background: rgba(143, 180, 255, 0.07); border-radius: 12px; }
 .player-compact-row.is-editing { background: rgba(240, 165, 0, 0.10); border-radius: 12px; }
+.player-compact-row.is-left-team { opacity: 0.6; }
+.left-team-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--hfc-text-muted, #9fb0cc);
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.players-left-team {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+}
 .player-compact-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .player-compact-text { min-width: 0; }
 .player-compact-text .row-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -2,6 +2,8 @@ import { SUPABASE_CONFIG } from '../../config/supabase.config.js';
 import {
   savePlayerAccessLink,
   savePlayerLogicalDelete,
+  savePlayerLeftTeam,
+  savePlayerReactivate,
   restoreDeletedPlayerByPhone,
 } from '../../services/storage.supabase.js';
 import { assertCriticalOperationAllowed } from '../../services/environment.guard.js';
@@ -173,6 +175,33 @@ export async function deletePlayerOperation({ player, currentPlayerId, allPlayer
   }
 
   return { ok: true, reason: 'player_logically_deleted', message: 'Jogador removido.', result };
+}
+
+export async function leaveTeamOperation({ player, currentPlayerId, allPlayers = [] }) {
+  if (!player?.id) return { ok: false, reason: 'missing_player' };
+
+  if (String(player.id) === String(currentPlayerId)) {
+    return { ok: false, reason: 'cannot_leave_self', message: 'Você não pode marcar a si mesmo como saiu do time.' };
+  }
+
+  const admins = Array.isArray(allPlayers) ? allPlayers.filter((p) => p?.is_admin && !p?.left_team) : [];
+  if (player.is_admin && admins.length <= 1) {
+    return { ok: false, reason: 'cannot_leave_last_admin', message: 'Não é possível remover o último administrador.' };
+  }
+
+  const result = await savePlayerLeftTeam(player.id);
+  if (!result.ok) return { ok: false, reason: 'left_team_save_failed', message: 'Não foi possível salvar. Tente novamente.', result };
+
+  return { ok: true, reason: 'player_left_team', message: `${player.name || 'Jogador'} marcado como saiu do time.`, result };
+}
+
+export async function reactivateLeftPlayerOperation({ player }) {
+  if (!player?.id) return { ok: false, reason: 'missing_player' };
+
+  const result = await savePlayerReactivate(player.id);
+  if (!result.ok) return { ok: false, reason: 'reactivate_save_failed', message: 'Não foi possível reativar. Tente novamente.', result };
+
+  return { ok: true, reason: 'player_reactivated', message: `${player.name || 'Jogador'} reativado no time.`, result };
 }
 
 export async function restoreDeletedPlayerByPhoneOperation(phone, updates = {}) {
