@@ -8,6 +8,7 @@ import {
   isAdmin,
   isConfirmed,
   isCurrentPlayer,
+  listActivePlayers,
   listCarneOnly,
   listJogadores,
   listPlayers,
@@ -166,12 +167,18 @@ function renderSelfProfileCard(currentPlayer) {
 
 
 export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
-  const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
-  const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const allPlayers = orderedPlayers;
-  const jogadores = orderedPlayers.filter((player) => player.plays_football !== false);
-  const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
-  // "Somente carne" = qualquer perfil que não joga (independente do grupo), para
+  const allSourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
+  const orderedAll = [...allSourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  // Auto-cadastro pendente NÃO é membro: sai das listas/contagens de membro e
+  // aparece só na fila de aprovação do admin (renderPendingApprovalCard).
+  const pendingPlayers = orderedAll.filter((player) => player.pending === true);
+  const leftTeamPlayers = orderedAll.filter((player) => player.pending !== true && player.left_team === true);
+  const orderedPlayers = orderedAll.filter((player) => player.pending !== true && !player.left_team);
+  const activePlayers = orderedPlayers;
+  const allPlayers = activePlayers;
+  const jogadores = activePlayers.filter((player) => player.plays_football !== false);
+  const carneGroup = activePlayers.filter((player) => player.in_carne_group === true);
+  // "Somente churrasco" = qualquer perfil que não joga (independente do grupo), para
   // garantir que todos sejam editáveis aqui na aba Jogadores.
   const carneOnly = orderedPlayers.filter((player) => player.plays_football === false);
   const jogadoresFinanceiros = jogadores.filter((player) => !isMensalidadeExempt(player));
@@ -221,6 +228,15 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             <div class="players-subhead">Somente carne <strong>${carneOnly.length}</strong></div>
             <div class="player-compact-list" role="table" aria-label="Somente carne">
               ${carneOnly.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${isAdmin(currentPlayer) && leftTeamPlayers.length ? `
+          <div class="players-left-team">
+            <div class="players-subhead">Ex-membros <strong>${leftTeamPlayers.length}</strong></div>
+            <div class="player-compact-list" role="table" aria-label="Ex-membros">
+              ${leftTeamPlayers.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
             </div>
           </div>
         ` : ''}
@@ -541,7 +557,9 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
 }
 
 export function renderCarneScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, rotation = null, calendar = null, dirty = false, editingPairIndex = -1) {
-  const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
+  const sourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length
+    ? projectedPlayers.filter((p) => !p.left_team)
+    : listActivePlayers();
   const orderedPlayers = [...sourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const carneGroup = orderedPlayers.filter((player) => player.in_carne_group === true);
   const carneOnly = carneGroup.filter((player) => player.plays_football === false);
@@ -638,28 +656,36 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   const currentFlag = isCurrentPlayer(player, currentPlayer);
   const isEditing = player.id === editingPlayerId;
   const carneOnly = isCarneOnly(player);
+  const leftTeam = player.left_team === true;
   const access = admin ? (player.auth_user_id ? 'Acesso criado' : 'Sem acesso') : '';
-  const subtitle = `${carneOnly ? 'Somente carne' : getPositionLabel(player.position)}${access ? ` · ${access}` : ''}`;
+  const statusLabel = leftTeam ? 'Saiu do time' : (carneOnly ? 'Somente churrasco' : getPositionLabel(player.position));
+  const subtitle = `${statusLabel}${!leftTeam && access ? ` · ${access}` : ''}`;
   const rowPeriodGame = { mens_expire_date: String(snapshot?.settings?.mens_expire_date || '').slice(0, 10) };
 
   return `
-    <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''}" role="row">
+    <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''} ${leftTeam ? 'is-left-team' : ''}" role="row">
       <div class="player-compact-main">
         ${getAvatarHtml(player)}
         <div class="player-compact-text">
-          <div class="row-title">${escapeHtml(player.name || '')}${currentFlag ? ' · você' : ''}</div>
+          <div class="row-title">${escapeHtml(player.name || '')}${currentFlag ? ' · você' : ''}${leftTeam ? ' <span class="left-team-badge">Saiu</span>' : ''}</div>
           <div class="row-subtitle">${subtitle}</div>
         </div>
       </div>
       <div class="player-compact-right">
-        ${carneOnly ? '' : renderFinanceControls(player, currentPlayer, rowPeriodGame)}
+        ${!leftTeam && !carneOnly ? renderFinanceControls(player, currentPlayer, rowPeriodGame) : ''}
         ${admin ? `
           <div class="carne-edit-actions">
-            <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar" aria-label="Editar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-            ${player.auth_user_id
-              ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
-              : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
-            ${!currentFlag ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
+            ${leftTeam ? `
+              <button class="access-action-button" type="button" data-action="reactivate-left-player" data-id="${player.id}">Reativar</button>
+              <button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
+            ` : `
+              <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar" aria-label="Editar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+              ${player.auth_user_id
+                ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
+                : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
+              ${!currentFlag ? `<button class="icon-action-button player-leave-team-near-paid" type="button" data-action="leave-team-player" data-id="${player.id}" title="Saiu do time" aria-label="Saiu do time"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>` : ''}
+              ${!currentFlag ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
+            `}
           </div>
         ` : ''}
       </div>

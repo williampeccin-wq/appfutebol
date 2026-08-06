@@ -13,12 +13,16 @@ export function listPlayers() {
   return [...snapshot.players].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
+export function listActivePlayers() {
+  return listPlayers().filter((player) => !player.left_team);
+}
+
 export function listJogadores() {
-  return listPlayers().filter((player) => normalizeParticipation(player).playsFootball);
+  return listActivePlayers().filter((player) => normalizeParticipation(player).playsFootball);
 }
 
 export function listCarneOnly() {
-  return listPlayers().filter((player) => {
+  return listActivePlayers().filter((player) => {
     const meta = normalizeParticipation(player);
     return meta.inCarneGroup && !meta.playsFootball;
   });

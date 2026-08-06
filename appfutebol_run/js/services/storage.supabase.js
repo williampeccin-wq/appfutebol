@@ -163,6 +163,10 @@ function isDeletedPlayerRecord(player, deletedIds, deletedPhones) {
   return logicallyInactive || deletedIds.includes(playerId) || (phone && deletedPhones.includes(phone));
 }
 
+export function isLeftTeamPlayerRecord(player) {
+  return player?.left_team === true;
+}
+
 // Predicados de "tem conteúdo" dos campos CRÍTICOS do meta. Usados pelas travas
 // anti-apagão (load E save): nenhum desses campos deve ir de preenchido→vazio por
 // estado degradado (leitura falha/parcial/sessão expirada). O composeState
@@ -1338,6 +1342,94 @@ export async function savePlayerLogicalDelete(playerId) {
   lastRemoteUpdatedAt = savedRow?.updated_at || now;
 
   return { ok: true, reason: 'player_logical_delete_saved_on_player_row', updatedAt: lastRemoteUpdatedAt };
+}
+
+export async function savePlayerLeftTeam(playerId) {
+  const config = getConfig();
+  if (!isSupabaseConfigured()) return { ok: false, reason: 'supabase_not_configured' };
+
+  const normalizedId = String(playerId || '').trim();
+  if (!normalizedId) return { ok: false, reason: 'missing_player_id' };
+
+  const currentResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+    { method: 'GET' }
+  );
+  if (!currentResult.ok) return { ok: false, reason: `load_player_failed_${currentResult.status}` };
+
+  const row = Array.isArray(currentResult.data) ? currentResult.data[0] : null;
+  if (!row) return { ok: false, reason: 'player_not_found' };
+
+  const now = new Date().toISOString();
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const nextData = { ...currentData, id: normalizedId, left_team: true, left_team_at: now };
+
+  const patchResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,data,updated_at`),
+    { method: 'PATCH', prefer: 'return=representation', body: JSON.stringify({ data: nextData, updated_at: now }) }
+  );
+  if (!patchResult.ok) return { ok: false, reason: `save_player_left_team_failed_${patchResult.status}` };
+
+  const savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  if (!savedRow?.data?.left_team) return { ok: false, reason: 'save_player_left_team_did_not_persist' };
+
+  if (lastSplitSnapshot?.players) {
+    lastSplitSnapshot.players = lastSplitSnapshot.players.map((p) =>
+      String(p?.id) === normalizedId ? { ...p, left_team: true, left_team_at: now } : p
+    );
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = savedRow?.updated_at || now;
+  return { ok: true, reason: 'player_left_team_saved', updatedAt: lastRemoteUpdatedAt };
+}
+
+export async function savePlayerReactivate(playerId) {
+  const config = getConfig();
+  if (!isSupabaseConfigured()) return { ok: false, reason: 'supabase_not_configured' };
+
+  const normalizedId = String(playerId || '').trim();
+  if (!normalizedId) return { ok: false, reason: 'missing_player_id' };
+
+  const currentResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+    { method: 'GET' }
+  );
+  if (!currentResult.ok) return { ok: false, reason: `load_player_failed_${currentResult.status}` };
+
+  const row = Array.isArray(currentResult.data) ? currentResult.data[0] : null;
+  if (!row) return { ok: false, reason: 'player_not_found' };
+
+  const now = new Date().toISOString();
+  const currentData = row?.data && typeof row.data === 'object' ? row.data : {};
+  const nextData = { ...currentData, id: normalizedId };
+  delete nextData.left_team;
+  delete nextData.left_team_at;
+
+  const patchResult = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,data,updated_at`),
+    { method: 'PATCH', prefer: 'return=representation', body: JSON.stringify({ data: nextData, updated_at: now }) }
+  );
+  if (!patchResult.ok) return { ok: false, reason: `save_player_reactivate_failed_${patchResult.status}` };
+
+  const savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  if (!savedRow) return { ok: false, reason: 'save_player_reactivate_no_row' };
+
+  if (lastSplitSnapshot?.players) {
+    lastSplitSnapshot.players = lastSplitSnapshot.players.map((p) => {
+      if (String(p?.id) !== normalizedId) return p;
+      const updated = { ...p };
+      delete updated.left_team;
+      delete updated.left_team_at;
+      return updated;
+    });
+    lastSplitFingerprint = snapshotFingerprint(lastSplitSnapshot);
+  }
+  lastRemoteUpdatedAt = savedRow?.updated_at || now;
+  return { ok: true, reason: 'player_reactivated', updatedAt: lastRemoteUpdatedAt };
 }
 
 export async function savePlayerDeletionTombstone(playerId, phone = '') {

@@ -2141,6 +2141,160 @@ if (action === "delete-player") {
 }
 
 
+if (action === "approve-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode aprovar cadastros')) return;
+  const currentSnapshot = structuredClone(getState());
+  if (Array.isArray(currentSnapshot.players)) currentSnapshot.players = currentSnapshot.players.map(normalizePlayer);
+  const player = currentSnapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Aprovando...');
+
+  player.pending = false; // vira membro (o trigger permite admin mudar pending)
+  const safeSnapshot = repairManualSnapshot(currentSnapshot);
+  replaceState(safeSnapshot);
+
+  uiActionInFlight = false;
+  clearActionBusy(trigger);
+  showToast(`${player.name || 'Jogador'} aprovado! Já pode entrar no grupo.`, 'success');
+  return;
+}
+
+
+if (action === "reject-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode recusar cadastros')) return;
+  if (!requireCriticalOperationAllowed('recusar cadastro', trigger)) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+  const currentPlayerId = snapshot.session?.playerId;
+
+  const ok = await showConfirmModal({
+    title: 'Recusar cadastro',
+    message: `Recusar o cadastro de ${player.name}? A conta será removida e a pessoa não entrará no grupo.`,
+    confirmText: 'Recusar',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Recusando...');
+
+  try {
+    const result = await deletePlayerOperation({
+      player,
+      currentPlayerId,
+      allPlayers: snapshot.players,
+      confirmationText: player.name,
+    });
+
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível recusar o cadastro.', 'error');
+      return;
+    }
+
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast('Cadastro recusado.', 'success');
+  } catch (error) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    showToast(error?.message || 'Erro ao recusar cadastro.', 'error');
+  }
+
+  return;
+}
+
+
+if (action === "leave-team-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode mover jogadores para ex-membros')) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+
+  const ok = await showConfirmModal({
+    title: 'Saiu do time',
+    message: `Marcar ${player.name} como ex-membro? O nome ficará visível no histórico de campeonatos e a operação pode ser desfeita.`,
+    confirmText: 'Confirmar',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Salvando...');
+
+  try {
+    const result = await leaveTeamOperation({
+      player,
+      currentPlayerId: snapshot.session?.playerId,
+      allPlayers: snapshot.players,
+    });
+
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível salvar.', 'error');
+      return;
+    }
+
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast(result.message || 'Jogador movido para ex-membros.', 'success');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    showToast(error?.message || 'Erro inesperado.', 'error');
+  }
+
+  return;
+}
+
+
+if (action === "reactivate-left-player") {
+  if (!requireAdmin(snapshot, 'Apenas administrador pode reativar jogadores')) return;
+
+  const player = snapshot.players.find((p) => String(p.id) === String(id));
+  if (!player) return;
+
+  const ok = await showConfirmModal({
+    title: 'Reativar jogador',
+    message: `Reativar ${player.name} no time?`,
+    confirmText: 'Reativar',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Reativando...');
+
+  try {
+    const result = await reactivateLeftPlayerOperation({ player });
+
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+
+    if (!result.ok) {
+      showToast(result.message || 'Não foi possível reativar.', 'error');
+      return;
+    }
+
+    await reloadRemoteStateAfterCriticalOperation(snapshot);
+    showToast(result.message || 'Jogador reativado.', 'success');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    clearActionBusy(trigger);
+    uiActionInFlight = false;
+    showToast(error?.message || 'Erro inesperado ao reativar.', 'error');
+  }
+
+  return;
+}
+
+
 if (action === "admin-remove-from-game") {
   const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
   const player = snapshot.players.find((p) => p.id === id);
@@ -2361,7 +2515,7 @@ import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos } from '../services/storage.supabase.js';
-import { createPlayerAccessOperation, deletePlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
+import { createPlayerAccessOperation, deletePlayerOperation, leaveTeamOperation, reactivateLeftPlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
@@ -3226,6 +3380,7 @@ async function submitCarneVote() {
   carneVote = null;
   unmountCarneVote();
   showToast('Nota do churrasco enviada. Valeu! 🥩', 'success');
+  loadRatingsCache(true).then(() => render(getState())).catch(() => {});
 }
 // =================== fim votação do churrasco ===================
 
