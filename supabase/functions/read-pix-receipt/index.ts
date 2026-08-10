@@ -122,12 +122,18 @@ Deno.serve(async (req) => {
   if (!cfgAmount || !cfgBeneficiary) return json({ ok: false, error: "config_missing" });
 
   const { data: playerRow } = await admin
-    .from("players").select("id,data").eq("auth_user_id", userId).maybeSingle();
+    .from("players").select("id,data,club_id").eq("auth_user_id", userId).maybeSingle();
   if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
+  const clubId = String(playerRow.club_id || "");
 
   // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
+  // Se o período venceu, mens_ok do ciclo anterior não vale — o jogador pode
+  // enviar o comprovante do novo período.
   const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
-  if (pdata0.mens_ok === true) return json({ ok: true, result: "already_paid" });
+  const expireDate = String(settings.mens_expire_date || "").slice(0, 10);
+  const todayBrt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const periodExpired = !!expireDate && todayBrt > expireDate;
+  if (pdata0.mens_ok === true && !periodExpired) return json({ ok: true, result: "already_paid" });
 
   // Rate-limit por jogador: a chamada de visão é PAGA (API Anthropic). Limita a
   // N leituras por hora para impedir abuso/loop que queime créditos.
@@ -285,6 +291,23 @@ Deno.serve(async (req) => {
     await admin.from("pix_receipts").delete().eq("e2e_id", e2e);
     console.warn("[pix] update players erro:", upd.error);
     return json({ ok: false, error: "persist_failed" }, 500);
+  }
+
+  // Espelha a mensalidade no LIVRO-CAIXA (aba Financeiro). Idempotente por
+  // pix_e2e_id (unique). NÃO-fatal: pagamento já confirmado; o caixa é derivado.
+  const finDate = /^\d{4}-\d{2}-\d{2}$/.test(extracted.date) ? extracted.date : new Date().toISOString().slice(0, 10);
+  const fin = await admin.from("finance_entries").insert({
+    club_id: clubId,
+    kind: "receita",
+    category: "mensalidade",
+    amount: extracted.amount,
+    date: finDate,
+    player_id: String(playerRow.id),
+    source: "pix_ia",
+    pix_e2e_id: e2e,
+  });
+  if (fin.error && String(fin.error.code) !== "23505") {
+    console.warn("[pix] insert finance_entries erro:", fin.error);
   }
 
   return json({ ok: true, result: "marked", extracted: view });
