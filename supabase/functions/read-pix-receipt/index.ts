@@ -137,8 +137,13 @@ Deno.serve(async (req) => {
   if (!cfgAmount || !cfgBeneficiary) return json({ ok: false, error: "config_missing" });
 
   // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
+  // Se o período venceu, mens_ok do ciclo anterior não vale — o jogador pode
+  // enviar o comprovante do novo período.
   const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
-  if (pdata0.mens_ok === true) return json({ ok: true, result: "already_paid" });
+  const expireDate = String(settings.mens_expire_date || "").slice(0, 10);
+  const todayBrt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const periodExpired = !!expireDate && todayBrt > expireDate;
+  if (pdata0.mens_ok === true && !periodExpired) return json({ ok: true, result: "already_paid" });
 
   // Rate-limit por jogador: a chamada de visão é PAGA (API Anthropic). Limita a
   // N leituras por hora para impedir abuso/loop que queime créditos.
