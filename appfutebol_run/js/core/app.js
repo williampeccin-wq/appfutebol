@@ -2459,10 +2459,11 @@ if (action === "admin-add-to-game") {
     setActionBusy(trigger, action === "mark-paid" ? "Salvando..." : "Atualizando...");
 
     player.mens_ok = action === "mark-paid";
-    // Toggle manual do admin: limpa avisos/carimbos de PIX (o selo "📷 PIX" fica
-    // só para pagamentos confirmados por comprovante).
+    // Toggle manual do admin: limpa avisos pendentes. O comprovante PIX (mens_payment)
+    // só é removido ao marcar PAGO manualmente — preservar na inadimplência protege
+    // a prova de que o jogador havia pago.
     if (player.mens_review) delete player.mens_review;
-    if (player.mens_payment) delete player.mens_payment;
+    if (action === "mark-paid" && player.mens_payment) delete player.mens_payment;
 
     const safeSnapshot = repairManualSnapshot(currentSnapshot);
 

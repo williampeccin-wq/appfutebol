@@ -103,5 +103,5 @@ export function buildGameView(state, currentPlayerId) {
 export function buildPlayersView(state) {
   const gameView = buildGameView(state, null);
   const confirmedIds = new Set(gameView.confirmedPlayerIds.map(String));
-  return (state.players || []).map((p) => ({ ...p, isActive: p.status !== 'inactive', isConfirmed: confirmedIds.has(String(p.id)), isInadimplente: (p.plays_football !== undefined ? p.plays_football : p.role !== 'carne') && !p.mens_ok }));
+  return (state.players || []).map((p) => ({ ...p, isActive: p.status !== 'inactive', isConfirmed: confirmedIds.has(String(p.id)), isInadimplente: (p.plays_football !== undefined ? p.plays_football : p.role !== 'carne') && p.mens_ok === false }));
 }

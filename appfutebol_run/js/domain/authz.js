@@ -49,7 +49,7 @@ export function canManageFinance(player) {
   return isAdmin(player);
 }
 
-import { isAfterMensalidadeDueDate } from './rules.engine.js';
+import { isMensOkEffective } from './rules.engine.js';
 
 export function canManageChampionship(player) {
   return isAdmin(player);
@@ -75,8 +75,8 @@ export function canConfirmPresence(player, game = null) {
   if (!player) return false;
   if (isCarneOnly(player)) return false;
   if (player.status === 'inactive') return false;
-  if (player.mens_ok === true) return true;
-  return !isAfterMensalidadeDueDate(game);
+  if (isMensalidadeExempt(player)) return true;
+  return isMensOkEffective(player);
 }
 
 export function exposeAuthz(currentPlayerProvider) {
