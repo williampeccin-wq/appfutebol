@@ -43,11 +43,11 @@ export function isAfterMensalidadeDueDate(game, referenceDate = getLocalDateStri
   return String(referenceDate) > dueDate;
 }
 
-// Um pagamento registrado num período anterior não vale para o período atual.
-// Retorna false quando o vencimento já passou, independente de mens_ok ser true.
-export function isMensOkEffective(player, game) {
-  if (!player?.mens_ok) return false;
-  return !isAfterMensalidadeDueDate(game);
+// mens_ok=true significa "pagou no ciclo atual". O ciclo é resetado pelo admin ao
+// salvar uma nova mens_expire_date — até lá, quem pagou continua Em dia mesmo
+// após a data de vencimento ter passado.
+export function isMensOkEffective(player, _game) {
+  return !!player?.mens_ok;
 }
 
 // Bloqueia a CONFIRMAÇÃO de presença de inadimplente. Vale tanto no modo

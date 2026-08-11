@@ -114,26 +114,32 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // Config do clube + jogador.
+  // Jogador do chamador (por auth_user_id).
+  // club_id não existe nesta instância (migração multitenant não aplicada).
+  const { data: playerRow } = await admin
+    .from("players").select("id,data").eq("auth_user_id", userId).maybeSingle();
+  if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
+
+  // GATE Pro: tenta via tabela clubs; se não existir (pré-multitenant), assume pro.
+  try {
+    const { data: clubRow, error: clubErr } = await admin.from("clubs").select("plan").limit(1).maybeSingle();
+    if (!clubErr && clubRow && (clubRow.plan || "free") !== "pro") {
+      return json({ ok: false, error: "pro_required", message: "A leitura automática do comprovante é um recurso do plano Pro." });
+    }
+  } catch (_) { /* tabela clubs ausente — assume pro */ }
+
+  // Config do clube (blob app_meta). Chave = 'default' enquanto multitenant não aplicado.
   const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
   const settings = metaRow?.data?.settings || {};
   const cfgAmount = Number(settings.mens_amount) || 0;
   const cfgBeneficiary = normName(String(settings.mens_beneficiary || ""));
   if (!cfgAmount || !cfgBeneficiary) return json({ ok: false, error: "config_missing" });
 
-  const { data: playerRow } = await admin
-    .from("players").select("id,data,club_id").eq("auth_user_id", userId).maybeSingle();
-  if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
-  const clubId = String(playerRow.club_id || "");
-
   // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
-  // Se o período venceu, mens_ok do ciclo anterior não vale — o jogador pode
-  // enviar o comprovante do novo período.
+  // O ciclo é resetado pelo admin ao salvar nova mens_expire_date (zera mens_ok
+  // de todos), então mens_ok=true aqui significa "pagou no período atual".
   const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
-  const expireDate = String(settings.mens_expire_date || "").slice(0, 10);
-  const todayBrt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const periodExpired = !!expireDate && todayBrt > expireDate;
-  if (pdata0.mens_ok === true && !periodExpired) return json({ ok: true, result: "already_paid" });
+  if (pdata0.mens_ok === true) return json({ ok: true, result: "already_paid" });
 
   // Rate-limit por jogador: a chamada de visão é PAGA (API Anthropic). Limita a
   // N leituras por hora para impedir abuso/loop que queime créditos.
@@ -251,11 +257,13 @@ Deno.serve(async (req) => {
     return json({ ok: true, result: "review", reason: "no_e2e", extracted: view });
   }
 
-  // E2E inédito?
+  // E2E inédito? O E2E do PIX é globalmente único — dedup por e2e_id é suficiente.
+  // (club_id não existe nesta instância pré-multitenant.)
   const { data: dup } = await admin.from("pix_receipts").select("e2e_id").eq("e2e_id", e2e).maybeSingle();
   if (dup?.e2e_id) return reject("duplicate_e2e");
 
   // Tudo ok: registra o E2E e marca pago.
+  // (club_id omitido — coluna não existe nesta instância pré-multitenant.)
   const ins = await admin.from("pix_receipts").insert({
     e2e_id: e2e,
     player_id: String(playerRow.id),
@@ -293,11 +301,12 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "persist_failed" }, 500);
   }
 
-  // Espelha a mensalidade no LIVRO-CAIXA (aba Financeiro). Idempotente por
-  // pix_e2e_id (unique). NÃO-fatal: pagamento já confirmado; o caixa é derivado.
+  // Espelha a mensalidade no LIVRO-CAIXA (aba Financeiro / Pro). Idempotente por
+  // pix_e2e_id (unique). NÃO-fatal: o pagamento já está confirmado; o caixa é
+  // derivado — se falhar, loga e segue (backfill futuro cobre).
   const finDate = /^\d{4}-\d{2}-\d{2}$/.test(extracted.date) ? extracted.date : new Date().toISOString().slice(0, 10);
   const fin = await admin.from("finance_entries").insert({
-    club_id: clubId,
+    club_id: "00000000-0000-0000-0000-000000000001", // default até migração multitenant
     kind: "receita",
     category: "mensalidade",
     amount: extracted.amount,
