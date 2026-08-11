@@ -497,7 +497,7 @@ function renderCarneMemberRow(player) {
       </div>
       <div class="carne-member-tags">
         <span class="position-pill">${player.plays_football === false ? 'Somente churrasco' : getPositionLabel(player.position)}</span>
-        ${player.plays_football !== false ? `<span class="tag ${player.mens_ok ? 'is-ok' : 'is-warn'}">${player.mens_ok ? 'Pago' : 'Pendente'}</span>` : ''}
+        ${player.plays_football !== false ? `<span class="tag ${isMensOkEffective(player) ? 'is-ok' : 'is-warn'}">${isMensOkEffective(player) ? 'Pago' : 'Pendente'}</span>` : ''}
       </div>
     </div>
   `;
