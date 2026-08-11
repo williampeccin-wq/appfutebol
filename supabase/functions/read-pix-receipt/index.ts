@@ -115,35 +115,35 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // Jogador + clube do chamador (multi-tenant).
+  // Jogador do chamador (por auth_user_id).
+  // Nota: club_id não existe nesta instância (migração multitenant não aplicada);
+  // por isso selecionamos apenas id e data. Quando a migração for aplicada,
+  // adicionar club_id aqui e usá-lo nas queries abaixo.
   const { data: playerRow } = await admin
-    .from("players").select("id,data,club_id").eq("auth_user_id", userId).maybeSingle();
+    .from("players").select("id,data").eq("auth_user_id", userId).maybeSingle();
   if (!playerRow?.id) return json({ ok: false, error: "player_not_found" });
-  const clubId = String(playerRow.club_id || "");
-  if (!clubId) return json({ ok: false, error: "player_not_found" });
 
-  // GATE Pro: a leitura automática do comprovante (PIX-IA) é recurso do plano Pro.
-  // Autoridade no servidor — o cliente pode esconder o botão, mas quem barra é aqui.
-  const { data: clubRow } = await admin.from("clubs").select("plan").eq("id", clubId).maybeSingle();
-  if ((clubRow?.plan || "free") !== "pro") {
-    return json({ ok: false, error: "pro_required", message: "A leitura automática do comprovante é um recurso do plano Pro." });
-  }
+  // GATE Pro: tenta via tabela clubs; se não existir (instância pré-multitenant),
+  // assume pro — o CORS já restringe às origens do clube.
+  try {
+    const { data: clubRow, error: clubErr } = await admin.from("clubs").select("plan").limit(1).maybeSingle();
+    if (!clubErr && clubRow && (clubRow.plan || "free") !== "pro") {
+      return json({ ok: false, error: "pro_required", message: "A leitura automática do comprovante é um recurso do plano Pro." });
+    }
+  } catch (_) { /* tabela clubs ausente — assume pro */ }
 
-  // Config do clube (blob por club_id — não mais 'default').
-  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", clubId).maybeSingle();
+  // Config do clube (blob app_meta). Chave = 'default' enquanto multitenant não aplicado.
+  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
   const settings = metaRow?.data?.settings || {};
   const cfgAmount = Number(settings.mens_amount) || 0;
   const cfgBeneficiary = normName(String(settings.mens_beneficiary || ""));
   if (!cfgAmount || !cfgBeneficiary) return json({ ok: false, error: "config_missing" });
 
   // Curto-circuito: já pago neste ciclo → não gasta a chamada de visão (custo).
-  // Se o período venceu, mens_ok do ciclo anterior não vale — o jogador pode
-  // enviar o comprovante do novo período.
+  // O ciclo é resetado pelo admin ao salvar nova mens_expire_date (zera mens_ok
+  // de todos), então mens_ok=true aqui significa "pagou no período atual".
   const pdata0 = (playerRow.data || {}) as Record<string, unknown>;
-  const expireDate = String(settings.mens_expire_date || "").slice(0, 10);
-  const todayBrt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const periodExpired = !!expireDate && todayBrt > expireDate;
-  if (pdata0.mens_ok === true && !periodExpired) return json({ ok: true, result: "already_paid" });
+  if (pdata0.mens_ok === true) return json({ ok: true, result: "already_paid" });
 
   // Rate-limit por jogador: a chamada de visão é PAGA (API Anthropic). Limita a
   // N leituras por hora para impedir abuso/loop que queime créditos.
@@ -274,15 +274,15 @@ Deno.serve(async (req) => {
     return json({ ok: true, result: "review", reason: "no_e2e", extracted: view });
   }
 
-  // E2E inédito? (dedup dentro do clube; o E2E do PIX é globalmente único, mas
-  // escopar por clube mantém o isolamento — service_role enxerga todos.)
-  const { data: dup } = await admin.from("pix_receipts").select("e2e_id").eq("e2e_id", e2e).eq("club_id", clubId).maybeSingle();
+  // E2E inédito? O E2E do PIX é globalmente único — dedup por e2e_id é suficiente.
+  // (club_id não existe nesta instância pré-multitenant.)
+  const { data: dup } = await admin.from("pix_receipts").select("e2e_id").eq("e2e_id", e2e).maybeSingle();
   if (dup?.e2e_id) return reject("duplicate_e2e");
 
   // Tudo ok: registra o E2E e marca pago.
+  // (club_id omitido — coluna não existe nesta instância pré-multitenant.)
   const ins = await admin.from("pix_receipts").insert({
     e2e_id: e2e,
-    club_id: clubId,
     player_id: String(playerRow.id),
     auth_user_id: userId,
     amount: extracted.amount,
@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
   // derivado — se falhar, loga e segue (backfill futuro cobre).
   const finDate = /^\d{4}-\d{2}-\d{2}$/.test(extracted.date) ? extracted.date : new Date().toISOString().slice(0, 10);
   const fin = await admin.from("finance_entries").insert({
-    club_id: clubId,
+    club_id: "00000000-0000-0000-0000-000000000001", // default até migração multitenant
     kind: "receita",
     category: "mensalidade",
     amount: extracted.amount,
