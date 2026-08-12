@@ -1,5 +1,6 @@
 import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js';
 import { auditPresenceProjection } from '../domain/presence.audit.js';
+import { getChurrascoDuo as calcChurrascoDuo, carneDiffDays as _carneDiffDays } from '../domain/carne.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
 window.__HARMONIA_BUILD__ = 'v1.82.0-aura';
@@ -1059,9 +1060,7 @@ function carneAddDays(iso, days) {
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function carneDiffDays(aIso, bIso) {
-  return Math.round((carneIsoToNoon(aIso).getTime() - carneIsoToNoon(bIso).getTime()) / 86400000);
-}
+function carneDiffDays(aIso, bIso) { return _carneDiffDays(aIso, bIso); }
 
 // Fonte de verdade do rodízio. Se ainda não foi salvo, MIGRA da tabela datada
 // atual (carne_schedule): duplas distintas na ordem das datas = um ciclo.
@@ -3249,20 +3248,15 @@ function getCarneWindow(game) {
   return { openMs, closeMs };
 }
 
-// Dupla responsável pelo churrasco do jogo, a partir do rodízio.
+// Dupla responsável pelo churrasco do jogo.
+// Delega ao domínio puro (domain/carne.js); aqui apenas resolve os dados do snapshot.
 function getChurrascoDuo(snapshot, game) {
-  const rotation = getCarneRotation(snapshot);
-  const pairs = Array.isArray(rotation?.pairs) ? rotation.pairs : [];
-  const startIso = String(rotation?.start_date || '').slice(0, 10);
-  const gameIso = String(game?.game_date || '').slice(0, 10);
-  if (!pairs.length || !startIso || !gameIso) return null;
-  const week = Math.round(carneDiffDays(gameIso, startIso) / 7);
-  const idx = ((week % pairs.length) + pairs.length) % pairs.length;
-  const pair = pairs[idx];
-  if (!pair) return null;
-  const find = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id)) || { id, name: 'Jogador' };
-  const key = [String(pair.player1_id), String(pair.player2_id)].sort().join('|');
-  return { player1: find(pair.player1_id), player2: find(pair.player2_id), key };
+  return calcChurrascoDuo(
+    getCarneScheduleEntriesForApp(snapshot),
+    getCarneRotation(snapshot),
+    snapshot.players || [],
+    String(game?.game_date || '').slice(0, 10),
+  );
 }
 
 async function maybeShowCarneVote(snapshot, currentPlayer) {
