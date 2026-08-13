@@ -1,8 +1,9 @@
-// Cron de 5 min (Web Push). Faz três coisas, todas idempotentes e controladas
+// Cron de 5 min (Web Push). Faz duas coisas, todas idempotentes e controladas
 // pela Central de Notificações (app_meta.data.settings.notifications):
 //   1) Abre inscrições de jogos com auto_open_at vencido e avisa todos.
-//   2) Avisa quem jogou quando abre a votação de DESEMPENHO (1h após o jogo).
-//   3) Avisa todos quando abre a votação do CHURRASCO (23h do dia do jogo).
+//   2) Avisa todos quando abre a votação do CHURRASCO (23h do dia do jogo).
+// O push de votação de DESEMPENHO é disparado pelo admin ao lançar resultado
+// (send-push trigger_voting via app.js), não mais por este cron.
 // Cada aviso é único por jogo (índices uq_push_log_open / uq_push_log_voting).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -27,7 +28,6 @@ function corsHeaders(req: Request): Record<string, string> {
 }
 
 const KIND_OPEN = "inscricoes_abertas";
-const KIND_PERF = "votacao_desempenho";
 const KIND_CHURR = "votacao_churrasco";
 
 function nowBrtMinute(): string {
@@ -38,13 +38,6 @@ function formatGameDate(raw: string): string {
   const s = String(raw || "").trim();
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}` : s;
-}
-// Início do jogo em ms (UTC) a partir de data+hora locais (BRT, -03:00).
-function gameStartMs(date: string, time: string): number {
-  const d = String(date || "").slice(0, 10);
-  const t = String(time || "").slice(0, 5);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{2}:\d{2}$/.test(t)) return NaN;
-  return Date.parse(`${d}T${t}:00-03:00`);
 }
 function churrascoOpenMs(date: string): number {
   const d = String(date || "").slice(0, 10);
@@ -96,7 +89,7 @@ Deno.serve(async (req) => {
     return true;
   }
 
-  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, perf: 0, churrasco: 0 };
+  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, churrasco: 0 };
   const nowMs = Date.now();
   const nowBrt = nowBrtMinute();
 
@@ -150,31 +143,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ---------- 2) Votação de desempenho (1h após o jogo) → quem jogou ----------
-    const perfHours = Number(settings.ratings_perf_window_hours) || 0;
-    if (enabled(KIND_PERF) && perfHours > 0) {
-      for (const g of games) {
-        const start = gameStartMs(String(g.game_date || ""), String(g.game_time || ""));
-        if (!start) continue;
-        const open = start + 3600_000;
-        const close = open + perfHours * 3600_000;
-        if (nowMs < open || nowMs > close) continue;
-        const gameKey = String(g.game_key || g.id || "");
-        const title = "Hora de votar ⭐";
-        const body = `Dê as notas de desempenho do jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
-        if (!(await claim(KIND_PERF, gameKey, title, body, clubId))) continue;
-        const { data: confs } = await admin
-          .from("presence_confirmations").select("player_id").eq("game_key", gameKey).eq("status", "confirmed").eq("club_id", clubId);
-        const ids = [...new Set((confs || []).map((c) => String(c.player_id)).filter(Boolean))];
-        if (!ids.length) continue;
-        const { data: subs } = await admin
-          .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids).eq("club_id", clubId);
-        await pushTo(subs || [], title, body);
-        out.perf = (out.perf as number) + 1;
-      }
-    }
-
-    // ---------- 3) Votação do churrasco (23h do dia do jogo) → todos ----------
+    // ---------- 2) Votação do churrasco (23h do dia do jogo) → todos ----------
     if (enabled(KIND_CHURR)) {
       for (const g of games) {
         const openMs = churrascoOpenMs(String(g.game_date || ""));
