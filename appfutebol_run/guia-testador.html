@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guia do Testador — Convocados</title>
+<style>
+:root {
+  --navy:        #0C1A38;
+  --navy-card:   #12233F;
+  --navy-inner:  #1A2E4A;
+  --navy-border: #1E3558;
+  --navy-deep:   #060E1C;
+  --gold:        #F0A500;
+  --gold-bg:     rgba(240,165,0,.10);
+  --gold-border: rgba(240,165,0,.22);
+  --green:       #22C55E;
+  --amber:       #F59E0B;
+  --white:       #F0F4FF;
+  --muted:       #6B8AAE;
+  --subtle:      #3A567A;
+  --bg:          #070E1D;
+  --surface:     #0D1B30;
+  --surface2:    #142234;
+  --border:      #1C3050;
+  --text:        #A8C0DC;
+  --heading:     #EDF3FF;
+  --accent:      #F0A500;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;color-scheme:dark}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+.wrap{max-width:720px;margin:0 auto;padding:1.75rem 1.25rem 5rem}
+
+/* ── Header ── */
+.pg-header{text-align:center;padding:2rem 0 2.25rem;margin-bottom:2rem}
+.app-chip{
+  display:inline-flex;align-items:center;gap:.45rem;
+  background:var(--gold-bg);border:1px solid var(--gold-border);
+  border-radius:999px;padding:.28rem .85rem .28rem .35rem;margin-bottom:1rem;
+}
+.chip-icon{
+  width:22px;height:22px;background:var(--gold);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--navy);
+}
+.chip-text{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.pg-title{font-size:clamp(1.6rem,5vw,2.4rem);font-weight:800;color:var(--heading);letter-spacing:-.025em;line-height:1.1;text-wrap:balance}
+.pg-sub{font-size:.9rem;color:var(--text);margin-top:.6rem;max-width:440px;margin-inline:auto;line-height:1.55}
+
+/* ── Tab bar ── */
+.tabs{
+  display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:3px;margin-bottom:2rem;overflow-x:auto;scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  flex:1;min-width:0;padding:.55rem .5rem;background:transparent;border:none;
+  border-radius:9px;color:var(--muted);font-size:.73rem;font-weight:600;cursor:pointer;
+  white-space:nowrap;transition:background .13s,color .13s;font-family:inherit;
+}
+.tab:hover{color:var(--heading);background:var(--surface2)}
+.tab.on{background:var(--gold);color:var(--navy)}
+
+/* ── Panels ── */
+.panel{display:none}
+.panel.on{display:block}
+
+/* ── Roteiro header ── */
+.rt-header{margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)}
+.rt-eyebrow{font-size:.6rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.35rem}
+.rt-title{font-size:1.3rem;font-weight:700;color:var(--heading);margin-bottom:.4rem}
+.rt-desc{font-size:.875rem;line-height:1.55;color:var(--text)}
+
+/* ── Steps ── */
+.steps{display:flex;flex-direction:column;gap:0}
+.step{
+  display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;
+  gap:.6rem 1rem;padding:1.25rem 0;border-bottom:1px solid var(--border);
+}
+.step:last-child{border-bottom:none}
+.step-n{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--gold-bg);border:1.5px solid var(--gold-border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:700;color:var(--accent);flex-shrink:0;margin-top:2px;
+}
+.step-text{min-width:0}
+.step-title{font-size:.95rem;font-weight:600;color:var(--heading);margin-bottom:.3rem}
+.step-body{font-size:.82rem;line-height:1.55;color:var(--text)}
+.step-body strong{color:var(--heading)}
+.tap{color:var(--gold);font-weight:600}
+.step-screen{grid-column:1/-1;display:flex;justify-content:center;padding-top:.25rem}
+
+/* ── Phone frame ── */
+.phone{
+  width:190px;background:var(--navy);border-radius:24px;
+  border:2px solid #253F60;
+  box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04);
+  overflow:hidden;position:relative;
+}
+.phone::before{
+  content:'';display:block;height:14px;background:var(--navy-deep);
+  border-bottom:1px solid #0F1E33;
+}
+
+/* ── App header ── */
+.ah{background:var(--navy);padding:7px 9px 5px;display:flex;align-items:center;justify-content:space-between}
+.ah-logo{display:flex;align-items:center;gap:6px}
+.ah-icon{width:21px;height:21px;background:#152C55;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px}
+.ah-name{font-size:9.5px;font-weight:800;color:#fff;letter-spacing:.04em}
+.ah-ver{font-size:5.5px;color:var(--muted);letter-spacing:.03em;display:block}
+.ah-av{width:19px;height:19px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;color:#1e3a5f}
+
+/* ── Game card ── */
+.gc{margin:5px 7px;background:var(--navy-card);border-radius:9px;padding:9px;border:1px solid var(--navy-border);position:relative;overflow:hidden}
+.gc-badge{position:absolute;top:8px;right:8px;z-index:1;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);border-radius:999px;padding:2px 7px;font-size:5.5px;font-weight:700;color:var(--green)}
+.gc-lbl{font-size:5px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.gc-date{font-size:16px;font-weight:800;color:#fff;line-height:1.05;margin-bottom:1px}
+.gc-time{font-size:5.5px;color:var(--muted);margin-bottom:8px}
+.gc-count{font-size:20px;font-weight:800;color:#fff;line-height:1}
+.gc-clbl{font-size:4.5px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.pb{height:3.5px;background:#1E3558;border-radius:999px;margin-bottom:2px;overflow:hidden}
+.pb-fill{height:100%;background:linear-gradient(90deg,var(--gold) 0%,var(--green) 100%);border-radius:999px}
+.pb-lbls{display:flex;justify-content:space-between;font-size:4.5px;color:var(--muted);margin-bottom:7px}
+.gc-btns{display:flex;gap:5px}
+.btn-g{flex:1;background:var(--gold);color:var(--navy);border:none;border-radius:999px;padding:5.5px 3px;font-size:6px;font-weight:700;text-align:center;line-height:1.3}
+.btn-d{flex:1;background:#1A2E4A;color:#fff;border:1px solid #253F60;border-radius:999px;padding:5.5px 3px;font-size:6px;font-weight:600;text-align:center}
+
+/* ── Stats row ── */
+.sr{display:flex;gap:3px;margin:3px 7px}
+.sb{flex:1;background:#0A1828;border-radius:5px;padding:4px 3px;text-align:center}
+.sb-v{font-size:8px;font-weight:700;color:#fff}
+.sb-l{font-size:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Bottom nav ── */
+.bn{background:var(--navy-deep);border-top:1px solid var(--navy-border);display:flex;padding:5px 2px 7px;justify-content:space-around}
+.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+.bn-icon{width:17px;height:17px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:8px}
+.bn-icon.on{background:var(--gold)}
+.bn-dot{width:3px;height:3px;background:var(--gold);border-radius:50%}
+
+/* ── Section box ── */
+.sb2{margin:4px 7px;background:var(--navy-card);border-radius:9px;padding:9px;border:1px solid var(--navy-border)}
+.sb2-lbl{font-size:5px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+
+/* ── Presence rows ── */
+.pr-row{display:flex;align-items:center;gap:5px;padding:4.5px 0;border-bottom:1px solid #162640}
+.pr-row:last-child{border-bottom:none}
+.pr-av{width:18px;height:18px;border-radius:50%;background:#1A2E4A;display:flex;align-items:center;justify-content:center;font-size:5.5px;font-weight:700;color:var(--muted);flex-shrink:0}
+.pr-name{font-size:6px;font-weight:600;color:#fff;flex:1}
+.pr-role{font-size:4.5px;color:var(--muted)}
+.tgl{width:20px;height:11px;border-radius:999px;display:flex;align-items:center;padding:1px;flex-shrink:0}
+.tgl.on{background:var(--gold);justify-content:flex-end}
+.tgl.off{background:#1E3558;justify-content:flex-start}
+.tthumb{width:9px;height:9px;background:#fff;border-radius:50%}
+.tlbl{font-size:4.5px;font-weight:600;margin-left:2px}
+.tlbl.on{color:var(--gold)}
+.tlbl.off{color:var(--muted)}
+
+/* ── Team result ── */
+.team-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.team-nm{font-size:8px;font-weight:700;color:#7BB3FF}
+.team-pts{background:var(--gold);color:var(--navy);font-size:5.5px;font-weight:700;padding:1px 5px;border-radius:999px}
+.team-row{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid #162640}
+.team-row:last-child{border-bottom:none}
+
+/* ── Player list ── */
+.jrow{display:flex;align-items:center;gap:5px;padding:5px 7px;border-bottom:1px solid #0F1E33}
+.jrow:last-child{border-bottom:none}
+.jav{width:20px;height:20px;border-radius:50%;background:#1A2E4A;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;color:var(--muted);flex-shrink:0}
+.jname{font-size:6.5px;font-weight:600;color:#fff}
+.jrole{font-size:5px;color:var(--muted)}
+.jright{display:flex;align-items:center;gap:4px;margin-left:auto}
+.pills{display:flex;flex-wrap:wrap;gap:3px;margin:5px 7px}
+.pill{padding:2px 7px;border-radius:999px;font-size:5.5px;font-weight:700}
+.pill.all{background:#1A2E4A;color:#7BB3FF}
+.pill.paid{background:rgba(34,197,94,.12);color:var(--green)}
+.pill.pend{background:rgba(240,165,0,.12);color:var(--amber)}
+.pill.in{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+
+/* ── Form ── */
+.ff{background:#1A2E4A;border:1px solid #253F60;border-radius:7px;padding:6px 7px;font-size:6.5px;color:var(--muted);margin-bottom:3px}
+.fs{background:#1A2E4A;border:1px solid #253F60;border-radius:7px;padding:6px 7px;font-size:6.5px;color:#fff;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.photo-row{display:flex;align-items:center;gap:6px;background:#1A2E4A;border:1px dashed #253F60;border-radius:7px;padding:6px 7px;margin-bottom:3px}
+.photo-circ{width:16px;height:16px;background:#253F60;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px}
+.photo-txt{font-size:5.5px;color:var(--muted);line-height:1.4}
+.photo-txt strong{display:block;font-size:6px;color:#fff}
+.chk-row{display:flex;align-items:center;gap:5px;margin:3px 0;font-size:6px;color:var(--muted)}
+.chk{width:10px;height:10px;border-radius:2px;border:1.5px solid var(--subtle);display:flex;align-items:center;justify-content:center}
+.chk.on{background:var(--gold);border-color:var(--gold);color:var(--navy);font-size:7px}
+.form-lbl{font-size:5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+
+/* ── Toast ── */
+.toast{margin:4px 7px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:7px;padding:5px 8px;font-size:6px;color:var(--green);text-align:center;font-weight:600}
+
+/* ── Highlight pulse ── */
+.hl{position:relative}
+.hl::after{content:'';position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--gold);animation:hlp 1.4s ease-in-out infinite;pointer-events:none}
+@keyframes hlp{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── Tip box ── */
+.tip{display:flex;gap:.6rem;align-items:flex-start;background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:9px;padding:.7rem .9rem;margin-top:1.25rem;font-size:.78rem;line-height:1.5;color:var(--text)}
+.tip-i{color:var(--accent);font-size:1rem;flex-shrink:0;margin-top:.05rem}
+
+.pspace{height:7px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pg-header">
+    <div class="app-chip">
+      <div class="chip-icon">⚽</div>
+      <span class="chip-text">Convocados · Guia do Testador</span>
+    </div>
+    <h1 class="pg-title">O que fazer no app</h1>
+    <p class="pg-sub">Siga os roteiros abaixo — cada um leva de 5 a 10 minutos e mostra as telas reais do aplicativo.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab on" onclick="showTab(0)">Roteiro 1 · Presença</button>
+    <button class="tab" onclick="showTab(1)">Roteiro 2 · Jogadores</button>
+    <button class="tab" onclick="showTab(2)">Roteiro 3 · Sorteio</button>
+  </div>
+
+  <!-- ══ ROTEIRO 1 ══ -->
+  <div class="panel on" id="p0">
+    <div class="rt-header">
+      <div class="rt-eyebrow">⏱ ~5 minutos · Para todos</div>
+      <h2 class="rt-title">Confirmar presença no jogo</h2>
+      <p class="rt-desc">Confirme sua presença no próximo jogo e explore a lista de jogadores confirmados. Essa é a ação mais importante para o teste.</p>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-text">
+          <div class="step-title">Abra o Convocados</div>
+          <div class="step-body">Ao entrar, você verá a tela inicial com o card do próximo jogo — data, horário e quantas vagas já foram preenchidas.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo">
+                <div class="ah-icon">⚽</div>
+                <div><div class="ah-name">CONVOCADOS</div><span class="ah-ver">1.170.0 · Administrador</span></div>
+              </div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc">
+              <div class="gc-badge">Confirmado</div>
+              <div class="gc-lbl">Hoje no Convocados</div>
+              <div class="gc-date">18/10/2026</div>
+              <div class="gc-time">20:00 · Aberto</div>
+              <div class="gc-count">5/10</div>
+              <div class="gc-clbl">Confirmados de linha</div>
+              <div class="pb"><div class="pb-fill" style="width:50%"></div></div>
+              <div class="pb-lbls"><span>50% preenchido</span><span>5 vagas restantes</span></div>
+              <div class="gc-btns">
+                <div class="btn-g">Cancelar presença</div>
+                <div class="btn-d">Ver jogo</div>
+              </div>
+            </div>
+            <div class="sr">
+              <div class="sb"><div class="sb-v">5</div><div class="sb-l">Linha</div></div>
+              <div class="sb"><div class="sb-v">2/2</div><div class="sb-l">Goleiros</div></div>
+              <div class="sb"><div class="sb-v">0</div><div class="sb-l">Fila</div></div>
+              <div class="sb"><div class="sb-v" style="font-size:6px;color:var(--green)">Aberto</div><div class="sb-l">Status</div></div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon on">🏠</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-text">
+          <div class="step-title">Confirme sua presença</div>
+          <div class="step-body">Se aparecer o botão dourado <span class="tap">"Confirmar presença"</span>, toque nele. Se já mostrar <strong>Confirmado</strong> e o botão <span class="tap">"Cancelar presença"</span>, você já está dentro — ótimo!</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc">
+              <div class="gc-lbl">Hoje no Convocados</div>
+              <div class="gc-date">18/10/2026</div>
+              <div class="gc-time">20:00 · Aberto</div>
+              <div class="gc-count">4/10</div>
+              <div class="gc-clbl">Confirmados de linha</div>
+              <div class="pb"><div class="pb-fill" style="width:40%"></div></div>
+              <div class="pb-lbls"><span>40% preenchido</span><span>6 vagas restantes</span></div>
+              <div class="gc-btns">
+                <div class="btn-g hl" style="border-radius:999px">Confirmar presença</div>
+                <div class="btn-d">Ver jogo</div>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon on">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-text">
+          <div class="step-title">Entre na tela do jogo</div>
+          <div class="step-body">Toque em <span class="tap">"Ver jogo"</span>. Você vai ver a seção <strong>Lista de Presença</strong> com goleiros e jogadores de linha — quem está dentro e quem está fora.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc" style="padding:7px">
+              <div class="gc-lbl">Próximo jogo</div>
+              <div class="gc-date" style="font-size:13px">18/10/2026</div>
+              <div class="gc-time">20:00 · Inscrições abertas</div>
+              <div class="pb" style="margin-top:4px"><div class="pb-fill" style="width:50%"></div></div>
+              <div style="font-size:6px;color:#fff;font-weight:700;margin-top:3px">5 / 10 <span style="font-weight:400;color:var(--muted)">confirmados</span></div>
+              <div style="font-size:5.5px;color:var(--green)">5 vagas restantes</div>
+            </div>
+            <div class="sb2">
+              <div class="sb2-lbl">Lista de presença</div>
+              <div style="font-size:6px;color:var(--green);font-weight:700;margin-bottom:4px">🤝 Goleiros (2/2)</div>
+              <div class="pr-row">
+                <div class="pr-av">RS</div>
+                <div style="flex:1"><div class="pr-name">🤝 Robson Severino</div><div class="pr-role">Goleiro</div></div>
+                <div class="tgl on"><div class="tthumb"></div></div>
+                <span class="tlbl on">Dentro</span>
+              </div>
+              <div style="font-size:5.5px;color:#7BB3FF;font-weight:700;margin:5px 0 3px">Linha (5/10)</div>
+              <div class="pr-row">
+                <div class="pr-av">HE</div>
+                <div style="flex:1"><div class="pr-name">Henry Eduardo</div><div class="pr-role">Zagueiro</div></div>
+                <div class="tgl on"><div class="tthumb"></div></div>
+                <span class="tlbl on">Dentro</span>
+              </div>
+              <div class="pr-row">
+                <div class="pr-av">FC</div>
+                <div style="flex:1"><div class="pr-name">Fabiano da Costa</div><div class="pr-role">Meia</div></div>
+                <div class="tgl off"><div class="tthumb"></div></div>
+                <span class="tlbl off">Fora</span>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon on">⚽</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-text">
+          <div class="step-title">Cancele e confirme de novo <span style="font-size:.7rem;color:var(--muted);font-weight:400">(extra)</span></div>
+          <div class="step-body">Para gerar mais atividade, volte à tela inicial e alterne sua presença: cancele e confirme novamente. Mais interações = melhor avaliação pelo Google.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="tip">
+      <span class="tip-i">💡</span>
+      <span>Faça isso em <strong style="color:var(--heading)">dias diferentes</strong> nas duas semanas. O Google analisa a frequência e a qualidade das sessões — quanto mais funcionalidades você usar, melhor.</span>
+    </div>
+  </div>
+
+
+  <!-- ══ ROTEIRO 2 ══ -->
+  <div class="panel" id="p1">
+    <div class="rt-header">
+      <div class="rt-eyebrow">⏱ ~8 minutos · Para organizadores</div>
+      <h2 class="rt-title">Gerenciar jogadores e mensalidades</h2>
+      <p class="rt-desc">Acesse a lista de jogadores, veja quem está em dia e experimente adicionar um jogador novo.</p>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-text">
+          <div class="step-title">Toque em "Jogadores" no menu</div>
+          <div class="step-body">No menu inferior, toque no ícone <span class="tap">👥</span> (terceiro da esquerda). Você verá a lista de todos os jogadores do grupo com os filtros de pagamento.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div style="padding:5px 7px 2px;font-size:9px;font-weight:700;color:#fff">Jogadores</div>
+            <div class="pills">
+              <div class="pill all">Todos 20</div>
+              <div class="pill paid">Pagos 3</div>
+              <div class="pill pend">Pendentes 13</div>
+              <div class="pill in">Dentro do jogo 5</div>
+            </div>
+            <div class="jrow">
+              <div class="jav">AF</div>
+              <div><div class="jname">Anderson F.</div><div class="jrole">Goleiro</div></div>
+              <div class="jright">
+                <div class="tgl off"><div class="tthumb"></div></div>
+                <span class="tlbl off" style="font-size:5px">Pendente</span>
+              </div>
+            </div>
+            <div class="jrow">
+              <div class="jav">CS</div>
+              <div><div class="jname">Carlos S.</div><div class="jrole">Zagueiro</div></div>
+              <div class="jright">
+                <div class="tgl on"><div class="tthumb"></div></div>
+                <span class="tlbl on" style="font-size:5px">Pago</span>
+              </div>
+            </div>
+            <div class="jrow">
+              <div class="jav">CM</div>
+              <div><div class="jname">Carlos M.</div><div class="jrole">Meia</div></div>
+              <div class="jright">
+                <div class="tgl off"><div class="tthumb"></div></div>
+                <span class="tlbl off" style="font-size:5px">Pendente</span>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon on">👥</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-text">
+          <div class="step-title">Marque a mensalidade de um jogador</div>
+          <div class="step-body">Encontre um jogador com status <strong>Pendente</strong> e toque no <span class="tap">toggle</span> ao lado do nome para marcar como <strong>Pago</strong>. Pode reverter logo depois.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div style="padding:5px 7px 2px;font-size:9px;font-weight:700;color:#fff">Jogadores</div>
+            <div class="jrow">
+              <div class="jav">AF</div>
+              <div><div class="jname">Anderson F.</div><div class="jrole">Goleiro</div></div>
+              <div class="jright">
+                <div class="tgl off hl" style="border-radius:999px"><div class="tthumb"></div></div>
+                <span class="tlbl off" style="font-size:5px">Pendente</span>
+              </div>
+            </div>
+            <div class="jrow" style="background:rgba(34,197,94,.04);border-radius:5px">
+              <div class="jav">CM</div>
+              <div><div class="jname">Carlos M.</div><div class="jrole">Meia</div></div>
+              <div class="jright">
+                <div class="tgl on"><div class="tthumb"></div></div>
+                <span class="tlbl on" style="font-size:5px">Pago ✓</span>
+              </div>
+            </div>
+            <div class="jrow">
+              <div class="jav">DM</div>
+              <div><div class="jname">Diego M.</div><div class="jrole">Atacante</div></div>
+              <div class="jright">
+                <div class="tgl off"><div class="tthumb"></div></div>
+                <span class="tlbl off" style="font-size:5px">Pendente</span>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon on">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-text">
+          <div class="step-title">Adicione um jogador de teste</div>
+          <div class="step-body">Role a tela para cima até ver <strong>"NOVO JOGADOR"</strong> e toque em <span class="tap">"Adicionar jogador"</span>. O formulário vai aparecer abaixo.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div style="margin:5px 7px;background:var(--navy-card);border-radius:9px;padding:9px;border:1px solid var(--navy-border)">
+              <div class="form-lbl">Novo jogador</div>
+              <div class="ff">Nome</div>
+              <div class="ff">Telefone</div>
+              <div class="ff">DD/MM/AAAA</div>
+              <div class="photo-row">
+                <div class="photo-circ">📷</div>
+                <div class="photo-txt"><strong>Foto do jogador</strong>Selecionar ou trocar foto</div>
+              </div>
+              <div class="fs">Jogador <span style="color:var(--muted)">▾</span></div>
+              <div class="fs">Goleiro <span style="color:var(--muted)">▾</span></div>
+              <div class="chk-row"><div class="chk">🔒</div> Admin (Pro)</div>
+              <div class="chk-row"><div class="chk on">✓</div> Mensalidade OK</div>
+              <div class="btn-g hl" style="margin-top:5px;border-radius:999px;padding:6px;font-size:7px">Adicionar</div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon on">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-text">
+          <div class="step-title">Preencha e confirme</div>
+          <div class="step-body">Digite um nome (ex: <strong>"Testador Silva"</strong>), escolha a posição e toque em <span class="tap">"Adicionar"</span>. Pode excluir depois — o importante é usar o fluxo completo.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="tip">
+      <span class="tip-i">💡</span>
+      <span>Use os <strong style="color:var(--heading)">filtros</strong> — Pagos, Pendentes, Dentro do jogo — para navegar pela lista. Cada toque conta como interação no relatório do Google.</span>
+    </div>
+  </div>
+
+
+  <!-- ══ ROTEIRO 3 ══ -->
+  <div class="panel" id="p2">
+    <div class="rt-header">
+      <div class="rt-eyebrow">⏱ ~5 minutos · Para organizadores</div>
+      <h2 class="rt-title">Sortear os times</h2>
+      <p class="rt-desc">Com jogadores confirmados, faça o sorteio automático. O app equilibra os times pelas posições de cada jogador.</p>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-text">
+          <div class="step-title">Abra o jogo da semana</div>
+          <div class="step-body">Na tela inicial, toque em <span class="tap">"Ver jogo"</span> para entrar nos detalhes do próximo jogo.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc">
+              <div class="gc-badge">Confirmado</div>
+              <div class="gc-lbl">Hoje no Convocados</div>
+              <div class="gc-date">18/10/2026</div>
+              <div class="gc-time">20:00 · Aberto</div>
+              <div class="gc-count">5/10</div>
+              <div class="gc-clbl">Confirmados de linha</div>
+              <div class="pb"><div class="pb-fill" style="width:50%"></div></div>
+              <div class="pb-lbls"><span>50% preenchido</span><span>5 vagas restantes</span></div>
+              <div class="gc-btns">
+                <div class="btn-g">Cancelar presença</div>
+                <div class="btn-d hl" style="border-radius:999px">Ver jogo</div>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon on">🏠</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">⚽</div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-text">
+          <div class="step-title">Encontre "Sorteio de Times"</div>
+          <div class="step-body">Role a tela para baixo até ver a seção <strong>"SORTEIO DE TIMES"</strong>. Ela mostra quantos confirmados estão disponíveis para o sorteio.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc" style="padding:7px">
+              <div class="gc-lbl">Próximo jogo</div>
+              <div class="gc-date" style="font-size:13px">18/10/2026</div>
+              <div class="gc-time">20:00 · Inscrições abertas</div>
+              <div style="font-size:6px;color:#fff;font-weight:700;margin-top:3px">5 / 10 confirmados · <span style="color:var(--green)">5 vagas</span></div>
+            </div>
+            <div class="sb2">
+              <div class="sb2-lbl">Sorteio de Times</div>
+              <div style="font-size:5.5px;color:var(--muted);margin-bottom:5px;line-height:1.5">▪ Confirmados disponíveis: 5<br>▪ Equilibra os times pelas notas de desempenho, mantendo as posições divididas.</div>
+              <div class="btn-g hl" style="border-radius:999px;padding:7px;font-size:7.5px;text-align:center">Sortear times</div>
+            </div>
+            <div class="sb2">
+              <div class="sb2-lbl">Lista de Presença</div>
+              <div class="pr-row">
+                <div class="pr-av">RS</div>
+                <div style="flex:1"><div class="pr-name">🤝 Robson S.</div><div class="pr-role">Goleiro</div></div>
+                <div class="tgl on"><div class="tthumb"></div></div>
+                <span class="tlbl on">Dentro</span>
+              </div>
+            </div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon on">⚽</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-text">
+          <div class="step-title">Veja o resultado do sorteio</div>
+          <div class="step-body">Após tocar em <span class="tap">"Sortear times"</span>, o app monta o <strong>Time A</strong> e o <strong>Time B</strong> automaticamente, com nome e posição de cada jogador. Uma confirmação verde aparece na tela.</div>
+        </div>
+        <div class="step-screen">
+          <div class="phone">
+            <div class="ah">
+              <div class="ah-logo"><div class="ah-icon">⚽</div><div class="ah-name">CONVOCADOS</div></div>
+              <div class="ah-av">WP</div>
+            </div>
+            <div class="gc" style="padding:7px">
+              <div class="gc-lbl">Próximo jogo</div>
+              <div class="gc-date" style="font-size:12px">18/10/2026</div>
+              <div class="gc-time">20:00 · Inscrições abertas</div>
+            </div>
+            <div class="sb2">
+              <div class="sb2-lbl">Sorteio de Times</div>
+              <div style="font-size:5.5px;color:var(--muted);margin-bottom:5px">▪ Sorteado em: 14/08/2026, 14:50:41</div>
+              <div class="team-hdr">
+                <span class="team-nm">Time A</span>
+                <span class="team-pts">⚡ 5</span>
+              </div>
+              <div class="team-row">
+                <div class="pr-av">RM</div>
+                <div><div class="pr-name">🤝 Rosa Maria</div><div class="pr-role">Goleiro</div></div>
+              </div>
+              <div class="team-row">
+                <div class="pr-av">HE</div>
+                <div><div class="pr-name">Henry Eduardo</div><div class="pr-role">Zagueiro</div></div>
+              </div>
+              <div class="team-row">
+                <div class="pr-av">FC</div>
+                <div><div class="pr-name">Fabiano da Costa</div><div class="pr-role">Meia</div></div>
+              </div>
+            </div>
+            <div class="toast">✓ Times sorteados com sucesso</div>
+            <div class="pspace"></div>
+            <div class="bn">
+              <div class="bn-item"><div class="bn-icon">🏠</div></div>
+              <div class="bn-item"><div class="bn-icon on">⚽</div><div class="bn-dot"></div></div>
+              <div class="bn-item"><div class="bn-icon">👥</div></div>
+              <div class="bn-item"><div class="bn-icon">🍖</div></div>
+              <div class="bn-item"><div class="bn-icon">🏆</div></div>
+              <div class="bn-item"><div class="bn-icon">💰</div></div>
+              <div class="bn-item"><div class="bn-icon">⚙️</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-text">
+          <div class="step-title">Repita o sorteio <span style="font-size:.7rem;color:var(--muted);font-weight:400">(opcional)</span></div>
+          <div class="step-body">Pode sortear mais de uma vez — cada sorteio redistribui os jogadores. Isso mostra para o Google que o app está sendo usado de verdade.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="tip">
+      <span class="tip-i">💡</span>
+      <span>Sorteie em dias diferentes e combine com os outros roteiros. Quanto mais variado o uso, melhor o sinal para a revisão do Google Play.</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  document.querySelectorAll('.panel').forEach((p,j)=>p.classList.toggle('on',j===i));
+}
+</script>
+</body>
+</html>
