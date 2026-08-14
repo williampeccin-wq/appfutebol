@@ -22,6 +22,7 @@ const OPEN_THROTTLE_MS = 5 * 60 * 1000;
 let lastOpenAt = 0;
 let lastTab = null;
 let lastPlayer = null;
+let lastVersion = null;
 let visibilityHooked = false;
 
 function enabled() {
@@ -76,19 +77,20 @@ function hookVisibility() {
       const now = Date.now();
       if (now - lastOpenAt < OPEN_THROTTLE_MS) return;
       lastOpenAt = now;
-      post('app_open', lastPlayer, { source: 'foreground' });
+      post('app_open', lastPlayer, { source: 'foreground', v: lastVersion });
     });
   } catch (_) {}
 }
 
 // "Abriu o app" — carga inicial e cada retorno ao foreground (throttle 5 min).
-export function logAppOpen(player) {
+export function logAppOpen(player, version) {
   if (player) lastPlayer = player;
+  if (version) lastVersion = String(version).replace(/^v/, '').split('-')[0]; // "1.170.0"
   hookVisibility();
   const now = Date.now();
   if (now - lastOpenAt < OPEN_THROTTLE_MS) return;
   lastOpenAt = now;
-  post('app_open', player, { source: 'load' });
+  post('app_open', player, { source: 'load', v: lastVersion });
 }
 
 // Troca de aba (só quando muda de fato).

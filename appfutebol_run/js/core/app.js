@@ -4131,7 +4131,7 @@ function bindAppEvents(currentPlayer) {
   });
 
   // TEMPORÁRIO (piloto): registra que o app foi aberto (throttle interno de 5min).
-  logAppOpen(currentPlayer);
+  logAppOpen(currentPlayer, APP_VERSION);
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
