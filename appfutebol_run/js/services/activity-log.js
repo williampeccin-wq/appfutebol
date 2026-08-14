@@ -98,3 +98,10 @@ export function logTab(player, tab) {
   lastTab = tab;
   post('tab', player, { tab });
 }
+
+// Ações dos roteiros de teste fechado.
+export function logPresenceConfirmed(player) { post('presence_confirmed', player, null); }
+export function logPresenceCancelled(player) { post('presence_cancelled', player, null); }
+export function logTeamDraw(player, detail)  { post('team_draw',          player, detail || null); }
+export function logPlayerAdded(player, detail){ post('player_added',       player, detail || null); }
+export function logPaymentToggled(player, detail){ post('payment_toggled', player, detail || null); }

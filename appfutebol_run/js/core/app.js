@@ -2023,6 +2023,7 @@ document.addEventListener("click", async (e) => {
   setPlayerFormMode(false);
   resetPlayerForm();
   uiActionInFlight = false;
+  if (!isEditing) logPlayerAdded(currentPlayer, { name });
   showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
   return;
@@ -2615,6 +2616,7 @@ if (action === "admin-add-to-game") {
     replaceState(safeSnapshot);
 
     uiActionInFlight = false;
+    logPaymentToggled(currentPlayer, { paid: action === "mark-paid", target_id: id });
     showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
     return;
   }
@@ -2677,7 +2679,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 // TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
-import { logAppOpen, logTab } from '../services/activity-log.js';
+import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
@@ -4147,6 +4149,10 @@ function bindAppEvents(currentPlayer) {
 
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
     const result = toggleConfirmation(currentPlayer.id);
+    if (result?.ok) {
+      if (result.message?.includes('cancelad')) logPresenceCancelled(currentPlayer);
+      else if (result.message?.includes('confirmad')) logPresenceConfirmed(currentPlayer);
+    }
     if (result?.message) showToast(result.message, result.ok ? 'success' : 'error');
     notifyWaitlistPromotion(result);
   });
@@ -4156,6 +4162,7 @@ function bindAppEvents(currentPlayer) {
     // balanceamento por nota cai no fallback neutro sem o admin perceber).
     if (isVotingEnabled()) { try { await loadRatingsCache(); } catch (_) { /* segue só por posição */ } }
     const result = drawTeams();
+    if (result?.ok) logTeamDraw(currentPlayer, { players: result.sortResult?.total_players || null });
     showToast(result.message, result.ok ? 'success' : 'error');
   });
 
