@@ -5849,6 +5849,32 @@ body {
   border: 1px solid var(--hfc-glass-border);
 }
 
+/* ---------- BANNER DE ATUALIZAÇÃO (teste fechado) ---------- */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(240, 165, 0, 0.10);
+  border: 1px solid rgba(240, 165, 0, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  text-decoration: none;
+  color: var(--hfc-text);
+}
+.update-banner-text {
+  flex: 1;
+  font-size: 0.83rem;
+  line-height: 1.35;
+}
+.update-banner-cta {
+  margin-left: auto;
+  color: var(--hfc-gold, #f0a500);
+  font-weight: 700;
+  font-size: 0.83rem;
+  white-space: nowrap;
+}
+
 /* ---------- JOGO DA SEMANA (Stadium Glass) ---------- */
 .content--weekly_game {
   background: radial-gradient(130% 55% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 40%, var(--hfc-navy-900) 100%);

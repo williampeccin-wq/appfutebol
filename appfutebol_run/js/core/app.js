@@ -4864,6 +4864,12 @@ function renderHome(snapshot, currentPlayer) {
 
   return `
     <section class="home-v2">
+      ${/Android/i.test(navigator.userAgent) ? `
+      <a class="update-banner" href="https://play.google.com/store/apps/details?id=br.app.convocados" target="_blank" rel="noopener noreferrer">
+        <span>📲</span>
+        <span class="update-banner-text">Atualize o app na Play Store para participar do teste fechado</span>
+        <span class="update-banner-cta">Atualizar →</span>
+      </a>` : ''}
       ${(game && game.open) ? `
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
