@@ -1256,6 +1256,12 @@ document.addEventListener("click", async (e) => {
   if (uiActionInFlight && action !== "cancel-edit") return;
   const id = trigger.dataset.id || "";
 
+  if (action === "dismiss-update-modal") {
+    sessionStorage.setItem('update_modal_dismissed', '1');
+    document.getElementById('update-modal-overlay')?.remove();
+    return;
+  }
+
   if (action === "pro-upsell") {
     e.preventDefault();
     showProUpsellModal();
@@ -4864,12 +4870,22 @@ function renderHome(snapshot, currentPlayer) {
 
   return `
     <section class="home-v2">
-      ${/Android/i.test(navigator.userAgent) ? `
-      <a class="update-banner" href="https://play.google.com/store/apps/details?id=br.app.convocados" target="_blank" rel="noopener noreferrer">
-        <span>📲</span>
-        <span class="update-banner-text">Atualize o app na Play Store para participar do teste fechado</span>
-        <span class="update-banner-cta">Atualizar →</span>
-      </a>` : ''}
+      ${/Android/i.test(navigator.userAgent) && !sessionStorage.getItem('update_modal_dismissed') ? `
+      <div class="update-modal-overlay" id="update-modal-overlay">
+        <div class="update-modal">
+          <div class="update-modal-icon">📲</div>
+          <div class="update-modal-title">Atualização disponível</div>
+          <div class="update-modal-body">
+            Atualize o Convocados pela Play Store para participar do teste fechado com a versão mais recente.
+          </div>
+          <a class="btn btn-primary update-modal-cta" href="https://play.google.com/store/apps/details?id=br.app.convocados" target="_blank" rel="noopener noreferrer">
+            Ir para a Play Store
+          </a>
+          <button class="btn btn-secondary update-modal-dismiss" type="button" data-action="dismiss-update-modal">
+            Já atualizei
+          </button>
+        </div>
+      </div>` : ''}
       ${(game && game.open) ? `
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
