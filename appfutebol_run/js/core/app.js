@@ -2957,7 +2957,8 @@ function bindGlobalSystemEvents() {
   // servidor não recebeu. Sem avisar, a pessoa confia numa confirmação que vai
   // sumir no próximo sync. Throttle de 30s para não virar spam em rede instável.
   let lastRemoteSaveFailAt = 0;
-  window.addEventListener('harmonia:remote-save-failed', () => {
+  window.addEventListener('harmonia:remote-save-failed', (event) => {
+    if (event.detail?.conflict) return; // conflito já tratado silenciosamente pelo remote-conflict
     const now = Date.now();
     if (now - lastRemoteSaveFailAt < 30000) return;
     lastRemoteSaveFailAt = now;
