@@ -800,6 +800,22 @@ async function deleteRow(config, table, column, value) {
   });
 }
 
+// Quem está gravando e o que o SERVIDOR aceita dele. Um jogador comum só pode
+// escrever a PRÓPRIA linha de players (trigger harmonia_guard_player_update:
+// `player_update_not_allowed` para linha de outro) e a PRÓPRIA presença
+// (policy harmonia_presence_*_admin_or_self). app_meta/game_state são
+// admin-only (app_meta_write_admin / game_state_write_admin).
+//
+// Sem sessão ou sem achar o próprio player, NÃO restringe nada — mantém o
+// comportamento anterior em vez de arriscar engolir gravação legítima.
+function writerScope(nextParts) {
+  const uid = getCurrentAuthUserId();
+  if (!uid) return { restricted: false, playerId: null };
+  const me = (nextParts?.players || []).find((player) => String(player?.auth_user_id || '') === String(uid));
+  if (!me) return { restricted: false, playerId: null };
+  return { restricted: me.is_admin !== true, playerId: String(me.id) };
+}
+
 function buildGranularOperations(config, previousParts, nextParts, now) {
   // club_id do clube atual para carimbar nas gravações de player. SEM isto, o
   // upsert cai no DEFAULT do schema (o clube legado) e a RLS rejeita com 403 —
@@ -811,6 +827,18 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
   const clubIdField = (clubKeyParaRls && clubKeyParaRls !== (config.stateKey || 'default'))
     ? { club_id: clubKeyParaRls }
     : {};
+  // INCIDENTE 17/08: o toast vermelho "Não consegui salvar no servidor" pipocava
+  // para os TESTADORES (perfil Jogador) logo depois de confirmar presença — e a
+  // presença tinha sido salva. Motivo: o baseline `lastSplitSnapshot` guarda o
+  // estado CRU do servidor, enquanto o app roda validateAndRepairState por cima
+  // (normaliza telefone com máscara, remove password_hash residual, dedupe...).
+  // O diff acusava mudança em jogadores que o usuário nunca tocou e o cliente
+  // tentava regravar a linha DELES. Para o admin passa; para o jogador o
+  // servidor recusa, a operação em lote falha e o app culpa a internet.
+  // Aqui não se propõe mais gravação que o servidor sempre recusaria — quem
+  // cura o dado cru é a sessão de admin, que tem permissão para isso.
+  const scope = writerScope(nextParts);
+  const skipped = [];
   const operations = [];
   const previousPlayers = indexBy(previousParts?.players || [], (player) => player.id);
   const nextPlayers = indexBy(nextParts.players, (player) => player.id);
@@ -826,6 +854,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   for (const [id, player] of nextPlayers.entries()) {
     if (stableStringify(previousPlayers.get(id)) !== stableStringify(player)) {
+      if (scope.restricted && String(id) !== scope.playerId) {
+        skipped.push(`player:${id}`);
+        continue;
+      }
       const authUserId = player.auth_user_id || null;
       const isAdmin = player.is_admin === true;
       operations.push({
@@ -873,6 +905,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     };
 
     if (stableStringify(previousConfirmations.get(key)) !== stableStringify(normalizedConfirmation)) {
+      if (scope.restricted && String(normalizedConfirmation.player_id) !== scope.playerId) {
+        skipped.push(`presence:${key}`);
+        continue;
+      }
       operations.push({
         type: 'upsert_presence_confirmation',
         run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, ownGameKey),
@@ -888,6 +924,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     const entryGameKey = String(confirmation?.game_key || '') || previousGameKey;
     const entryPlayerId = String(confirmation?.player_id || '');
     if (!nextConfirmations.has(key) && explicitDeletedPlayerIds.has(entryPlayerId)) {
+      if (scope.restricted && entryPlayerId !== scope.playerId) {
+        skipped.push(`presence_delete:${key}`);
+        continue;
+      }
       operations.push({
         type: 'delete_presence_confirmation_explicit',
         run: () => requestNoContent(
@@ -902,25 +942,41 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
 
   const clubKey = currentClubKey(config);
 
-  if (stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null)) {
-    operations.push({
-      type: 'upsert_game',
-      run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
-    });
+  // game_state e app_meta são blobs do CLUBE: só admin grava. Um jogador que
+  // tentasse (ex.: reconciliação da fila no poll, normalização do guard) levava
+  // recusa do servidor e o app anunciava "não salvei" para uma alteração que
+  // nem era dele.
+  const gameChanged = stableStringify(previousParts?.game || null) !== stableStringify(nextParts.game || null);
+  const metaChanged = stableStringify(previousParts?.meta || {}) !== stableStringify(nextParts.meta || {});
+
+  if (scope.restricted) {
+    if (gameChanged || gameStateHadVolatileDraw) skipped.push('game_state');
+    if (metaChanged) skipped.push('app_meta');
+  } else {
+    if (gameChanged) {
+      operations.push({
+        type: 'upsert_game',
+        run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
+      });
+    }
+
+    if (gameStateHadVolatileDraw && !operations.some((operation) => operation.type === 'upsert_game')) {
+      operations.push({
+        type: 'cleanup_game_draw_fields',
+        run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
+      });
+    }
+
+    if (metaChanged) {
+      operations.push({
+        type: 'upsert_meta',
+        run: () => upsertRow(config, SPLIT_TABLES.meta, { key: clubKey, data: nextParts.meta, updated_at: now }),
+      });
+    }
   }
 
-  if (gameStateHadVolatileDraw && !operations.some((operation) => operation.type === 'upsert_game')) {
-    operations.push({
-      type: 'cleanup_game_draw_fields',
-      run: () => upsertRow(config, SPLIT_TABLES.game, { key: clubKey, data: stripVolatileDrawFields(nextParts.game), updated_at: now }),
-    });
-  }
-
-  if (stableStringify(previousParts?.meta || {}) !== stableStringify(nextParts.meta || {})) {
-    operations.push({
-      type: 'upsert_meta',
-      run: () => upsertRow(config, SPLIT_TABLES.meta, { key: clubKey, data: nextParts.meta, updated_at: now }),
-    });
+  if (skipped.length) {
+    console.info('[storage.supabase] gravações fora do alcance deste usuário (não-admin) — ignoradas:', skipped);
   }
 
   return operations;
@@ -1098,7 +1154,9 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
   const failed = results.find((result) => !result.ok);
 
   if (failed) {
-    return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}` };
+    // O status vai junto: quem avisa o usuário precisa saber se foi rede (culpar
+    // a internet faz sentido) ou recusa do servidor (culpar a internet mente).
+    return { ok: false, conflict: false, status: failed.status || null, reason: `split_granular_save_failed_${failed.status}` };
   }
 
   // O baseline tem de refletir o que foi REALMENTE gravado. Depois de um rebase

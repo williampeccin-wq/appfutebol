@@ -2925,19 +2925,6 @@ function bindGlobalSystemEvents() {
     showToast('Armazenamento do aparelho cheio. Os dados seguem salvos no servidor; considere remover fotos grandes.', 'error');
   });
 
-  // A gravação no servidor não aconteceu — o que está na tela é só local e vai
-  // ser substituído pelo estado remoto. O usuário PRECISA saber que precisa
-  // refazer; antes isso era silencioso e a alteração sumia sozinha.
-  // Um alerta por vez: o poll pode disparar o evento em sequência.
-  let remoteSaveFailureNotifiedAt = 0;
-  window.addEventListener('harmonia:remote-save-failed', (event) => {
-    const agora = Date.now();
-    if (agora - remoteSaveFailureNotifiedAt < 8000) return;
-    remoteSaveFailureNotifiedAt = agora;
-    console.warn('[app] alteração não salva no servidor:', event?.detail?.reason);
-    showToast('Sua alteração NÃO foi salva no servidor e será desfeita. Verifique a conexão e refaça.', 'error');
-  });
-
   window.addEventListener('harmonia:remote-conflict', () => {
     // Conflito remoto de polling/sync não deve gerar toast recorrente.
     // Apenas atualiza o estado local de forma silenciosa, preservando sessão/UI.
@@ -2956,13 +2943,27 @@ function bindGlobalSystemEvents() {
   // Escrita remota falhou: o local JÁ salvou (a tela mostra o resultado), mas o
   // servidor não recebeu. Sem avisar, a pessoa confia numa confirmação que vai
   // sumir no próximo sync. Throttle de 30s para não virar spam em rede instável.
+  //
+  // UM listener só. Havia dois ouvindo este mesmo evento, com textos
+  // diferentes, e o guard de conflito de a6c477d cobria apenas um deles — todo
+  // conflito de concorrência continuava exibindo o toast do outro.
+  //
+  // O texto acompanha a causa: mandar "confira a internet" quando o servidor
+  // RECUSOU a gravação (4xx) manda o usuário caçar um problema que não existe.
   let lastRemoteSaveFailAt = 0;
   window.addEventListener('harmonia:remote-save-failed', (event) => {
     if (event.detail?.conflict) return; // conflito já tratado silenciosamente pelo remote-conflict
     const now = Date.now();
     if (now - lastRemoteSaveFailAt < 30000) return;
     lastRemoteSaveFailAt = now;
-    showToast('Não consegui salvar no servidor: sua alteração ficou só neste aparelho. Confira a internet e refaça.', 'error');
+    const status = Number(event.detail?.status) || 0;
+    console.warn('[app] alteração não salva no servidor:', event.detail?.reason, status || '');
+    const mensagem = status === 401
+      ? 'Sua sessão expirou: a alteração ficou só neste aparelho. Entre de novo e refaça.'
+      : (status >= 400 && status < 500)
+        ? `O servidor não aceitou esta alteração (erro ${status}). Ela ficou só neste aparelho — avise o administrador.`
+        : 'Não consegui salvar no servidor: sua alteração ficou só neste aparelho. Confira a internet e refaça.';
+    showToast(mensagem, 'error');
   });
 }
 
