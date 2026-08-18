@@ -27,9 +27,16 @@ function corsHeaders(req: Request): Record<string, string> {
   return h;
 }
 
-// SQLSTATE de "relation does not exist": separa o projeto single-tenant (fallback
-// abaixo) de uma falha real de leitura, que continua devolvendo 500.
-const MISSING_TABLE = "42P01";
+// "Tabela não existe" separa o projeto single-tenant (fallback abaixo) de uma falha
+// real de leitura, que continua devolvendo 500. Não basta olhar o SQLSTATE 42P01: o
+// PostgREST resolve tabela pelo schema cache e devolve PGRST205 ANTES de chegar ao
+// Postgres — foi o que manteve o cron em 500 mesmo depois do primeiro conserto.
+const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205", "PGRST202", "PGRST200"]);
+function isMissingTable(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_TABLE_CODES.has(err.code)) return true;
+  return /does not exist|schema cache/i.test(String(err.message || ""));
+}
 
 const KIND_OPEN = "inscricoes_abertas";
 const KIND_CHURR = "votacao_churrasco";
@@ -105,7 +112,8 @@ Deno.serve(async (req) => {
 
   // Multi-tenant: itera TODOS os clubes; cada um tem seu blob app_meta key=club_id.
   // MAS nem todo projeto tem a tabela `clubs`: o harmonia-fc nasceu single-tenant e
-  // nunca recebeu as migrations do multi-tenant. Lá esta leitura falhava com 42P01 e
+  // nunca recebeu as migrations do multi-tenant. Lá esta leitura falha com "tabela
+  // ausente" e
   // a função saía em 500 ANTES de olhar qualquer jogo — o cron rodava de 5 em 5 min,
   // nada abria e nenhum push saía, sem rastro no app (INCIDENTE 17/08: o jogo de
   // 19/08 tinha auto_open_at 17/08 21:00 e teve de ser aberto na mão). Quando a
@@ -114,15 +122,15 @@ Deno.serve(async (req) => {
   const clubsRead = await admin.from("clubs").select("id, plan");
   if (!clubsRead.error) {
     clubList = (clubsRead.data || []) as Array<{ id: string; plan?: string }>;
-  } else if (clubsRead.error.code === MISSING_TABLE) {
+  } else if (isMissingTable(clubsRead.error)) {
     singleTenant = true;
     const { data: metaKeys, error: metaKeysErr } = await admin.from("app_meta").select("key");
     if (metaKeysErr) { console.error("[auto-open] app_meta keys read:", metaKeysErr.message); return json({ error: "app_meta_query_failed" }, 500); }
     // Sem tabela de planos não há o que gatear: o clube único vale como pro.
     clubList = (metaKeys || []).map((row) => ({ id: String(row.key), plan: "pro" }));
   } else {
-    console.error("[auto-open] clubs read:", clubsRead.error.message);
-    return json({ error: "clubs_query_failed" }, 500);
+    console.error("[auto-open] clubs read:", clubsRead.error.code, clubsRead.error.message);
+    return json({ error: "clubs_query_failed", code: clubsRead.error.code || null, message: String(clubsRead.error.message || "").slice(0, 200) }, 500);
   }
   out.single_tenant = singleTenant;
 
