@@ -132,8 +132,17 @@ Deno.serve(async (req) => {
     }
   } catch (_) { /* tabela clubs ausente — assume pro */ }
 
-  // Config do clube (blob app_meta). Chave = 'default' enquanto multitenant não aplicado.
-  const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", "default").maybeSingle();
+  // Config do clube (blob app_meta). A chave é 'default' na instância pré-multitenant
+  // e o club_id no multi-tenant — mas o harmonia-fc é híbrido: NÃO tem a tabela clubs
+  // e mesmo assim o cliente já grava o blob sob uma chave UUID. Com 'default' fixo a
+  // leitura voltava vazia e todo comprovante morria em config_missing. Fallback só
+  // dispara quando existe UM único blob no projeto (single-tenant de fato); havendo
+  // mais de um, não há o que adivinhar e o comportamento é o de antes.
+  let metaRow = (await admin.from("app_meta").select("data").eq("key", "default").maybeSingle()).data;
+  if (!metaRow) {
+    const { data: metaRows } = await admin.from("app_meta").select("data").limit(2);
+    if (metaRows && metaRows.length === 1) metaRow = metaRows[0];
+  }
   const settings = metaRow?.data?.settings || {};
   const cfgAmount = Number(settings.mens_amount) || 0;
   const cfgBeneficiary = normName(String(settings.mens_beneficiary || ""));

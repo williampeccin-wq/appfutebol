@@ -27,6 +27,10 @@ function corsHeaders(req: Request): Record<string, string> {
   return h;
 }
 
+// SQLSTATE de "relation does not exist": separa o projeto single-tenant (fallback
+// abaixo) de uma falha real de leitura, que continua devolvendo 500.
+const MISSING_TABLE = "42P01";
+
 const KIND_OPEN = "inscricoes_abertas";
 const KIND_CHURR = "votacao_churrasco";
 
@@ -67,6 +71,10 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
+  // Projeto sem a tabela `clubs` (single-tenant): resolvido logo abaixo, antes de
+  // qualquer uso. Mora aqui em cima porque claim()/subsOfClub() fecham sobre ele.
+  let singleTenant = false;
+
   // Envia uma notificação para uma lista de inscrições; remove as mortas.
   async function pushTo(subs: Array<{ endpoint: string; p256dh: string; auth: string }>, title: string, body: string) {
     const payload = JSON.stringify({ title, body, url: "./" });
@@ -84,7 +92,9 @@ Deno.serve(async (req) => {
   }
   // Insere a linha de dedup (POR CLUBE); true se é a primeira vez (deve enviar).
   async function claim(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
-    const { error } = await admin.from("push_log").insert({ kind, game_key: gameKey, club_id: clubId, title, body, status: "sent" });
+    const row: Record<string, unknown> = { kind, game_key: gameKey, title, body, status: "sent" };
+    if (!singleTenant) row.club_id = clubId; // coluna inexistente no projeto single-tenant
+    const { error } = await admin.from("push_log").insert(row);
     if (error) return false; // 23505 (já enviado) ou outro erro → não envia
     return true;
   }
@@ -94,8 +104,36 @@ Deno.serve(async (req) => {
   const nowBrt = nowBrtMinute();
 
   // Multi-tenant: itera TODOS os clubes; cada um tem seu blob app_meta key=club_id.
-  const { data: clubList, error: clubErr } = await admin.from("clubs").select("id, plan");
-  if (clubErr) { console.error("[auto-open] clubs read:", clubErr.message); return json({ error: "clubs_query_failed" }, 500); }
+  // MAS nem todo projeto tem a tabela `clubs`: o harmonia-fc nasceu single-tenant e
+  // nunca recebeu as migrations do multi-tenant. Lá esta leitura falhava com 42P01 e
+  // a função saía em 500 ANTES de olhar qualquer jogo — o cron rodava de 5 em 5 min,
+  // nada abria e nenhum push saía, sem rastro no app (INCIDENTE 17/08: o jogo de
+  // 19/08 tinha auto_open_at 17/08 21:00 e teve de ser aberto na mão). Quando a
+  // tabela não existe, cada linha de app_meta é um "clube" e não há plano para gatear.
+  let clubList: Array<{ id: string; plan?: string }> = [];
+  const clubsRead = await admin.from("clubs").select("id, plan");
+  if (!clubsRead.error) {
+    clubList = (clubsRead.data || []) as Array<{ id: string; plan?: string }>;
+  } else if (clubsRead.error.code === MISSING_TABLE) {
+    singleTenant = true;
+    const { data: metaKeys, error: metaKeysErr } = await admin.from("app_meta").select("key");
+    if (metaKeysErr) { console.error("[auto-open] app_meta keys read:", metaKeysErr.message); return json({ error: "app_meta_query_failed" }, 500); }
+    // Sem tabela de planos não há o que gatear: o clube único vale como pro.
+    clubList = (metaKeys || []).map((row) => ({ id: String(row.key), plan: "pro" }));
+  } else {
+    console.error("[auto-open] clubs read:", clubsRead.error.message);
+    return json({ error: "clubs_query_failed" }, 500);
+  }
+  out.single_tenant = singleTenant;
+
+  // Sem a tabela `clubs`, as colunas club_id das tabelas de push também não existem
+  // (mesmas migrations). Como nesse projeto há um clube só, ler tudo == filtrar.
+  async function subsOfClub(clubId: string) {
+    const query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
+    const { data, error } = await (singleTenant ? query : query.eq("club_id", clubId));
+    if (error) { console.error("[auto-open] subs read", clubId, error.message); return []; }
+    return data || [];
+  }
 
   for (const club of (clubList || [])) {
     const clubId = String(club.id);
@@ -131,7 +169,7 @@ Deno.serve(async (req) => {
         else if (upd && upd.length) {
           out.opened = (out.opened as number) + toOpen.length;
           if (enabled(KIND_OPEN)) {
-            const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth").eq("club_id", clubId);
+            const subs = await subsOfClub(clubId);
             for (const g of toOpen) {
               const gameKey = String(g.game_key || g.id || "");
               const title = "Inscrições abertas ⚽";
@@ -154,8 +192,7 @@ Deno.serve(async (req) => {
         const title = "Vote no churrasco 🥩🔥";
         const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
         if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
-        const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth").eq("club_id", clubId);
-        await pushTo(subs || [], title, body);
+        await pushTo(await subsOfClub(clubId), title, body);
         out.churrasco = (out.churrasco as number) + 1;
       }
     }
