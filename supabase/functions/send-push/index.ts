@@ -16,6 +16,17 @@ function corsHeaders(req: Request): Record<string, string> {
   return h;
 }
 
+// Coluna ausente (42703 no Postgres, PGRST204 no schema cache do PostgREST). O
+// harmonia-fc nunca recebeu as migrations do multi-tenant: lá NENHUMA tabela tem
+// club_id, e desde o deploy de 29/07 a leitura de players quebrava e todo admin
+// virava "forbidden" — nenhum push manual nem o de votação de desempenho saía.
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+function isMissingColumn(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_COLUMN_CODES.has(err.code)) return true;
+  return /column .* does not exist|could not find the .* column/i.test(String(err.message || ""));
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: Record<string, unknown>, status = 200) =>
@@ -49,19 +60,28 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: "unauthorized" }, 401);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-  const { data: player } = await admin
+  let singleTenant = false;
+  const playerRead = await admin
     .from("players")
     .select("is_admin, club_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
+  let player = playerRead.data as { is_admin?: boolean; club_id?: string } | null;
+  if (playerRead.error && isMissingColumn(playerRead.error)) {
+    singleTenant = true;
+    const fallback = await admin
+      .from("players").select("is_admin").eq("auth_user_id", user.id).maybeSingle();
+    player = fallback.data as { is_admin?: boolean } | null;
+  }
 
   if (!player?.is_admin) return json({ error: "forbidden" }, 403);
 
   // Ser admin de ALGUM clube não pode virar permissão de disparar para TODOS.
   // Esta função roda com service_role (ignora RLS), então o escopo por clube
-  // precisa ser explícito na query — é a única barreira que resta.
+  // precisa ser explícito na query — é a única barreira que resta. No projeto
+  // single-tenant não há o que escopar: existe UM clube, e "todos" já é ele.
   const callerClubId = player.club_id;
-  if (!callerClubId) return json({ error: "club_not_resolved" }, 403);
+  if (!callerClubId && !singleTenant) return json({ error: "club_not_resolved" }, 403);
 
   // 2) Payload
   let payload: { action?: string; target?: string; title?: string; body?: string; url?: string; game_key?: string; kind?: string };
@@ -109,34 +129,34 @@ Deno.serve(async (req) => {
       : "Dê a nota da dupla da carne do jogo de hoje.";
 
     // Dedup: insere linha no push_log; se já existe (23505) → já enviado, pula.
-    const { error: claimErr } = await admin.from("push_log").insert({
-      kind: pushKind, game_key: gameKey, club_id: callerClubId, title, body, status: "sent",
-    });
+    const logRow = { kind: pushKind, game_key: gameKey, title, body, status: "sent" };
+    let claimErr = (await admin.from("push_log").insert({ ...logRow, club_id: callerClubId })).error;
+    if (claimErr && isMissingColumn(claimErr)) {
+      claimErr = (await admin.from("push_log").insert(logRow)).error;
+    }
     if (claimErr) return json({ ok: true, skipped: true, reason: "already_sent" });
 
     // Destinatários: desempenho → só quem jogou; churrasco → todos do clube.
     let subs: Array<{ endpoint: string; p256dh: string; auth: string }> = [];
     if (kind === "desempenho") {
-      const { data: confs } = await admin
+      const confsQuery = admin
         .from("presence_confirmations")
         .select("player_id")
         .eq("game_key", gameKey)
-        .eq("club_id", callerClubId)
         .eq("status", "confirmed");
+      const { data: confs } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", callerClubId));
       const ids = [...new Set((confs || []).map((c) => String(c.player_id)).filter(Boolean))];
       if (ids.length) {
-        const { data: s } = await admin
+        const subsQuery = admin
           .from("push_subscriptions")
           .select("endpoint, p256dh, auth")
-          .eq("club_id", callerClubId)
           .in("player_id", ids);
+        const { data: s } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", callerClubId));
         subs = s || [];
       }
     } else {
-      const { data: s } = await admin
-        .from("push_subscriptions")
-        .select("endpoint, p256dh, auth")
-        .eq("club_id", callerClubId);
+      const allQuery = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
+      const { data: s } = await (singleTenant ? allQuery : allQuery.eq("club_id", callerClubId));
       subs = s || [];
     }
 
@@ -155,9 +175,8 @@ Deno.serve(async (req) => {
     url: payload.url || "./",
   });
 
-  let query = admin.from("push_subscriptions")
-    .select("endpoint, p256dh, auth, player_id")
-    .eq("club_id", callerClubId);
+  let query = admin.from("push_subscriptions").select("endpoint, p256dh, auth, player_id");
+  if (!singleTenant) query = query.eq("club_id", callerClubId);
   if (target && target !== "all") query = query.eq("player_id", target);
   const { data: subscriptions, error } = await query;
   if (error) return json({ error: "subscriptions_query_failed", detail: error.message }, 500);
