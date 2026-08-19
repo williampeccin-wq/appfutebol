@@ -155,68 +155,80 @@ Deno.serve(async (req) => {
     return data || [];
   }
 
+  const failures: Array<{ club: string; error: string }> = [];
   for (const club of (clubList || [])) {
-    const clubId = String(club.id);
-    const isPro = String(club.plan || "free") === "pro";
+    // Falha de UM clube não pode calar o cron dos outros: sem este catch, um
+    // blob em formato inesperado sobe como TypeError, escapa do loop e mata a
+    // invocação inteira — nenhum clube abre inscrição. Os erros de query já
+    // tratados abaixo continuam usando `continue`; este catch é para o resto.
+    try {
+      const clubId = String(club.id);
+      const isPro = String(club.plan || "free") === "pro";
 
-    const { data: metaRow, error: metaErr } = await admin
-      .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
-    if (metaErr) { console.error("[auto-open] meta read", clubId, metaErr.message); continue; }
-    if (!metaRow) continue;
+      const { data: metaRow, error: metaErr } = await admin
+        .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
+      if (metaErr) { console.error("[auto-open] meta read", clubId, metaErr.message); continue; }
+      if (!metaRow) continue;
 
-    const data = (metaRow.data || {}) as Record<string, unknown>;
-    const prevUpdatedAt = metaRow.updated_at;
-    const settings = (data.settings || {}) as Record<string, unknown>;
-    const notif = (settings.notifications || {}) as Record<string, boolean>;
-    const enabled = (k: string) => notif[k] !== false; // ausente = ligado
-    const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
-    out.clubs = (out.clubs as number) + 1;
+      const data = (metaRow.data || {}) as Record<string, unknown>;
+      const prevUpdatedAt = metaRow.updated_at;
+      const settings = (data.settings || {}) as Record<string, unknown>;
+      const notif = (settings.notifications || {}) as Record<string, boolean>;
+      const enabled = (k: string) => notif[k] !== false; // ausente = ligado
+      const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
+      out.clubs = (out.clubs as number) + 1;
 
-    // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
-    if (isPro) {
-      const toOpen: Array<Record<string, unknown>> = [];
-      const nextGames = games.map((g) => {
-        const at = String(g?.auto_open_at || "").slice(0, 16);
-        if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
-        return g;
-      });
-      if (toOpen.length) {
-        const { data: upd, error: upErr } = await admin
-          .from("app_meta")
-          .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
-          .eq("key", clubId).eq("updated_at", prevUpdatedAt).select("key");
-        if (upErr) { console.error("[auto-open] meta write", clubId, upErr.message); }
-        else if (upd && upd.length) {
-          out.opened = (out.opened as number) + toOpen.length;
-          if (enabled(KIND_OPEN)) {
-            const subs = await subsOfClub(clubId);
-            for (const g of toOpen) {
-              const gameKey = String(g.game_key || g.id || "");
-              const title = "Inscrições abertas ⚽";
-              const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
-              if (await claim(KIND_OPEN, gameKey, title, body, clubId)) await pushTo(subs || [], title, body);
+      // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
+      if (isPro) {
+        const toOpen: Array<Record<string, unknown>> = [];
+        const nextGames = games.map((g) => {
+          const at = String(g?.auto_open_at || "").slice(0, 16);
+          if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
+          return g;
+        });
+        if (toOpen.length) {
+          const { data: upd, error: upErr } = await admin
+            .from("app_meta")
+            .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
+            .eq("key", clubId).eq("updated_at", prevUpdatedAt).select("key");
+          if (upErr) { console.error("[auto-open] meta write", clubId, upErr.message); }
+          else if (upd && upd.length) {
+            out.opened = (out.opened as number) + toOpen.length;
+            if (enabled(KIND_OPEN)) {
+              const subs = await subsOfClub(clubId);
+              for (const g of toOpen) {
+                const gameKey = String(g.game_key || g.id || "");
+                const title = "Inscrições abertas ⚽";
+                const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+                if (await claim(KIND_OPEN, gameKey, title, body, clubId)) await pushTo(subs || [], title, body);
+              }
             }
           }
         }
       }
-    }
 
-    // ---------- 2) Votação do churrasco (23h do dia do jogo) → todos ----------
-    if (enabled(KIND_CHURR)) {
-      for (const g of games) {
-        const openMs = churrascoOpenMs(String(g.game_date || ""));
-        if (!openMs) continue;
-        const closeMs = openMs + 13 * 3600_000; // 23h → 12h do dia seguinte
-        if (nowMs < openMs || nowMs > closeMs) continue;
-        const gameKey = String(g.game_key || g.id || "");
-        const title = "Vote no churrasco 🥩🔥";
-        const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
-        if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
-        await pushTo(await subsOfClub(clubId), title, body);
-        out.churrasco = (out.churrasco as number) + 1;
+      // ---------- 2) Votação do churrasco (23h do dia do jogo) → todos ----------
+      if (enabled(KIND_CHURR)) {
+        for (const g of games) {
+          const openMs = churrascoOpenMs(String(g.game_date || ""));
+          if (!openMs) continue;
+          const closeMs = openMs + 13 * 3600_000; // 23h → 12h do dia seguinte
+          if (nowMs < openMs || nowMs > closeMs) continue;
+          const gameKey = String(g.game_key || g.id || "");
+          const title = "Vote no churrasco 🥩🔥";
+          const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
+          if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
+          await pushTo(await subsOfClub(clubId), title, body);
+          out.churrasco = (out.churrasco as number) + 1;
+        }
       }
+    } catch (err) {
+      const message = String((err as Error)?.message || err).slice(0, 200);
+      console.error("[auto-open] clube falhou", String(club.id), message);
+      failures.push({ club: String(club.id), error: message });
     }
   }
 
+  if (failures.length) out.failed = failures;
   return json({ ok: true, ...out });
 });

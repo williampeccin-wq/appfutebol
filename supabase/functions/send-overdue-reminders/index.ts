@@ -183,9 +183,17 @@ Deno.serve(async (req) => {
     const results: Record<string, unknown>[] = [];
     let totalSent = 0;
     for (const c of (proClubs || [])) {
-      const r = await processClub(String(c.id));
-      totalSent += Number(r.sent || 0);
-      results.push({ club: c.id, ...r });
+      // Falha de UM clube não pode cancelar o lembrete dos outros: processClub
+      // toca dado de clube (blob + jogadores) e uma exceção aqui mataria a rodada.
+      try {
+        const r = await processClub(String(c.id));
+        totalSent += Number(r.sent || 0);
+        results.push({ club: c.id, ...r });
+      } catch (err) {
+        const message = String((err as Error)?.message || err).slice(0, 200);
+        console.error("[overdue] clube falhou", String(c.id), message);
+        results.push({ club: c.id, error: message });
+      }
     }
     return json({ ok: true, mode: "cron", clubs: (proClubs || []).length, sent: totalSent, results });
   }
