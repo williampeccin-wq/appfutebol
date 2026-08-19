@@ -37,6 +37,13 @@ function isMissingTable(err: { code?: string; message?: string } | null): boolea
   if (err.code && MISSING_TABLE_CODES.has(err.code)) return true;
   return /does not exist|schema cache/i.test(String(err.message || ""));
 }
+// Coluna ausente (42703 no Postgres, PGRST204 no schema cache do PostgREST).
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+function isMissingColumn(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_COLUMN_CODES.has(err.code)) return true;
+  return /column .* does not exist|could not find the .* column/i.test(String(err.message || ""));
+}
 
 const KIND_OPEN = "inscricoes_abertas";
 const KIND_CHURR = "votacao_churrasco";
@@ -100,10 +107,15 @@ Deno.serve(async (req) => {
   // Insere a linha de dedup (POR CLUBE); true se é a primeira vez (deve enviar).
   async function claim(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
     const row: Record<string, unknown> = { kind, game_key: gameKey, title, body, status: "sent" };
-    if (!singleTenant) row.club_id = clubId; // coluna inexistente no projeto single-tenant
-    const { error } = await admin.from("push_log").insert(row);
-    if (error) return false; // 23505 (já enviado) ou outro erro → não envia
-    return true;
+    // SEMPRE tenta com club_id primeiro. Omiti-lo quando a coluna EXISTE seria pior
+    // que o bug original: os índices uq_push_log_* são por (kind, game_key, club_id)
+    // e NULL não colide com NULL em índice único — o dedup morreria e o mesmo aviso
+    // sairia a cada 5 min durante a janela inteira (13h, no caso do churrasco).
+    const first = await admin.from("push_log").insert({ ...row, club_id: clubId });
+    if (!first.error) return true;
+    if (!isMissingColumn(first.error)) return false; // 23505 (já enviado) ou erro real
+    const retry = await admin.from("push_log").insert(row); // projeto sem a coluna
+    return !retry.error;
   }
 
   const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, churrasco: 0 };
