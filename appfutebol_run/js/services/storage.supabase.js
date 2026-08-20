@@ -1356,6 +1356,32 @@ export async function uploadPlayerPhoto(dataUrl, playerId) {
   }
 }
 
+// Confirmações de UM jogo específico, sem tocar no estado carregado.
+//
+// Existe por causa da votação: o load traz só as confirmações do jogo ATIVO, mas
+// a janela de votação vale para o jogo com janela aberta — que deixa de ser o
+// ativo assim que o próximo jogo é criado. Sem esta leitura, a votação sumia da
+// tela para todo mundo no meio da janela (ACHADO 20/08).
+//
+// Devolve lista à parte de propósito: `snapshot.confirmations` é lido em pontos
+// que NÃO filtram por jogo, e misturar confirmações de jogos diferentes ali
+// faria o app tratar quem se confirmou semana passada como confirmado hoje.
+export async function fetchConfirmationsForGame(gameKey) {
+  const key = String(gameKey || '').trim();
+  if (!key || !isSupabaseConfigured()) return { ok: false, rows: [] };
+  const config = getConfig();
+  const res = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(key)}&select=game_key,player_id,status,confirmed_at,cancelled_at,removed_by_admin,data,updated_at`),
+    { method: 'GET' }
+  );
+  if (!res.ok) return { ok: false, rows: [] };
+  const rows = Array.isArray(res.data)
+    ? res.data.map(confirmationFromPresenceRow).filter((entry) => entry?.player_id)
+    : [];
+  return { ok: true, rows };
+}
+
 export async function loadRemoteState() {
   const config = getConfig();
 

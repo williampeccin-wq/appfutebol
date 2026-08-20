@@ -15,6 +15,7 @@ Rodam sozinhos a cada push em `main` e `production` (`.github/workflows/testes.y
 |---|---|
 | `apagao.regression.mjs` | cache local devolvia semente e o adapter publicava ela no servidor |
 | `conflito-sobrescrita.regression.mjs` | gravação concorrente apagava alteração alheia em silêncio (15/07); e o merge de um nível levava junto resultado de campeonato que o cliente nunca viu (20/08) |
+| `votacao-confirmacoes.regression.mjs` | votação sumia da tela ao criar o próximo jogo: elegibilidade vinha das confirmações do jogo ATIVO, não do jogo com janela aberta (20/08) |
 | `notas-paginacao.regression.mjs` | leitura de notas truncava no teto do PostgREST sem erro, e a média truncada desequilibrava o sorteio (20/08) |
 | `campeonato-pontuacao.regression.mjs` | heurística de remoção atropelava a declaração do admin; substituição muda |
 | `club-profile.regression.mjs` | clube novo herdava pontos de outro clube por coincidência de nome |
