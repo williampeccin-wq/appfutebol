@@ -47,6 +47,48 @@ function isMissingColumn(err: { code?: string; message?: string } | null): boole
   return /column .* does not exist|could not find the .* column/i.test(String(err.message || ""));
 }
 
+
+// ---- Dupla do churrasco: espelho de getChurrascoDuo (domain/carne.js) ----
+//
+// O alvo do voto de churrasco NAO era validado: qualquer string virava uma dupla
+// avaliada, poluindo o ranking da carne (ACHADO da auditoria de 20/08). Aqui o
+// servidor recalcula qual dupla era a responsavel pelo jogo e compara.
+//
+// A chave e o MESMO formato do cliente: os dois ids ordenados, unidos por "|".
+// O meio-dia no calculo de dias existe para nao virar a data por fuso — e como a
+// diferenca e entre duas datas ao meio-dia, o fuso se cancela e o resultado bate
+// com o do navegador.
+//
+// Prioridade, igual ao cliente: escala datada (carne_schedule) > rodizio.
+const MAX_VOTES = 100;
+
+function diffDays(aIso: string, bIso: string): number {
+  const noon = (iso: string) => Date.parse(`${String(iso).slice(0, 10)}T12:00:00Z`);
+  return Math.round((noon(aIso) - noon(bIso)) / 86400000);
+}
+function duoKeyOf(a: unknown, b: unknown): string {
+  return [String(a), String(b)].sort().join("|");
+}
+function churrascoDuoKey(data: Record<string, unknown>, gameDate: string): string | null {
+  const iso = String(gameDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const carne = Array.isArray(data.carne) ? data.carne as Array<Record<string, unknown>> : [];
+
+  const escala = carne.find((e) =>
+    e?.type === "carne_schedule" && String(e?.date || "").slice(0, 10) === iso);
+  if (escala) return duoKeyOf(escala.player1_id, escala.player2_id);
+
+  const rodizio = carne.find((e) => e?.type === "carne_rotation") as Record<string, unknown> | undefined;
+  const pares = Array.isArray(rodizio?.pairs) ? rodizio!.pairs as Array<Record<string, unknown>> : [];
+  const inicio = String(rodizio?.start_date || "").slice(0, 10);
+  if (!pares.length || !/^\d{4}-\d{2}-\d{2}$/.test(inicio)) return null;
+
+  const semana = Math.round(diffDays(iso, inicio) / 7);
+  const idx = ((semana % pares.length) + pares.length) % pares.length;
+  const par = pares[idx];
+  return par ? duoKeyOf(par.player1_id, par.player2_id) : null;
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: Record<string, unknown>, status = 200) =>
@@ -124,6 +166,8 @@ Deno.serve(async (req) => {
   if (kind !== "desempenho" && kind !== "churrasco") return json({ ok: false, error: "invalid_kind" }, 400);
   if (!gameKey) return json({ ok: false, error: "missing_game_key" }, 400);
   if (!votes.length) return json({ ok: false, error: "no_votes" }, 400);
+  // Sem teto, uma requisicao podia criar centenas de linhas de uma vez.
+  if (votes.length > MAX_VOTES) return json({ ok: false, error: "too_many_votes" }, 400);
 
   // Estado: settings (janela) + o jogo — blob por club_id (não mais 'default'). No
   // projeto single-tenant a chave não é conhecida: cai para 'default' e, não achando,
@@ -142,6 +186,7 @@ Deno.serve(async (req) => {
   const nowMs = Date.now();
 
   let confirmedIds: Set<string> | null = null;
+  let duoEsperado: string | null = null;
   if (kind === "desempenho") {
     const perfHours = Number(settings.ratings_perf_window_hours) || 0;
     if (perfHours <= 0) return json({ ok: false, error: "voting_closed" }, 403);
@@ -173,6 +218,11 @@ Deno.serve(async (req) => {
     if (!openMs) return json({ ok: false, error: "voting_closed" }, 403);
     const closeMs = openMs + 13 * 3600_000; // 23h -> 12h do dia seguinte
     if (nowMs < openMs || nowMs > closeMs) return json({ ok: false, error: "voting_closed" }, 403);
+    // Alvo tem de ser a dupla REAL do jogo. Quando o servidor nao consegue
+    // determinar a dupla (sem escala e sem rodizio no blob), aceita: recusar um
+    // voto legitimo por divergencia de calculo e pior do que deixar passar um
+    // alvo que ninguem consegue forjar sem ser jogador autenticado do clube.
+    duoEsperado = churrascoDuoKey(data, String(game.game_date || ""));
   }
 
   const rows: Array<Record<string, unknown>> = [];
@@ -185,6 +235,12 @@ Deno.serve(async (req) => {
     if (kind === "desempenho") {
       if (target === voterId) continue;                    // não vota em si mesmo
       if (confirmedIds && !confirmedIds.has(target)) continue; // só avalia quem jogou
+    }
+    if (kind === "churrasco" && duoEsperado && target !== duoEsperado) {
+      // Erro explicito em vez de descartar em silencio: um alvo que nao bate com
+      // a dupla do jogo e bug de cliente ou tentativa de poluir o ranking, e nos
+      // dois casos e melhor aparecer.
+      return json({ ok: false, error: "invalid_target" }, 400);
     }
     const row: Record<string, unknown> = { kind, game_key: gameKey, voter_id: voterId, target_id: target, score, updated_at: nowIso };
     if (!singleTenant) row.club_id = clubId; // coluna inexistente no projeto single-tenant
