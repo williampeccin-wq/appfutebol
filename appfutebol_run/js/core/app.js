@@ -3028,10 +3028,20 @@ function parseGameDateTimeMs(game) {
 function getPerfWindow(snapshot, game) {
   const hours = Number(snapshot?.settings?.ratings_perf_window_hours) || 0;
   if (hours <= 0) return null;
-  const startMs = parseGameDateTimeMs(game);
-  if (!startMs) return null;
-  const openMs = startMs + 60 * 60 * 1000; // 1h após o início
-  return { openMs, closeMs: openMs + hours * 60 * 60 * 1000 };
+  const gameDate = String(game?.game_date || '').slice(0, 10);
+  if (!gameDate) return null;
+  // A votação SÓ abre depois que o admin LANÇA O RESULTADO deste jogo — dá tempo
+  // de reorganizar times / tirar quem não apareceu antes de liberar as notas.
+  // Casado por DATA (o game_key do resultado é inconsistente: às vezes null, às
+  // vezes com ':' no horário). Dura ratings_perf_window_hours a partir do lançamento.
+  const results = snapshot?.championship?.active?.results || [];
+  const markedMs = results
+    .filter((r) => String(r?.date || '').slice(0, 10) === gameDate)
+    .map((r) => Date.parse(r?.created_at || ''))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => b - a)[0];
+  if (!markedMs) return null; // sem resultado lançado → votação fechada
+  return { openMs: markedMs, closeMs: markedMs + hours * 60 * 60 * 1000 };
 }
 
 // Jogo cuja janela de votação está ABERTA agora, do mais recente para o mais
