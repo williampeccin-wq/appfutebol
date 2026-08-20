@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.167.0-resultado-nao-some-no-rebase';
+export const APP_VERSION = 'v1.168.0-notas-sem-truncamento';
