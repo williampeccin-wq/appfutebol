@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.172.0-sem-modal-de-atualizacao';
+export const APP_VERSION = 'v1.173.0-resultado-nao-some-no-rebase';

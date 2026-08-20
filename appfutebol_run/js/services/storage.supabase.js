@@ -1109,7 +1109,9 @@ async function rebaseSharedParts(config, previousParts, parts) {
   const rebasedParts = {
     ...parts,
     game: remoteGame ? mergeChangedFields(remoteGame, previousParts?.game, parts.game) : parts.game,
-    meta: remoteMeta ? mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta) : parts.meta,
+    meta: remoteMeta
+      ? mergeChampionshipResults(remoteMeta, previousParts?.meta, mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta))
+      : parts.meta,
   };
 
   lastSharedUpdatedAt = maxTimestamp([
@@ -1118,6 +1120,48 @@ async function rebaseSharedParts(config, previousParts, parts) {
   ]) || lastSharedUpdatedAt;
 
   return { ok: true, parts: rebasedParts };
+}
+
+// Resultados do campeonato de um blob meta, ou null se não houver lista.
+function championshipResultsOf(meta) {
+  const list = meta?.championship?.active?.results;
+  return Array.isArray(list) ? list : null;
+}
+
+// Merge de 3 vias para a LISTA de resultados do campeonato. `mergeChangedFields`
+// é de UM nível: qualquer alteração local em `championship` — ranking
+// recalculado, normalização do state.guard — marcava a chave inteira como
+// "editada por mim" e gravava a lista deste cliente por cima da do servidor,
+// levando junto resultados que ele nunca viu. Foi o que apagou o resultado de
+// 19/08 duas vezes em uma hora (INCIDENTE 20/08).
+//
+// A regra que separa perda de exclusão legítima: uma entrada que está no
+// servidor e NUNCA esteve na baseline deste cliente não pode ter sido apagada
+// por ele — então é resgatada. Uma que ESTAVA na baseline e sumiu no next foi
+// removida de propósito, e continua removida.
+function mergeChampionshipResults(base, previous, next) {
+  const baseList = championshipResultsOf(base);
+  const nextList = championshipResultsOf(next);
+  if (!baseList || !nextList) return next; // sem lista dos dois lados: nada a reconciliar
+
+  const knownIds = new Set((championshipResultsOf(previous) || []).map((r) => String(r?.id || '')));
+  const nextIds = new Set(nextList.map((r) => String(r?.id || '')));
+  const resgatados = baseList.filter((r) => {
+    const id = String(r?.id || '');
+    return id && !nextIds.has(id) && !knownIds.has(id);
+  });
+  if (!resgatados.length) return next;
+
+  console.warn('[storage.supabase] resgatando ' + resgatados.length + ' resultado(s) do campeonato que este cliente nunca viu.');
+  const results = [...nextList, ...resgatados]
+    .sort((left, right) => String(left?.date || '').localeCompare(String(right?.date || '')));
+  return {
+    ...next,
+    championship: {
+      ...next.championship,
+      active: { ...next.championship.active, results },
+    },
+  };
 }
 
 // Merge de 3 vias em um nível: parte do `base` (servidor) e sobrepõe apenas as
