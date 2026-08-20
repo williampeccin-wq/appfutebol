@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.168.0-notas-sem-truncamento';
+export const APP_VERSION = 'v1.169.0-votacao-le-o-jogo-certo';

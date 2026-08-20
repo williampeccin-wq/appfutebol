@@ -2514,7 +2514,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, fetchConfirmationsForGame } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, leaveTeamOperation, reactivateLeftPlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
@@ -3063,7 +3063,7 @@ function getGameWithOpenVoteWindow(snapshot, windowFn) {
     }) || null;
 }
 
-function getInGamePlayers(snapshot, game) {
+function getInGamePlayers(snapshot, game, confirmations = null) {
   const key = getGameKey(game);
   // Quem "jogou" = quem está CONFIRMADO neste jogo, pela regra CANÔNICA
   // (isConfirmedEntry respeita o status: um 'cancelled'/'removed' NÃO conta,
@@ -3072,7 +3072,7 @@ function getInGamePlayers(snapshot, game) {
   // uma confirmação antiga/duplicada residual. Endurece a votação contra o bug
   // "removido antes do voto ainda aparece pra receber nota".
   const latestByPlayer = new Map();
-  for (const e of (snapshot.confirmations || [])) {
+  for (const e of (confirmations || snapshot.confirmations || [])) {
     if (!belongsToGame(e, key)) continue;
     const pid = String(e?.player_id || '');
     if (!pid) continue;
@@ -3085,6 +3085,27 @@ function getInGamePlayers(snapshot, game) {
   return (snapshot.players || []).filter((p) => ids.has(String(p.id)));
 }
 
+// Confirmações que valem para a VOTAÇÃO. Quando o jogo com janela aberta ainda é
+// o ativo, usa o que já está carregado; quando não é mais (o próximo jogo foi
+// criado), busca as daquele jogo e cacheia — uma leitura por jogo, não uma por
+// render. Devolve null enquanto a leitura está em voo, para o chamador decidir no
+// próximo render em vez de esconder a votação por engano.
+let votingConfirmations = { gameKey: null, rows: null, loading: false };
+
+async function confirmationsForVotingGame(snapshot, game) {
+  const key = getGameKey(game);
+  const activeKey = getGameKey(getActiveGameFromSnapshot(snapshot));
+  if (!key || key === activeKey) return snapshot.confirmations || [];
+  if (votingConfirmations.gameKey === key && votingConfirmations.rows) return votingConfirmations.rows;
+  if (votingConfirmations.loading) return null;
+  votingConfirmations = { gameKey: key, rows: null, loading: true };
+  const res = await fetchConfirmationsForGame(key);
+  // Leitura falhou: cai no que está carregado em vez de travar a votação. Pior
+  // caso volta ao comportamento antigo, nunca a um estado novo e pior.
+  votingConfirmations = { gameKey: key, rows: res.ok ? res.rows : null, loading: false };
+  return votingConfirmations.rows || snapshot.confirmations || [];
+}
+
 async function maybeShowPerfVote(snapshot, currentPlayer) {
   if (!isVotingEnabled()) { unmountPerfVote(); return; }
   if (!currentPlayer) { unmountPerfVote(); return; }
@@ -3095,11 +3116,14 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
   const win = getPerfWindow(snapshot, game);
   const now = Date.now();
   const active = !!win && now >= win.openMs && now <= win.closeMs;
-  const inGame = active && getInGamePlayers(snapshot, game).some((p) => String(p.id) === String(currentPlayer.id));
 
   if (perfVoteGameKey !== key) { perfVoteGameKey = key; perfVoteStatus = 'idle'; }
+  if (!active || ratingsUnavailable) { unmountPerfVote(); return; }
 
-  if (!active || !inGame || ratingsUnavailable) { unmountPerfVote(); return; }
+  const confirmacoes = await confirmationsForVotingGame(snapshot, game);
+  if (confirmacoes === null) return; // leitura em voo: decide no próximo render
+  const elegiveis = getInGamePlayers(snapshot, game, confirmacoes);
+  if (!elegiveis.some((p) => String(p.id) === String(currentPlayer.id))) { unmountPerfVote(); return; }
   if (perfVoteStatus === 'voted' || perfVoteStatus === 'active' || perfVoteStatus === 'checking') return;
 
   perfVoteStatus = 'checking';
@@ -3115,7 +3139,7 @@ async function maybeShowPerfVote(snapshot, currentPlayer) {
     perfVoteStatus = 'voted';
     return;
   }
-  const targets = getInGamePlayers(snapshot, game).filter((p) => String(p.id) !== String(currentPlayer.id));
+  const targets = elegiveis.filter((p) => String(p.id) !== String(currentPlayer.id));
   if (!targets.length) { perfVoteStatus = 'voted'; return; }
   perfVote = { gameKey: key, voterId: String(currentPlayer.id), targets, index: 0, scores: {} };
   perfVoteStatus = 'active';
