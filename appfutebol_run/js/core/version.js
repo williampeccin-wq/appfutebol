@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.175.0-votacao-le-o-jogo-certo';
+export const APP_VERSION = 'v1.176.0-voto-anonimo-de-verdade';
