@@ -148,7 +148,19 @@ export function duoRatingAverages(rows, gameKeys = null) {
   return aggregateByTarget(rows, 'churrasco', gameKeys);
 }
 
-// Lê votos (filtra por kind e/ou game_key). Sem filtro, traz tudo.
+// Tamanho da página e teto de páginas. O teto existe só como rede: se o servidor
+// ignorar o Range, o laço para em vez de repetir a primeira página para sempre.
+const PAGINA = 1000;
+const MAX_PAGINAS = 50;
+
+// Lê votos (filtra por kind e/ou game_key). Sem filtro, traz tudo — PAGINANDO.
+//
+// Por que paginar: o PostgREST corta a resposta no teto de linhas do projeto
+// (db-max-rows) SEM erro e SEM aviso — chega um pedaço e o cliente calcula a
+// média como se fosse a tabela inteira. Essas médias alimentam o
+// buildStrengthResolver, que equilibra os times no sorteio: truncar significa
+// time desequilibrado e "melhor votado" errado, sem nada quebrar na tela.
+// Medido em 20/08/2026: 992 linhas, oito abaixo do teto padrão de 1000.
 export async function fetchRatings({ kind = null, gameKey = null } = {}) {
   const { url, anonKey } = getSupabase();
   if (!url || !anonKey) return { ok: false, reason: 'not_configured', rows: [] };
@@ -156,11 +168,34 @@ export async function fetchRatings({ kind = null, gameKey = null } = {}) {
   const params = ['select=kind,game_key,target_id,score,created_at'];
   if (kind) params.push(`kind=eq.${encodeURIComponent(kind)}`);
   if (gameKey) params.push(`game_key=eq.${encodeURIComponent(gameKey)}`);
+  const alvo = `${url}/rest/v1/ratings_public?${params.join('&')}`;
+
+  const rows = [];
+  let primeiraDaPaginaAnterior = null;
   try {
-    const resp = await fetch(`${url}/rest/v1/ratings_public?${params.join('&')}`, { method: 'GET', headers: headers() });
-    if (!resp.ok) return { ok: false, reason: `load_${resp.status}`, rows: [] };
-    const rows = await resp.json().catch(() => []);
-    return { ok: true, rows: Array.isArray(rows) ? rows : [] };
+    for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
+      const de = pagina * PAGINA;
+      const resp = await fetch(alvo, {
+        method: 'GET',
+        headers: { ...headers(), 'Range-Unit': 'items', Range: `${de}-${de + PAGINA - 1}` },
+      });
+      if (!resp.ok) return { ok: false, reason: `load_${resp.status}`, rows: [] };
+      const lote = await resp.json().catch(() => []);
+      if (!Array.isArray(lote) || !lote.length) break;
+
+      // Servidor ignorando o Range devolve sempre o mesmo começo: para o laço em
+      // vez de acumular a mesma página repetida.
+      const primeira = JSON.stringify(lote[0]);
+      if (primeiraDaPaginaAnterior !== null && primeira === primeiraDaPaginaAnterior) {
+        console.warn('[ratings] o servidor ignorou o Range; leitura pode estar incompleta.');
+        break;
+      }
+      primeiraDaPaginaAnterior = primeira;
+
+      rows.push(...lote);
+      if (lote.length < PAGINA) break; // última página
+    }
+    return { ok: true, rows };
   } catch (error) {
     console.warn('[ratings] falha ao ler votos:', error);
     return { ok: false, reason: 'network', rows: [] };
