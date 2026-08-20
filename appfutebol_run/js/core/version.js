@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.166.0-janela-desempenho-pelo-resultado';
+export const APP_VERSION = 'v1.167.0-resultado-nao-some-no-rebase';

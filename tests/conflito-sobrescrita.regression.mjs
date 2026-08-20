@@ -238,4 +238,88 @@ assert.deepEqual(
   'o restante do estado segue intacto na gravação normal',
 );
 
-console.log('OK — 11 asserções em 3 cenários. Gravação concorrente preserva os dois lados; nada é sobrescrito em silêncio.');
+
+// ---------------------------------------------------------------- cenário 4
+//
+// INCIDENTE 20/08: o resultado do jogo da véspera sumiu DUAS vezes em uma hora,
+// minutos depois de ser lançado. Diferente do cenário 2 — aqui o cliente
+// defasado MEXEU no campeonato (ranking recalculado ao sincronizar, ou
+// normalização do state.guard). Como o merge de rebase era de UM nível, a chave
+// `championship` inteira contava como "editada por mim" e a lista de resultados
+// do cliente ia por cima da do servidor, levando junto o resultado que ele nunca
+// viu. O sintoma para o time: pontuação sem computar e votação de desempenho que
+// não abria, porque a janela depende do resultado lançado.
+
+const servidor4 = criarServidor();
+instalarFetch(servidor4);
+
+const carga4 = await storage.loadRemoteState();
+assert.equal(carga4.ok, true, 'o estado remoto deveria carregar');
+
+// O admin lança o resultado de 22/07 de outro aparelho: o app_meta avança.
+servidor4.meta = {
+  key: 'default',
+  data: {
+    ...servidor4.meta.data,
+    championship: { active: { id: 'inverno-2026', results: [{ id: 'r1', date: '2026-07-15' }, { id: 'r2', date: '2026-07-22' }] } },
+  },
+  updated_at: T(40),
+};
+
+// O cliente defasado recalcula o ranking — mexe em `championship`, mas NÃO na
+// lista de resultados, que continua a dele (só o 15/07).
+const estado4 = carga4.state;
+estado4.championship = { ...estado4.championship, ranking: [{ player_id: 'p1', points: 3 }] };
+
+const gravacao4 = await storage.saveRemoteState(estado4);
+assert.equal(gravacao4.ok, true, 'a gravação do cliente defasado deveria ser concluída');
+
+assert.deepEqual(
+  servidor4.meta.data.championship.active.results.map((r) => r.date).sort(),
+  ['2026-07-15', '2026-07-22'],
+  'mexer no ranking não pode apagar um resultado que este cliente nunca viu',
+);
+
+assert.deepEqual(
+  servidor4.meta.data.championship.ranking,
+  [{ player_id: 'p1', points: 3 }],
+  'a alteração que o cliente realmente fez (o ranking) precisa ter sido gravada',
+);
+
+// ---------------------------------------------------------------- cenário 5
+//
+// O outro lado da mesma regra: excluir resultado é uma ação legítima do admin e
+// NÃO pode ser desfeita pelo resgate do cenário 4. A diferença entre perda e
+// exclusão é a baseline — o que o cliente conhecia quando começou a editar.
+
+const servidor5 = criarServidor();
+servidor5.meta.data.championship.active.results = [{ id: 'r1', date: '2026-07-15' }, { id: 'r2', date: '2026-07-22' }];
+instalarFetch(servidor5);
+
+const carga5 = await storage.loadRemoteState();
+assert.equal(carga5.ok, true, 'o estado remoto deveria carregar');
+
+// Outro cliente grava algo não relacionado, forçando o caminho de rebase.
+servidor5.meta = {
+  key: 'default',
+  data: {
+    ...servidor5.meta.data,
+    games: [...servidor5.meta.data.games, { game_key: 'game_2026-08-05_2030', game_date: '2026-08-05' }],
+  },
+  updated_at: T(40),
+};
+
+// O admin exclui o resultado de 22/07 — que ESTAVA na baseline dele.
+const estado5 = carga5.state;
+estado5.championship.active.results = estado5.championship.active.results.filter((r) => r.id !== 'r2');
+
+const gravacao5 = await storage.saveRemoteState(estado5);
+assert.equal(gravacao5.ok, true, 'a exclusão deveria ser gravada');
+
+assert.deepEqual(
+  servidor5.meta.data.championship.active.results.map((r) => r.date),
+  ['2026-07-15'],
+  'exclusão deliberada de resultado não pode ser desfeita pelo resgate',
+);
+
+console.log('OK — 18 asserções em 5 cenários. Gravação concorrente preserva os dois lados; nada é sobrescrito em silêncio.');
