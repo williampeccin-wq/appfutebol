@@ -165,7 +165,10 @@ export async function fetchRatings({ kind = null, gameKey = null } = {}) {
   const { url, anonKey } = getSupabase();
   if (!url || !anonKey) return { ok: false, reason: 'not_configured', rows: [] };
   // Lê da VIEW pública (sem voter_id) — o anonimato do voto deixa de ser só de UI.
-  const params = ['select=kind,game_key,target_id,score,created_at'];
+  // Sem created_at de propósito: as notas de uma cédula compartilham o mesmo
+  // instante, e agrupar por ele remontava a cédula de cada votante — como
+  // ninguém vota em si mesmo, o confirmado ausente do grupo era o autor.
+  const params = ['select=kind,game_key,target_id,score'];
   if (kind) params.push(`kind=eq.${encodeURIComponent(kind)}`);
   if (gameKey) params.push(`game_key=eq.${encodeURIComponent(gameKey)}`);
   const alvo = `${url}/rest/v1/ratings_public?${params.join('&')}`;
