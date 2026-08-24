@@ -13,6 +13,7 @@ Rodam sozinhos a cada push em `main` e `production` (`.github/workflows/testes.y
 
 | arquivo | incidente / risco |
 |---|---|
+| `exclusao-confirma-no-servidor.regression.mjs` | exclusão de jogador aplicada no servidor era reportada como falha porque o PATCH voltou sem representação — tarja vermelha com o jogador já apagado (24/08, teste fechado) |
 | `apagao.regression.mjs` | cache local devolvia semente e o adapter publicava ela no servidor |
 | `admin-nao-desfaz-edicao.regression.mjs` | a sessão do admin regravava, com a cópia local, a linha de jogadores que nunca tocou — e desfazia a edição de perfil deles (18/08, posição do Vinícius) |
 | `conflito-sobrescrita.regression.mjs` | gravação concorrente apagava alteração alheia em silêncio (15/07); e o merge de um nível levava junto resultado de campeonato que o cliente nunca viu (20/08) |

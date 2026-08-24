@@ -1644,10 +1644,30 @@ export async function savePlayerLogicalDelete(playerId) {
     return { ok: false, reason: `save_player_logical_delete_failed_${patchResult.status}`, status: patchResult.status, body: patchResult.body };
   }
 
-  const savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
-  const savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : null;
+  let savedRow = Array.isArray(patchResult.data) ? patchResult.data[0] : null;
+  let savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : null;
 
-  if (!savedData || savedData.active !== false || savedData.deleted !== true) {
+  // A representação do PATCH não é prova suficiente de fracasso: ela volta vazia
+  // sempre que o Prefer não é honrado (204 sem corpo) ou o corpo não parseia — e
+  // aí o app anunciava "não foi possível excluir" com a linha JÁ apagada. Antes
+  // de acusar falha, RELÊ a linha e pergunta ao servidor. Mesmo padrão do
+  // savePlayerAccessLink logo acima. Relato do teste fechado, 24/08.
+  const pareceExcluido = (dados) => !!dados && dados.active === false && dados.deleted === true;
+
+  if (!pareceExcluido(savedData)) {
+    const verifyResult = await requestJson(
+      config,
+      tableUrl(config, SPLIT_TABLES.players, `id=eq.${encodeURIComponent(normalizedId)}&select=id,auth_user_id,is_admin,data,updated_at&limit=1`),
+      { method: 'GET' }
+    );
+
+    if (verifyResult.ok) {
+      savedRow = Array.isArray(verifyResult.data) ? verifyResult.data[0] : null;
+      savedData = savedRow?.data && typeof savedRow.data === 'object' ? savedRow.data : null;
+    }
+  }
+
+  if (!pareceExcluido(savedData)) {
     return {
       ok: false,
       reason: 'save_player_logical_delete_did_not_persist',

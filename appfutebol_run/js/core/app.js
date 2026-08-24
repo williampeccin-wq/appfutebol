@@ -2283,7 +2283,9 @@ if (action === "delete-player") {
     uiActionInFlight = false;
 
     if (!result.ok) {
-      showToast(result.message || 'Não foi possível excluir o jogador.', 'error');
+      // Sem mensagem amigável, mostra o código: num celular no meio do teste o
+      // console não existe, e "não foi possível" sozinho não diagnostica nada.
+      showToast(result.message || `Não foi possível excluir o jogador (${result.reason || 'sem detalhe'}).`, 'error');
       console.warn('[players] delete operation failed', result);
       return;
     }

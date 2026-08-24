@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.178.0-roteiro-do-testador-no-log';
+export const APP_VERSION = 'v1.179.0-exclusao-confere-antes-de-acusar';
