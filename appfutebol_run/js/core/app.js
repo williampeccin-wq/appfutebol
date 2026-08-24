@@ -2289,6 +2289,10 @@ if (action === "delete-player") {
     }
 
     await reloadRemoteStateAfterCriticalOperation(snapshot);
+    // Último passo do roteiro do testador (limpar o jogador de teste) era o
+    // único sem rastro no activity_log — sem ele não dava para saber se a
+    // pessoa chegou ao fim.
+    logPlayerDeleted(currentPlayer, { target_id: String(player.id) });
     showToast(result.message || 'Jogador removido.', 'success');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (error) {
@@ -2696,7 +2700,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 // TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
-import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled } from '../services/activity-log.js';
+import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled, logPlayerDeleted } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';

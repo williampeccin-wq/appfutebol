@@ -107,3 +107,4 @@ export function logPresenceCancelled(player) { post('presence_cancelled', player
 export function logTeamDraw(player, detail)  { post('team_draw',          player, detail || null); }
 export function logPlayerAdded(player, detail){ post('player_added',       player, detail || null); }
 export function logPaymentToggled(player, detail){ post('payment_toggled', player, detail || null); }
+export function logPlayerDeleted(player, detail){ post('player_deleted',   player, detail || null); }

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.177.0-ninguem-regrava-quem-nao-tocou';
+export const APP_VERSION = 'v1.178.0-roteiro-do-testador-no-log';
