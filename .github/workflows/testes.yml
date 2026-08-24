@@ -28,5 +28,14 @@ jobs:
             node --input-type=module --check < "$f" || { echo "SINTAXE QUEBRADA: $f"; exit 1; }
           done
 
+      - name: Variável que não existe (eslint no-undef)
+        # O --check acima valida SINTAXE; escopo ele não vê. Em 24/08/2026 três
+        # chamadas de telemetria usavam `currentPlayer` fora do escopo onde a
+        # variável era declarada: ReferenceError no celular do testador, com o
+        # passo do roteiro não gravado e tarja vermelha na exclusão de jogador.
+        # Uma regra só, sem estilo e sem formatação. Config em eslint.config.mjs.
+        # Versão fixa de propósito; para atualizar, troque aqui e rode local.
+        run: npx --yes eslint@9.39.5
+
       - name: Suíte de regressão
         run: node --test "tests/*.regression.mjs"

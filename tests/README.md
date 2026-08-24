@@ -9,6 +9,22 @@ node --test "tests/*.regression.mjs"
 
 Rodam sozinhos a cada push em `main` e `production` (`.github/workflows/testes.yml`).
 
+## Checagens estáticas (antes das suítes)
+
+O CI roda duas, nesta ordem, e as duas dá para rodar na mão:
+
+```bash
+for f in $(find appfutebol_run/js -name '*.js'); do node --input-type=module --check < "$f"; done
+npx --yes eslint@9.39.5
+```
+
+A primeira pega sintaxe e import quebrado. A segunda tem **uma regra só**,
+`no-undef` (config em `eslint.config.mjs`): variável usada fora do escopo onde
+foi declarada. Ela existe por causa de 24/08/2026 — três chamadas de telemetria
+usavam `currentPlayer` num escopo onde a variável não existia, e o
+ReferenceError só apareceu no celular do testador. Não é lint de estilo e não
+opina sobre formatação.
+
 ## O que cada suíte protege
 
 | arquivo | incidente / risco |
