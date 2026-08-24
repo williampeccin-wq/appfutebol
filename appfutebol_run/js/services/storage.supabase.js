@@ -1,5 +1,6 @@
 import { SUPABASE_CONFIG } from '../config/supabase.config.js';
 import { assertCriticalOperationAllowed } from './environment.guard.js';
+import { validateAndRepairState } from '../domain/state.guard.js';
 
 let lastRemoteUpdatedAt = null;
 // Baseline SEPARADO dos objetos compartilhados (game_state + app_meta).
@@ -509,8 +510,23 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
   };
 }
 
+// INCIDENTE 18/08: a posição que o jogador tinha trocado no próprio perfil
+// (meia -> zagueiro) VOLTOU sozinha no dia seguinte. O baseline do diff era o
+// estado CRU do servidor, enquanto o estado a gravar já tinha passado pelo
+// validateAndRepairState (telefone com máscara -> dígitos, password_hash
+// residual removido, dedupe). O diff acusava mudança FANTASMA em linhas que o
+// usuário nunca tocou e a sessão de ADMIN as regravava com a cópia LOCAL — que
+// pode estar mais velha que o servidor. Como `players` não tem trava de
+// concorrência (o rebase cobre só game_state/app_meta) e a linha é gravada como
+// blob inteiro, quem grava por último apaga a edição do outro.
+//
+// O baseline passa pelo MESMO reparo do estado a gravar: assim artefato de
+// reparo nunca conta como edição do usuário. Custo consciente: a auto-cura do
+// dado cru (normalizar telefone alheio de carona num save qualquer) deixa de
+// acontecer — o que se ganha é não desfazer edição de ninguém. Edição de
+// verdade, inclusive a do admin na linha de outro jogador, segue no diff.
 function rememberSplitSnapshot(state, updatedAt = null) {
-  rememberSplitParts(splitState(state), updatedAt);
+  rememberSplitParts(splitState(validateAndRepairState(state).state), updatedAt);
 }
 
 // Mesmo efeito, mas a partir das `parts` já prontas — usado depois de um rebase,
@@ -1185,6 +1201,19 @@ function mergeChangedFields(base, previous, next) {
   return merged;
 }
 
+// A recusa do PostgREST vem como JSON {code, message, details, hint}. Quando é
+// um `raise exception` dos triggers de guarda, `message` é o próprio código
+// ('free_single_admin', 'player_update_not_allowed'...). Devolve string curta.
+function serverMessageFrom(body) {
+  if (!body) return null;
+  try {
+    const parsed = JSON.parse(body);
+    return String(parsed?.message || parsed?.error || '').slice(0, 120) || null;
+  } catch (_) {
+    return String(body).slice(0, 120) || null;
+  }
+}
+
 async function runSaveOperations(config, state, previousParts, parts, now, { rebased = false } = {}) {
   const operations = buildGranularOperations(config, previousParts, parts, now);
 
@@ -1200,7 +1229,16 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
   if (failed) {
     // O status vai junto: quem avisa o usuário precisa saber se foi rede (culpar
     // a internet faz sentido) ou recusa do servidor (culpar a internet mente).
-    return { ok: false, conflict: false, status: failed.status || null, reason: `split_granular_save_failed_${failed.status}` };
+    // A mensagem do Postgres vai junto também: quando um trigger de guarda
+    // recusa (free_single_admin, player_update_not_allowed, mens_ok_is_admin_only
+    // ...), ela é a ÚNICA pista do que aconteceu — sem isso o app só sabe "400".
+    return {
+      ok: false,
+      conflict: false,
+      status: failed.status || null,
+      serverMessage: serverMessageFrom(failed.body),
+      reason: `split_granular_save_failed_${failed.status}`,
+    };
   }
 
   // O baseline tem de refletir o que foi REALMENTE gravado. Depois de um rebase

@@ -38,6 +38,21 @@ function todayBrtIso(): string {
 
 const KIND = "mensalidade_atrasada";
 
+// "Tabela/coluna não existe": o PostgREST resolve pelo schema cache e devolve
+// PGRST205/PGRST204 ANTES de chegar ao Postgres, então olhar só o SQLSTATE não basta.
+const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205", "PGRST202", "PGRST200"]);
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+function isMissingTable(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_TABLE_CODES.has(err.code)) return true;
+  return /does not exist|schema cache/i.test(String(err.message || ""));
+}
+function isMissingColumn(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_COLUMN_CODES.has(err.code)) return true;
+  return /column .* does not exist|could not find the .* column/i.test(String(err.message || ""));
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: Record<string, unknown>, status = 200) =>
@@ -104,8 +119,23 @@ Deno.serve(async (req) => {
   // Os recibos voltam para ESTA própria função (cujo gateway aceita o anon key).
   const receiptUrl = `${SUPABASE_URL}/functions/v1/send-overdue-reminders`;
 
+  // Projeto sem as migrations multi-tenant (harmonia-fc): não existe a tabela
+  // `clubs` nem coluna club_id em tabela nenhuma. Sem esta tolerância, a busca de
+  // clubes não acha ninguém e o cron passa a responder "ok" SEM MANDAR NADA — pior
+  // que falhar, porque some sem ruído. Resolvido uma vez, antes do primeiro uso.
+  let singleTenant = false;
+
+  // Chave do blob quando não há clubes: 'default' na instalação original, ou o
+  // blob único do projeto. Com mais de um blob não há o que adivinhar.
+  async function singleTenantKey(): Promise<string> {
+    const { data } = await admin.from("app_meta").select("key").limit(2);
+    if (data && data.length === 1) return String(data[0].key);
+    return "default";
+  }
+
   // Processa UM clube (lembrete de atraso = recurso PRO). Blob por club_id;
-  // vencimento, jogadores, dedup e push todos escopados ao clube.
+  // vencimento, jogadores, dedup e push todos escopados ao clube — exceto no
+  // projeto single-tenant, onde há um clube só e "todos" já é o escopo certo.
   async function processClub(clubId: string): Promise<Record<string, unknown>> {
     const { data: metaRow } = await admin.from("app_meta").select("data").eq("key", clubId).maybeSingle();
     if (!metaRow) return { skipped: "sem_blob" };
@@ -118,7 +148,8 @@ Deno.serve(async (req) => {
     if (!dueDate) return { skipped: "sem_vencimento" };
     if (today <= dueDate) return { skipped: "ainda_nao_venceu", dueDate, today };
 
-    const { data: players } = await admin.from("players").select("id, data").eq("club_id", clubId);
+    const playersQuery = admin.from("players").select("id, data");
+    const { data: players } = await (singleTenant ? playersQuery : playersQuery.eq("club_id", clubId));
     const overdue = (players || []).filter((row) => {
       const d = (row.data || {}) as Record<string, unknown>;
       const carneOnly = d.role === "carne" || d.plays_football === false;
@@ -129,9 +160,10 @@ Deno.serve(async (req) => {
 
     let alreadyToday = new Set<string>();
     if (!force) {
-      const { data: todays } = await admin
+      const todaysQuery = admin
         .from("push_log").select("player_id")
-        .eq("kind", KIND).eq("club_id", clubId).gte("sent_at", `${today}T00:00:00Z`);
+        .eq("kind", KIND).gte("sent_at", `${today}T00:00:00Z`);
+      const { data: todays } = await (singleTenant ? todaysQuery : todaysQuery.eq("club_id", clubId));
       alreadyToday = new Set((todays || []).map((r) => String(r.player_id)));
     }
 
@@ -142,8 +174,9 @@ Deno.serve(async (req) => {
       const d = (row.data || {}) as Record<string, unknown>;
       const firstName = String(d.name || "").split(" ")[0] || "jogador";
 
-      const { data: subs } = await admin
-        .from("push_subscriptions").select("endpoint, p256dh, auth").eq("player_id", playerId).eq("club_id", clubId);
+      const subsQuery = admin
+        .from("push_subscriptions").select("endpoint, p256dh, auth").eq("player_id", playerId);
+      const { data: subs } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", clubId));
       if (!subs || !subs.length) continue;
 
       const title = "Convocados — mensalidade";
@@ -151,10 +184,10 @@ Deno.serve(async (req) => {
 
       for (const sub of subs) {
         targets += 1;
+        const logInsert: Record<string, unknown> = { kind: KIND, player_id: playerId, endpoint: sub.endpoint, title, body, status: "sent" };
+        if (!singleTenant) logInsert.club_id = clubId; // coluna inexistente no single-tenant
         const { data: logRow } = await admin
-          .from("push_log")
-          .insert({ kind: KIND, player_id: playerId, club_id: clubId, endpoint: sub.endpoint, title, body, status: "sent" })
-          .select("id").single();
+          .from("push_log").insert(logInsert).select("id").single();
         const logId = logRow?.id || null;
 
         const notification = JSON.stringify({ title, body, url: "./", logId, receiptUrl, anonKey: ANON });
@@ -179,7 +212,16 @@ Deno.serve(async (req) => {
 
   // Cron → todos os clubes PRO. Admin manual → só o clube dele (com gate Pro).
   if (isCron) {
-    const { data: proClubs } = await admin.from("clubs").select("id").eq("plan", "pro");
+    const clubsRead = await admin.from("clubs").select("id").eq("plan", "pro");
+    let proClubs = clubsRead.data as Array<{ id: string }> | null;
+    if (clubsRead.error && isMissingTable(clubsRead.error)) {
+      // Sem tabela de planos não há o que gatear: o clube único vale como pro.
+      singleTenant = true;
+      proClubs = [{ id: await singleTenantKey() }];
+    } else if (clubsRead.error) {
+      console.error("[overdue] clubs read:", clubsRead.error.message);
+      return json({ error: "clubs_query_failed", code: clubsRead.error.code || null }, 500);
+    }
     const results: Record<string, unknown>[] = [];
     let totalSent = 0;
     for (const c of (proClubs || [])) {
@@ -199,12 +241,15 @@ Deno.serve(async (req) => {
   }
 
   // Admin manual: resolve o clube + plano; gate Pro (lembrete é recurso Pro).
-  const { data: me } = await admin.from("players").select("club_id").eq("auth_user_id", adminUserId).maybeSingle();
-  const clubId = String(me?.club_id || "");
+  const meRead = await admin.from("players").select("club_id").eq("auth_user_id", adminUserId).maybeSingle();
+  if (meRead.error && isMissingColumn(meRead.error)) singleTenant = true;
+  const clubId = singleTenant ? await singleTenantKey() : String(meRead.data?.club_id || "");
   if (!clubId) return json({ error: "player_not_found" }, 403);
-  const { data: club } = await admin.from("clubs").select("plan").eq("id", clubId).maybeSingle();
-  if (String(club?.plan || "free") !== "pro") {
-    return json({ ok: false, error: "pro_required", message: "O lembrete automático de atraso é um recurso Pro." }, 402);
+  if (!singleTenant) {
+    const { data: club } = await admin.from("clubs").select("plan").eq("id", clubId).maybeSingle();
+    if (String(club?.plan || "free") !== "pro") {
+      return json({ ok: false, error: "pro_required", message: "O lembrete automático de atraso é um recurso Pro." }, 402);
+    }
   }
   const r = await processClub(clubId);
   return json({ ok: true, mode: "admin", ...r });

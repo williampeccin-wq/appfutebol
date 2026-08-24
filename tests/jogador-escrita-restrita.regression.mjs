@@ -129,14 +129,20 @@ assert.deepEqual(blobsDoClube, [],
   'jogador NÃO pode tentar gravar app_meta/game_state — são admin-only no servidor');
 
 // --------------------------------------------------------------------- admin
-// O admin segue curando o dado cru: é dele a permissão para isso.
+// v1.177.0: o admin TAMBÉM não regrava mais a linha de quem não tocou. Aqui a
+// restrição de escopo não vale (ele pode escrever a linha dos outros), mas
+// desde que o baseline do diff passa pelo mesmo reparo, artefato de reparo não
+// vira mudança fantasma — e a cópia local dele, mais velha que o servidor, não
+// desfaz a edição de perfil alheia (INCIDENTE 18/08, ver
+// admin-nao-desfaz-edicao.regression.mjs).
 
 const comoAdmin = await confirmarPresencaComo('u_admin', 'p_admin');
 
 assert.equal(comoAdmin.gravacao.ok, true, 'a gravação do admin funciona');
-assert.ok(
-  comoAdmin.escritas.some((e) => e.tabela === 'players' && e.corpo?.id === 'p_out'),
-  'o admin continua normalizando a linha dos outros jogadores (auto-cura do dado)'
+assert.deepEqual(
+  comoAdmin.escritas.filter((e) => e.tabela === 'players' && e.corpo?.id === 'p_out'),
+  [],
+  'o admin também não regrava a linha do outro jogador só por causa do reparo'
 );
 
-console.log('OK — 7 asserções. Jogador só escreve o que é dele; admin segue curando o resto.');
+console.log('OK — 7 asserções. Jogador só escreve o que é dele; ninguém regrava quem não tocou.');

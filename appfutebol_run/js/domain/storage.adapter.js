@@ -187,7 +187,12 @@ function createHybridStorageAdapter() {
             // perdida na noite do jogo, sem rastro pro admin. Avisa a UI.
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
-              detail: { reason: result.reason, status: result.status || null, conflict: false },
+              detail: {
+                reason: result.reason,
+                status: result.status || null,
+                serverMessage: result.serverMessage || null,
+                conflict: false,
+              },
             }));
           }
 

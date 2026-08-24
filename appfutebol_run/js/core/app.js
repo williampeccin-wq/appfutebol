@@ -2018,11 +2018,28 @@ document.addEventListener("click", async (e) => {
 
   const safeSnapshot = repairManualSnapshot(snapshot);
   replaceState(safeSnapshot);
-  savePersistedState(safeSnapshot);
+  // ESPERA a gravação antes de comemorar. Anunciar "Jogador atualizado com
+  // sucesso" sem confirmação do servidor foi o que escondeu o gate de
+  // multi-admin do plano Free: o admin promovia todo mundo, o banco recusava
+  // uma a uma (trigger free_single_admin) e a tela dizia que tinha dado certo —
+  // só pegando o celular do outro é que dava pra ver que não virou admin.
+  const gravacao = await Promise.resolve(savePersistedState(safeSnapshot));
   editingPlayerId = null;
   setPlayerFormMode(false);
   resetPlayerForm();
   uiActionInFlight = false;
+
+  if (gravacao && gravacao.ok !== true) {
+    showToast(
+      gravacao.conflict
+        ? 'Outro aparelho salvou antes. Abra o cadastro de novo e refaça a alteração.'
+        : mensagemDeFalhaRemota(Number(gravacao.status) || 0, gravacao.serverMessage),
+      'error'
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
   if (!isEditing) logPlayerAdded(currentPlayer, { name });
   showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2912,6 +2929,31 @@ async function initInner() {
   });
 }
 
+// Recusas dos triggers de guarda do banco. A mensagem crua ('free_single_admin')
+// não diz nada a quem está com o celular na mão — e, pior, dizer "confira a
+// internet" faz caçar um problema que não existe. Cada regra do servidor tem
+// aqui a sua tradução.
+const RECUSAS_DO_SERVIDOR = {
+  free_single_admin: 'O plano Free permite 1 administrador por clube. Para vários admins é preciso o plano Pro.',
+  player_update_not_allowed: 'Você só pode alterar o seu próprio cadastro.',
+  mens_ok_is_admin_only: 'Só o administrador altera a mensalidade.',
+  role_is_admin_only: 'Só o administrador altera o tipo de participante.',
+  plays_football_is_admin_only: 'Só o administrador altera se a pessoa joga.',
+  in_carne_group_is_admin_only: 'Só o administrador altera o grupo do churrasco.',
+  pending_is_admin_only: 'Só o administrador aprova um cadastro pendente.',
+};
+
+function mensagemDeFalhaRemota(status, serverMessage) {
+  const bruta = String(serverMessage || '');
+  const conhecida = Object.keys(RECUSAS_DO_SERVIDOR).find((chave) => bruta.includes(chave));
+  if (conhecida) return `${RECUSAS_DO_SERVIDOR[conhecida]} A alteração não foi salva.`;
+  if (status === 401) return 'Sua sessão expirou: a alteração ficou só neste aparelho. Entre de novo e refaça.';
+  if (status >= 400 && status < 500) {
+    return `O servidor não aceitou esta alteração (erro ${status}). Ela ficou só neste aparelho — avise o administrador.`;
+  }
+  return 'Não consegui salvar no servidor: sua alteração ficou só neste aparelho. Confira a internet e refaça.';
+}
+
 function bindGlobalSystemEvents() {
   bindAvatarLightbox();
 
@@ -2951,13 +2993,8 @@ function bindGlobalSystemEvents() {
     if (now - lastRemoteSaveFailAt < 30000) return;
     lastRemoteSaveFailAt = now;
     const status = Number(event.detail?.status) || 0;
-    console.warn('[app] alteração não salva no servidor:', event.detail?.reason, status || '');
-    const mensagem = status === 401
-      ? 'Sua sessão expirou: a alteração ficou só neste aparelho. Entre de novo e refaça.'
-      : (status >= 400 && status < 500)
-        ? `O servidor não aceitou esta alteração (erro ${status}). Ela ficou só neste aparelho — avise o administrador.`
-        : 'Não consegui salvar no servidor: sua alteração ficou só neste aparelho. Confira a internet e refaça.';
-    showToast(mensagem, 'error');
+    console.warn('[app] alteração não salva no servidor:', event.detail?.reason, status || '', event.detail?.serverMessage || '');
+    showToast(mensagemDeFalhaRemota(status, event.detail?.serverMessage), 'error');
   });
 }
 

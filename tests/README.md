@@ -14,6 +14,7 @@ Rodam sozinhos a cada push em `main` e `production` (`.github/workflows/testes.y
 | arquivo | incidente / risco |
 |---|---|
 | `apagao.regression.mjs` | cache local devolvia semente e o adapter publicava ela no servidor |
+| `admin-nao-desfaz-edicao.regression.mjs` | a sessão do admin regravava, com a cópia local, a linha de jogadores que nunca tocou — e desfazia a edição de perfil deles (18/08, posição do Vinícius) |
 | `conflito-sobrescrita.regression.mjs` | gravação concorrente apagava alteração alheia em silêncio (15/07); e o merge de um nível levava junto resultado de campeonato que o cliente nunca viu (20/08) |
 | `churrasco-alvo-servidor.regression.mjs` | alvo do voto de churrasco não era validado; e a validação nova não pode divergir do cálculo do cliente, senão recusa voto legítimo (20/08) |
 | `votacao-confirmacoes.regression.mjs` | votação sumia da tela ao criar o próximo jogo: elegibilidade vinha das confirmações do jogo ATIVO, não do jogo com janela aberta (20/08) |
