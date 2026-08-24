@@ -1398,6 +1398,16 @@ document.addEventListener("click", async (e) => {
   }
   if (!Array.isArray(snapshot.players)) return;
 
+  // Quem está clicando — vale para TODOS os blocos de ação daqui para baixo.
+  // Sem esta declaração, as chamadas `log*(currentPlayer, ...)` dentro dos
+  // blocos referenciavam uma variável que não existia no escopo: ReferenceError
+  // ANTES do showToast de sucesso. Efeito no teste fechado de 24/08: cadastrar
+  // jogador e marcar mensalidade não registravam nada no activity_log e ainda
+  // engoliam o aviso de sucesso; excluir jogador mostrava tarja vermelha com
+  // "currentPlayer is not defined" — com a exclusão já feita. Alguns blocos
+  // redeclaram o mesmo nome internamente; isso apenas sombreia, e segue válido.
+  const currentPlayer = getCurrentSnapshotPlayer(snapshot);
+
 
   if (action === "select-active-game") {
     e.preventDefault();
