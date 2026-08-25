@@ -35,6 +35,8 @@ function showToast(msg, type='success') {
 
 
 let editingPlayerId = null;
+// Filtro ativo dos contadores da aba Jogadores (Todos/Pagos/Pendentes/Dentro do jogo).
+let playersFilter = 'all';
 // Sorteio escolhido no seletor de "lançar resultado". null = o mais recente.
 // Precisa ser estado (não só o valor do <select>): a data e as escalações
 // exibidas dependem dele, e o app re-renderiza por innerHTML a cada poll.
@@ -1259,6 +1261,15 @@ document.addEventListener("click", async (e) => {
   if (action === "pro-upsell") {
     e.preventDefault();
     showProUpsellModal();
+    return;
+  }
+
+  if (action === "players-filter") {
+    e.preventDefault();
+    const next = trigger.dataset.filter || 'all';
+    // Tocar de novo no filtro ativo volta pra lista completa.
+    playersFilter = (playersFilter === next) ? 'all' : next;
+    render(getState());
     return;
   }
 
@@ -4220,6 +4231,9 @@ function bindAppEvents(currentPlayer) {
       patchState({ ui: { currentTab: nextTab } });
       // Ao trocar de aba, volta ao topo (padrão de navegação web/SPA).
       if (previousTab !== nextTab) {
+        // Sair da aba Jogadores zera o filtro: voltar depois e ver a lista
+        // cortada sem lembrar do porquê é pegadinha.
+        if (nextTab !== 'players') playersFilter = 'all';
         window.scrollTo({ top: 0 });
         logTab(currentPlayer, nextTab); // TEMPORÁRIO (piloto)
       }
@@ -4693,7 +4707,7 @@ function renderTab(snapshot, activeTab, currentPlayer) {
     case 'weekly_game':
       return renderWeeklyGame(snapshot, currentPlayer);
     case 'players':
-      return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId);
+      return renderPlayersScreen(snapshot, currentPlayer, buildPlayersView(snapshot), editingPlayerId, playersFilter);
     case 'carne':
       {
         // Carnê/rodízio é recurso Pro — clube Free vê o cadeado + upsell.

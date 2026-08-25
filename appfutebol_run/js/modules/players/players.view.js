@@ -197,7 +197,7 @@ function renderPendingApprovalCard(pendingPlayers, currentPlayer) {
 
 
 
-export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null) {
+export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = null, editingPlayerId = null, activeFilter = 'all') {
   const allSourcePlayers = Array.isArray(projectedPlayers) && projectedPlayers.length ? projectedPlayers : listPlayers();
   const orderedAll = [...allSourcePlayers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   // Auto-cadastro pendente NÃO é membro: sai das listas/contagens de membro e
@@ -215,10 +215,30 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
   const jogadoresFinanceiros = jogadores.filter((player) => !isMensalidadeExempt(player));
   const mensDue = String(snapshot?.settings?.mens_expire_date || '').slice(0, 10);
   const periodGame = { mens_expire_date: mensDue };
-  const emDia = jogadoresFinanceiros.filter((player) => isMensOkEffective(player, periodGame)).length;
-  const pendentes = jogadoresFinanceiros.filter((player) => !isMensOkEffective(player, periodGame)).length;
+  const pagosList = jogadoresFinanceiros.filter((player) => isMensOkEffective(player, periodGame));
+  const pendentesList = jogadoresFinanceiros.filter((player) => !isMensOkEffective(player, periodGame));
+  const dentroDoJogoList = jogadores.filter((player) => player.isConfirmed === true);
+  const emDia = pagosList.length;
+  const pendentes = pendentesList.length;
   const adimplencia = jogadoresFinanceiros.length ? Math.round((emDia / jogadoresFinanceiros.length) * 100) : 100;
   const mensDueLabel = mensDue ? mensDue.split('-').reverse().join('/') : 'não definido';
+
+  // Os contadores do topo também servem de filtro da lista. A contagem de cada
+  // pill continua sendo o total do grupo — quem muda é só a lista renderizada.
+  const FILTERS = [
+    { key: 'all', label: 'Todos', tone: 'is-active', list: jogadores },
+    { key: 'paid', label: 'Pagos', tone: 'is-ok', list: pagosList },
+    { key: 'pending', label: 'Pendentes', tone: 'is-warn', list: pendentesList },
+    { key: 'in_game', label: 'Dentro do jogo', tone: 'is-ok', list: dentroDoJogoList },
+  ];
+  const currentFilter = FILTERS.some((f) => f.key === activeFilter) ? activeFilter : 'all';
+  const visibleJogadores = (FILTERS.find((f) => f.key === currentFilter) || FILTERS[0]).list;
+  const isFiltered = currentFilter !== 'all';
+  const emptyFilterMessages = {
+    paid: 'Ningu\u00e9m com a mensalidade em dia neste per\u00edodo.',
+    pending: 'Ningu\u00e9m com mensalidade pendente. \ud83c\udf89',
+    in_game: 'Ningu\u00e9m confirmado no jogo ainda.',
+  };
 
   return `
     <section class="section-stack">
@@ -232,10 +252,15 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
             
           </div>
           <div class="players-filter-row">
-            <span class="filter-pill is-active">Todos <strong>${jogadores.length}</strong></span>
-            <span class="filter-pill is-ok">Pagos <strong>${emDia}</strong></span>
-            <span class="filter-pill is-warn">Pendentes <strong>${pendentes}</strong></span>
-            <span class="filter-pill is-ok">Dentro do jogo <strong>${allPlayers.filter((player) => player.plays_football !== false && player.isConfirmed).length}</strong></span>
+            ${FILTERS.map((f) => `
+              <button
+                class="filter-pill ${f.tone} ${f.key === currentFilter ? 'is-selected' : ''}"
+                type="button"
+                data-action="players-filter"
+                data-filter="${f.key}"
+                aria-pressed="${f.key === currentFilter ? 'true' : 'false'}"
+              >${f.label} <strong>${f.list.length}</strong></button>
+            `).join('')}
           </div>
         </div>
 
@@ -249,7 +274,9 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
         ` : ''}
 
         <div class="player-compact-list" role="table" aria-label="Jogadores">
-          ${jogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')}
+          ${visibleJogadores.length
+            ? visibleJogadores.map((player) => renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId)).join('')
+            : `<p class="footer-note players-filter-empty">${escapeHtml(emptyFilterMessages[currentFilter] || 'Nenhum jogador cadastrado.')}</p>`}
         </div>
 
         <div class="switch-legend">
@@ -257,7 +284,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
           <span><span class="legend-switch is-off"></span> Pendente</span>
         </div>
 
-        ${carneOnly.length ? `
+        ${!isFiltered && carneOnly.length ? `
           <div class="players-carne-only">
             <div class="players-subhead">Somente churrasco <strong>${carneOnly.length}</strong></div>
             <div class="player-compact-list" role="table" aria-label="Somente churrasco">
@@ -266,7 +293,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
           </div>
         ` : ''}
 
-        ${isAdmin(currentPlayer) && leftTeamPlayers.length ? `
+        ${!isFiltered && isAdmin(currentPlayer) && leftTeamPlayers.length ? `
           <div class="players-left-team">
             <div class="players-subhead">Ex-membros <strong>${leftTeamPlayers.length}</strong></div>
             <div class="player-compact-list" role="table" aria-label="Ex-membros">

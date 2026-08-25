@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.180.0-telemetria-do-roteiro-volta-a-gravar';
+export const APP_VERSION = 'v1.181.0-filtros-de-jogadores-clicaveis';

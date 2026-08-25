@@ -2108,6 +2108,32 @@ input.input[type="datetime-local"],
   border-color: #fed7aa;
 }
 
+/* Os contadores são botões de filtro: precisam parecer clicáveis e mostrar
+   qual está ativo. */
+button.filter-pill {
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+}
+
+button.filter-pill:hover { opacity: 0.85; }
+button.filter-pill:active { transform: scale(0.97); }
+
+button.filter-pill:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.filter-pill.is-selected {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.players-filter-empty {
+  padding: 18px 4px;
+  text-align: center;
+}
+
 .players-switch-table {
   display: flex;
   flex-direction: column;
@@ -6053,6 +6079,7 @@ body {
 .content--players .filter-pill.is-active { background: rgba(143, 180, 255, 0.16); color: var(--hfc-accent-blue); border-color: transparent; }
 .content--players .filter-pill.is-ok { background: rgba(25, 195, 125, 0.16); color: var(--hfc-grass); border-color: transparent; }
 .content--players .filter-pill.is-warn { background: rgba(240, 165, 0, 0.16); color: var(--hfc-gold-200); border-color: transparent; }
+.content--players .filter-pill.is-selected { box-shadow: inset 0 0 0 2px currentColor; }
 
 .content--players .input,
 .content--players .select {
