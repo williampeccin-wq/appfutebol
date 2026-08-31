@@ -1,19 +1,27 @@
--- QUEM FEZ E QUEM NÃO FEZ O ROTEIRO — uma query só, da rodada de AGORA.
+-- QUEM FEZ E QUEM NÃO FEZ O ROTEIRO — uma query só, a rodada inteira.
 --
 -- Cole no SQL Editor e aperte Run. É uma instrução única de propósito: o editor
 -- mostra apenas o resultado da ÚLTIMA instrução do arquivo.
 --
 -- Uma linha por testador com login. Quem não fez nada na janela aparece com
 -- tudo em '·' — é justamente quem você precisa cobrar.
+--
+-- A janela padrão é de 7 DIAS: um ✓ quer dizer "fez em algum momento da rodada",
+-- não "fez hoje". A coluna `quando` mostra quando a pessoa mexeu pela última vez.
+--
+-- ATENÇÃO ao ler os passos 2 e 3: até a v1.180.0 eles NUNCA eram gravados (bug de
+-- escopo no cliente, corrigido em 24/08/2026). Quem rodou o roteiro em versão
+-- anterior aparece sem eles mesmo tendo feito — o dado não existe no banco.
 
 with janela as (
   -- ⬇⬇⬇ A ÚNICA LINHA PARA EDITAR: a partir de QUANDO contar. ⬇⬇⬇
-  select date_trunc('day', now() at time zone 'America/Sao_Paulo')
-         at time zone 'America/Sao_Paulo' as inicio          -- hoje, desde 00:00 (Brasília)
+  select now() - interval '7 days' as inicio                 -- a rodada inteira do teste
 
   -- Outras janelas — troque a linha acima por UMA destas:
-  --   select now() - interval '3 hours'                     as inicio   -- últimas 3 horas
   --   select now() - interval '24 hours'                    as inicio   -- últimas 24 horas
+  --   select now() - interval '48 hours'                    as inicio   -- hoje e ontem
+  --   select date_trunc('day', now() at time zone 'America/Sao_Paulo')
+  --          at time zone 'America/Sao_Paulo'               as inicio   -- só hoje, desde 00:00
   --   select timestamptz '2026-08-25 19:00-03'              as inicio   -- desde um horário exato
   --   select now() - interval '30 days'                     as inicio   -- histórico do piloto
 ),
@@ -77,6 +85,15 @@ select nome,
        case when n8  > 0 then '✓' else '·' end as "8 limpou",
        (n1>0)::int + (n2>0)::int + (n3>0)::int + (n4>0)::int
          + (n5>0)::int + (n67>0)::int + (n67>1)::int + (n8>0)::int as passos_de_8,
+       -- Quando foi a última vez que a pessoa mexeu no app. Com a janela larga,
+       -- é isto que separa quem fez agora de quem fez ontem.
+       case when ultima_atividade is null then '—'
+            when (ultima_atividade at time zone 'America/Sao_Paulo')::date
+                 = (now() at time zone 'America/Sao_Paulo')::date         then 'hoje'
+            when (ultima_atividade at time zone 'America/Sao_Paulo')::date
+                 = (now() at time zone 'America/Sao_Paulo')::date - 1     then 'ontem'
+            else to_char(ultima_atividade at time zone 'America/Sao_Paulo', 'DD/MM')
+       end                                                                as quando,
        versao,
        to_char(ultima_atividade at time zone 'America/Sao_Paulo', 'DD/MM HH24:MI') as ultima_atividade
   from agg
