@@ -182,10 +182,11 @@ export function addGuestPlayer(name = '', position = 'meia') {
   if (cleanPosition === 'gol') {
     // Goleiro respeita o TETO DE GOLEIROS (não a vaga de linha), junto com os
     // goleiros de aluguel e os goleiros-convidados já no jogo.
-    const teto = goleirosPorJogo(snapshot);
-    if (teto <= 0) {
-      return { ok: false, message: 'Este clube não usa goleiro fixo. Ajuste em Config › Como o clube joga.' };
-    }
+    // 2 fixo, igual ao addRentalGoalkeeper logo acima. O port do Lote 1 (e5d4ae8)
+    // trouxe a chamada a goleirosPorJogo() do app genérico, mas o perfil de
+    // clube não existe nesta branch: a função nunca foi definida aqui e a linha
+    // estourava ReferenceError ao adicionar convidado goleiro.
+    const teto = 2;
     const rentalGks = getRentalGoalkeepers(game).length;
     const guestGks = current.filter((g) => ['gol', 'goleiro'].includes(String(g?.position || '').toLowerCase())).length;
     if (rentalGks + guestGks >= teto) {
