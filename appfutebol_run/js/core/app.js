@@ -3445,9 +3445,9 @@ async function submitPerfVote() {
 // =================== fim votação de desempenho ===================
 
 // ===================== Votação do churrasco (modal bloqueante) =====================
-// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Quem esteve no jogo vota
-// UMA nota 1–10 na dupla responsável (do rodízio). O modal de desempenho tem
-// prioridade.
+// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Quem esteve no jogo — e o
+// sócio de carnê, que não joga mas come — vota UMA nota 1–10 na dupla
+// responsável (do rodízio). O modal de desempenho tem prioridade.
 let carneVote = null;          // { gameKey, voterId, duo, score }
 let carneVoteGameKey = null;
 let carneVoteStatus = 'idle';
@@ -3489,17 +3489,18 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
   if (carneVoteGameKey !== key) { carneVoteGameKey = key; carneVoteStatus = 'idle'; }
   if (!active || ratingsUnavailable) { unmountCarneVote(); return; }
 
-  // Só quem esteve no jogo vota — mesma regra da votação de desempenho, mesma
-  // função de elegibilidade. Antes o modal era de TODOS os membros: no jogo de
-  // 26/08, 3 dos 9 votos vieram de quem não estava lá. O servidor barra também
-  // (submit-rating), esta checagem é só para não abrir um modal que vai falhar.
-  // CONSEQUÊNCIA CONHECIDA: quem tem `plays_football: false` (perfil só do
-  // churrasco) não confirma presença e, portanto, deixa de votar. Se um dia isso
-  // tiver de mudar, o lugar é aqui e no submit-rating, juntos.
+  // Quem esteve no jogo vota — mais o sócio de carnê, que não joga e por isso
+  // nunca confirma presença, mas come o churrasco e avalia a dupla. Antes o
+  // modal era de TODOS os membros: no jogo de 26/08, 3 dos 9 votos vieram de
+  // quem não estava lá, e só 1 deles era sócio de carnê. O servidor aplica a
+  // mesma regra (submit-rating); esta checagem é só para não abrir um modal que
+  // ia falhar na hora de gravar.
   const confirmacoesCarne = await confirmationsForVotingGame(snapshot, game);
   if (confirmacoesCarne === null) return; // leitura em voo: decide no próximo render
   const noJogo = getInGamePlayers(snapshot, game, confirmacoesCarne);
-  if (!noJogo.some((p) => String(p.id) === String(currentPlayer.id))) { unmountCarneVote(); return; }
+  const podeVotarCarne = noJogo.some((p) => String(p.id) === String(currentPlayer.id))
+    || authzIsCarneOnly(currentPlayer);
+  if (!podeVotarCarne) { unmountCarneVote(); return; }
 
   if (carneVoteStatus === 'voted' || carneVoteStatus === 'active' || carneVoteStatus === 'checking') return;
 

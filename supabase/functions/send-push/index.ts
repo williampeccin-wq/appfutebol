@@ -136,10 +136,10 @@ Deno.serve(async (req) => {
     }
     if (claimErr) return json({ ok: true, skipped: true, reason: "already_sent" });
 
-    // Destinatários: quem esteve no jogo, nos DOIS tipos. O churrasco avisava o
-    // clube inteiro, mas só quem jogou pode votar (submit-rating recusa o resto
-    // com voter_not_in_game) — avisar todo mundo era mandar gente abrir um modal
-    // que não existe para ela.
+    // Destinatários: quem esteve no jogo — mais, no churrasco, os sócios de carnê
+    // (não jogam, não confirmam presença, mas comem o churrasco e avaliam a
+    // dupla). O aviso ia para o clube inteiro: quem não estava no jogo abria um
+    // modal que o servidor recusa.
     //
     // Os dois formatos de confirmação do sistema valem (status='confirmed' OU
     // data.confirmed===true), igual ao submit-rating: se o alvo do push divergir
@@ -150,10 +150,22 @@ Deno.serve(async (req) => {
       .select("player_id, status, data")
       .eq("game_key", gameKey);
     const { data: confs } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", callerClubId));
-    const ids = [...new Set((confs || [])
+    const alvos = new Set((confs || [])
       .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
       .map((c) => String(c.player_id))
-      .filter(Boolean))];
+      .filter(Boolean));
+
+    if (kind === "churrasco") {
+      // Espelha isCarneOnly() do domain/authz.js e a regra do submit-rating.
+      const playersQuery = admin.from("players").select("id, data");
+      const { data: ps } = await (singleTenant ? playersQuery : playersQuery.eq("club_id", callerClubId));
+      for (const p of (ps || [])) {
+        const d = (p?.data || {}) as Record<string, unknown>;
+        if (d.role === "carne" || d.plays_football === false) alvos.add(String(p.id));
+      }
+    }
+
+    const ids = [...alvos];
     if (ids.length) {
       const subsQuery = admin
         .from("push_subscriptions")
