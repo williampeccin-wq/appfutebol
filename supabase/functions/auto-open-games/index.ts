@@ -1,43 +1,73 @@
-// Abertura automática de inscrições (Web Push).
-//
-// Disparada pelo cron do Supabase a cada poucos minutos. Para cada jogo marcado
-// com `auto_open_at` (data/hora de Brasília) cujo horário já chegou e que ainda
-// está fechado, abre as inscrições (open=true em app_meta.data.games — a fonte
-// autoritativa do flag) e avisa todos por push. Idempotente: depois de aberto,
-// não reabre nem reavisa; o índice único uq_push_log_open garante 1 push por jogo.
+// Cron de 5 min (Web Push). Faz duas coisas, todas idempotentes e controladas
+// pela Central de Notificações (app_meta.data.settings.notifications):
+//   1) Abre inscrições de jogos com auto_open_at vencido e avisa todos.
+//   2) Avisa todos quando abre a votação do CHURRASCO (23h do dia do jogo).
+// O push de votação de DESEMPENHO é disparado pelo admin ao lançar resultado
+// (send-push trigger_voting via app.js), não mais por este cron.
+// Cada aviso é único por jogo (índices uq_push_log_open / uq_push_log_voting).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
-};
-
-function json(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+// CORS por allowlist de Origin (consistente com as demais funções), em vez de
+// wildcard "*". Na prática esta função é cron-only (exige x-cron-secret) e
+// server-to-server nem usa CORS — mas restringir é higiene/defesa em profundidade.
+const ALLOWED_ORIGIN = (o: string): boolean =>
+  /^https?:\/\/localhost(:\d+)?$/i.test(o)
+  || /^https:\/\/([a-z0-9-]+\.)*harmoniafc-prod\.pages\.dev$/i.test(o)
+  || /^https:\/\/([a-z0-9-]+\.)*convocados-44x\.pages\.dev$/i.test(o)
+  || /^https:\/\/([a-z0-9-]+\.)*convocados\.app\.br$/i.test(o);
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") || "";
+  const h: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+    "Vary": "Origin",
+  };
+  if (origin && ALLOWED_ORIGIN(origin)) h["Access-Control-Allow-Origin"] = origin;
+  return h;
 }
 
-const KIND = "inscricoes_abertas";
+// "Tabela não existe" separa o projeto single-tenant (fallback abaixo) de uma falha
+// real de leitura, que continua devolvendo 500. Não basta olhar o SQLSTATE 42P01: o
+// PostgREST resolve tabela pelo schema cache e devolve PGRST205 ANTES de chegar ao
+// Postgres — foi o que manteve o cron em 500 mesmo depois do primeiro conserto.
+const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205", "PGRST202", "PGRST200"]);
+function isMissingTable(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_TABLE_CODES.has(err.code)) return true;
+  return /does not exist|schema cache/i.test(String(err.message || ""));
+}
+// Coluna ausente (42703 no Postgres, PGRST204 no schema cache do PostgREST).
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+function isMissingColumn(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.code && MISSING_COLUMN_CODES.has(err.code)) return true;
+  return /column .* does not exist|could not find the .* column/i.test(String(err.message || ""));
+}
 
-// Agora em Brasília (UTC-3), no formato "YYYY-MM-DDTHH:mm" para comparar com o
-// datetime-local gravado pelo app (que também é horário local/BRT).
+const KIND_OPEN = "inscricoes_abertas";
+const KIND_CHURR = "votacao_churrasco";
+
 function nowBrtMinute(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
   return brt.toISOString().slice(0, 16);
 }
-
 function formatGameDate(raw: string): string {
   const s = String(raw || "").trim();
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}` : s;
 }
+function churrascoOpenMs(date: string): number {
+  const d = String(date || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return NaN;
+  return Date.parse(`${d}T23:00:00-03:00`);
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeaders(req);
+  const json = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -47,87 +77,181 @@ Deno.serve(async (req) => {
   const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@harmonia.app";
   const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
-  // Só o cron (segredo compartilhado) pode disparar.
   if (!CRON_SECRET || req.headers.get("x-cron-secret") !== CRON_SECRET) {
     return json({ error: "unauthorized" }, 401);
   }
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "vapid_not_configured" }, 500);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-
-  // 1) Lê os jogos e decide quais abrir. Guarda o updated_at para a escrita
-  //    condicional (concorrência otimista).
-  const { data: metaRow, error: metaErr } = await admin
-    .from("app_meta").select("data, updated_at").eq("key", "default").maybeSingle();
-  if (metaErr) { console.error("[auto-open] meta read:", metaErr.message); return json({ error: "meta_query_failed" }, 500); }
-
-  const data = (metaRow?.data || {}) as Record<string, unknown>;
-  const prevUpdatedAt = metaRow?.updated_at;
-  const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
-  const nowBrt = nowBrtMinute();
-
-  const toOpen: Array<Record<string, unknown>> = [];
-  const nextGames = games.map((g) => {
-    const at = String(g?.auto_open_at || "").slice(0, 16);
-    if (at && g?.open !== true && nowBrt >= at) {
-      toOpen.push(g);
-      return { ...g, open: true };
-    }
-    return g;
-  });
-
-  if (!toOpen.length) return json({ ok: true, now: nowBrt, opened: 0 });
-
-  // 2) Persiste a abertura com CONCORRÊNCIA OTIMISTA: só grava se o updated_at
-  //    ainda for o mesmo que lemos. Se um cliente (admin editando settings,
-  //    carnê, etc.) gravou nesse meio-tempo, 0 linhas afetadas → não sobrescreve;
-  //    o próximo tick do cron (5 min) reabre. Evita clobber do blob app_meta.
-  const { data: upd, error: upErr } = await admin
-    .from("app_meta")
-    .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
-    .eq("key", "default")
-    .eq("updated_at", prevUpdatedAt)
-    .select("key");
-  if (upErr) { console.error("[auto-open] meta write:", upErr.message); return json({ error: "meta_update_failed" }, 500); }
-  if (!upd || !upd.length) return json({ ok: true, now: nowBrt, opened: 0, skipped: "concurrent_write" });
-
-  // 3) Push para todos, com dedup por jogo.
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-  const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth");
 
-  let pushedGames = 0, sent = 0, removed = 0, skippedDuplicate = 0;
-  for (const g of toOpen) {
-    const gameKey = String(g.game_key || g.id || "");
-    const title = "Inscrições abertas ⚽";
-    const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+  // Projeto sem a tabela `clubs` (single-tenant): resolvido logo abaixo, antes de
+  // qualquer uso. Mora aqui em cima porque claim()/subsOfClub() fecham sobre ele.
+  let singleTenant = false;
 
-    // Dedup: 1 linha por (kind, game_key).
-    const { error: insErr } = await admin
-      .from("push_log")
-      .insert({ kind: KIND, game_key: gameKey, title, body, status: "sent" });
-    if (insErr) {
-      if ((insErr as { code?: string }).code === "23505") { skippedDuplicate += 1; continue; }
-      continue;
-    }
-    pushedGames += 1;
-
-    const notification = JSON.stringify({ title, body, url: "./" });
+  // Envia uma notificação para uma lista de inscrições; remove as mortas.
+  async function pushTo(subs: Array<{ endpoint: string; p256dh: string; auth: string }>, title: string, body: string) {
+    const payload = JSON.stringify({ title, body, url: "./" });
+    let sent = 0, removed = 0;
     for (const sub of subs || []) {
       try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          notification,
-        );
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
         sent += 1;
       } catch (err) {
-        const statusCode = (err as { statusCode?: number })?.statusCode;
-        if (statusCode === 404 || statusCode === 410) {
-          await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
-          removed += 1;
+        const sc = (err as { statusCode?: number })?.statusCode;
+        if (sc === 404 || sc === 410) { await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); removed += 1; }
+      }
+    }
+    return { sent, removed };
+  }
+  // Insere a linha de dedup (POR CLUBE); true se é a primeira vez (deve enviar).
+  async function claim(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
+    const row: Record<string, unknown> = { kind, game_key: gameKey, title, body, status: "sent" };
+    // SEMPRE tenta com club_id primeiro. Omiti-lo quando a coluna EXISTE seria pior
+    // que o bug original: os índices uq_push_log_* são por (kind, game_key, club_id)
+    // e NULL não colide com NULL em índice único — o dedup morreria e o mesmo aviso
+    // sairia a cada 5 min durante a janela inteira (13h, no caso do churrasco).
+    const first = await admin.from("push_log").insert({ ...row, club_id: clubId });
+    if (!first.error) return true;
+    if (!isMissingColumn(first.error)) return false; // 23505 (já enviado) ou erro real
+    const retry = await admin.from("push_log").insert(row); // projeto sem a coluna
+    return !retry.error;
+  }
+
+  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, churrasco: 0 };
+  const nowMs = Date.now();
+  const nowBrt = nowBrtMinute();
+
+  // Multi-tenant: itera TODOS os clubes; cada um tem seu blob app_meta key=club_id.
+  // MAS nem todo projeto tem a tabela `clubs`: o harmonia-fc nasceu single-tenant e
+  // nunca recebeu as migrations do multi-tenant. Lá esta leitura falha com "tabela
+  // ausente" e
+  // a função saía em 500 ANTES de olhar qualquer jogo — o cron rodava de 5 em 5 min,
+  // nada abria e nenhum push saía, sem rastro no app (INCIDENTE 17/08: o jogo de
+  // 19/08 tinha auto_open_at 17/08 21:00 e teve de ser aberto na mão). Quando a
+  // tabela não existe, cada linha de app_meta é um "clube" e não há plano para gatear.
+  let clubList: Array<{ id: string; plan?: string }> = [];
+  const clubsRead = await admin.from("clubs").select("id, plan");
+  if (!clubsRead.error) {
+    clubList = (clubsRead.data || []) as Array<{ id: string; plan?: string }>;
+  } else if (isMissingTable(clubsRead.error)) {
+    singleTenant = true;
+    const { data: metaKeys, error: metaKeysErr } = await admin.from("app_meta").select("key");
+    if (metaKeysErr) { console.error("[auto-open] app_meta keys read:", metaKeysErr.message); return json({ error: "app_meta_query_failed" }, 500); }
+    // Sem tabela de planos não há o que gatear: o clube único vale como pro.
+    clubList = (metaKeys || []).map((row) => ({ id: String(row.key), plan: "pro" }));
+  } else {
+    console.error("[auto-open] clubs read:", clubsRead.error.code, clubsRead.error.message);
+    return json({ error: "clubs_query_failed", code: clubsRead.error.code || null, message: String(clubsRead.error.message || "").slice(0, 200) }, 500);
+  }
+  out.single_tenant = singleTenant;
+
+  // Sem a tabela `clubs`, as colunas club_id das tabelas de push também não existem
+  // (mesmas migrations). Como nesse projeto há um clube só, ler tudo == filtrar.
+  async function subsOfClub(clubId: string) {
+    const query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
+    const { data, error } = await (singleTenant ? query : query.eq("club_id", clubId));
+    if (error) { console.error("[auto-open] subs read", clubId, error.message); return []; }
+    return data || [];
+  }
+
+  // Assinaturas de quem ESTEVE NO JOGO. O aviso do churrasco ia para o clube
+  // inteiro, mas só quem jogou pode votar (submit-rating recusa o resto com
+  // voter_not_in_game): avisar todo mundo era mandar gente abrir um modal que
+  // não existe para ela. Os dois formatos de confirmação valem, igual ao
+  // submit-rating — alvo do push e alvo do voto não podem divergir.
+  async function subsOfGame(clubId: string, gameKey: string) {
+    if (!gameKey) return [];
+    const confsQuery = admin
+      .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
+    const { data: confs, error: confErr } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", clubId));
+    if (confErr) { console.error("[auto-open] confs read", clubId, confErr.message); return []; }
+    const ids = [...new Set((confs || [])
+      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
+      .map((c) => String(c.player_id))
+      .filter(Boolean))];
+    if (!ids.length) return [];
+    const subsQuery = admin
+      .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids);
+    const { data, error } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", clubId));
+    if (error) { console.error("[auto-open] subs of game", clubId, error.message); return []; }
+    return data || [];
+  }
+
+  const failures: Array<{ club: string; error: string }> = [];
+  for (const club of (clubList || [])) {
+    // Falha de UM clube não pode calar o cron dos outros: sem este catch, um
+    // blob em formato inesperado sobe como TypeError, escapa do loop e mata a
+    // invocação inteira — nenhum clube abre inscrição. Os erros de query já
+    // tratados abaixo continuam usando `continue`; este catch é para o resto.
+    try {
+      const clubId = String(club.id);
+      const isPro = String(club.plan || "free") === "pro";
+
+      const { data: metaRow, error: metaErr } = await admin
+        .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
+      if (metaErr) { console.error("[auto-open] meta read", clubId, metaErr.message); continue; }
+      if (!metaRow) continue;
+
+      const data = (metaRow.data || {}) as Record<string, unknown>;
+      const prevUpdatedAt = metaRow.updated_at;
+      const settings = (data.settings || {}) as Record<string, unknown>;
+      const notif = (settings.notifications || {}) as Record<string, boolean>;
+      const enabled = (k: string) => notif[k] !== false; // ausente = ligado
+      const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
+      out.clubs = (out.clubs as number) + 1;
+
+      // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
+      if (isPro) {
+        const toOpen: Array<Record<string, unknown>> = [];
+        const nextGames = games.map((g) => {
+          const at = String(g?.auto_open_at || "").slice(0, 16);
+          if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
+          return g;
+        });
+        if (toOpen.length) {
+          const { data: upd, error: upErr } = await admin
+            .from("app_meta")
+            .update({ data: { ...data, games: nextGames }, updated_at: new Date().toISOString() })
+            .eq("key", clubId).eq("updated_at", prevUpdatedAt).select("key");
+          if (upErr) { console.error("[auto-open] meta write", clubId, upErr.message); }
+          else if (upd && upd.length) {
+            out.opened = (out.opened as number) + toOpen.length;
+            if (enabled(KIND_OPEN)) {
+              const subs = await subsOfClub(clubId);
+              for (const g of toOpen) {
+                const gameKey = String(g.game_key || g.id || "");
+                const title = "Inscrições abertas ⚽";
+                const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+                if (await claim(KIND_OPEN, gameKey, title, body, clubId)) await pushTo(subs || [], title, body);
+              }
+            }
+          }
         }
       }
+
+      // ---------- 2) Votação do churrasco (23h do dia do jogo) → todos ----------
+      if (enabled(KIND_CHURR)) {
+        for (const g of games) {
+          const openMs = churrascoOpenMs(String(g.game_date || ""));
+          if (!openMs) continue;
+          const closeMs = openMs + 13 * 3600_000; // 23h → 12h do dia seguinte
+          if (nowMs < openMs || nowMs > closeMs) continue;
+          const gameKey = String(g.game_key || g.id || "");
+          const title = "Vote no churrasco 🥩🔥";
+          const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
+          if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
+          await pushTo(await subsOfGame(clubId, gameKey), title, body);
+          out.churrasco = (out.churrasco as number) + 1;
+        }
+      }
+    } catch (err) {
+      const message = String((err as Error)?.message || err).slice(0, 200);
+      console.error("[auto-open] clube falhou", String(club.id), message);
+      failures.push({ club: String(club.id), error: message });
     }
   }
 
-  return json({ ok: true, now: nowBrt, opened: toOpen.length, pushedGames, sent, removed, skippedDuplicate });
+  if (failures.length) out.failed = failures;
+  return json({ ok: true, ...out });
 });

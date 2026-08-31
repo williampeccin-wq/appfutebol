@@ -1680,6 +1680,21 @@ document.addEventListener("click", async (e) => {
       showToast('Resultado NÃO foi salvo no servidor. Verifique a conexão e lance de novo.', 'error');
     } else {
       showToast("Resultado lançado e classificação recalculada", "success");
+      // Dispara votação de desempenho imediatamente após o resultado ser salvo,
+      // em vez de depender do cron que só roda 1h após o início do jogo.
+      // Fire-and-forget: não bloqueia nem mostra erro ao admin se falhar.
+      if (builtResult.game_key && SUPABASE_CONFIG?.url) {
+        try {
+          const token = JSON.parse(localStorage.getItem('harmonia_auth_session') || 'null')?.access_token || null;
+          if (token) {
+            fetch(`${SUPABASE_CONFIG.url}/functions/v1/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ action: 'trigger_voting', kind: 'desempenho', game_key: builtResult.game_key }),
+            }).catch(() => {});
+          }
+        } catch (_) { /* fire-and-forget */ }
+      }
     }
     return;
   }
@@ -3430,8 +3445,9 @@ async function submitPerfVote() {
 // =================== fim votação de desempenho ===================
 
 // ===================== Votação do churrasco (modal bloqueante) =====================
-// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Todos os membros votam UMA
-// nota 1–10 na dupla responsável (do rodízio). O modal de desempenho tem prioridade.
+// Abre 23h do dia do jogo, fecha 12h do dia seguinte. Quem esteve no jogo vota
+// UMA nota 1–10 na dupla responsável (do rodízio). O modal de desempenho tem
+// prioridade.
 let carneVote = null;          // { gameKey, voterId, duo, score }
 let carneVoteGameKey = null;
 let carneVoteStatus = 'idle';
@@ -3472,6 +3488,19 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
 
   if (carneVoteGameKey !== key) { carneVoteGameKey = key; carneVoteStatus = 'idle'; }
   if (!active || ratingsUnavailable) { unmountCarneVote(); return; }
+
+  // Só quem esteve no jogo vota — mesma regra da votação de desempenho, mesma
+  // função de elegibilidade. Antes o modal era de TODOS os membros: no jogo de
+  // 26/08, 3 dos 9 votos vieram de quem não estava lá. O servidor barra também
+  // (submit-rating), esta checagem é só para não abrir um modal que vai falhar.
+  // CONSEQUÊNCIA CONHECIDA: quem tem `plays_football: false` (perfil só do
+  // churrasco) não confirma presença e, portanto, deixa de votar. Se um dia isso
+  // tiver de mudar, o lugar é aqui e no submit-rating, juntos.
+  const confirmacoesCarne = await confirmationsForVotingGame(snapshot, game);
+  if (confirmacoesCarne === null) return; // leitura em voo: decide no próximo render
+  const noJogo = getInGamePlayers(snapshot, game, confirmacoesCarne);
+  if (!noJogo.some((p) => String(p.id) === String(currentPlayer.id))) { unmountCarneVote(); return; }
+
   if (carneVoteStatus === 'voted' || carneVoteStatus === 'active' || carneVoteStatus === 'checking') return;
 
   const duo = getChurrascoDuo(snapshot, game);
