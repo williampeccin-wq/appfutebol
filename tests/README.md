@@ -41,6 +41,7 @@ opina sobre formatação.
 | `profile-persistencia.regression.mjs` | perfil do clube sumia no ida-e-volta com o servidor |
 | `perfil-formulario.regression.mjs` | tela de configuração gravar errado ou apagar o que não está nela |
 | `cadencia.regression.mjs` | campo de parametrização exposto que não decide nada |
+| `temporada-encerramento.regression.mjs` | `end_date` era só texto no hero: o jogo de setembro entrava no Inverno 26 e a classificação final do quadrimestre nunca era congelada (31/08) |
 
 ## Como escrever uma nova
 

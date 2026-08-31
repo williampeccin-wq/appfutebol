@@ -148,6 +148,21 @@ export function duoRatingAverages(rows, gameKeys = null) {
   return aggregateByTarget(rows, 'churrasco', gameKeys);
 }
 
+// Data do jogo a que um voto pertence, lida do PRÓPRIO game_key
+// (`game_AAAA-MM-DD_HHMM`, ver makeGameKeyFromForm em core/app.js).
+//
+// É o que permite recortar nota por temporada sem tocar em `created_at`: a view
+// `ratings_public` omite o instante de propósito — agrupar por ele remontava a
+// cédula de cada votante (ver o comentário em fetchRatings). A data do JOGO não
+// tem esse problema: ela é a mesma para a mesa inteira.
+//
+// Chave sem data ('default', formatos anteriores) devolve null e o voto fica
+// FORA de qualquer temporada — nunca é jogado por engano na temporada corrente.
+export function dateOfGameKey(gameKey) {
+  const match = /^game_(\d{4}-\d{2}-\d{2})_/.exec(String(gameKey || ''));
+  return match ? match[1] : null;
+}
+
 // Tamanho da página e teto de páginas. O teto existe só como rede: se o servidor
 // ignorar o Range, o laço para em vez de repetir a primeira página para sempre.
 const PAGINA = 1000;

@@ -1126,7 +1126,7 @@ async function rebaseSharedParts(config, previousParts, parts) {
     ...parts,
     game: remoteGame ? mergeChangedFields(remoteGame, previousParts?.game, parts.game) : parts.game,
     meta: remoteMeta
-      ? mergeChampionshipResults(remoteMeta, previousParts?.meta, mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta))
+      ? mergeChampionshipFrozen(remoteMeta, mergeChampionshipResults(remoteMeta, previousParts?.meta, mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta)))
       : parts.meta,
   };
 
@@ -1178,6 +1178,33 @@ function mergeChampionshipResults(base, previous, next) {
       active: { ...next.championship.active, results },
     },
   };
+}
+
+// Temporadas/anos ENCERRADOS são append-only: uma temporada congelada nunca é
+// apagada de propósito, então tudo que existe no servidor e não existe aqui é
+// perda, não exclusão — e diferente dos resultados, o congelado NÃO é
+// recomputável (a nota de uma temporada passada depende de votos que a exclusão
+// de um jogo apaga do banco). Por isso a regra aqui é união simples por id, sem
+// consultar baseline: nada que já foi congelado sai.
+function mergeFrozenList(baseList, nextList) {
+  const base = Array.isArray(baseList) ? baseList : [];
+  const next = Array.isArray(nextList) ? nextList : [];
+  if (!base.length) return next;
+  const idsLocais = new Set(next.map((item) => String(item?.id ?? item?.year ?? '')));
+  const resgatados = base.filter((item) => !idsLocais.has(String(item?.id ?? item?.year ?? '')));
+  if (!resgatados.length) return next;
+  console.warn('[storage.supabase] preservando ' + resgatados.length + ' temporada(s)/ano(s) encerrado(s) que este cliente não tinha.');
+  return [...next, ...resgatados];
+}
+
+function mergeChampionshipFrozen(base, next) {
+  const baseChamp = base?.championship;
+  const nextChamp = next?.championship;
+  if (!baseChamp || !nextChamp) return next;
+  const history = mergeFrozenList(baseChamp.history, nextChamp.history);
+  const years = mergeFrozenList(baseChamp.years, nextChamp.years);
+  if (history === nextChamp.history && years === nextChamp.years) return next;
+  return { ...next, championship: { ...nextChamp, history, years } };
 }
 
 // Merge de 3 vias em um nível: parte do `base` (servidor) e sobrepõe apenas as

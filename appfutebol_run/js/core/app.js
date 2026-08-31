@@ -1860,6 +1860,164 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "save-season") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!authzIsAdmin(current)) {
+      showToast("Apenas administrador pode editar a temporada", "error");
+      return;
+    }
+
+    const campos = {
+      name: document.getElementById('season-edit-name')?.value?.trim() || '',
+      start_date: displayToIso(document.getElementById('season-edit-start')?.value?.trim() || ''),
+      end_date: displayToIso(document.getElementById('season-edit-end')?.value?.trim() || ''),
+    };
+
+    // Ensaio antes de perguntar: a validação mora no domínio, e rodá-la numa
+    // cópia rasa (updateSeason só troca `championship`) evita duplicar as regras
+    // aqui e deixar as duas versões divergirem.
+    const ensaio = updateSeason({ ...snapshot }, campos);
+    if (!ensaio.ok) {
+      const recados = {
+        name_required: 'Informe o nome da temporada',
+        end_before_start: 'O fim da temporada não pode ser antes do início',
+        overlaps_closed_season: `O início precisa ser depois de ${formatDate(ensaio.limit)} — aquele período já foi encerrado e não pode ser recontado.`,
+      };
+      showToast(recados[ensaio.reason] || 'Não foi possível salvar a temporada', "error");
+      return;
+    }
+
+    // Mexer nas datas move rodadas para dentro e para fora da classificação.
+    // Sem este aviso o admin corrige um dígito e vê a tabela inteira mudar.
+    const impacto = seasonWindowChangeImpact(snapshot, { start: campos.start_date, end: campos.end_date });
+    if (impacto.entering.length || impacto.leaving.length) {
+      const partes = [];
+      if (impacto.entering.length) partes.push(`<p>${impacto.entering.length} rodada(s) <strong>passam a contar</strong>: ${impacto.entering.map((r) => formatDate(r.date)).join(', ')}.</p>`);
+      if (impacto.leaving.length) partes.push(`<p>${impacto.leaving.length} rodada(s) <strong>saem da classificação</strong>: ${impacto.leaving.map((r) => formatDate(r.date)).join(', ')}. Não são apagadas — ficam marcadas como fora da temporada.</p>`);
+      const seguir = await showConfirmModal({
+        title: 'A classificação vai mudar',
+        message: partes.join(''),
+        confirmText: 'Salvar mesmo assim',
+        cancelText: 'Rever',
+      });
+      if (!seguir) return;
+    }
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, 'Salvando...');
+
+    const snapshotFresco = getState();
+    snapshotFresco.session = snapshot.session;
+    const salvo = updateSeason(snapshotFresco, campos);
+    if (!salvo.ok) {
+      uiActionInFlight = false;
+      render(snapshot);
+      showToast('Não foi possível salvar a temporada', "error");
+      return;
+    }
+
+    const safeSnapshot = repairManualSnapshot(snapshotFresco);
+    const gravacao = await Promise.resolve(savePersistedState(safeSnapshot));
+    render(safeSnapshot);
+    uiActionInFlight = false;
+
+    if (gravacao && gravacao.ok !== true) {
+      showToast('A temporada NÃO foi salva no servidor. Verifique a conexão e tente de novo.', 'error');
+    } else {
+      showToast('Temporada atualizada', "success");
+    }
+    return;
+  }
+
+  if (action === "close-season") {
+    const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+    if (!authzIsAdmin(current)) {
+      showToast("Apenas administrador pode encerrar a temporada", "error");
+      return;
+    }
+
+    const nome = document.getElementById('season-next-name')?.value?.trim() || '';
+    const inicio = displayToIso(document.getElementById('season-next-start')?.value?.trim() || '');
+    const fim = displayToIso(document.getElementById('season-next-end')?.value?.trim() || '');
+    if (!nome || !inicio || !fim) {
+      showToast("Preencha nome, início e fim da próxima temporada", "error");
+      return;
+    }
+    if (fim < inicio) {
+      showToast("O fim da próxima temporada não pode ser antes do início", "error");
+      return;
+    }
+
+    const status = getSeasonStatus(snapshot, { today: carneTodayIso(), nowMs: Date.now() });
+    if (status.pendingGames.length || status.openVoting.length) {
+      showToast("Resolva as pendências listadas no card antes de encerrar", "error");
+      return;
+    }
+
+    // A nota da temporada é congelada agora e NÃO é recomputável depois (excluir
+    // um jogo apaga os votos dele do banco). Encerrar sem ter conseguido ler as
+    // notas grava uma temporada sem nota, para sempre — então isso barra.
+    let ratingRows = [];
+    if (isVotingEnabled()) {
+      const cache = await loadRatingsCache(true).catch(() => null);
+      if (!cache || !cache.loaded) {
+        showToast("Não foi possível ler as notas para congelar a temporada. Verifique a conexão e tente de novo.", "error");
+        return;
+      }
+      ratingRows = getCachedRatings();
+    }
+
+    const previa = calculateCurrentRanking(snapshot);
+    const campeao = previa[0];
+    const podio = previa.slice(0, 3).map((row, i) => `${i + 1}º ${row.name} (${row.points})`).join(' · ');
+    const seguir = await showConfirmModal({
+      title: `Encerrar ${status.season.name || 'a temporada'}?`,
+      message: `
+        <p>A classificação abaixo vira <strong>resultado final</strong> e não muda mais:</p>
+        <p>${campeao ? podio : 'Nenhum jogador pontuou nesta temporada.'}</p>
+        <p>${status.seasonResults} rodada(s) congelada(s)${status.outOfSeason.length ? `, ${status.outOfSeason.length} fora do período ${status.outOfSeason.length === 1 ? 'migra' : 'migram'} para a temporada nova` : ''}. Em seguida abre <strong>${nome}</strong> (${formatDate(inicio)} a ${formatDate(fim)}) começando do zero.</p>`,
+      confirmText: 'Encerrar temporada',
+      cancelText: 'Cancelar',
+      requiredText: 'ENCERRAR',
+    });
+    if (!seguir) return;
+
+    uiActionInFlight = true;
+    setActionBusy(trigger, 'Encerrando...');
+
+    // RELÊ o estado: o poll pode ter trazido um resultado novo enquanto o admin
+    // lia o modal, e congelar o snapshot velho perderia essa rodada.
+    const snapshotFresco = getState();
+    snapshotFresco.session = snapshot.session;
+
+    const fechamento = closeSeason(snapshotFresco, {
+      nextSeason: { name: nome, label: nome, start_date: inicio, end_date: fim, year: Number(fim.slice(0, 4)) || null },
+      ratingRows,
+      closedBy: current?.id || null,
+    });
+
+    if (!fechamento.ok) {
+      uiActionInFlight = false;
+      render(snapshot);
+      showToast(fechamento.reason === 'season_already_closed'
+        ? "Esta temporada já foi encerrada."
+        : "Não foi possível encerrar a temporada.", "error");
+      return;
+    }
+
+    const safeSnapshot = repairManualSnapshot(snapshotFresco);
+    const gravacao = await Promise.resolve(savePersistedState(safeSnapshot));
+    render(safeSnapshot);
+    uiActionInFlight = false;
+
+    if (gravacao && gravacao.ok !== true) {
+      showToast('A temporada NÃO foi encerrada no servidor. Verifique a conexão e tente de novo.', 'error');
+    } else {
+      showToast(`${fechamento.frozen.name} encerrada. ${fechamento.next.name} começou.`, "success");
+    }
+    return;
+  }
+
   if (action === "delete-championship-result") {
     const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
     if (!authzIsAdmin(current)) {
@@ -2714,7 +2872,7 @@ import { renderChampionshipScreen } from '../modules/championship/championship.v
 import { isPro, renderProLock, renderProLockInline, showProUpsellModal } from '../domain/gating.js';
 import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
 import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
-import { buildTeamResultStatuses, deleteChampionshipResult, findReplacedChampionshipResult, persistChampionshipResult } from '../modules/championship/championship.service.js';
+import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';

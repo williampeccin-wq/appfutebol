@@ -1,6 +1,7 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { CHAMPIONSHIP_HISTORY } from './championship.history.js';
 import { getChampionshipLegacyDataset, getChampionshipPoints, getChampionshipSeason } from '../../domain/club-profile.js';
+import { dateOfGameKey } from '../../services/ratings.service.js';
 
 // Identificador do único dataset histórico existente hoje (a planilha Rei da
 // Quadra do Harmonia). Um clube só enxerga estes dados se o PERFIL dele apontar
@@ -317,6 +318,415 @@ export function getEffectiveChampionshipResults(snapshot) {
   ].sort((left, right) => String(left.date).localeCompare(String(right.date)));
 }
 
+// ===========================================================================
+// TEMPORADA — janela, encerramento e histórico congelado
+//
+// Até 31/08/2026 `end_date` era só texto no hero: a classificação somava TODOS
+// os resultados, então o jogo de setembro entrava no Inverno 26 — uma temporada
+// que a própria tela dizia ter acabado. Aqui a janela passa a valer, e encerrar
+// vira ato explícito do admin que CONGELA a tabela final.
+//
+// PRINCÍPIO: temporada encerrada é FATO, não cálculo. Nada recalcula o que está
+// em `championship.history`. Sem isso, mudar a pontuação do clube, renomear um
+// jogador ou excluir um jogo antigo reescreveria um quadrimestre já premiado —
+// e no caso da nota o estrago é irreversível, porque excluir o jogo APAGA os
+// votos dele do banco (deleteGameRatings).
+//
+// Clube sem datas na temporada (o default genérico do perfil) não tem janela:
+// tudo continua entrando na classificação, como antes. A regra só aperta para
+// quem definiu um período.
+// ===========================================================================
+
+export function getSeasonWindow(snapshot) {
+  const active = getChampionshipState(snapshot).active;
+  return {
+    start: String(active.start_date || '').slice(0, 10),
+    end: String(active.end_date || '').slice(0, 10),
+  };
+}
+
+export function hasSeasonWindow(window) {
+  return !!(window && (window.start || window.end));
+}
+
+export function isDateInSeason(date, window) {
+  const dia = String(date || '').slice(0, 10);
+  if (!dia) return false;
+  if (window?.start && dia < window.start) return false;
+  if (window?.end && dia > window.end) return false;
+  return true;
+}
+
+/** Resultados que contam para a temporada CORRENTE. */
+export function getSeasonResults(snapshot) {
+  const window = getSeasonWindow(snapshot);
+  const todos = getEffectiveChampionshipResults(snapshot);
+  if (!hasSeasonWindow(window)) return todos;
+  return todos.filter((result) => isDateInSeason(result.date, window));
+}
+
+/**
+ * Resultados lançados FORA da janela da temporada. Nunca são descartados em
+ * silêncio: alimentam o aviso na tela e migram para a próxima temporada no
+ * encerramento. As rodadas importadas ficam de fora desta lista — elas
+ * pertencem à temporada em que foram importadas e não são editáveis pelo admin,
+ * então cobrá-las depois do encerramento seria um alerta que nunca some.
+ */
+export function getOutOfSeasonResults(snapshot) {
+  const window = getSeasonWindow(snapshot);
+  if (!hasSeasonWindow(window)) return [];
+  return getEffectiveChampionshipResults(snapshot)
+    .filter((result) => !result.imported && !isDateInSeason(result.date, window));
+}
+
+export function getFrozenSeasons(snapshot) {
+  const history = getChampionshipState(snapshot).history;
+  return Array.isArray(history) ? history : [];
+}
+
+export function getFrozenYears(snapshot) {
+  const years = getChampionshipState(snapshot).years;
+  return Array.isArray(years) ? years : [];
+}
+
+// Ano a que a temporada corrente pertence. O campo explícito manda (temporada
+// que atravessa o Ano Novo pertence ao ano que o clube declarar); na falta
+// dele, vale o ano do fim, e depois o do começo.
+export function getSeasonYear(season) {
+  const explicito = Number(season?.year);
+  if (Number.isFinite(explicito) && explicito > 0) return explicito;
+  const data = String(season?.end_date || season?.start_date || '').slice(0, 4);
+  const ano = Number(data);
+  return Number.isFinite(ano) && ano > 0 ? ano : null;
+}
+
+// Totais de nota (desempenho) por jogador dentro da janela. Devolve soma E
+// quantidade — não a média — porque é a soma que permite montar o anual
+// ponderado por votos depois, sem reler a tabela `ratings` (que pode ter
+// perdido linhas por exclusão de jogo).
+export function seasonRatingTotals(ratingRows, window) {
+  const totais = new Map();
+  for (const row of Array.isArray(ratingRows) ? ratingRows : []) {
+    if (!row || row.kind !== 'desempenho') continue;
+    const data = dateOfGameKey(row.game_key);
+    if (!data) continue;                                   // voto sem data → fora
+    if (hasSeasonWindow(window) && !isDateInSeason(data, window)) continue;
+    const id = String(row.target_id);
+    const atual = totais.get(id) || { sum: 0, votes: 0 };
+    atual.sum += Number(row.score) || 0;
+    atual.votes += 1;
+    totais.set(id, atual);
+  }
+  return totais;
+}
+
+// Janela de votação de desempenho ainda aberta em algum jogo da temporada.
+// Espelha getPerfWindow() do app.js: abre quando o resultado é LANÇADO e dura
+// `ratings_perf_window_hours`. Encerrar com voto em andamento congelaria a nota
+// pela metade — e a temporada congelada não é recalculável.
+export function getOpenVotingResults(snapshot, nowMs) {
+  const horas = Number(snapshot?.settings?.ratings_perf_window_hours) || 0;
+  if (horas <= 0) return [];
+  const agora = Number.isFinite(nowMs) ? nowMs : Date.now();
+  return getSeasonResults(snapshot)
+    .map((result) => {
+      const abriu = Date.parse(result.created_at || '');
+      if (!Number.isFinite(abriu)) return null;
+      const fecha = abriu + horas * 3600_000;
+      return fecha > agora ? { date: result.date, game_key: result.game_key, closeMs: fecha } : null;
+    })
+    .filter(Boolean);
+}
+
+// Jogos DENTRO da janela que já aconteceram e não têm resultado lançado. Um
+// encerramento com jogo pendente congela a temporada sem uma rodada inteira.
+export function getPendingSeasonGames(snapshot, today) {
+  const window = getSeasonWindow(snapshot);
+  const comResultado = new Set(getSeasonResults(snapshot).map((result) => String(result.date)));
+  const hoje = String(today || '').slice(0, 10);
+  return (Array.isArray(snapshot?.games) ? snapshot.games : [])
+    .map((game) => ({ date: String(game?.game_date || '').slice(0, 10), game_key: game?.game_key || null }))
+    .filter((game) => game.date
+      && (!hoje || game.date <= hoje)
+      && isDateInSeason(game.date, window)
+      && !comResultado.has(game.date))
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+/**
+ * Situação da temporada para a tela e para o diálogo de encerramento.
+ * `today` (AAAA-MM-DD) e `nowMs` vêm de fora: data local é do chamador, não do
+ * domínio — calcular aqui com toISOString viraria o dia à noite, no fuso.
+ */
+export function getSeasonStatus(snapshot, { today = '', nowMs = Date.now() } = {}) {
+  const active = getChampionshipState(snapshot).active;
+  const window = getSeasonWindow(snapshot);
+  const hoje = String(today || '').slice(0, 10);
+  return {
+    season: active,
+    window,
+    hasWindow: hasSeasonWindow(window),
+    ended: !!(window.end && hoje && hoje > window.end),
+    seasonResults: getSeasonResults(snapshot).length,
+    outOfSeason: getOutOfSeasonResults(snapshot),
+    pendingGames: getPendingSeasonGames(snapshot, hoje),
+    openVoting: getOpenVotingResults(snapshot, nowMs),
+    alreadyClosed: getFrozenSeasons(snapshot).some((s) => String(s.id) === String(active.id)),
+  };
+}
+
+// --- Sugestão da próxima temporada -----------------------------------------
+// Sem campo novo de configuração: a duração da próxima sai da duração da que
+// está sendo encerrada (01/05→31/08 = 4 meses ⇒ 01/09→31/12). O admin edita o
+// que quiser antes de confirmar.
+
+function partesIso(iso) {
+  const [ano, mes, dia] = String(iso || '').split('-').map(Number);
+  return (ano && mes && dia) ? { ano, mes, dia } : null;
+}
+
+function isoDe(ano, mes, dia) {
+  return `${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+function diaSeguinte(iso) {
+  const p = partesIso(iso);
+  if (!p) return '';
+  const d = new Date(Date.UTC(p.ano, p.mes - 1, p.dia + 1));
+  return isoDe(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+function mesesEntre(inicio, fim) {
+  const a = partesIso(inicio);
+  const b = partesIso(fim);
+  if (!a || !b) return 0;
+  return (b.ano - a.ano) * 12 + (b.mes - a.mes) + 1;
+}
+
+function ultimoDiaApos(inicioIso, meses) {
+  const p = partesIso(inicioIso);
+  if (!p || meses <= 0) return '';
+  const d = new Date(Date.UTC(p.ano, p.mes - 1 + meses, 0));   // dia 0 = último do mês anterior
+  return isoDe(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+export function suggestNextSeason(snapshot, today = '') {
+  const active = getChampionshipState(snapshot).active;
+  const window = getSeasonWindow(snapshot);
+  const inicio = diaSeguinte(window.end) || String(today || '').slice(0, 10);
+  const meses = mesesEntre(window.start, window.end) || 4;
+  const fim = ultimoDiaApos(inicio, meses);
+  const ano = Number(String(fim || inicio).slice(0, 4)) || getSeasonYear(active);
+  const anteriores = getFrozenSeasons(snapshot).filter((s) => getSeasonYear(s) === ano).length;
+  const ordem = anteriores + (getSeasonYear(active) === ano ? 2 : 1);
+  const nome = `Temporada ${ordem}/${ano}`;
+  return { id: `temporada-${inicio}`, name: nome, label: nome, year: ano, start_date: inicio, end_date: fim };
+}
+
+// --- Edição da temporada corrente -------------------------------------------
+
+// Fim da última temporada encerrada. É o piso do que a temporada corrente pode
+// cobrir: uma janela que invade período já congelado faria a mesma rodada
+// pontuar duas vezes (uma no congelado, outra no atual).
+function fimDoUltimoCongelado(snapshot) {
+  return getFrozenSeasons(snapshot)
+    .map((temporada) => String(temporada.end_date || '').slice(0, 10))
+    .filter(Boolean)
+    .sort()
+    .pop() || '';
+}
+
+/**
+ * O que muda na classificação se a janela virar `novaJanela`. A UI pergunta com
+ * isto na mão: mexer nas datas move rodadas para dentro e para fora da
+ * classificação, e sem o aviso o admin corrige um dígito da data e vê a tabela
+ * inteira mudar sem entender por quê.
+ */
+export function seasonWindowChangeImpact(snapshot, novaJanela) {
+  const todos = getEffectiveChampionshipResults(snapshot);
+  const dentroHoje = new Set(getSeasonResults(snapshot).map((result) => String(result.id)));
+  const temJanela = hasSeasonWindow(novaJanela);
+  const dentroDepois = new Set(todos
+    .filter((result) => !temJanela || isDateInSeason(result.date, novaJanela))
+    .map((result) => String(result.id)));
+
+  return {
+    entering: todos.filter((result) => !dentroHoje.has(String(result.id)) && dentroDepois.has(String(result.id))),
+    leaving: todos.filter((result) => dentroHoje.has(String(result.id)) && !dentroDepois.has(String(result.id))),
+  };
+}
+
+/**
+ * Renomeia / corrige as datas da temporada CORRENTE. MUTA o snapshot.
+ *
+ * Existe porque encerrar era o único jeito de escrever nome e datas de
+ * temporada: um dígito errado na data ali só se consertava encerrando de novo —
+ * ou seja, congelando uma temporada pela metade para arrumar a seguinte.
+ *
+ * O `id` NÃO muda: é a chave que identifica a temporada no histórico quando ela
+ * for encerrada, e trocá-la deixaria uma temporada já congelada passar por
+ * aberta de novo.
+ */
+export function updateSeason(snapshot, { name, label = '', start_date = '', end_date = '', year = null } = {}) {
+  const championship = getChampionshipState(snapshot);
+  const nome = String(name || '').trim();
+  if (!nome) return { ok: false, reason: 'name_required' };
+
+  const inicio = String(start_date || '').slice(0, 10);
+  const fim = String(end_date || '').slice(0, 10);
+  if (inicio && fim && fim < inicio) return { ok: false, reason: 'end_before_start' };
+
+  const piso = fimDoUltimoCongelado(snapshot);
+  if (piso && (!inicio || inicio <= piso)) {
+    return { ok: false, reason: 'overlaps_closed_season', limit: piso };
+  }
+
+  const proximo = {
+    ...championship.active,
+    name: nome,
+    label: String(label || nome),
+    start_date: inicio,
+    end_date: fim,
+  };
+  // O ano acompanha as datas novas (é ele que decide o título do anual e a
+  // virada de ano no encerramento); um `year` explícito do chamador ganha.
+  proximo.year = Number(year) || getSeasonYear({ end_date: fim, start_date: inicio }) || championship.active.year || null;
+
+  snapshot.championship = { ...championship, active: proximo };
+  return { ok: true, season: proximo };
+}
+
+// --- Encerramento -----------------------------------------------------------
+
+function linhaCongelada(row, totalNota) {
+  const rating = totalNota
+    ? { sum: totalNota.sum, votes: totalNota.votes, avg: Number((totalNota.sum / totalNota.votes).toFixed(2)) }
+    : { sum: 0, votes: 0, avg: null };
+  return {
+    player_id: row.player_id,
+    name: row.name,
+    rank: row.rank,
+    points: row.points,
+    wins: row.wins,
+    draws: row.draws,
+    losses: row.losses,
+    no_play: row.no_play,
+    played: row.played,
+    rating,
+  };
+}
+
+// Tabela anual a partir das temporadas congeladas de um ano. Ponto SOMA;
+// nota é MÉDIA PONDERADA por votos (Σ scores / Σ votos) — média de médias faria
+// uma temporada com 2 votos pesar igual a uma com 40.
+function consolidaAno(temporadas) {
+  const porJogador = new Map();
+  temporadas.forEach((temporada) => {
+    (temporada.rows || []).forEach((row) => {
+      const id = String(row.player_id);
+      const atual = porJogador.get(id) || { player_id: id, name: row.name, points: 0, sum: 0, votes: 0 };
+      atual.name = row.name || atual.name;
+      atual.points += Number(row.points) || 0;
+      atual.sum += Number(row.rating?.sum) || 0;
+      atual.votes += Number(row.rating?.votes) || 0;
+      porJogador.set(id, atual);
+    });
+  });
+  return [...porJogador.values()]
+    .map((linha) => ({
+      player_id: linha.player_id,
+      name: linha.name,
+      points: linha.points,
+      rating: { sum: linha.sum, votes: linha.votes, avg: linha.votes ? Number((linha.sum / linha.votes).toFixed(2)) : null },
+    }))
+    .sort((left, right) => right.points - left.points || String(left.name).localeCompare(String(right.name), 'pt-BR'))
+    .map((linha, index) => ({ ...linha, rank: index + 1 }));
+}
+
+/**
+ * Encerra a temporada corrente e abre a próxima. MUTA o snapshot (mesmo
+ * contrato de persistChampionshipResult).
+ *
+ * - congela a tabela final (pontos E nota) em `championship.history`;
+ * - leva as rodadas da temporada junto, para o congelado ser auditável sozinho;
+ * - o que ficou FORA da janela migra para a temporada nova (não some);
+ * - se o ano mudou, consolida o anual em `championship.years` no mesmo ato —
+ *   a virada de ano não é um segundo ritual que alguém possa esquecer.
+ *
+ * `ratingRows` vem de fora (cache de notas do cliente) para esta função seguir
+ * pura e testável. Sem elas a temporada congelaria sem nota, e nota não é
+ * recomputável depois — por isso o chamador é obrigado a passar.
+ */
+export function closeSeason(snapshot, { nextSeason, ratingRows = [], closedBy = null, now = new Date().toISOString() } = {}) {
+  const championship = getChampionshipState(snapshot);
+  const active = championship.active;
+  const historico = getFrozenSeasons(snapshot);
+
+  if (historico.some((temporada) => String(temporada.id) === String(active.id))) {
+    return { ok: false, reason: 'season_already_closed' };
+  }
+  if (!nextSeason || !nextSeason.name || !nextSeason.start_date) {
+    return { ok: false, reason: 'next_season_invalid' };
+  }
+
+  const window = getSeasonWindow(snapshot);
+  const notas = seasonRatingTotals(ratingRows, window);
+  const congelada = {
+    id: String(active.id || `temporada-${active.start_date || now.slice(0, 10)}`),
+    name: active.name || 'Temporada',
+    label: active.label || active.name || 'Temporada',
+    year: getSeasonYear(active),
+    start_date: window.start,
+    end_date: window.end,
+    closed_at: now,
+    closed_by: closedBy ? String(closedBy) : null,
+    points_table: pointsTableFor(snapshot),
+    rows: calculateCurrentRanking(snapshot).map((row) => linhaCongelada(row, notas.get(String(row.player_id)))),
+    results: getSeasonResults(snapshot),
+  };
+
+  // Fica no `active` só o que NÃO era desta temporada: os lançamentos fora da
+  // janela migram para a temporada nova. As rodadas importadas não moram no
+  // blob (vêm do dataset do clube), então não entram aqui.
+  const idsDaTemporada = new Set(congelada.results.map((result) => String(result.id)));
+  const migrados = championship.active.results.filter((result) => !idsDaTemporada.has(String(result.id)));
+
+  const proxima = {
+    id: String(nextSeason.id || `temporada-${nextSeason.start_date}`),
+    name: String(nextSeason.name),
+    label: String(nextSeason.label || nextSeason.name),
+    year: getSeasonYear(nextSeason),
+    start_date: String(nextSeason.start_date).slice(0, 10),
+    end_date: String(nextSeason.end_date || '').slice(0, 10),
+    results: migrados,
+  };
+
+  const history = [...historico, congelada];
+
+  // Virada de ano: a temporada que fecha e a que abre são de anos diferentes ⇒
+  // o ano da que fechou está completo e vira fato também.
+  const anoFechado = congelada.year;
+  const anos = getFrozenYears(snapshot);
+  let years = anos;
+  let yearClosed = null;
+  const precisaFecharAno = anoFechado
+    && proxima.year !== anoFechado
+    && !anos.some((registro) => Number(registro.year) === Number(anoFechado));
+  if (precisaFecharAno) {
+    const doAno = history.filter((temporada) => getSeasonYear(temporada) === anoFechado);
+    yearClosed = {
+      year: anoFechado,
+      closed_at: now,
+      season_ids: doAno.map((temporada) => temporada.id),
+      rows: consolidaAno(doAno),
+    };
+    years = [...anos, yearClosed];
+  }
+
+  snapshot.championship = { ...championship, active: proxima, history, years };
+  return { ok: true, frozen: congelada, next: proxima, yearClosed };
+}
+
 export function getResultAuditRows(result, players) {
   const playerById = new Map((players || []).map((player) => [String(player.id), player]));
 
@@ -389,6 +799,11 @@ export function getChampionshipState(snapshot) {
 
   return {
     ...source,
+    // Temporadas e anos ENCERRADOS. Normalizados aqui para ninguém precisar
+    // checar o tipo: o que está nestas listas é fato congelado e nunca é
+    // recalculado — ver o bloco TEMPORADA acima.
+    history: Array.isArray(source.history) ? source.history : [],
+    years: Array.isArray(source.years) ? source.years : [],
     // O fallback vem da TEMPORADA DO CLUBE, não da constante do Harmonia. Antes
     // um clube novo abria o campeonato como "Inverno 2026 · 01/05 até 31/08" —
     // o calendário de outro grupo, que ele nunca definiu.
@@ -705,7 +1120,11 @@ export function buildRemovedByGameKey(snapshot) {
 export function calculateCurrentRanking(snapshot) {
   const players = getFootballPlayers(snapshot);
   const rowsById = new Map(players.map((player) => [String(player.id), buildEmptyRow(player)]));
-  const results = getEffectiveChampionshipResults(snapshot);
+  // Só as rodadas DENTRO da janela da temporada. Antes era `getEffective...`
+  // (tudo), e o jogo de setembro entrava no Inverno 26 — uma temporada que a
+  // própria tela dizia ter terminado em 31/08. Clube sem datas na temporada não
+  // tem janela e continua somando tudo.
+  const results = getSeasonResults(snapshot);
   const removedByGameKey = buildRemovedByGameKey(snapshot);
   const pontos = pointsTableFor(snapshot);   // 3/2/1/0 é default, não regra fixa
 
@@ -785,22 +1204,54 @@ function historicalTournamentPointsByName(tournamentName) {
 
 export function calculateAnnualRanking(snapshot) {
   const currentRanking = calculateCurrentRanking(snapshot);
+  const anoCorrente = getSeasonYear(getChampionshipState(snapshot).active);
+
+  // Temporadas JÁ ENCERRADAS deste ano. Sem isto, encerrar o Inverno 26 fazia o
+  // anual perder o quadrimestre inteiro no instante em que ele virava fato.
+  // Casamento por player_id — o do legado abaixo é por nome, e é justamente o
+  // que quebra quando alguém é renomeado.
+  const congeladas = getFrozenSeasons(snapshot)
+    .filter((temporada) => !anoCorrente || getSeasonYear(temporada) === anoCorrente);
+  const pontosCongelados = new Map();
+  const notaCongelada = new Map();
+  congeladas.forEach((temporada) => {
+    (temporada.rows || []).forEach((row) => {
+      const id = String(row.player_id);
+      pontosCongelados.set(id, (pontosCongelados.get(id) || 0) + (Number(row.points) || 0));
+      const nota = notaCongelada.get(id) || { sum: 0, votes: 0 };
+      nota.sum += Number(row.rating?.sum) || 0;
+      nota.votes += Number(row.rating?.votes) || 0;
+      notaCongelada.set(id, nota);
+    });
+  });
+
   // Idem: somar por nome vazaria pontos de outro clube — e este ranking
   // alimenta o índice de força do sorteio, então o estrago passaria dos pontos
-  // para a divisão dos times.
-  const abertura26 = usesLegacyDataset(snapshot)
+  // para a divisão dos times. O dataset legado só entra enquanto a temporada
+  // dele não tiver sido materializada no histórico do clube (fase C).
+  const jaCongelada = (nome) => congeladas
+    .some((temporada) => normalizeName(temporada.name) === normalizeName(nome));
+  const abertura26 = (usesLegacyDataset(snapshot) && !jaCongelada('Abertura 26'))
     ? historicalTournamentPointsByName('Abertura 26')
     : new Map();
-  const rows = currentRanking.map((row) => ({
-    player_id: row.player_id,
-    name: row.name,
-    points: row.points + (abertura26.get(normalizeName(row.name)) || 0),
-    current_points: row.points,
-    abertura_points: abertura26.get(normalizeName(row.name)) || 0,
-    wins: row.wins,
-    draws: row.draws,
-    losses: row.losses,
-  }));
+
+  const rows = currentRanking.map((row) => {
+    const id = String(row.player_id);
+    const legado = abertura26.get(normalizeName(row.name)) || 0;
+    const encerradas = (pontosCongelados.get(id) || 0) + legado;
+    return {
+      player_id: row.player_id,
+      name: row.name,
+      points: row.points + encerradas,
+      current_points: row.points,
+      closed_points: encerradas,
+      abertura_points: legado,          // preservado: a coluna antiga ainda lê
+      closed_rating: notaCongelada.get(id) || { sum: 0, votes: 0 },
+      wins: row.wins,
+      draws: row.draws,
+      losses: row.losses,
+    };
+  });
 
   return applyRanks(rows.sort(compareRows));
 }

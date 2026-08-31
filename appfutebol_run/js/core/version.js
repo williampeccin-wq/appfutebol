@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.181.0-filtros-de-jogadores-clicaveis';
+export const APP_VERSION = 'v1.182.0-encerramento-de-temporada';
