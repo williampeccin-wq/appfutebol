@@ -185,6 +185,19 @@ Deno.serve(async (req) => {
 
   const nowMs = Date.now();
 
+  // Quem esteve no jogo (confirmado). Aceita os dois formatos de confirmação do
+  // sistema (status='confirmed' OU data.confirmed===true), igual à
+  // notify-waitlist-promotion. Vale para os DOIS tipos de voto: desempenho e
+  // churrasco. O churrasco era aberto a qualquer jogador autenticado do clube —
+  // no jogo de 26/08, 3 dos 9 votos vieram de quem não estava lá.
+  async function quemEstavaNoJogo(): Promise<Set<string>> {
+    const { data: confs } = await admin
+      .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
+    return new Set((confs || [])
+      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
+      .map((c) => String(c.player_id)));
+  }
+
   let confirmedIds: Set<string> | null = null;
   let duoEsperado: string | null = null;
   if (kind === "desempenho") {
@@ -204,20 +217,19 @@ Deno.serve(async (req) => {
     const open = resultMs;
     const close = open + perfHours * 3600_000;
     if (nowMs < open || nowMs > close) return json({ ok: false, error: "voting_closed" }, 403);
-    // Quem jogou (confirmado neste jogo). Aceita os dois formatos de confirmação
-    // do sistema (status='confirmed' OU data.confirmed===true), igual à
-    // notify-waitlist-promotion. Serve para validar o votante E os alvos.
-    const { data: confs } = await admin
-      .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
-    confirmedIds = new Set((confs || [])
-      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
-      .map((c) => String(c.player_id)));
+    // Serve para validar o votante E os alvos.
+    confirmedIds = await quemEstavaNoJogo();
     if (!confirmedIds.has(voterId)) return json({ ok: false, error: "voter_not_in_game" }, 403);
   } else {
     const openMs = churrascoOpenMs(String(game.game_date || ""));
     if (!openMs) return json({ ok: false, error: "voting_closed" }, 403);
     const closeMs = openMs + 13 * 3600_000; // 23h -> 12h do dia seguinte
     if (nowMs < openMs || nowMs > closeMs) return json({ ok: false, error: "voting_closed" }, 403);
+    // Quem nao esteve no jogo nao avalia o churrasco do jogo. Mesma regra do
+    // desempenho, mesma fonte de verdade. CONSEQUENCIA CONHECIDA: perfil so de
+    // churrasco (plays_football: false) nao confirma presenca e deixa de votar.
+    const presentes = await quemEstavaNoJogo();
+    if (!presentes.has(voterId)) return json({ ok: false, error: "voter_not_in_game" }, 403);
     // Alvo tem de ser a dupla REAL do jogo. Quando o servidor nao consegue
     // determinar a dupla (sem escala e sem rodizio no blob), aceita: recusar um
     // voto legitimo por divergencia de calculo e pior do que deixar passar um

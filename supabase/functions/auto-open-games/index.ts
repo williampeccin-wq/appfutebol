@@ -155,6 +155,29 @@ Deno.serve(async (req) => {
     return data || [];
   }
 
+  // Assinaturas de quem ESTEVE NO JOGO. O aviso do churrasco ia para o clube
+  // inteiro, mas só quem jogou pode votar (submit-rating recusa o resto com
+  // voter_not_in_game): avisar todo mundo era mandar gente abrir um modal que
+  // não existe para ela. Os dois formatos de confirmação valem, igual ao
+  // submit-rating — alvo do push e alvo do voto não podem divergir.
+  async function subsOfGame(clubId: string, gameKey: string) {
+    if (!gameKey) return [];
+    const confsQuery = admin
+      .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
+    const { data: confs, error: confErr } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", clubId));
+    if (confErr) { console.error("[auto-open] confs read", clubId, confErr.message); return []; }
+    const ids = [...new Set((confs || [])
+      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
+      .map((c) => String(c.player_id))
+      .filter(Boolean))];
+    if (!ids.length) return [];
+    const subsQuery = admin
+      .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids);
+    const { data, error } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", clubId));
+    if (error) { console.error("[auto-open] subs of game", clubId, error.message); return []; }
+    return data || [];
+  }
+
   const failures: Array<{ club: string; error: string }> = [];
   for (const club of (clubList || [])) {
     // Falha de UM clube não pode calar o cron dos outros: sem este catch, um
@@ -218,7 +241,7 @@ Deno.serve(async (req) => {
           const title = "Vote no churrasco 🥩🔥";
           const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
           if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
-          await pushTo(await subsOfClub(clubId), title, body);
+          await pushTo(await subsOfGame(clubId, gameKey), title, body);
           out.churrasco = (out.churrasco as number) + 1;
         }
       }

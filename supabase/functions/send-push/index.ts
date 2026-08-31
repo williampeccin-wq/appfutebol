@@ -136,27 +136,30 @@ Deno.serve(async (req) => {
     }
     if (claimErr) return json({ ok: true, skipped: true, reason: "already_sent" });
 
-    // Destinatários: desempenho → só quem jogou; churrasco → todos do clube.
+    // Destinatários: quem esteve no jogo, nos DOIS tipos. O churrasco avisava o
+    // clube inteiro, mas só quem jogou pode votar (submit-rating recusa o resto
+    // com voter_not_in_game) — avisar todo mundo era mandar gente abrir um modal
+    // que não existe para ela.
+    //
+    // Os dois formatos de confirmação do sistema valem (status='confirmed' OU
+    // data.confirmed===true), igual ao submit-rating: se o alvo do push divergir
+    // do alvo do voto, alguém deixa de ser avisado de uma votação que pode fazer.
     let subs: Array<{ endpoint: string; p256dh: string; auth: string }> = [];
-    if (kind === "desempenho") {
-      const confsQuery = admin
-        .from("presence_confirmations")
-        .select("player_id")
-        .eq("game_key", gameKey)
-        .eq("status", "confirmed");
-      const { data: confs } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", callerClubId));
-      const ids = [...new Set((confs || []).map((c) => String(c.player_id)).filter(Boolean))];
-      if (ids.length) {
-        const subsQuery = admin
-          .from("push_subscriptions")
-          .select("endpoint, p256dh, auth")
-          .in("player_id", ids);
-        const { data: s } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", callerClubId));
-        subs = s || [];
-      }
-    } else {
-      const allQuery = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
-      const { data: s } = await (singleTenant ? allQuery : allQuery.eq("club_id", callerClubId));
+    const confsQuery = admin
+      .from("presence_confirmations")
+      .select("player_id, status, data")
+      .eq("game_key", gameKey);
+    const { data: confs } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", callerClubId));
+    const ids = [...new Set((confs || [])
+      .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
+      .map((c) => String(c.player_id))
+      .filter(Boolean))];
+    if (ids.length) {
+      const subsQuery = admin
+        .from("push_subscriptions")
+        .select("endpoint, p256dh, auth")
+        .in("player_id", ids);
+      const { data: s } = await (singleTenant ? subsQuery : subsQuery.eq("club_id", callerClubId));
       subs = s || [];
     }
 

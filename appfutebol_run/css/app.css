@@ -7361,6 +7361,58 @@ body.vote-open { overflow: hidden; }
 }
 .pro-lock-inline > div { flex: 1; min-width: 140px; }
 
+/* Modal de upsell Pro. O JS que usa estas classes (showProUpsellModal) foi
+   commitado sem elas: o modal que vende o Pro subiu sem estilo — lista com
+   marcador, preço sem destaque, botão do WhatsApp sem o verde. */
+.pro-upsell-modal {
+  gap: 12px;
+}
+.pro-upsell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pro-upsell-close {
+  background: none;
+  border: none;
+  color: var(--gray-500, #8b97b0);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.pro-upsell-price {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--hfc-gold, #f0a500);
+}
+.pro-upsell-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--gray-500, #8b97b0);
+}
+.pro-upsell-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 7px;
+}
+.pro-upsell-features li {
+  font-size: 14px;
+  color: var(--gray-600, #64748b);
+  line-height: 1.4;
+}
+.pro-upsell-whatsapp {
+  background: #25D366 !important;
+  border-color: #25D366 !important;
+  color: #fff !important;
+  text-decoration: none;
+  text-align: center;
+  display: block;
+}
+
 /* "Como o clube joga" (Config) — os quatro campos de pontuação lado a lado,
    quebrando em duas linhas no celular em vez de espremerem. */
 .club-profile-points {
