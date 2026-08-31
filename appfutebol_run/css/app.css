@@ -4240,6 +4240,16 @@ input.input[type="datetime-local"],
 .championship-save-result-btn-v2{width:100%!important;height:64px!important;margin-top:24px!important;font-size:1.15rem!important}
 .championship-result-info-v2{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#173760;font-weight: 600;line-height:1.35}
 .championship-result-info-v2 strong{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:#1d4ed8;color:#fff}
+/* Variante de ALERTA do bloco acima: pendência que impede encerrar a temporada
+   (jogo sem resultado, votação aberta). Azul de informação lia como dica. */
+.championship-result-info-v2.is-warning{border-color:#fcd34d;background:var(--gold-050);color:#7c4a03}
+.championship-result-info-v2.is-warning strong{background:var(--gold-500);color:#3b2600}
+/* Os cards de temporada empilham duas ou três notas explicativas antes do
+   formulário, e .footer-note nasce sem margem: sem isto elas colam. */
+.championship-season-card .footer-note{margin:0 0 8px}
+/* Aviso de temporada vencida — aparece para todo mundo, inclusive jogador. */
+.championship-season-notice{border-left:4px solid var(--gold-500)}
+.championship-season-notice .card-title{color:#7c4a03}
 @media(max-width:760px){.championship-result-card-v2{padding:20px 16px!important}.championship-result-header-v2{grid-template-columns:40px minmax(0,1fr);gap:12px}.championship-result-icon-v2{width:40px;height:40px;font-size:1.15rem}.championship-result-badges-v2{display:grid;grid-template-columns:1fr}.championship-result-form-v2{grid-template-columns:1fr!important}.championship-control-v2{height:52px!important;font-size:.95rem!important}}
 
 /* v1.60.70 - multiple future games */
@@ -6145,6 +6155,14 @@ body {
   border: 1px solid var(--hfc-glass-border);
   color: var(--hfc-text-muted);
 }
+.content--championship .championship-result-info-v2.is-warning {
+  background: rgba(240, 165, 0, 0.10);
+  border-color: rgba(240, 165, 0, 0.45);
+  color: var(--hfc-gold-200);
+}
+.content--championship .championship-result-info-v2.is-warning strong { background: var(--gold-500); color: #3b2600; }
+.content--championship .championship-season-notice { border-left: 4px solid var(--gold-500); }
+.content--championship .championship-season-notice .card-title { color: var(--hfc-gold-200); }
 .content--championship .championship-team-result-box,
 .content--championship .championship-team-player-pill {
   background: var(--hfc-glass-2);

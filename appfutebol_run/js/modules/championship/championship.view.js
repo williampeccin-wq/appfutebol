@@ -17,6 +17,13 @@ import {
   getTeamOutcomeLabel,
   getManualChampionshipResults,
   buildLineupFromDraw,
+  getSeasonResults,
+  getSeasonStatus,
+  getFrozenSeasons,
+  getFrozenYears,
+  suggestNextSeason,
+  isDateInSeason,
+  getSeasonWindow,
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml, isoToDisplay } from '../players/players.service.js';
@@ -107,7 +114,7 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
             <th>Pos.</th>
             <th>Foto</th><th>Jogador</th>
             <th>Pts</th>
-            ${annual ? '<th>Abertura</th><th>Inverno</th>' : '<th>V</th><th>E</th><th>D</th><th>NJ</th>'}
+            ${annual ? '<th title="Temporadas já encerradas neste ano">Encerradas</th><th title="Temporada em andamento">Atual</th>' : '<th>V</th><th>E</th><th>D</th><th>NJ</th>'}
           </tr>
         </thead>
         <tbody>
@@ -117,7 +124,7 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
               <td class="championship-player-avatar">${renderChampionshipPlayerAvatar(snapshot, row)}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
               ${annual ? `
-                <td>${row.abertura_points || 0}</td>
+                <td>${row.closed_points ?? row.abertura_points ?? 0}</td>
                 <td>${row.current_points || 0}</td>
               ` : `
                 <td>${row.wins}</td>
@@ -148,7 +155,7 @@ function renderRoundMatrix(snapshot) {
     return '<div class="empty-state">Nenhum jogador elegível para o campeonato.</div>';
   }
 
-  const rounds = getEffectiveChampionshipResults(snapshot);
+  const rounds = getSeasonResults(snapshot);
   const removedByGameKey = buildRemovedByGameKey(snapshot);
   const pointsByStatus = { win: 3, draw: 2, loss: 1, no_play: 0 };
   // Nota média de desempenho por jogador (todas as notas do campeonato vigente).
@@ -365,7 +372,7 @@ function renderResultsHistory(snapshot, currentPlayer) {
         <span class="champ-collapse-chevron" aria-hidden="true"></span>
       </summary>
       <div class="champ-collapse-body">
-      <p class="footer-note">Cada rodada abaixo é usada para calcular a classificação. A importação inicial veio da planilha Rei da Quadra.</p>
+      <p class="footer-note">Todas as rodadas lançadas, inclusive as fora do período da temporada — elas ficam marcadas e não entram na classificação atual. A importação inicial veio da planilha Rei da Quadra.</p>
       ${results.length ? `
         <div class="championship-audit-list">
           ${results.slice().reverse().map((result) => {
@@ -378,7 +385,7 @@ function renderResultsHistory(snapshot, currentPlayer) {
                 <summary>
                   <div>
                     <strong>${formatDate(result.date)}</strong>
-                    <span>${result.imported ? 'Importado da planilha' : getTeamOutcomeLabel(result.outcome)}</span>
+                    <span>${result.imported ? 'Importado da planilha' : getTeamOutcomeLabel(result.outcome)}${isDateInSeason(result.date, getSeasonWindow(snapshot)) ? '' : ' · fora da temporada'}</span>
                   </div>
                   <small>${summary.win} V · ${summary.draw} E · ${summary.loss} D · ${summary.no_play} WO${unmatched ? ` · ${unmatched} sem vínculo` : ''}</small>
                 </summary>
@@ -415,7 +422,7 @@ function renderResultsHistory(snapshot, currentPlayer) {
             `;
           }).join('')}
         </div>
-      ` : '<div class="empty-state">Nenhum resultado lançado para o Inverno 26.</div>'}
+      ` : '<div class="empty-state">Nenhum resultado lançado nesta temporada.</div>'}
       </div>
     </details>
   `;
@@ -441,9 +448,190 @@ function renderSimpleAnnualHistoryTable(rows) {
   `;
 }
 
+// Data de HOJE no fuso do aparelho. `toISOString()` daria a data em UTC — às
+// 21h de Brasília ele já virou o dia, e a temporada apareceria encerrada uma
+// noite antes.
+function hojeIso() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+}
+
+function horaCurta(ms) {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Aviso de temporada vencida — para TODO MUNDO, não só para o admin. Com a
+// janela valendo, uma rodada fora do período some da classificação; sem esta
+// linha o jogador só veria a tabela não mexer depois da quarta-feira.
+function renderSeasonNotice(status) {
+  if (!status.hasWindow) return '';
+  const fora = status.outOfSeason.length;
+  if (!status.ended && !fora) return '';
+
+  const partes = [];
+  if (status.ended) partes.push(`Esta temporada terminou em <strong>${formatDate(status.window.end)}</strong>.`);
+  if (fora) {
+    partes.push(`${fora} ${fora === 1 ? 'rodada lançada está fora' : 'rodadas lançadas estão fora'} do período e ${fora === 1 ? 'não conta' : 'não contam'} nesta classificação — ${fora === 1 ? 'ela vai' : 'elas vão'} para a próxima temporada quando esta for encerrada.`);
+  }
+
+  return `
+    <section class="card championship-season-notice">
+      <div class="card-title">⏳ Temporada encerrada</div>
+      <p class="footer-note" style="margin:0;">${partes.join(' ')}</p>
+    </section>`;
+}
+
+// Editar a temporada corrente (admin). Antes, nome e datas de temporada só se
+// escreviam no encerramento: um dígito errado na data ali só se consertava
+// encerrando de novo — congelando uma temporada pela metade para arrumar a
+// seguinte.
+function renderSeasonEditCard(snapshot, currentPlayer, status) {
+  if (!canManageChampionship(currentPlayer)) return '';
+
+  const temporada = status.season;
+  const congeladas = getFrozenSeasons(snapshot);
+  const ultima = congeladas.length ? congeladas[congeladas.length - 1] : null;
+
+  return `
+    <details class="card champ-collapse championship-season-card">
+      <summary class="champ-collapse-summary">
+        <span class="card-title">✏️ Editar temporada atual</span>
+        <span class="champ-collapse-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="champ-collapse-body">
+        <p class="footer-note">Nome e período da temporada em andamento. Mudar as datas muda quais rodadas entram na classificação — o app avisa quantas antes de salvar. Deixar as duas datas em branco tira o período: tudo volta a contar.</p>
+        ${ultima ? `<p class="footer-note">O início precisa ser depois de ${formatDate(ultima.end_date)}, fim de <strong>${escapeHtml(ultima.name || 'temporada encerrada')}</strong> — período já congelado não pode ser recontado.</p>` : ''}
+
+        <div class="championship-result-form-v2">
+          <label class="championship-field-v2">
+            <span>Nome</span>
+            <input id="season-edit-name" class="championship-control-v2" type="text" maxlength="40" value="${escapeHtml(temporada.name || '')}">
+          </label>
+          <label class="championship-field-v2">
+            <span>Início</span>
+            <input id="season-edit-start" class="championship-control-v2" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(status.window.start)}">
+          </label>
+          <label class="championship-field-v2">
+            <span>Fim</span>
+            <input id="season-edit-end" class="championship-control-v2" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(status.window.end)}">
+          </label>
+        </div>
+
+        <div class="actions" style="margin-top:10px;">
+          <button class="btn btn-primary" type="button" data-action="save-season">Salvar temporada</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+// Card de encerramento (admin). As três checagens ficam VISÍVEIS antes do
+// clique, e não escondidas num alerta depois: congelar com jogo pendente ou com
+// votação aberta grava uma temporada pela metade, e o congelado não é
+// recalculável.
+function renderSeasonCloseCard(snapshot, currentPlayer, status) {
+  if (!canManageChampionship(currentPlayer)) return '';
+  if (!status.hasWindow) return '';
+
+  const sugestao = suggestNextSeason(snapshot, hojeIso());
+  const bloqueios = [];
+  if (status.pendingGames.length) {
+    bloqueios.push(`${status.pendingGames.length} jogo(s) do período sem resultado lançado: ${status.pendingGames.map((jogo) => formatDate(jogo.date)).join(', ')}.`);
+  }
+  if (status.openVoting.length) {
+    const fecha = Math.max(...status.openVoting.map((voto) => voto.closeMs));
+    bloqueios.push(`Votação de desempenho ainda aberta (fecha às ${horaCurta(fecha)}). Encerrar agora congelaria a nota pela metade.`);
+  }
+
+  const avisos = status.outOfSeason.length
+    ? `<p class="footer-note">${status.outOfSeason.length} rodada(s) fora do período (${status.outOfSeason.map((r) => formatDate(r.date)).join(', ')}) ${status.outOfSeason.length === 1 ? 'migra' : 'migram'} para a temporada nova.</p>`
+    : '';
+
+  return `
+    <details class="card champ-collapse championship-season-card"${status.ended && !bloqueios.length ? ' open' : ''}>
+      <summary class="champ-collapse-summary">
+        <span class="card-title">🔒 Encerrar temporada</span>
+        <span class="champ-collapse-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="champ-collapse-body">
+        <p class="footer-note">Congela a classificação de <strong>${escapeHtml(status.season.name || 'temporada')}</strong> como resultado final — com pontos e notas — e abre a próxima do zero. O que fica congelado não é recalculado depois.</p>
+
+        ${bloqueios.length ? `
+          <div class="championship-result-info-v2 is-warning"><strong>!</strong><span>${bloqueios.map(escapeHtml).join(' ')}</span></div>
+        ` : ''}
+        ${avisos}
+
+        <div class="championship-result-form-v2">
+          <label class="championship-field-v2">
+            <span>Nome da próxima temporada</span>
+            <input id="season-next-name" class="championship-control-v2" type="text" maxlength="40" value="${escapeHtml(sugestao.name)}">
+          </label>
+          <label class="championship-field-v2">
+            <span>Início</span>
+            <input id="season-next-start" class="championship-control-v2" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(sugestao.start_date)}">
+          </label>
+          <label class="championship-field-v2">
+            <span>Fim</span>
+            <input id="season-next-end" class="championship-control-v2" type="tel" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" data-date-mask value="${isoToDisplay(sugestao.end_date)}">
+          </label>
+        </div>
+
+        <div class="actions" style="margin-top:10px;">
+          <!-- Com pendência o botão não pode continuar parecendo a ação
+               principal: o atributo disabled sozinho mal muda o dourado do
+               tema escuro, e o admin clicaria achando que travou. -->
+          <button class="btn ${bloqueios.length ? 'btn-secondary' : 'btn-primary'}" type="button" data-action="close-season"${bloqueios.length ? ' disabled' : ''}>Encerrar e abrir a próxima</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+// Temporadas e anos encerrados DESTE clube (blob), ao contrário do histórico
+// estático, que é a planilha importada de um clube só.
+function renderFrozenHistory(snapshot) {
+  const temporadas = getFrozenSeasons(snapshot).slice().reverse();
+  const anos = getFrozenYears(snapshot).slice().reverse();
+  if (!temporadas.length && !anos.length) return '';
+
+  return `
+    <section class="card">
+      <div class="card-title">Temporadas encerradas</div>
+      <p class="footer-note">Classificação final congelada no dia do encerramento. Não é recalculada por lançamentos ou alterações posteriores.</p>
+
+      ${anos.length ? `
+        <div class="history-section-label">Anuais</div>
+        <div class="history-list">
+          ${anos.map((ano) => `
+            <details class="history-year">
+              <summary class="history-year-summary">
+                <span class="history-year-name">${escapeHtml(String(ano.year))}</span>
+                <span class="history-year-hint">${(ano.rows || []).length} jogador${(ano.rows || []).length === 1 ? '' : 'es'}</span>
+              </summary>
+              ${renderSimpleAnnualHistoryTable((ano.rows || []).slice(0, 10))}
+            </details>
+          `).join('')}
+        </div>` : ''}
+
+      <div class="history-section-label">Temporadas</div>
+      <div class="history-list">
+        ${temporadas.map((temporada) => `
+          <details class="history-year">
+            <summary class="history-year-summary">
+              <span class="history-year-name">${escapeHtml(temporada.name || 'Temporada')}</span>
+              <span class="history-year-hint">${formatDate(temporada.start_date)} a ${formatDate(temporada.end_date)}</span>
+            </summary>
+            ${renderRankingTable((temporada.rows || []).slice(0, 10), { snapshot })}
+          </details>
+        `).join('')}
+      </div>
+    </section>`;
+}
+
 function renderHistoricalBlock(snapshot, ) {
   const tournaments = getHistoricalTournaments();
   const annual = getHistoricalAnnual();
+
+  if (!tournaments.length && !annual.length) return '';
 
   return `
     <section class="card">
@@ -497,7 +685,9 @@ function collapsibleCard({ title, note = '', body = '', open = false, extraClass
 export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, resultCardOpen = false) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
-  const resultCount = getEffectiveChampionshipResults(snapshot).length;
+  const status = getSeasonStatus(snapshot, { today: hojeIso(), nowMs: Date.now() });
+  const resultCount = getSeasonResults(snapshot).length;
+  const anoCorrente = activeMeta.year || String(activeMeta.end_date || activeMeta.start_date || '').slice(0, 4);
 
   return `
     <section class="section-stack championship-screen">
@@ -507,21 +697,26 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
         <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
       </section>
 
+      ${renderSeasonNotice(status)}
+
       ${renderResultForm(snapshot, currentPlayer, selectedDrawId, lineupState, resultCardOpen)}
 
       ${collapsibleCard({
-        title: 'Classificação atual · Inverno 26',
+        title: `Classificação atual · ${escapeHtml(activeMeta.name || activeMeta.label || 'temporada')}`,
         note: 'Pontos por rodada (3 vitória · 2 empate · 1 derrota · 0 não jogou). Importado da planilha Rei da Quadra + resultados lançados no app.',
         body: renderRoundMatrix(snapshot),
         open: true,
       })}
 
       ${collapsibleCard({
-        title: 'Classificação anual · 2026',
-        note: 'Soma do Abertura 26 importado do histórico com o Inverno 26 calculado pelo app.',
+        title: `Classificação anual · ${escapeHtml(String(anoCorrente || ''))}`,
+        note: 'Soma das temporadas já encerradas neste ano com a temporada em andamento.',
         body: renderRankingTable(annualRanking, { annual: true, snapshot }),
       })}
 
+      ${renderSeasonEditCard(snapshot, currentPlayer, status)}
+      ${renderSeasonCloseCard(snapshot, currentPlayer, status)}
+      ${renderFrozenHistory(snapshot)}
       ${renderHistoricalBlock(snapshot, )}
       ${renderResultsHistory(snapshot, currentPlayer)}
     </section>
