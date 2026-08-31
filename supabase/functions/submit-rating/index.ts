@@ -116,17 +116,27 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "unauthorized" }, 401);
   }
 
+  // Espelha isCarneOnly() do domain/authz.js: sócio que não joga, só participa
+  // do churrasco. Ele NÃO confirma presença (não há o que confirmar), mas come o
+  // churrasco e avalia a dupla — por isso é a única exceção à regra de "só quem
+  // esteve no jogo vota".
+  type Voter = { id?: string; is_admin?: boolean; club_id?: string; data?: Record<string, unknown> | null };
+  const ehSocioDeCarne = (p: Voter | null) => {
+    const d = (p?.data || {}) as Record<string, unknown>;
+    return d.role === "carne" || d.plays_football === false;
+  };
+
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   let singleTenant = false;
   const voterRead = await admin
-    .from("players").select("id, is_admin, club_id").eq("auth_user_id", userId).maybeSingle();
-  let voter = voterRead.data as { id?: string; is_admin?: boolean; club_id?: string } | null;
+    .from("players").select("id, is_admin, club_id, data").eq("auth_user_id", userId).maybeSingle();
+  let voter = voterRead.data as Voter | null;
   if (voterRead.error && isMissingColumn(voterRead.error)) {
     singleTenant = true;
     const fallback = await admin
-      .from("players").select("id, is_admin").eq("auth_user_id", userId).maybeSingle();
-    voter = fallback.data as { id?: string; is_admin?: boolean } | null;
+      .from("players").select("id, is_admin, data").eq("auth_user_id", userId).maybeSingle();
+    voter = fallback.data as Voter | null;
   }
   if (!voter) return json({ ok: false, error: "player_not_found" }, 403);
   const voterId = String(voter.id);
@@ -187,9 +197,10 @@ Deno.serve(async (req) => {
 
   // Quem esteve no jogo (confirmado). Aceita os dois formatos de confirmação do
   // sistema (status='confirmed' OU data.confirmed===true), igual à
-  // notify-waitlist-promotion. Vale para os DOIS tipos de voto: desempenho e
-  // churrasco. O churrasco era aberto a qualquer jogador autenticado do clube —
-  // no jogo de 26/08, 3 dos 9 votos vieram de quem não estava lá.
+  // notify-waitlist-promotion. Vale para os dois tipos de voto — no churrasco
+  // com a exceção do sócio de carnê (ver ehSocioDeCarne). O churrasco era aberto
+  // a qualquer jogador autenticado do clube: no jogo de 26/08, 3 dos 9 votos
+  // vieram de quem não estava lá, e só 1 dos 3 era sócio de carnê.
   async function quemEstavaNoJogo(): Promise<Set<string>> {
     const { data: confs } = await admin
       .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
@@ -229,7 +240,9 @@ Deno.serve(async (req) => {
     // desempenho, mesma fonte de verdade. CONSEQUENCIA CONHECIDA: perfil so de
     // churrasco (plays_football: false) nao confirma presenca e deixa de votar.
     const presentes = await quemEstavaNoJogo();
-    if (!presentes.has(voterId)) return json({ ok: false, error: "voter_not_in_game" }, 403);
+    if (!presentes.has(voterId) && !ehSocioDeCarne(voter)) {
+      return json({ ok: false, error: "voter_not_in_game" }, 403);
+    }
     // Alvo tem de ser a dupla REAL do jogo. Quando o servidor nao consegue
     // determinar a dupla (sem escala e sem rodizio no blob), aceita: recusar um
     // voto legitimo por divergencia de calculo e pior do que deixar passar um

@@ -155,21 +155,32 @@ Deno.serve(async (req) => {
     return data || [];
   }
 
-  // Assinaturas de quem ESTEVE NO JOGO. O aviso do churrasco ia para o clube
-  // inteiro, mas só quem jogou pode votar (submit-rating recusa o resto com
-  // voter_not_in_game): avisar todo mundo era mandar gente abrir um modal que
-  // não existe para ela. Os dois formatos de confirmação valem, igual ao
-  // submit-rating — alvo do push e alvo do voto não podem divergir.
-  async function subsOfGame(clubId: string, gameKey: string) {
+  // Assinaturas de quem pode votar no CHURRASCO: quem esteve no jogo, mais os
+  // sócios de carnê (não jogam, não confirmam presença, mas comem o churrasco e
+  // avaliam a dupla — espelha isCarneOnly() do domain/authz.js). O aviso ia para
+  // o clube inteiro: quem não estava no jogo abria um modal que o servidor
+  // recusa. Os dois formatos de confirmação valem, igual ao submit-rating —
+  // alvo do push e alvo do voto não podem divergir.
+  async function subsOfChurrasco(clubId: string, gameKey: string) {
     if (!gameKey) return [];
     const confsQuery = admin
       .from("presence_confirmations").select("player_id, status, data").eq("game_key", gameKey);
     const { data: confs, error: confErr } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", clubId));
     if (confErr) { console.error("[auto-open] confs read", clubId, confErr.message); return []; }
-    const ids = [...new Set((confs || [])
+    const alvos = new Set((confs || [])
       .filter((c) => c.status === "confirmed" || (c?.data as Record<string, unknown> | null)?.confirmed === true)
       .map((c) => String(c.player_id))
-      .filter(Boolean))];
+      .filter(Boolean));
+
+    const playersQuery = admin.from("players").select("id, data");
+    const { data: ps, error: pErr } = await (singleTenant ? playersQuery : playersQuery.eq("club_id", clubId));
+    if (pErr) { console.error("[auto-open] players read", clubId, pErr.message); }
+    for (const p of (ps || [])) {
+      const d = (p?.data || {}) as Record<string, unknown>;
+      if (d.role === "carne" || d.plays_football === false) alvos.add(String(p.id));
+    }
+
+    const ids = [...alvos];
     if (!ids.length) return [];
     const subsQuery = admin
       .from("push_subscriptions").select("endpoint, p256dh, auth").in("player_id", ids);
@@ -241,7 +252,7 @@ Deno.serve(async (req) => {
           const title = "Vote no churrasco 🥩🔥";
           const body = `Dê a nota da dupla da carne${g.game_date ? ` do jogo de ${formatGameDate(String(g.game_date))}` : ""}.`;
           if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
-          await pushTo(await subsOfGame(clubId, gameKey), title, body);
+          await pushTo(await subsOfChurrasco(clubId, gameKey), title, body);
           out.churrasco = (out.churrasco as number) + 1;
         }
       }
