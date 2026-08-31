@@ -783,6 +783,12 @@ export function getChampionshipState(snapshot) {
     active: {
       id: active.id || ACTIVE_CHAMPIONSHIP.id,
       name: active.name || ACTIVE_CHAMPIONSHIP.name,
+      // O `label` PRECISA cair no `name` do blob antes de cair na constante:
+      // sem esta linha ele não era normalizado, o meta ficava com o label do
+      // módulo e o hero anunciava a temporada ANTERIOR ("Inverno 2026") em cima
+      // das datas da nova — foi o que apareceu logo após o primeiro
+      // encerramento.
+      label: active.label || active.name || ACTIVE_CHAMPIONSHIP.label,
       year: active.year || ACTIVE_CHAMPIONSHIP.year,
       start_date: active.start_date || ACTIVE_CHAMPIONSHIP.start_date,
       end_date: active.end_date || ACTIVE_CHAMPIONSHIP.end_date,

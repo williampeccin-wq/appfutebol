@@ -7070,6 +7070,10 @@ body.vote-open { overflow: hidden; }
 .championship-nota-cell { text-align: center; }
 .championship-nota { font-weight: 700; color: var(--hfc-gold-200, #ffd980); }
 .championship-nota.is-empty { color: var(--hfc-text-muted, #9fb0cc); font-weight: 600; }
+/* Média com menos votos que o mínimo: aparece, mas sem o dourado — numa
+   temporada curta um único 10 vira o topo da coluna, e essa média não pode ter
+   o mesmo peso visual da de quem tem rodada inteira atrás. */
+.championship-nota.is-weak { color: var(--hfc-text-muted, #9fb0cc); font-weight: 600; opacity: .85; }
 .churrasco-rank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .churrasco-rank-row {
   display: flex; align-items: center; gap: 12px;

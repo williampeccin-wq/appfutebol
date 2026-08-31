@@ -2679,7 +2679,7 @@ import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, con
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
-import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
+import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
@@ -2688,7 +2688,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
@@ -3148,6 +3148,11 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  // A áurea de melhor votado é decidida dentro do render de cada avatar, que
+  // não tem o snapshot em mãos. Aqui é o único ponto que tem os dois: empurra a
+  // janela da temporada para o serviço de notas antes de desenhar, para a
+  // áurea seguir a mesma regra da coluna ★ (recomeça a cada temporada).
+  try { setRatingSeasonWindow(getSeasonWindow(snapshot)); } catch (_) { /* nota é acessório: nunca derruba o render */ }
   // Garante URLs assinadas das fotos (bucket privado) — async, re-renderiza
   // quando chegam. Guardado internamente para não martelar.
   ensureSignedPhotos(snapshot);

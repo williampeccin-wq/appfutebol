@@ -27,7 +27,7 @@ import {
 } from './championship.service.js';
 import { canManageChampionship } from '../../domain/authz.js';
 import { getAvatarHtml, isoToDisplay } from '../players/players.service.js';
-import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
+import { getCachedRatings, playerRatingAverages, TOP_MIN_VOTES } from '../../services/ratings.service.js';
 import { isVotingEnabled } from '../../core/flags.js';
 
 function normalizeChampionshipPlayerName(value) {
@@ -101,10 +101,16 @@ function getPositionShortLabel(position) {
 }
 
 
-function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
+// `notas` mapeia player_id -> { avg, votes } quando a nota é calculada fora
+// (o anual, que soma temporada corrente + encerradas). Sem ele, vale a nota
+// gravada na própria linha — é o caso das temporadas congeladas.
+function renderRankingTable(rows, { annual = false, snapshot = null, notas = null } = {}) {
   if (!rows.length) {
     return '<div class="empty-state">Nenhum jogador elegível para o campeonato.</div>';
   }
+
+  const notaDe = (row) => (notas ? notas[String(row.player_id)] : (row.rating || null));
+  const mostrarNota = !!notas || rows.some((row) => row.rating);
 
   return `
     <div class="championship-table-wrap">
@@ -114,6 +120,7 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
             <th>Pos.</th>
             <th>Foto</th><th>Jogador</th>
             <th>Pts</th>
+            ${mostrarNota ? `<th title="${annual ? 'Nota média do ano, ponderada pelos votos' : 'Nota média da temporada'}">★</th>` : ''}
             ${annual ? '<th title="Temporadas já encerradas neste ano">Encerradas</th><th title="Temporada em andamento">Atual</th>' : '<th>V</th><th>E</th><th>D</th><th>NJ</th>'}
           </tr>
         </thead>
@@ -123,6 +130,7 @@ function renderRankingTable(rows, { annual = false, snapshot = null } = {}) {
               <td><span class="rank-badge">${row.rank}</span></td>
               <td class="championship-player-avatar">${renderChampionshipPlayerAvatar(snapshot, row)}</td><td class="championship-player-name">${escapeHtml(row.name)}</td>
               <td><strong>${row.points}</strong></td>
+              ${mostrarNota ? `<td class="championship-nota-cell">${renderNotaCell(notaDe(row))}</td>` : ''}
               ${annual ? `
                 <td>${row.closed_points ?? row.abertura_points ?? 0}</td>
                 <td>${row.current_points || 0}</td>
@@ -146,6 +154,16 @@ function shortRoundLabel(date) {
   return `${day}/${month}`;
 }
 
+// Célula da nota. Abaixo do mínimo de votos ela aparece APAGADA: numa temporada
+// curta um único 10 vira o topo da coluna, e a média mal votada não pode ter o
+// mesmo peso visual da que tem rodada inteira atrás.
+function renderNotaCell(nota) {
+  if (!nota || !nota.votes) return '<span class="championship-nota is-empty">–</span>';
+  const fraca = nota.votes < TOP_MIN_VOTES ? ' is-weak' : '';
+  const titulo = `${nota.votes} voto(s)${fraca ? ` · abaixo de ${TOP_MIN_VOTES}, média ainda pouco firme` : ''}`;
+  return `<span class="championship-nota${fraca}" title="${titulo}">${nota.avg.toFixed(1)}</span>`;
+}
+
 // Matriz jogador × data: replica a planilha Rei da Quadra (Pos, Jogador, Pts,
 // V/E/D/WO, Ap% e uma coluna por rodada com os pontos daquele dia, coloridos
 // pelo resultado). É a visão principal do campeonato atual.
@@ -158,12 +176,15 @@ function renderRoundMatrix(snapshot) {
   const rounds = getSeasonResults(snapshot);
   const removedByGameKey = buildRemovedByGameKey(snapshot);
   const pointsByStatus = { win: 3, draw: 2, loss: 1, no_play: 0 };
-  // Nota média de desempenho por jogador (todas as notas do campeonato vigente).
-  // Sem filtrar por rodada lançada — a votação acontece logo após o jogo, antes
-  // do resultado ser lançado, então restringir aos game_keys com resultado
-  // esconderia as notas recém-dadas.
+  // Nota média de desempenho por jogador na temporada. Recorte por DATA do jogo,
+  // não por rodada lançada: a votação acontece logo após o jogo, antes de o
+  // resultado ser lançado, e restringir aos game_keys com resultado esconderia
+  // as notas recém-dadas.
   const showNota = isVotingEnabled();
-  const playerAvg = showNota ? playerRatingAverages(getCachedRatings()) : {};
+  // Nota DA TEMPORADA: mesma janela dos pontos. Sem o recorte, a coluna era a
+  // média vitalícia — uma temporada recém-aberta nascia mostrando as notas da
+  // anterior ao lado de zero ponto e zero jogo.
+  const playerAvg = showNota ? playerRatingAverages(getCachedRatings(), getSeasonWindow(snapshot)) : {};
 
   return `
     <div class="championship-table-wrap championship-matrix-wrap">
@@ -186,7 +207,7 @@ function renderRoundMatrix(snapshot) {
                 <td class="cm-freeze cm-c1"><span class="rank-badge">${row.rank}</span></td>
                 <td class="cm-freeze cm-c2 championship-player-name championship-matrix-name-col"><div class="cm-name">${renderChampionshipPlayerAvatar(snapshot, row)}<span>${escapeHtml(row.name)}</span></div></td>
                 <td class="cm-freeze cm-c3"><strong>${row.points}</strong></td>
-                ${showNota ? `<td class="championship-nota-cell">${playerAvg[String(row.player_id)] ? `<span class="championship-nota" title="${playerAvg[String(row.player_id)].votes} voto(s)">${playerAvg[String(row.player_id)].avg.toFixed(1)}</span>` : '<span class="championship-nota is-empty">–</span>'}</td>` : ''}
+                ${showNota ? `<td class="championship-nota-cell">${renderNotaCell(playerAvg[String(row.player_id)])}</td>` : ''}
                 <td>${row.wins}</td><td>${row.draws}</td><td>${row.losses}</td><td>${row.no_play}</td>
                 <td>${ap === null ? '–' : `${ap}%`}</td>
                 ${rounds.map((round) => {
@@ -682,10 +703,28 @@ function collapsibleCard({ title, note = '', body = '', open = false, extraClass
     </details>`;
 }
 
+function montaNotaAnual(annualRanking, window) {
+  const daTemporada = playerRatingAverages(getCachedRatings(), window);
+  const saida = {};
+  annualRanking.forEach((row) => {
+    const id = String(row.player_id);
+    const agora = daTemporada[id] || { sum: 0, votes: 0 };
+    const antes = row.closed_rating || { sum: 0, votes: 0 };
+    const votes = (Number(agora.votes) || 0) + (Number(antes.votes) || 0);
+    const sum = (Number(agora.sum) || 0) + (Number(antes.sum) || 0);
+    saida[id] = votes ? { avg: sum / votes, votes } : null;
+  });
+  return saida;
+}
+
 export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId = null, lineupState = null, resultCardOpen = false) {
   const activeMeta = getActiveChampionshipMeta(snapshot);
   const annualRanking = calculateAnnualRanking(snapshot);
   const status = getSeasonStatus(snapshot, { today: hojeIso(), nowMs: Date.now() });
+  // Nota do ANO: soma dos votos das temporadas encerradas com os da corrente,
+  // ponderada por votos (Σ notas / Σ votos). Média das médias faria uma
+  // temporada com 2 votos pesar igual a uma com 40.
+  const notaAnual = isVotingEnabled() ? montaNotaAnual(annualRanking, getSeasonWindow(snapshot)) : null;
   const resultCount = getSeasonResults(snapshot).length;
   const anoCorrente = activeMeta.year || String(activeMeta.end_date || activeMeta.start_date || '').slice(0, 4);
 
@@ -693,8 +732,13 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
     <section class="section-stack championship-screen">
       <section class="hero-card championship-hero championship-hero-current">
         <div class="hero-label">Campeonato atual</div>
-        <div class="hero-date">${ACTIVE_CHAMPIONSHIP.label}</div>
-        <div class="hero-meta">${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ${resultCount} jogo(s) lançado(s)</div>
+        <!-- Lia ACTIVE_CHAMPIONSHIP.label CRU: depois do primeiro encerramento o
+             cabeçalho continuava anunciando "Inverno 2026" em cima das datas da
+             temporada nova. Agora segue a temporada corrente, com a constante só
+             como último recurso. -->
+        <div class="hero-date">${escapeHtml(activeMeta.label || activeMeta.name || ACTIVE_CHAMPIONSHIP.label)}</div>
+        <div class="hero-meta">${(activeMeta.start_date && activeMeta.end_date)
+          ? `${formatDate(activeMeta.start_date)} até ${formatDate(activeMeta.end_date)} · ` : ''}${resultCount} jogo(s) lançado(s)</div>
       </section>
 
       ${renderSeasonNotice(status)}
@@ -711,7 +755,7 @@ export function renderChampionshipScreen(snapshot, currentPlayer, selectedDrawId
       ${collapsibleCard({
         title: `Classificação anual · ${escapeHtml(String(anoCorrente || ''))}`,
         note: 'Soma das temporadas já encerradas neste ano com a temporada em andamento.',
-        body: renderRankingTable(annualRanking, { annual: true, snapshot }),
+        body: renderRankingTable(annualRanking, { annual: true, snapshot, notas: notaAnual }),
       })}
 
       ${renderSeasonEditCard(snapshot, currentPlayer, status)}
