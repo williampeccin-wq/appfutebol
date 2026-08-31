@@ -2872,7 +2872,7 @@ import { renderChampionshipScreen } from '../modules/championship/championship.v
 import { isPro, renderProLock, renderProLockInline, showProUpsellModal } from '../domain/gating.js';
 import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
 import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
-import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
+import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
@@ -2883,7 +2883,7 @@ import { registerServiceWorker, getPushState, enablePush, disablePush, triggerSe
 // TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
 import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled, logPlayerDeleted } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
-import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted } from '../services/ratings.service.js';
+import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
@@ -3414,6 +3414,11 @@ function persist(snapshot) {
 }
 
 function render(snapshot) {
+  // A áurea de melhor votado é decidida dentro do render de cada avatar, que
+  // não tem o snapshot em mãos. Aqui é o único ponto que tem os dois: empurra a
+  // janela da temporada para o serviço de notas antes de desenhar, para a
+  // áurea seguir a mesma regra da coluna ★ (recomeça a cada temporada).
+  try { setRatingSeasonWindow(getSeasonWindow(snapshot)); } catch (_) { /* nota é acessório: nunca derruba o render */ }
   // Garante URLs assinadas das fotos (bucket privado) — async, re-renderiza
   // quando chegam. Guardado internamente para não martelar.
   ensureSignedPhotos(snapshot);

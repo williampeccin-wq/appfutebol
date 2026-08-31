@@ -2,7 +2,7 @@ import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/a
 import { getState, patchState } from '../../core/state.js';
 import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
-import { getCachedRatings, playerRatingAverages } from '../../services/ratings.service.js';
+import { getCachedRatings, playerRatingAverages, rollingRatingWindow } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
 import { isPro } from '../../domain/gating.js';
 import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
@@ -566,7 +566,13 @@ const STRENGTH_WEIGHTS = { perf: 0.5, champ: 0.5 };
 // Devolve { strengthOf, perfOf, champOf } para reuso no selo da UI.
 export function buildStrengthResolver(players = [], snapshot = getState()) {
   const list = Array.isArray(players) ? players : [];
-  const avgs = playerRatingAverages(getCachedRatings());
+  // JANELA MÓVEL de 12 meses, e não a temporada: se o índice de força zerasse
+  // junto com a classificação, o primeiro sorteio de cada temporada — e pior, o
+  // primeiro do ANO, quando os pontos também recomeçam — sairia com todo mundo
+  // empatado em força, ou seja, times sem critério bem na semana em que o
+  // pessoal volta. O recorte por temporada é regra de RANKING; equilibrar time
+  // é heurística interna.
+  const avgs = playerRatingAverages(getCachedRatings(), rollingRatingWindow(12));
   const ratedVals = list.map((p) => avgs[String(p?.id)]).filter((r) => r && r.votes > 0).map((r) => r.avg);
   const perfFallback = ratedVals.length ? ratedVals.reduce((a, b) => a + b, 0) / ratedVals.length : 6;
   const perfOf = (player) => {

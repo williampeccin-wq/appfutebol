@@ -107,10 +107,24 @@ export async function loadRatingsCache(force = false) {
 
 // Jogador melhor votado (maior média de desempenho com um mínimo de votos).
 // Computado quando o cache carrega; lido barato por cada avatar (áurea).
-const TOP_MIN_VOTES = 3;
+export const TOP_MIN_VOTES = 3;
 let _topRatedId = null;
+
+// Janela da temporada corrente, para a áurea seguir a mesma regra da coluna ★.
+// Mora aqui, e não no parâmetro, porque a áurea é decidida lá dentro do render
+// de cada avatar — em getAvatarHtml, que não tem o snapshot em mãos. Quem tem
+// (o render do app) empurra a janela uma vez por render.
+let _seasonWindow = null;
+export function setRatingSeasonWindow(window) {
+  const antes = `${_seasonWindow?.start || ''}..${_seasonWindow?.end || ''}`;
+  const agora = `${window?.start || ''}..${window?.end || ''}`;
+  if (antes === agora) return;
+  _seasonWindow = window || null;
+  if (_cache.loaded) recomputeTopRated();
+}
+
 function recomputeTopRated() {
-  const avgs = playerRatingAverages(_cache.rows);
+  const avgs = playerRatingAverages(_cache.rows, _seasonWindow);
   let bestId = null, bestAvg = -1, bestVotes = 0;
   for (const id in avgs) {
     const { avg, votes } = avgs[id];
@@ -121,31 +135,64 @@ function recomputeTopRated() {
 }
 export function getTopRatedPlayerId() { return _topRatedId; }
 
-// Média/qtde por ALVO de um tipo, restrito (opcionalmente) a um conjunto de jogos.
-function aggregateByTarget(rows, kind, gameKeys) {
+// O voto está DENTRO da janela de datas? Janela nula = sem recorte.
+// Chave sem data (ver dateOfGameKey) fica de fora de qualquer janela.
+function dentroDaJanela(gameKey, window) {
+  if (!window || (!window.start && !window.end)) return true;
+  const data = dateOfGameKey(gameKey);
+  if (!data) return false;
+  if (window.start && data < window.start) return false;
+  if (window.end && data > window.end) return false;
+  return true;
+}
+
+// Média/qtde por ALVO de um tipo. Dois recortes possíveis: um conjunto de jogos
+// (`gameKeys`, usado pelo ciclo do churrasco) ou uma janela de DATAS (`window`,
+// usada pela temporada e pela janela móvel do sorteio).
+function aggregateByTarget(rows, kind, { gameKeys = null, window = null } = {}) {
   const set = gameKeys && gameKeys.length ? new Set(gameKeys.map(String)) : null;
   const agg = {};
   for (const r of (rows || [])) {
     if (r.kind !== kind) continue;
     if (set && !set.has(String(r.game_key))) continue;
+    if (window && !dentroDaJanela(r.game_key, window)) continue;
     const id = String(r.target_id);
     if (!agg[id]) agg[id] = { sum: 0, n: 0 };
     agg[id].sum += Number(r.score) || 0;
     agg[id].n += 1;
   }
   const out = {};
-  for (const id in agg) out[id] = { avg: agg[id].sum / agg[id].n, votes: agg[id].n };
+  for (const id in agg) out[id] = { avg: agg[id].sum / agg[id].n, votes: agg[id].n, sum: agg[id].sum };
   return out;
 }
 
-// Média por jogador (desempenho). gameKeys = jogos do campeonato (ou vazio = tudo).
-export function playerRatingAverages(rows, gameKeys = null) {
-  return aggregateByTarget(rows, 'desempenho', gameKeys);
+// Média por jogador (desempenho) dentro de uma janela de datas `{start, end}`.
+// Janela nula = vitalícia — é o que a tela fazia SEMPRE até aqui: a coluna ★
+// somava desde o primeiro voto, então uma temporada nova nascia com as notas da
+// anterior, ao lado de zero ponto e zero jogo.
+export function playerRatingAverages(rows, window = null) {
+  return aggregateByTarget(rows, 'desempenho', { window });
+}
+
+// Janela móvel: os últimos `meses` a partir de hoje. O sorteio usa isto em vez
+// da temporada de propósito — se o índice de força zerasse junto com a
+// classificação, o primeiro sorteio de cada temporada (e pior, o primeiro do
+// ANO, quando os pontos também zeram) sairia com todo mundo empatado em força,
+// ou seja, times sem critério na semana em que o pessoal volta.
+export function rollingRatingWindow(meses = 12, hojeIso = null) {
+  const hoje = hojeIso || (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const [ano, mes, dia] = hoje.split('-').map(Number);
+  const inicio = new Date(Date.UTC(ano, mes - 1 - meses, dia));
+  const iso = `${inicio.getUTCFullYear()}-${String(inicio.getUTCMonth() + 1).padStart(2, '0')}-${String(inicio.getUTCDate()).padStart(2, '0')}`;
+  return { start: iso, end: hoje };
 }
 
 // Média por dupla (churrasco). gameKeys = jogos do ciclo (ou vazio = tudo).
 export function duoRatingAverages(rows, gameKeys = null) {
-  return aggregateByTarget(rows, 'churrasco', gameKeys);
+  return aggregateByTarget(rows, 'churrasco', { gameKeys });
 }
 
 // Data do jogo a que um voto pertence, lida do PRÓPRIO game_key

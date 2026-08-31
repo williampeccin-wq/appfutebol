@@ -1,6 +1,6 @@
 # Encerramento de temporada — pontos e notas por ciclo
 
-Status: **fase A implementada** (v1.182.0, 31/08/2026); fases B e C pendentes. Origem: o Inverno 26 (01/05–31/08/2026) terminou e o app não tem nada que reaja a isso — a classificação segue somando os jogos de setembro dentro de uma temporada que a própria tela diz ter acabado. Ver `club-profile-design.md` (a temporada já é entidade por-clube na Fase 1).
+Status: **fases A e B implementadas** (v1.182.0 e v1.183.0, 31/08/2026); fase C pendente. Origem: o Inverno 26 (01/05–31/08/2026) terminou e o app não tem nada que reaja a isso — a classificação segue somando os jogos de setembro dentro de uma temporada que a própria tela diz ter acabado. Ver `club-profile-design.md` (a temporada já é entidade por-clube na Fase 1).
 
 ## O problema
 
@@ -132,7 +132,8 @@ Temporada que atravessa o Ano Novo pertence ao ano do campo `year` (que já exis
 
 - **Fase A — ENTREGUE (v1.182.0):** janela por data em `calculateCurrentRanking`, aviso de temporada vencida na tela, card de encerramento com as três travas, `closeSeason` congelando pontos **e notas**, virada de ano no mesmo ato, histórico de temporadas no blob (append-only também no merge do save), anual somando as encerradas do ano, títulos da tela e pontuação da matriz deixando de ser fixos, e a tela de **editar a temporada corrente** (nome e datas, com aviso de quantas rodadas entram/saem e recusa de invadir período já congelado). Testes em `tests/temporada-encerramento.regression.mjs`.
   - A nota já é **congelada** aqui, embora ainda seja EXIBIDA como média vitalícia: congelar é a única parte que não dá para fazer depois — excluir um jogo apaga os votos dele do banco.
-- **Fase B — a nota entra no ciclo (exibição):** nota da temporada na coluna ★, nota anual ponderada no card anual, áurea por temporada, mínimo de 3 votos, sorteio com janela móvel de 12 meses.
+- **Fase B — ENTREGUE (v1.183.0):** nota da temporada na coluna ★, nota anual ponderada no card anual, áurea por temporada, mínimo de 3 votos (abaixo dele a média aparece apagada), e sorteio com janela móvel de 12 meses, desacoplado da temporada. Junto veio o conserto do `label` da temporada corrente, que não era normalizado: depois do primeiro encerramento o hero anunciava a temporada ANTERIOR em cima das datas da nova. Testes em `tests/nota-por-temporada.regression.mjs`.
+  - A janela da temporada chega ao serviço de notas por um setter chamado no `render` (`setRatingSeasonWindow`): a áurea é decidida dentro do render de cada avatar, em `getAvatarHtml`, que não tem o snapshot em mãos.
 - **Fase C — aposenta o legado:** materializar Abertura 26 e Inverno 26 do `championship.history.js` dentro do `history` do clube legado, com `player_id` no lugar do casamento por NOME — mata de vez o `IMPORTED_SHEET_NAME_ALIASES` (`championship.service.js:49`), que já quebrou em silêncio três vezes por renomeação. Mais o `cycle` no perfil do clube, para a sugestão da próxima temporada não depender de inferir a duração da anterior (a edição de nome/datas da temporada corrente já saiu na fase A).
 
-A Fase A era a única com pressa e já subiu. As fases B e C não têm prazo — a nota segue vitalícia na tela até a B, mas a de cada temporada encerrada já está guardada.
+A fase C não tem prazo: ela arruma o histórico anterior ao encerramento, e o que vem daqui para frente já nasce congelado por player_id.

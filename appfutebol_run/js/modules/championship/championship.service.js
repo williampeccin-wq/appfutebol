@@ -810,6 +810,12 @@ export function getChampionshipState(snapshot) {
     active: {
       id: active.id || temporada.id,
       name: active.name || temporada.name,
+      // O `label` PRECISA cair no `name` do blob antes de cair na temporada
+      // padrão: sem esta linha ele não era normalizado, o meta ficava com o
+      // label da constante e o hero anunciava a temporada ANTERIOR ("Inverno
+      // 2026") em cima das datas da nova — foi o que apareceu no Harmonia
+      // logo depois do primeiro encerramento.
+      label: active.label || active.name || temporada.label || temporada.name,
       year: active.year || temporada.year,
       start_date: active.start_date || temporada.start_date,
       end_date: active.end_date || temporada.end_date,
