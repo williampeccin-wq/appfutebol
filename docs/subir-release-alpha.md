@@ -7,12 +7,27 @@
 
 ## Antes de começar
 
-| Item | Onde |
-|---|---|
-| Keystore + senhas | você localizou — confirme que abre |
-| Projeto TWA (pasta com `twa-manifest.json`) | ver "se o projeto sumiu", no fim |
-| JDK 17 | `java -version` |
-| Bubblewrap | `bubblewrap --version` · instala com `npm i -g @bubblewrap/cli` |
+**O projeto NÃO é Bubblewrap — é um pacote do PWABuilder**, com projeto Gradle dentro.
+Fica em:
+
+```
+~/Downloads/Convocados - Google Play package (1)/
+├── signing.keystore          ← a chave de upload
+├── signing-key-info.txt      ← senhas e alias
+└── source/                   ← o projeto Gradle
+    ├── app/build.gradle      ← versão e SDK ficam AQUI
+    ├── gradle.properties     ← aponta a keystore e as senhas
+    └── gradlew
+```
+
+Não existe `twa-manifest.json` neste projeto. A assinatura é automática: o
+`app/build.gradle` lê `KEYSTORE_PATH`, `KEYSTORE_PASS`, `KEY_ALIAS` e `KEY_PASS` do
+`gradle.properties`, então o build não pede senha nenhuma.
+
+⚠️ **A pasta está em Downloads** — lugar onde se apaga coisa sem pensar. Como o
+`KEYSTORE_PATH` é relativo, dá para mover a pasta inteira para um lugar seguro sem
+quebrar nada. Faça uma cópia da `signing.keystore` e do `signing-key-info.txt` fora
+da máquina: perder isso é perder o app.
 
 Números deste lançamento: **versionCode 4**, **versionName 2.0.2.0**, package
 `br.app.convocados` (imutável).
@@ -21,32 +36,38 @@ Números deste lançamento: **versionCode 4**, **versionName 2.0.2.0**, package
 
 ## 1. Numerar a versão
 
-Na pasta do projeto TWA, edite `twa-manifest.json`:
+Edite `source/app/build.gradle`, no bloco `defaultConfig` (linhas ~60):
 
-```json
-"appVersionCode": 4,
-"appVersionName": "2.0.2.0",
+```gradle
+versionCode 4
+versionName "2.0.2.0"
 ```
 
-O `appVersionCode` **tem que ser maior** que o do último enviado (3). A Play recusa
-igual ou menor. O `appVersionName` é o que aparece para gente ler.
+O `versionCode` **tem que ser maior** que o do último enviado (3) — a Play recusa igual
+ou menor. Não mexa em `targetSdkVersion 36`, `minSdkVersion 23` nem `applicationId`.
 
 ## 2. Buildar
 
 ```bash
-bubblewrap build
+cd ~/Downloads/"Convocados - Google Play package (1)"/source
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+./gradlew bundleRelease
 ```
 
-Ele pede a senha do keystore e a da chave. Sai `app-release-signed.aab` na pasta.
+Sai em `app/build/outputs/bundle/release/` (confira o nome do arquivo — deve ser
+`app-release-signed.aab`, já assinado pela configuração do projeto).
 
-Se ele perguntar se quer atualizar a partir do manifest do site, pode aceitar — o
-conteúdo vem de `convocados.app.br` em tempo de execução, então isso só mexe em
-ícone, nome e cores.
+**Dois tropeços prováveis nesta máquina:**
+
+- `ANDROID_HOME` está vazio e não existe `local.properties`. O `export` acima resolve.
+- O Java instalado é o **25**, e o wrapper é Gradle 9.0. Se o build reclamar de versão
+  de JDK, instale o 17 e aponte só para este build:
+  `export JAVA_HOME=$(/usr/libexec/java_home -v 17)`
 
 ## 3. CONFERIR ANTES DE SUBIR — não pule
 
 ```bash
-python3 tools/aab-info.py app-release-signed.aab
+python3 ~/Dev/appFutebol/tools/aab-info.py app/build/outputs/bundle/release/app-release-signed.aab
 ```
 
 Tem que sair **exatamente** isto:
@@ -96,17 +117,14 @@ Os testadores recebem a atualização sozinhos pela Play.
 
 ---
 
-## Se o projeto TWA sumiu
+## Se o projeto sumir
 
-Dá para recriar, mas com cuidado — o package e a chave **têm** que ser os mesmos:
+Dá para gerar outro no [PWABuilder](https://www.pwabuilder.com) a partir de
+`https://convocados.app.br`, mas com duas condições inegociáveis:
 
-```bash
-bubblewrap init --manifest https://convocados.app.br/manifest.webmanifest
-```
-
-- Package name: `br.app.convocados` — exatamente isso, é imutável.
-- Signing key: aponte para a **keystore existente**, nunca gere uma nova. Chave nova =
-  a Play recusa o upload e você precisa de outro reset (que leva dias).
-- Depois do init, ajuste `appVersionCode: 4` e siga do passo 2.
-- Confirme a impressão digital: a chave certa é a que termina em
-  `...:F5:8F:C2:E3` (SHA-256 completo em [[api36-play-deadline]]).
+- Package name **exatamente** `br.app.convocados` — é imutável depois de publicado.
+- Assinatura: escolher "usar minha própria chave" e apontar para a
+  **`signing.keystore` existente**, com as senhas do `signing-key-info.txt`. Chave nova
+  significa upload recusado e mais um pedido de reset, que leva dias.
+- Confirme a impressão digital: a certa termina em `...:F5:8F:C2:E3`
+  (SHA-256 completo em [[api36-play-deadline]]).
