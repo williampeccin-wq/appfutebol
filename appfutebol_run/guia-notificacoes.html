@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Ativar notificações — Convocados</title>
+<style>
+:root{
+  --navy:#0C1A38; --gold:#F0A500; --gold-bg:rgba(240,165,0,.10); --gold-border:rgba(240,165,0,.22);
+  --green:#22C55E; --bg:#070E1D; --surface:#0D1B30; --surface2:#142234; --border:#1C3050;
+  --text:#A8C0DC; --heading:#EDF3FF; --muted:#6B8AAE;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;color-scheme:dark}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.wrap{max-width:640px;margin:0 auto;padding:1.75rem 1.25rem 4rem}
+.pg-header{text-align:center;padding:1.5rem 0 2rem;border-bottom:1px solid var(--border);margin-bottom:2rem}
+.chip{display:inline-flex;align-items:center;gap:.45rem;background:var(--gold-bg);
+  border:1px solid var(--gold-border);border-radius:999px;padding:.3rem .85rem;margin-bottom:1rem;
+  font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+h1{font-size:clamp(1.5rem,5vw,2.1rem);font-weight:800;color:var(--heading);letter-spacing:-.02em;line-height:1.15}
+.sub{font-size:.92rem;margin-top:.7rem;line-height:1.55;max-width:30rem;margin-inline:auto}
+h2{font-size:1.15rem;font-weight:700;color:var(--heading);margin:2.5rem 0 .35rem}
+.h2note{font-size:.85rem;color:var(--muted);margin-bottom:1.25rem}
+.step{display:grid;grid-template-columns:34px 1fr;gap:.55rem 1rem;padding:1.35rem 0;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.n{width:34px;height:34px;border-radius:50%;background:var(--gold-bg);border:1.5px solid var(--gold-border);
+  display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:var(--gold)}
+.st{font-size:1rem;font-weight:600;color:var(--heading);margin-bottom:.3rem}
+.sb{font-size:.88rem;line-height:1.6}
+.sb strong{color:var(--heading)}
+.shot{grid-column:1/-1;margin-top:.85rem;display:flex;justify-content:center}
+.shot img{max-width:230px;width:100%;border-radius:16px;border:1px solid var(--border);
+  box-shadow:0 14px 40px rgba(0,0,0,.5);display:block}
+/* Enquanto a foto não existe, o encaixe vira uma moldura tracejada com o texto
+   do alt — nunca o ícone de imagem quebrada. */
+.shot.pendente{width:100%}
+.slot{width:100%;max-width:230px;min-height:150px;margin-inline:auto;border-radius:16px;
+  border:1.5px dashed var(--border);background:var(--surface);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:1.1rem;font-size:.78rem;line-height:1.5}
+.box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--gold);
+  border-radius:10px;padding:1rem 1.1rem;margin:1.25rem 0;font-size:.88rem;line-height:1.6}
+.box b{color:var(--gold)}
+.ok{border-left-color:var(--green)}.ok b{color:var(--green)}
+.tap{color:var(--gold);font-weight:600}
+footer{margin-top:3rem;padding-top:1.25rem;border-top:1px solid var(--border);
+  font-size:.8rem;color:var(--muted);text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="pg-header">
+    <div class="chip">⚽ Convocados</div>
+    <h1>Ativar as notificações</h1>
+    <p class="sub">É assim que você fica sabendo na hora que as inscrições do jogo abrem.
+       Leva menos de um minuto e só precisa ser feito uma vez.</p>
+  </header>
+
+  <h2>No Android</h2>
+  <p class="h2note">Caminho normal, para quem ainda não recusou o aviso.</p>
+
+  <div class="step">
+    <div class="n">1</div>
+    <div>
+      <div class="st">Abra o Convocados pelo ícone</div>
+      <div class="sb">Pelo <strong>ícone do app</strong> no celular, não pelo navegador.
+        O convite <strong>“Avisos no celular”</strong> é a primeira coisa da tela inicial,
+        com um botão amarelo. <strong>Se ele não aparecer, é porque já está ativado</strong> —
+        não precisa fazer mais nada.</div>
+    </div>
+    <div class="shot"><img src="img/guia/notif-1-botao.png" alt="Topo da tela inicial com o convite Avisos no celular" /></div>
+  </div>
+
+  <div class="step">
+    <div class="n">2</div>
+    <div>
+      <div class="st">Toque em “Ativar”</div>
+      <div class="sb">O celular vai perguntar se o Convocados pode enviar notificações.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">3</div>
+    <div>
+      <div class="st">Toque em “Permitir”</div>
+      <div class="sb">Essa caixa é do próprio Android e aparece só uma vez.
+        <strong>Se tocar em “Não permitir”, ela não volta a aparecer</strong> — aí siga a
+        seção “Já recusei sem querer”, mais abaixo.</div>
+    </div>
+    <div class="shot"><img src="img/guia/notif-2-permissao.png" alt="Caixa do Android perguntando se permite notificações" /></div>
+  </div>
+
+  <div class="step">
+    <div class="n">4</div>
+    <div>
+      <div class="st">Confira o aviso verde</div>
+      <div class="sb">Deve aparecer <strong>“Notificações ativadas.”</strong> e o botão passa a
+        mostrar <strong>“Desativar”</strong>. Se está escrito “Desativar”, está tudo certo —
+        não toque nele.</div>
+    </div>
+    <div class="shot"><img src="img/guia/notif-3-sucesso.png" alt="Aviso verde Notificações ativadas" /></div>
+  </div>
+
+  <div class="box ok"><b>Como saber que deu certo:</b> o botão fica escrito
+    <strong>“Desativar”</strong>. É o único sinal que importa.</div>
+
+  <h2>Já recusei sem querer</h2>
+  <p class="h2note">O Android não pergunta duas vezes. Dá para liberar nos ajustes.</p>
+
+  <div class="step">
+    <div class="n">1</div>
+    <div>
+      <div class="st">Abra os Ajustes do celular</div>
+      <div class="sb">Vá em <span class="tap">Apps → Convocados → Notificações</span> e ligue a
+        chave. Em alguns aparelhos o caminho é
+        <span class="tap">Ajustes → Notificações → Convocados</span>.</div>
+    </div>
+    <div class="shot"><img src="img/guia/notif-4-ajustes.png" alt="Ajustes do Android na tela de notificações do Convocados" /></div>
+  </div>
+
+  <div class="step">
+    <div class="n">2</div>
+    <div>
+      <div class="st">Volte ao app e toque em “Ativar”</div>
+      <div class="sb">Agora ele aceita sem perguntar de novo.</div>
+    </div>
+  </div>
+
+  <h2>No iPhone</h2>
+  <p class="h2note">Só funciona com o app instalado na tela de início.</p>
+
+  <div class="box"><b>Antes de ativar:</b> abra o Convocados no Safari, toque em
+    <span class="tap">Compartilhar</span> e depois em
+    <span class="tap">Adicionar à Tela de Início</span>. Feche o Safari, abra o app
+    <strong>pelo ícone</strong> e só então toque em “Ativar”. Aberto dentro do Safari, o iPhone
+    não deixa ativar — o app vai avisar isso.</div>
+
+  <footer>
+    Deu errado ou apareceu outra mensagem? Manda print para
+    <strong>suporte@convocados.app.br</strong>.
+  </footer>
+
+</div>
+
+<script>
+// A página é publicada antes das fotos existirem. Sem isto, o testador vê o
+// ícone de imagem quebrada e acha que o app está com defeito.
+document.querySelectorAll('.shot img').forEach(function (img) {
+  img.addEventListener('error', function () {
+    var slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.textContent = img.alt || 'foto';
+    img.replaceWith(slot);
+    slot.parentElement.classList.add('pendente');
+  });
+});
+</script>
+</body>
+</html>

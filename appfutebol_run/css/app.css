@@ -5757,6 +5757,60 @@ body {
 }
 .home-v2-pending-nudge strong { color: var(--hfc-gold-200, #ffd479); }
 
+/* Medidor de sessão do testador (TEMPORÁRIO — teste fechado). Fica acima da
+   bottom-nav, discreto, sem roubar toque de nada. Remover com o activity-log. */
+.tester-meter {
+  position: fixed;
+  bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  width: calc(100% - 24px); max-width: 456px;
+  z-index: 59;                     /* abaixo da nav (60), acima do conteúdo */
+  pointer-events: none;            /* nunca engole um toque do app */
+  padding: 8px 12px 9px;
+  border-radius: 12px;
+  background: rgba(8, 14, 30, 0.9);
+  border: 1px solid var(--hfc-glass-border);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+}
+.tester-meter-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+}
+.tester-meter-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--hfc-text-dim);
+}
+.tester-meter-time { font-size: 12px; font-weight: 700; color: var(--hfc-text); }
+.tester-meter-bar {
+  margin-top: 6px; height: 4px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10); overflow: hidden;
+}
+.tester-meter-fill {
+  display: block; height: 100%; width: 0%; border-radius: 999px;
+  background: var(--hfc-gold, #f0a500);
+  transition: width .3s linear;
+}
+.tester-meter.is-done .tester-meter-fill { background: #22c55e; }
+.tester-meter.is-done .tester-meter-time { color: #22c55e; }
+.tester-meter-nudge {
+  margin: 7px 0 0; font-size: 11.5px; line-height: 1.35;
+  color: var(--hfc-gold-200, #ffd479);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tester-meter-fill { transition: none; }
+}
+
+/* Convite de notificações no topo da home: mesmo destaque do card de cadastros
+   pendentes, porque é a primeira coisa que o testador precisa ver. */
+.content--home .push-optin-card.is-destaque {
+  border: 1px solid rgba(240, 192, 64, 0.42);
+  background: rgba(240, 165, 0, 0.07);
+}
+.content--home .push-optin-card.is-destaque .push-toggle-btn {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
 /* Biblioteca de uniformes (Config) + seletor por time (sorteio) */
 .uniforms-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .uniform-item {

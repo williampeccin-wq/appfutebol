@@ -2894,7 +2894,8 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
 // TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
-import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled, logPlayerDeleted } from '../services/activity-log.js';
+import { startTesterMeter } from '../services/tester-meter.js';
+import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled, logPlayerDeleted, logPushEnabled, logPushDenied, logPushDisabled } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
@@ -2967,16 +2968,21 @@ function computeDefaultAutoOpen(gameDate) {
 // Controle de "Avisos no celular" (push). Markup com seletores por CLASSE para
 // poder existir em dois lugares: na home (onboarding, até a 1ª ativação) e
 // dentro da edição do perfil (gestão permanente).
-function renderPushOptinInner() {
+// variant 'destaque' = card de onboarding no TOPO da home: botão grande, para
+// não passar despercebido. O card do perfil segue discreto (gestão, não convite).
+function renderPushOptinInner(variant) {
+  const destaque = variant === 'destaque';
+  const btnClass = destaque ? 'home-v2-primary push-toggle-btn' : 'btn btn-secondary btn-sm push-toggle-btn';
   return `
     <div class="home-v2-card-head">
       <div>
         <strong>Avisos no celular</strong>
         <span class="push-status-line">Verificando…</span>
       </div>
-      <button class="btn btn-secondary btn-sm push-toggle-btn" type="button" style="display:none;"></button>
+      ${destaque ? '' : `<button class="${btnClass}" type="button" style="display:none;"></button>`}
     </div>
     <p class="footer-note push-optin-hint push-hint" style="display:none;"></p>
+    ${destaque ? `<button class="${btnClass}" type="button" style="display:none;"></button>` : ''}
   `;
 }
 function isPushOnboarded() {
@@ -4334,6 +4340,7 @@ async function bindPushControl(card, currentPlayer) {
     let activated = false;
     if (isCurrentlyOn) {
       await disablePush();
+      logPushDisabled(currentPlayer, null);
     } else {
       const result = await enablePush(currentPlayer?.id);
       if (!result.ok) {
@@ -4343,10 +4350,12 @@ async function bindPushControl(card, currentPlayer) {
           unsupported: 'Este navegador não suporta notificações.',
           subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
         };
+        logPushDenied(currentPlayer, { reason: result.reason || 'unknown' });
         showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
       } else {
         activated = true;
         setPushOnboarded();
+        logPushEnabled(currentPlayer, { where: isHomeCard ? 'home' : 'config' });
         showToast('Notificações ativadas.', 'success');
       }
     }
@@ -4461,6 +4470,8 @@ function bindAppEvents(currentPlayer) {
 
   // TEMPORÁRIO (piloto): registra que o app foi aberto (throttle interno de 5min).
   logAppOpen(currentPlayer, APP_VERSION);
+  // TEMPORÁRIO (teste fechado): medidor de sessão. Só monta no clube de teste.
+  startTesterMeter(currentPlayer, getCurrentClubId());
 
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
@@ -5201,6 +5212,11 @@ function renderHome(snapshot, currentPlayer) {
 
   return `
     <section class="home-v2">
+      ${isPushOnboarded() ? '' : `
+      <section class="home-v2-card push-optin-card is-destaque" id="push-optin-card">
+        ${renderPushOptinInner('destaque')}
+      </section>`}
+
       ${(game && game.open) ? `
       <section class="home-v2-hero">
         <div class="home-v2-hero-main">
@@ -5303,11 +5319,6 @@ function renderHome(snapshot, currentPlayer) {
           ${homeNoticeItems.length ? homeNoticeItems.map((item) => '<div class="home-v2-notice"><span>' + item.icon + '</span><div><strong>' + escapeHtml(item.title) + '</strong><small>' + (item.html || escapeHtml(item.text || '')) + '</small></div></div>').join('') : '<span class="home-v2-empty">Sem notificações por enquanto.</span>'}
         </div>
       </section>
-
-      ${isPushOnboarded() ? '' : `
-      <section class="home-v2-card push-optin-card" id="push-optin-card">
-        ${renderPushOptinInner()}
-      </section>`}
 
       ${renderProfilePanel(activePlayer, game)}
     </section>

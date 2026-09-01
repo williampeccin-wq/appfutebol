@@ -108,3 +108,14 @@ export function logTeamDraw(player, detail)  { post('team_draw',          player
 export function logPlayerAdded(player, detail){ post('player_added',       player, detail || null); }
 export function logPaymentToggled(player, detail){ post('payment_toggled', player, detail || null); }
 export function logPlayerDeleted(player, detail){ post('player_deleted',   player, detail || null); }
+
+// Ativação de notificações. O push_subscriptions só guarda quem ACEITOU; estes
+// eventos guardam também quem recusou/desistiu e quem desligou depois — que é
+// justamente quem precisa de ajuda.
+export function logPushEnabled(player, detail)  { post('push_enabled',  player, detail || null); }
+export function logPushDenied(player, detail)   { post('push_denied',   player, detail || null); }
+export function logPushDisabled(player, detail) { post('push_disabled', player, detail || null); }
+
+// Duração REAL da sessão, em segundos com o app em foco, mais o número de
+// interações. É o que separa quem usou de quem abriu e fechou.
+export function logSession(player, detail) { post('session', player, detail || null); }

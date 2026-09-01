@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.186.0-virada-de-mes-da-mensalidade';
+export const APP_VERSION = 'v1.187.0-avisos-no-topo-e-medidor-de-sessao';
