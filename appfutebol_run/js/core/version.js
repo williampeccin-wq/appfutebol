@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.184.1-socio-de-carne-vota-no-churrasco';
+export const APP_VERSION = 'v1.185.0-grupo-como-dupla-no-churrasco';

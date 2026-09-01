@@ -19,6 +19,7 @@ import { isVotingEnabled } from '../../core/flags.js';
 import { isMensalidadeExempt } from '../../domain/authz.js';
 import { isPro } from '../../domain/gating.js';
 import { isMensOkEffective } from '../../domain/rules.engine.js';
+import { CARNE_GROUP_ID, CARNE_GROUP_NAME, isCarneGroupId } from '../../domain/carne.js';
 
 function isCarneOnly(player) {
   return player?.plays_football === false;
@@ -350,6 +351,7 @@ function formatScheduleDate(value) {
 }
 
 function getPlayerName(playersById, id) {
+  if (isCarneGroupId(id)) return CARNE_GROUP_NAME;
   return playersById.get(String(id))?.name || 'Jogador não encontrado';
 }
 
@@ -409,10 +411,14 @@ function getNextScheduleEntry(schedule) {
   return next || schedule[0];
 }
 
-function renderPlayerOptions(players, selectedId = '') {
-  return players
+function renderPlayerOptions(players, selectedId = '', { includeGroup = false } = {}) {
+  const options = players
     .map((player) => `<option value="${escapeHtml(player.id)}" ${String(player.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(player.name)}</option>`)
     .join('');
+  // "Grupo" só aparece no rodízio (includeGroup), para quem sobrou de par ímpar.
+  if (!includeGroup) return options;
+  const groupOption = `<option value="${CARNE_GROUP_ID}" ${isCarneGroupId(selectedId) ? 'selected' : ''}>👥 ${CARNE_GROUP_NAME} (todos)</option>`;
+  return `${groupOption}${options}`;
 }
 
 function renderCarneScheduleForm(currentPlayer, orderedPlayers) {
@@ -539,7 +545,10 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
 
   // Jogadores que aparecem em mais de uma dupla (concorrência) — para alertar.
   const counts = new Map();
-  pairs.forEach((pair) => [pair.player1_id, pair.player2_id].forEach((idv) => counts.set(String(idv), (counts.get(String(idv)) || 0) + 1)));
+  pairs.forEach((pair) => [pair.player1_id, pair.player2_id].forEach((idv) => {
+    if (isCarneGroupId(idv)) return; // o Grupo pode cobrir mais de uma semana
+    counts.set(String(idv), (counts.get(String(idv)) || 0) + 1);
+  }));
   const dupIds = new Set([...counts.entries()].filter(([, n]) => n > 1).map(([idv]) => idv));
 
   const dateCell = (index) => `
@@ -555,8 +564,8 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
         <div class="carne-rotation-item is-editing" data-pair-index="${index}">
           ${dateCell(index)}
           <span class="carne-rotation-edit-fields">
-            <select id="carne-pair-edit-1" class="input">${renderPlayerOptions(orderedPlayers, pair.player1_id)}</select>
-            <select id="carne-pair-edit-2" class="input">${renderPlayerOptions(orderedPlayers, pair.player2_id)}</select>
+            <select id="carne-pair-edit-1" class="input">${renderPlayerOptions(orderedPlayers, pair.player1_id, { includeGroup: true })}</select>
+            <select id="carne-pair-edit-2" class="input">${renderPlayerOptions(orderedPlayers, pair.player2_id, { includeGroup: true })}</select>
           </span>
           <span class="carne-rotation-item-actions">
             <button class="icon-action-button is-ok" type="button" data-action="carne-pair-save" data-id="${index}" title="Salvar" aria-label="Salvar">✓</button>
@@ -597,7 +606,7 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
   return `
     <section class="card carne-rotation-card" id="carne-rotation-card">
       <div class="card-title">Calendário do churrasco</div>
-      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. <strong>Tudo salva automaticamente.</strong></p>
+      <p class="footer-note">Arraste pelo ⠿ para mudar a data de uma dupla, toque em ✎ para trocar os integrantes. A dupla do topo é a próxima. Se o número de integrantes for ímpar, escale <strong>👥 ${CARNE_GROUP_NAME} (todos)</strong> como par de quem sobrou. <strong>Tudo salva automaticamente.</strong></p>
 
       ${dupIds.size ? '<div class="carne-rotation-warning">⚠️ Há jogador(es) em mais de uma dupla. Cada pessoa deve estar em só uma.</div>' : ''}
 
@@ -609,8 +618,8 @@ function renderCarneSchedule(currentPlayer, orderedPlayers, rotation, dates, dir
       <div class="carne-rotation-list">${listHtml}</div>
 
       <div class="carne-rotation-add">
-        <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers)}</select>
-        <select id="carne-rotation-player-2" class="input"><option value="">Responsável 2</option>${renderPlayerOptions(orderedPlayers)}</select>
+        <select id="carne-rotation-player-1" class="input"><option value="">Responsável 1</option>${renderPlayerOptions(orderedPlayers, '', { includeGroup: true })}</select>
+        <select id="carne-rotation-player-2" class="input"><option value="">Responsável 2</option>${renderPlayerOptions(orderedPlayers, '', { includeGroup: true })}</select>
         <button class="btn btn-primary" type="button" data-action="carne-rotation-add-pair">Adicionar dupla</button>
       </div>
     </section>
@@ -689,7 +698,9 @@ function renderChurrascoRanking(snapshot) {
   const recentGames = Object.keys(lastByGame).sort((a, b) => String(lastByGame[b]).localeCompare(String(lastByGame[a])));
   const cycleGames = n ? recentGames.slice(0, n) : recentGames;
   const duos = duoRatingAverages(churras, cycleGames);
-  const name = (id) => (snapshot.players || []).find((p) => String(p.id) === String(id))?.name || 'Jogador';
+  const name = (id) => (isCarneGroupId(id)
+    ? CARNE_GROUP_NAME
+    : (snapshot.players || []).find((p) => String(p.id) === String(id))?.name || 'Jogador');
   const list = Object.entries(duos)
     .map(([key, agg]) => { const [a, b] = String(key).split('|'); return { names: `${name(a)} e ${name(b)}`, avg: agg.avg, votes: agg.votes }; })
     .sort((x, y) => y.avg - x.avg);

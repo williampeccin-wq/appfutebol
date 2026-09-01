@@ -1,6 +1,22 @@
 // Lógica pura do rodízio de churrasco (sem DOM, sem fetch).
 // Importada por app.js e testada diretamente.
 
+// Sentinela do "Grupo": quando o número de integrantes do churrasco é ímpar,
+// sobra alguém sem par. O admin escala o GRUPO (todo mundo) como dupla dessa
+// pessoa em vez de deixá-la sozinha. Não é um jogador: é um id reservado que
+// nunca colide com id real e atravessa rodízio, votação e ranking como se fosse
+// o segundo integrante.
+export const CARNE_GROUP_ID = '__grupo__';
+export const CARNE_GROUP_NAME = 'Grupo';
+
+export function isCarneGroupId(id) {
+  return String(id ?? '') === CARNE_GROUP_ID;
+}
+
+export function carneGroupMember() {
+  return { id: CARNE_GROUP_ID, name: CARNE_GROUP_NAME, is_carne_group: true };
+}
+
 export function carneDiffDays(aIso, bIso) {
   const noon = (iso) => new Date(`${String(iso).slice(0, 10)}T12:00:00`).getTime();
   return Math.round((noon(aIso) - noon(bIso)) / 86400000);
@@ -18,8 +34,10 @@ export function carneDiffDays(aIso, bIso) {
 export function getChurrascoDuo(scheduleEntries, rotation, players, gameIso) {
   if (!gameIso) return null;
 
-  const findPlayer = (id) =>
-    (players || []).find((p) => String(p.id) === String(id)) || { id, name: 'Jogador' };
+  const findPlayer = (id) => {
+    if (isCarneGroupId(id)) return carneGroupMember();
+    return (players || []).find((p) => String(p.id) === String(id)) || { id, name: 'Jogador' };
+  };
 
   const override = (scheduleEntries || [])
     .find((e) => String(e?.date || '').slice(0, 10) === gameIso);
