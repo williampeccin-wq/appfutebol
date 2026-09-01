@@ -312,6 +312,11 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
     settings: {
       mens_expire_date: String(meta.settings?.mens_expire_date || activeGame?.mens_expire_date || '').slice(0, 10),
       mens_enforcement_mode: String(meta.settings?.mens_enforcement_mode || 'none'),
+      // Carimbo 'AAAA-MM' do último mês já processado pela virada automática da
+      // mensalidade (rules.engine/reconcileMensalidadeMonthTurn). Sem ele aqui E
+      // no splitState, o carimbo se perderia a cada sync e a virada nunca sairia
+      // do estado "armando" — mesma falha silenciosa do `uniforms` (30/07).
+      mens_last_reset_month: String(meta.settings?.mens_last_reset_month || '').slice(0, 7),
       ratings_perf_window_hours: Number(meta.settings?.ratings_perf_window_hours) || 0,
       mens_amount: Number(meta.settings?.mens_amount) || 0,
       mens_beneficiary: String(meta.settings?.mens_beneficiary || ''),
@@ -349,6 +354,7 @@ function splitState(state) {
       settings: {
         mens_expire_date: String(state.settings?.mens_expire_date || '').slice(0, 10),
         mens_enforcement_mode: String(state.settings?.mens_enforcement_mode || 'none'),
+        mens_last_reset_month: String(state.settings?.mens_last_reset_month || '').slice(0, 7),
         ratings_perf_window_hours: Number(state.settings?.ratings_perf_window_hours) || 0,
         mens_amount: Number(state.settings?.mens_amount) || 0,
         mens_beneficiary: String(state.settings?.mens_beneficiary || ''),

@@ -236,3 +236,69 @@ export function validateState(state) {
     issues,
   };
 }
+
+// ---------------------------------------------------------------------------
+// VIRADA DE MÊS DA MENSALIDADE
+// ---------------------------------------------------------------------------
+// No dia 1º todo mundo volta a "Pendente". O gatilho é o CALENDÁRIO, não o
+// vencimento: o dia de vencimento configurado (10, 15, ...) continua sendo só o
+// prazo daquele mês. Isto é DIFERENTE do que 58fdb1f tentou e a97d6ad reverteu
+// — lá o `isMensOkEffective` mentia sobre quem já tinha pagado assim que a data
+// passava, e o ciclo nunca virava. Aqui o dado é reescrito uma vez, na virada, e
+// a leitura continua sendo `mens_ok` puro.
+//
+// `settings.mens_last_reset_month` ('AAAA-MM') carimba o último mês já
+// processado. Serve para duas coisas:
+//
+//  1. IDEMPOTÊNCIA — abrir o app dez vezes no dia 1º zera uma vez só.
+//  2. ESTREIA SEM ATROPELO — clube que ainda não tem carimbo é apenas ARMADO
+//     com o mês corrente, sem zerar ninguém. É o que protege os status que já
+//     estão no ar no dia do deploy: o primeiro reset automático só acontece na
+//     virada seguinte.
+const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
+
+export function getMensCycleMonth(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function reconcileMensalidadeMonthTurn(state, currentMonth = getMensCycleMonth()) {
+  const unchanged = { state, changed: false, reset: false, zerados: 0 };
+  if (!MONTH_KEY_RE.test(String(currentMonth))) return unchanged;
+
+  const settings = (state?.settings && typeof state.settings === 'object') ? state.settings : {};
+  const stamped = String(settings.mens_last_reset_month || '').slice(0, 7);
+
+  // Sem carimbo = primeira execução desta regra neste clube. Só arma o gatilho.
+  if (!MONTH_KEY_RE.test(stamped)) {
+    return {
+      state: { ...state, settings: { ...settings, mens_last_reset_month: currentMonth } },
+      changed: true,
+      reset: false,
+      zerados: 0,
+    };
+  }
+
+  // Mesmo mês — ou carimbo à frente, que é relógio do aparelho atrasado/errado.
+  // Nos dois casos não se zera nada: um celular com a data trocada não pode
+  // reabrir a cobrança do clube inteiro.
+  if (stamped >= currentMonth) return unchanged;
+
+  const players = Array.isArray(state?.players) ? state.players : [];
+  let zerados = 0;
+  const nextPlayers = players.map((player) => {
+    if (!player?.mens_ok) return player;
+    zerados += 1;
+    return { ...player, mens_ok: false };
+  });
+
+  return {
+    state: {
+      ...state,
+      players: nextPlayers,
+      settings: { ...settings, mens_last_reset_month: currentMonth },
+    },
+    changed: true,
+    reset: true,
+    zerados,
+  };
+}
