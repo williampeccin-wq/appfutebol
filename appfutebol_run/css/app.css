@@ -4574,6 +4574,17 @@ input.input[type="datetime-local"],
   border: 2px solid #ffffff;
 }
 
+/* Avatar do "Grupo": par de quem sobra quando o rodizio do churrasco e impar.
+   Nao e jogador, nao tem foto — emoji centralizado sobre fundo neutro. */
+.avatar-carne-group {
+  background: rgba(240, 165, 0, 0.18);
+  color: #f0a500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .home-carne-avatar img,
 .home-carne-avatar .avatar-image {
   width: 100% !important;

@@ -1,6 +1,6 @@
 import { assertRuntimeEnvironmentAllowed } from '../domain/environment.guard.js';
 import { auditPresenceProjection } from '../domain/presence.audit.js';
-import { getChurrascoDuo as calcChurrascoDuo, carneDiffDays as _carneDiffDays } from '../domain/carne.js';
+import { getChurrascoDuo as calcChurrascoDuo, carneDiffDays as _carneDiffDays, CARNE_GROUP_NAME, isCarneGroupId, carneGroupMember } from '../domain/carne.js';
 assertRuntimeEnvironmentAllowed();
 window.HarmoniaPresenceAudit = () => auditPresenceProjection(getState());
 window.__HARMONIA_BUILD__ = 'v1.82.0-aura';
@@ -554,6 +554,15 @@ function bindAvatarLightbox() {
     event.stopPropagation();
     openAvatarLightbox(img.getAttribute('src'), img.getAttribute('alt'));
   }, true);
+}
+
+// Avatar de um integrante da dupla do churrasco: o "Grupo" (par de quem sobrou
+// num rodízio ímpar) não é jogador e não tem foto — ganha o selo de todos.
+function renderCarneMemberAvatar(member, extraClass = '') {
+  if (isCarneGroupId(member?.id)) {
+    return `<div class="avatar avatar-carne-group ${extraClass}" title="${CARNE_GROUP_NAME}">👥</div>`;
+  }
+  return renderAvatarForApp(member, extraClass);
 }
 
 function renderAvatarForApp(player, extraClass = '') {
@@ -1174,6 +1183,7 @@ function resetCarneRotationDraft() { editingCarnePairIndex = -1; }
 
 // Concorrência: um jogador não pode estar em duas duplas do rodízio.
 function carnePlayerUsedElsewhere(draft, playerId, exceptIndex = -1) {
+  if (isCarneGroupId(playerId)) return false; // o Grupo pode ser par em várias semanas
   const id = String(playerId);
   return (draft.pairs || []).some((pair, i) => i !== exceptIndex
     && (String(pair.player1_id) === id || String(pair.player2_id) === id));
@@ -1183,6 +1193,7 @@ function carneDuplicatePlayerIds(draft) {
   const counts = new Map();
   (draft?.pairs || []).forEach((pair) => {
     [pair.player1_id, pair.player2_id].forEach((id) => {
+      if (isCarneGroupId(id)) return;
       const key = String(id);
       counts.set(key, (counts.get(key) || 0) + 1);
     });
@@ -1512,6 +1523,7 @@ document.addEventListener("click", async (e) => {
     const p1 = document.getElementById('carne-rotation-player-1')?.value?.trim();
     const p2 = document.getElementById('carne-rotation-player-2')?.value?.trim();
     if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
+    if (isCarneGroupId(p1) && isCarneGroupId(p2)) { showToast(`Só um dos lados pode ser o ${CARNE_GROUP_NAME}.`, 'error'); return; }
     if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
     const view = carneEditingView();
     const dupId = carnePlayerUsedElsewhere(view, p1) ? p1 : (carnePlayerUsedElsewhere(view, p2) ? p2 : null);
@@ -1558,6 +1570,7 @@ document.addEventListener("click", async (e) => {
     const p1 = document.getElementById('carne-pair-edit-1')?.value?.trim();
     const p2 = document.getElementById('carne-pair-edit-2')?.value?.trim();
     if (!p1 || !p2) { showToast('Selecione as duas pessoas da dupla.', 'error'); return; }
+    if (isCarneGroupId(p1) && isCarneGroupId(p2)) { showToast(`Só um dos lados pode ser o ${CARNE_GROUP_NAME}.`, 'error'); return; }
     if (p1 === p2) { showToast('A dupla precisa ser de duas pessoas diferentes.', 'error'); return; }
     const dupId = carnePlayerUsedElsewhere(view, p1, idx) ? p1 : (carnePlayerUsedElsewhere(view, p2, idx) ? p2 : null);
     if (dupId) {
@@ -3560,8 +3573,8 @@ function renderCarneVoteCard() {
         <div class="perf-vote-kicker">Avalie o churrasco 🥩</div>
       </div>
       <div class="carne-vote-duo">
-        ${renderAvatarForApp(duo.player1, 'perf-vote-avatar')}
-        ${renderAvatarForApp(duo.player2, 'perf-vote-avatar')}
+        ${renderCarneMemberAvatar(duo.player1, 'perf-vote-avatar')}
+        ${renderCarneMemberAvatar(duo.player2, 'perf-vote-avatar')}
       </div>
       <div class="perf-vote-name">${escapeHtml(duo.player1?.name || '?')} e ${escapeHtml(duo.player2?.name || '?')}</div>
 
@@ -4503,15 +4516,20 @@ function renderHome(snapshot, currentPlayer) {
   const storedNotifications = Array.isArray(workingSnapshot.notifications) ? workingSnapshot.notifications : [];
   const playersByIdForCarneNotification = new Map(workingSnapshot.players.map((player) => [String(player.id), player]));
   const nextCarneEntry = carneCalendarForHome[0];
+  // O "Grupo" não está em players: resolve pelo sentinela antes de cair no '-'.
+  const carneMemberRecord = (id) => (isCarneGroupId(id)
+    ? carneGroupMember()
+    : playersByIdForCarneNotification.get(String(id)) || null);
+  const carneMemberName = (id) => carneMemberRecord(id)?.name || '-';
   const carneNotification = nextCarneEntry
     ? {
         type: 'carne',
         date: formatDate(nextCarneEntry.date),
-        player1: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-',
-        player2: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-',
-        player1Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id)) || null,
-        player2Record: playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id)) || null,
-        message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${playersByIdForCarneNotification.get(String(nextCarneEntry.player1_id))?.name || '-'}, ${playersByIdForCarneNotification.get(String(nextCarneEntry.player2_id))?.name || '-'}`,
+        player1: carneMemberName(nextCarneEntry.player1_id),
+        player2: carneMemberName(nextCarneEntry.player2_id),
+        player1Record: carneMemberRecord(nextCarneEntry.player1_id),
+        player2Record: carneMemberRecord(nextCarneEntry.player2_id),
+        message: `Dupla da carne (${formatDate(nextCarneEntry.date)}): ${carneMemberName(nextCarneEntry.player1_id)}, ${carneMemberName(nextCarneEntry.player2_id)}`,
       }
     : null;
 
@@ -4627,8 +4645,8 @@ function renderHome(snapshot, currentPlayer) {
       text: String(carneNotification.player1 || '-') + ', ' + String(carneNotification.player2 || '-'),
       html: '<div class="notification-content-carne">'
         + '<div class="home-carne-avatars">'
-        + (carneNotification.player1Record ? renderAvatarForApp(carneNotification.player1Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
-        + (carneNotification.player2Record ? renderAvatarForApp(carneNotification.player2Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
+        + (carneNotification.player1Record ? renderCarneMemberAvatar(carneNotification.player1Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
+        + (carneNotification.player2Record ? renderCarneMemberAvatar(carneNotification.player2Record, 'home-carne-avatar') : '<span class="avatar home-carne-avatar">?</span>')
         + '</div>'
         + '<div class="home-carne-text"><span>' + escapeHtml(String(carneNotification.player1 || '-')) + '</span><span>e</span><span>' + escapeHtml(String(carneNotification.player2 || '-')) + '</span></div>'
         + '</div>'

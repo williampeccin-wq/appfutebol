@@ -1,4 +1,5 @@
 import { getMensalidadeMode, MENSALIDADE_MODES } from './rules.engine.js';
+import { isCarneGroupId } from './carne.js';
 
 function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
@@ -240,8 +241,11 @@ export function sanitizeCarne(state) {
     // Configuração do rodízio recorrente: mantém a entrada e remove apenas as
     // duplas cujos jogadores não existem mais.
     if (entry.type === 'carne_rotation') {
+      // O "Grupo" (par de quem sobra num rodízio ímpar) é um id reservado, não
+      // um jogador — vale como integrante e não pode ser podado como órfão.
+      const idOk = (id) => isCarneGroupId(id) || validIds.has(String(id || ''));
       entry.pairs = (Array.isArray(entry.pairs) ? entry.pairs : []).filter((pair) =>
-        validIds.has(String(pair?.player1_id || '')) && validIds.has(String(pair?.player2_id || '')));
+        idOk(pair?.player1_id) && idOk(pair?.player2_id));
       return true;
     }
 

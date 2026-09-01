@@ -3,6 +3,8 @@
 // NÃO escreve nada. Foco: pegar cedo o que já causou incidentes reais
 // (apagão do carnê, contas duplicadas) + higiene geral.
 
+import { isCarneGroupId, CARNE_GROUP_NAME } from './carne.js';
+
 function normName(value) {
   return String(value || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -14,6 +16,7 @@ function digits(value) {
 }
 
 function nameById(players, id) {
+  if (isCarneGroupId(id)) return CARNE_GROUP_NAME;
   const p = (players || []).find((x) => String(x.id) === String(id));
   return p?.name || `#${id}`;
 }
@@ -39,8 +42,11 @@ export function runIntegrityAudit(snapshot = {}) {
     findings.push(finding('high', 'Rodízio do carnê vazio',
       'Nenhuma dupla no rodízio. Pode indicar perda de dados (apagão) — confira a aba Carne.'));
   } else {
+    // O "Grupo" não é jogador: escalado como par de quem sobra num rodízio
+    // ímpar, ele é um id reservado e não conta como dupla órfã nem repetida.
+    const idConhecido = (id) => isCarneGroupId(id) || validIds.has(String(id));
     const orphanPairs = pairs.filter((p) =>
-      !validIds.has(String(p?.player1_id)) || !validIds.has(String(p?.player2_id)));
+      !idConhecido(p?.player1_id) || !idConhecido(p?.player2_id));
     if (orphanPairs.length) {
       findings.push(finding('high', `${orphanPairs.length} dupla(s) do carnê com jogador inexistente`,
         'Há dupla(s) apontando para jogador removido. Edite o rodízio para corrigir.'));
@@ -48,7 +54,7 @@ export function runIntegrityAudit(snapshot = {}) {
     const seen = new Map();
     for (const p of pairs) {
       for (const id of [p?.player1_id, p?.player2_id]) {
-        if (!id) continue;
+        if (!id || isCarneGroupId(id)) continue;
         seen.set(String(id), (seen.get(String(id)) || 0) + 1);
       }
     }
