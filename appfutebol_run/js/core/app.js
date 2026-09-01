@@ -2695,7 +2695,7 @@ import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/c
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
-import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective } from "../domain/rules.engine.js";
+import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective, reconcileMensalidadeMonthTurn } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
@@ -2895,6 +2895,12 @@ async function initInner() {
     replaceState(data);
   }
 
+  // Antes do primeiro render: se o mês virou desde a última abertura, os status
+  // já saem corrigidos na tela em vez de piscar Pago -> Pendente. Depois do
+  // bloco acima de propósito: a virada lê getState()/getCurrentPlayer() e sem o
+  // carregamento ela olharia um estado vazio.
+  await maybeTurnMensalidadeMonth();
+
   lastDomainFingerprint = getDomainFingerprint(getState());
 
   subscribe((snapshot) => {
@@ -2958,6 +2964,43 @@ function bindGlobalSystemEvents() {
   });
 }
 
+
+// Virada de mês da mensalidade (ver reconcileMensalidadeMonthTurn). A função pura
+// decide; aqui só persistimos. Quatro cuidados que não cabem no domínio:
+//
+//  - SÓ ADMIN. O trigger do banco (mens_ok_is_admin_only) recusa a gravação de
+//    qualquer outro perfil; deixar todo mundo tentar transformaria o boot do
+//    jogador comum num toast de erro. Efeito colateral aceito: no dia 1º os
+//    status só viram quando o PRIMEIRO admin abre o app.
+//  - SEM enforcement. Não passa pelo repairManualSnapshot de propósito: remover
+//    inadimplente confirmado da escalação no modo "Bloqueio total" é uma ação
+//    destrutiva, e fazê-la sozinha na madrugada do dia 1º é a mesma classe de
+//    problema que o 0f5e4e0 desligou. Aqui só o status vira Pendente; o bloqueio
+//    volta a valer no ato de confirmar presença.
+//  - NUNCA DERRUBA O BOOT. Roda dentro do try do initInner, cujo catch pinta a
+//    tela de erro fatal. Mensalidade é acessório: se falhar, o app abre igual e
+//    a virada tenta de novo na próxima abertura (o carimbo só avança se gravar).
+//  - Toast só no reset de verdade. A primeira execução apenas ARMA o gatilho e
+//    tem que ser silenciosa.
+async function maybeTurnMensalidadeMonth() {
+  try {
+    if (!authzIsAdmin(getCurrentPlayer())) return false;
+    const result = reconcileMensalidadeMonthTurn(getState());
+    if (!result.changed) return false;
+    replaceState(result.state);
+    await Promise.resolve(savePersistedState(result.state));
+    if (!result.reset) {
+      console.info('[mensalidade] Virada automática armada para o próximo mês.');
+      return false;
+    }
+    console.info(`[mensalidade] Virou o mês: ${result.zerados} jogador(es) voltaram a Pendente.`);
+    showToast(`Virou o mês: a mensalidade de ${result.zerados} jogador(es) voltou para Pendente.`);
+    return true;
+  } catch (error) {
+    console.warn('[mensalidade] Virada de mês falhou; tenta de novo na próxima abertura.', error);
+    return false;
+  }
+}
 
 function getDomainFingerprint(snapshot) {
   return JSON.stringify({
@@ -3142,7 +3185,14 @@ function startRemoteSync() {
     document.addEventListener('visibilitychange', () => {
       // Voltar o foco = nova chance para a votação: uma falha transitória da Edge
       // Function não pode deixar `ratingsUnavailable` travado a sessão inteira.
-      if (!document.hidden) { ratingsUnavailable = false; syncRemoteOnce(); checkForNewVersion(); }
+      if (!document.hidden) {
+        ratingsUnavailable = false;
+        // PWA aberto por dias atravessa a meia-noite do dia 1º sem passar pelo
+        // boot. Roda ANTES do sync: a escrita local pendente faz o poll pular o
+        // ciclo (hasPendingRemoteWrites) em vez de aplicar o remoto por cima.
+        maybeTurnMensalidadeMonth().finally(() => syncRemoteOnce());
+        checkForNewVersion();
+      }
     });
   }
 }
