@@ -2983,6 +2983,8 @@ function renderPushOptinInner(variant) {
     </div>
     <p class="footer-note push-optin-hint push-hint" style="display:none;"></p>
     ${destaque ? `<button class="${btnClass}" type="button" style="display:none;"></button>` : ''}
+    <a class="push-guide-link" href="/guia-notificacoes" target="_blank" rel="noopener"
+       style="display:none;">Ver como liberar →</a>
   `;
 }
 function isPushOnboarded() {
@@ -4286,7 +4288,15 @@ async function bindPushControl(card, currentPlayer) {
   const isHomeCard = card.id === 'push-optin-card';
 
   const showHint = (text) => { if (hint) { hint.textContent = text; hint.style.display = text ? '' : 'none'; } };
-  const showButton = (label) => { button.textContent = label; button.style.display = label ? 'inline-flex' : 'none'; };
+  // Sem botão o card vira beco sem saída: quem já recusou a permissão lia "reative
+  // nas configurações" sem nenhum caminho. O link leva ao guia com as telas.
+  const guideLink = card.querySelector('.push-guide-link');
+  const showGuide = (on) => { if (guideLink) guideLink.style.display = on ? '' : 'none'; };
+  const showButton = (label) => {
+    button.textContent = label;
+    button.style.display = label ? 'inline-flex' : 'none';
+    showGuide(!label);
+  };
 
   const state = await getPushState();
 

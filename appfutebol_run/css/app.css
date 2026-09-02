@@ -5810,6 +5810,15 @@ body {
   width: 100%;
   justify-content: center;
 }
+.push-guide-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hfc-gold, #f0a500);
+  text-decoration: none;
+}
+.push-guide-link:hover { text-decoration: underline; }
 
 /* Biblioteca de uniformes (Config) + seletor por time (sorteio) */
 .uniforms-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
