@@ -49,12 +49,14 @@ aprovado — duas passadas de pesquisa, ~200 agentes, zero relatos fechando o ci
 
 **4. ⚪ Agendar os quatro jogos** (ou anotar para abrir na mão):
 
-| Jogo | `auto_open_at` (push) | Data do jogo |
+| Jogo | `auto_open_at` (dispara o push) | Data do jogo |
 |---|---|---|
-| 1 | `2026-09-01T19:00` | qui 03/09, 20:00 |
-| 2 | `2026-09-04T19:00` | dom 06/09, 10:00 |
-| 3 | `2026-09-08T19:00` | qui 10/09, 20:00 |
-| 4 | `2026-09-11T19:00` | dom 13/09, 10:00 |
+| 1 | `2026-09-03T19:00` (qui) | sex 04/09, 20:00 |
+| 2 | `2026-09-06T19:00` (dom) | seg 07/09, 20:00 |
+| 3 | `2026-09-09T19:00` (qua) | sex 11/09, 20:00 |
+| 4 | `2026-09-12T19:00` (sáb) | dom 13/09, 10:00 |
+
+Push a cada 3 dias, todos já em cima da versão 4 do pacote (publicada 01/09 16:20).
 
 **5. ⚪ Pedir feedback por e-mail a 3 ou 4 testadores**, para `suporte@convocados.app.br`.
    O Google não lê essa caixa, mas é o canal que você declarou no Console e te dá material
