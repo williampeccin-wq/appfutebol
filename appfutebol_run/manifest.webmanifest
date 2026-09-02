@@ -9,9 +9,36 @@
   "background_color": "#0C1A38",
   "theme_color": "#0C1A38",
   "icons": [
-    { "src": "./img/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "./img/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "./img/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
-    { "src": "./img/icon-1024.png", "type": "image/png", "sizes": "1024x1024", "purpose": "any" }
+    {
+      "src": "./img/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "./img/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "./img/icon-512-maskable.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./img/icon-1024.png",
+      "type": "image/png",
+      "sizes": "1024x1024",
+      "purpose": "any"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "br.app.convocados",
+      "url": "https://play.google.com/store/apps/details?id=br.app.convocados"
+    }
   ]
 }

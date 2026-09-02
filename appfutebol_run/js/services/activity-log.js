@@ -25,6 +25,27 @@ let lastPlayer = null;
 let lastVersion = null;
 let visibilityHooked = false;
 
+// ORIGEM DA SESSÃO. Numa TWA o conteúdo é o mesmo do site, então até aqui o log
+// não distinguia "app instalado pela Play" de "aba do Chrome" — e o Google só
+// conta o primeiro. O referrer da carga inicial é 'android-app://<pacote>'
+// quando a origem é a TWA; guardamos no load porque navegação interna o perde.
+const LAUNCH_REFERRER = (() => { try { return String(document.referrer || ''); } catch (_) { return ''; } })();
+const IS_TWA = LAUNCH_REFERRER.startsWith('android-app://');
+
+// VERSÃO DO APP ANDROID INSTALADO. getInstalledRelatedApps() só responde com
+// related_applications declarado no manifest e assetlinks válido; existe apenas
+// no Chromium. Resolve uma vez e fica em cache — se vier vazio, seguimos com o
+// IS_TWA, que já responde a pergunta principal.
+let androidVersion = null;
+const androidVersionReady = (async () => {
+  try {
+    if (!navigator.getInstalledRelatedApps) return;
+    const apps = await navigator.getInstalledRelatedApps();
+    const play = (apps || []).find((a) => a && a.platform === 'play');
+    if (play) androidVersion = String(play.version || 'instalado');
+  } catch (_) {}
+})();
+
 function enabled() {
   return window.HARMONIA_ACTIVITY_LOG !== false; // default LIGADO
 }
@@ -77,20 +98,23 @@ function hookVisibility() {
       const now = Date.now();
       if (now - lastOpenAt < OPEN_THROTTLE_MS) return;
       lastOpenAt = now;
-      post('app_open', lastPlayer, { source: 'foreground', v: lastVersion });
+      post('app_open', lastPlayer, { source: 'foreground', v: lastVersion, twa: IS_TWA, av: androidVersion });
     });
   } catch (_) {}
 }
 
 // "Abriu o app" — carga inicial e cada retorno ao foreground (throttle 5 min).
-export function logAppOpen(player, version) {
+export async function logAppOpen(player, version) {
   if (player) lastPlayer = player;
   if (version) lastVersion = String(version).replace(/^v/, '').split('-')[0]; // "1.170.0"
   hookVisibility();
   const now = Date.now();
   if (now - lastOpenAt < OPEN_THROTTLE_MS) return;
   lastOpenAt = now;
-  post('app_open', player, { source: 'load', v: lastVersion });
+  // Espera a consulta da versão instalada antes de gravar: sem isso o primeiro
+  // app_open do dia sairia sem o dado, que é justamente o que interessa.
+  await androidVersionReady;
+  post('app_open', player, { source: 'load', v: lastVersion, twa: IS_TWA, av: androidVersion });
 }
 
 // Troca de aba (só quando muda de fato).

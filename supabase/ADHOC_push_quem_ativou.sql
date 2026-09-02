@@ -78,3 +78,33 @@ order by (s.player_id is not null) desc,   -- quem ativou primeiro
 --   left join public.push_subscriptions s on s.player_id = t.id
 --  where t.club_id = 'e2af269c-20d0-4739-b7db-80ed93165192'
 --    and t.auth_user_id is not null;
+
+
+-- ============================================================================
+-- DE ONDE O TESTADOR ABRE O APP, E EM QUE VERSÃO DO PACOTE
+-- ============================================================================
+-- Instrumentado em 02/09/2026. O `twa` diz se a sessão veio do app instalado
+-- pela Play (referrer android://) ou de uma aba do navegador — o Google só conta
+-- o primeiro. O `av` traz a versão do app Android instalado, via
+-- getInstalledRelatedApps(); pode vir nulo em aparelho que não seja Chromium,
+-- e vem 'instalado' quando a API confirma o app mas não informa a versão.
+--
+-- Serve para responder: quem já está na versão 4 e quem ficou para trás?
+
+select
+  coalesce(p.data->>'name','(sem nome)')                        as nome,
+  count(*)                                                       as aberturas,
+  count(*) filter (where (a.detail->>'twa')::boolean is true)    as pela_play,
+  count(*) filter (where (a.detail->>'twa')::boolean is not true) as pelo_navegador,
+  -- Versão do PACOTE Android (1, 2, 3, 4...) na abertura mais recente.
+  (array_agg(a.detail->>'av' order by a.created_at desc))[1]     as versao_android,
+  -- Versão do CONTEÚDO web (1.187.0...). São numerações diferentes.
+  (array_agg(a.detail->>'v'  order by a.created_at desc))[1]     as versao_pwa,
+  to_char(max(a.created_at) at time zone 'America/Sao_Paulo','DD/MM HH24:MI') as ultima
+from public.activity_log a
+join public.players p on p.id = a.player_id
+where a.action = 'app_open'
+  and a.created_at >= now() - interval '7 days'
+  and p.club_id = 'e2af269c-20d0-4739-b7db-80ed93165192'
+group by p.id, p.data->>'name'
+order by pela_play desc, aberturas desc;
