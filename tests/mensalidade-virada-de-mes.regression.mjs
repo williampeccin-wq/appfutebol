@@ -79,7 +79,7 @@ globalThis.localStorage = {
 };
 globalThis.document = { getElementById: () => null, querySelector: () => null };
 
-const { reconcileMensalidadeMonthTurn, getMensCycleMonth, isMensOkEffective } =
+const { reconcileMensalidadeMonthTurn, getMensCycleMonth, isMensOkEffective, rollMensDueDateToMonth } =
   await import('../appfutebol_run/js/domain/rules.engine.js');
 
 // Clube real no dia do deploy: uns pagos, uns pendentes, um isento de carnê.
@@ -132,8 +132,38 @@ test('virou o mês: todo mundo volta a Pendente e o carimbo avança', () => {
   );
   // A leitura continua sendo mens_ok puro: o conserto é no DADO, não na regra.
   assert.equal(isMensOkEffective(r.state.players[0]), false, 'a tela passa a mostrar Pendente');
-  // O vencimento é do admin, não desta regra.
-  assert.equal(r.state.settings.mens_expire_date, '2026-09-10', 'a virada não mexe na data de vencimento');
+  // O PRAZO ANDA JUNTO (03/09/2026). Antes o vencimento ficava parado no mês
+  // velho: no dia 1º o clube inteiro voltava a Pendente JÁ VENCIDO, e o lembrete
+  // diário de atraso disparava desde o primeiro dia do mês. Foi exatamente o
+  // relato do clube ("a notificação de atraso já começa a contar quando vira o
+  // mês"), com 19 pushes/dia.
+  assert.equal(r.state.settings.mens_expire_date, '2026-10-10', 'o vencimento acompanha o ciclo, no mesmo dia');
+  assert.equal(r.dueDateMoved, true, 'o app avisa no toast que o prazo mudou');
+});
+
+test('o prazo só anda para a frente, e o dia sobrevive a mês curto', () => {
+  // Mês curto: dia 31 vira o último dia disponível, não escorrega para o mês seguinte.
+  assert.equal(rollMensDueDateToMonth('2026-08-31', '2026-09'), '2026-09-30');
+  assert.equal(rollMensDueDateToMonth('2027-01-31', '2027-02'), '2027-02-28');
+  assert.equal(rollMensDueDateToMonth('2028-01-31', '2028-02'), '2028-02-29');
+  // Vencimento já no mês corrente, ou adiantado pelo admin: intocado.
+  assert.equal(rollMensDueDateToMonth('2026-09-10', '2026-09'), '2026-09-10');
+  assert.equal(rollMensDueDateToMonth('2026-10-15', '2026-09'), '2026-10-15');
+  // Ano errado digitado no Config (o caso real do clube) é recuperado na virada.
+  assert.equal(rollMensDueDateToMonth('2020-09-10', '2026-10'), '2026-10-10');
+  // Lixo entra, lixo sai — sem inventar data.
+  for (const ruim of ['', null, undefined, '10/09/2026', '2026-09']) {
+    assert.equal(rollMensDueDateToMonth(ruim, '2026-10'), String(ruim || '').slice(0, 10), `data inválida: ${String(ruim)}`);
+  }
+  assert.equal(rollMensDueDateToMonth('2026-08-10', 'setembro'), '2026-08-10', 'mês inválido não move nada');
+});
+
+test('clube sem vencimento definido vira o mês sem ganhar uma data do nada', () => {
+  const semData = { ...clube(), settings: { mens_last_reset_month: '2026-09' } };
+  const r = reconcileMensalidadeMonthTurn(semData, '2026-10');
+  assert.equal(r.reset, true);
+  assert.equal(r.state.settings.mens_expire_date, undefined, 'não inventa vencimento para quem nunca configurou');
+  assert.equal(r.dueDateMoved, false);
 });
 
 test('vira o ano: 2026-12 -> 2027-01', () => {

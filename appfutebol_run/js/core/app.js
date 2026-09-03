@@ -1757,8 +1757,10 @@ document.addEventListener("click", async (e) => {
     const result = await triggerOverdueReminders();
     if (result.ok) {
       const d = result.data || {};
-      if (d.skipped === 'sem_vencimento_definido') showToast('Defina a data de vencimento primeiro.', 'error');
-      else if (d.skipped === 'ainda_nao_venceu') showToast('Ainda não venceu — ninguém em atraso hoje.', 'info');
+      // 'sem_vencimento_definido' é o nome antigo do skip; a função responde
+      // 'sem_vencimento' desde a separação por clube.
+      if (d.skipped === 'sem_vencimento' || d.skipped === 'sem_vencimento_definido') showToast('Defina a data de vencimento primeiro.', 'error');
+      else if (d.skipped === 'ainda_nao_venceu' || d.skipped === 'prazo_do_mes_nao_venceu') showToast('Ainda não venceu — ninguém em atraso hoje.', 'info');
       else showToast(`Lembretes: ${d.sent || 0} enviado(s) para ${d.overdue || 0} atrasado(s).`, 'success');
     } else {
       showToast(`Falha ao enviar lembretes (${result.reason}).`, 'error');
@@ -3210,12 +3212,15 @@ function bindGlobalSystemEvents() {
 
 
 // Virada de mês da mensalidade (ver reconcileMensalidadeMonthTurn). A função pura
-// decide; aqui só persistimos. Quatro cuidados que não cabem no domínio:
+// decide; aqui só persistimos. Cinco cuidados que não cabem no domínio:
 //
 //  - SÓ ADMIN. O trigger do banco (mens_ok_is_admin_only) recusa a gravação de
 //    qualquer outro perfil; deixar todo mundo tentar transformaria o boot do
 //    jogador comum num toast de erro. Efeito colateral aceito: no dia 1º os
 //    status só viram quando o PRIMEIRO admin abre o app.
+//  - O PRAZO ANDA JUNTO. A virada também empurra `mens_expire_date` para o mês
+//    novo, no mesmo dia (rollMensDueDateToMonth). Sem isso o clube nascia
+//    vencido no dia 1º e o lembrete de atraso disparava do primeiro dia do mês.
 //  - SEM enforcement. Não passa pelo repairManualSnapshot de propósito: remover
 //    inadimplente confirmado da escalação no modo "Bloqueio total" é uma ação
 //    destrutiva, e fazê-la sozinha na madrugada do dia 1º é a mesma classe de
@@ -3237,8 +3242,9 @@ async function maybeTurnMensalidadeMonth() {
       console.info('[mensalidade] Virada automática armada para o próximo mês.');
       return false;
     }
-    console.info(`[mensalidade] Virou o mês: ${result.zerados} jogador(es) voltaram a Pendente.`);
-    showToast(`Virou o mês: a mensalidade de ${result.zerados} jogador(es) voltou para Pendente.`);
+    const novoPrazo = result.dueDateMoved ? isoToDisplay(result.dueDate) : '';
+    console.info(`[mensalidade] Virou o mês: ${result.zerados} jogador(es) voltaram a Pendente.${novoPrazo ? ` Vencimento agora ${novoPrazo}.` : ''}`);
+    showToast(`Virou o mês: a mensalidade de ${result.zerados} jogador(es) voltou para Pendente.${novoPrazo ? ` Vencimento agora ${novoPrazo}.` : ''}`);
     return true;
   } catch (error) {
     console.warn('[mensalidade] Virada de mês falhou; tenta de novo na próxima abertura.', error);

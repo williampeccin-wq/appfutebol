@@ -240,9 +240,10 @@ export function validateState(state) {
 // ---------------------------------------------------------------------------
 // VIRADA DE MÊS DA MENSALIDADE
 // ---------------------------------------------------------------------------
-// No dia 1º todo mundo volta a "Pendente". O gatilho é o CALENDÁRIO, não o
-// vencimento: o dia de vencimento configurado (10, 15, ...) continua sendo só o
-// prazo daquele mês. Isto é DIFERENTE do que 58fdb1f tentou e a97d6ad reverteu
+// No dia 1º todo mundo volta a "Pendente" E o vencimento anda junto para o mês
+// novo, no mesmo dia (ver rollMensDueDateToMonth). O gatilho é o CALENDÁRIO, não
+// o vencimento: o dia configurado (10, 15, ...) continua sendo só o prazo
+// daquele mês. Isto é DIFERENTE do que 58fdb1f tentou e a97d6ad reverteu
 // — lá o `isMensOkEffective` mentia sobre quem já tinha pagado assim que a data
 // passava, e o ciclo nunca virava. Aqui o dado é reescrito uma vez, na virada, e
 // a leitura continua sendo `mens_ok` puro.
@@ -259,6 +260,28 @@ const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
 
 export function getMensCycleMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// O PRAZO ACOMPANHA O CICLO. Sem isto a virada zerava todo mundo e deixava o
+// vencimento no mês passado: no dia 1º o clube inteiro já nascia "vencido" e o
+// lembrete diário de atraso disparava desde o primeiro dia do mês. Foi o relato
+// do clube em 03/09/2026 ("a notificação de atraso já começa a contar quando
+// vira o mês") — 19 pushes por dia, com a data de vencimento parada num
+// 10/09/2020 digitado errado que ninguém nunca corrigiu.
+//
+// Só ANDA PARA A FRENTE: vencimento já no mês corrente (ou à frente, admin que
+// se adiantou) fica intocado — a data é do admin, esta regra só a acompanha. O
+// DIA é preservado e limitado ao último dia do mês novo (31 -> 30 em setembro,
+// 28/29 em fevereiro).
+export function rollMensDueDateToMonth(dueDate, month) {
+  const iso = String(dueDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  if (!MONTH_KEY_RE.test(String(month))) return iso;
+  if (iso.slice(0, 7) >= String(month)) return iso;
+  const [year, monthNumber] = String(month).split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  const day = Math.min(Math.max(Number(iso.slice(8, 10)) || 1, 1), lastDay);
+  return `${month}-${String(day).padStart(2, '0')}`;
 }
 
 export function reconcileMensalidadeMonthTurn(state, currentMonth = getMensCycleMonth()) {
@@ -291,14 +314,21 @@ export function reconcileMensalidadeMonthTurn(state, currentMonth = getMensCycle
     return { ...player, mens_ok: false };
   });
 
+  const dueDate = String(settings.mens_expire_date || '').slice(0, 10);
+  const nextDueDate = rollMensDueDateToMonth(dueDate, currentMonth);
+  const nextSettings = { ...settings, mens_last_reset_month: currentMonth };
+  if (nextDueDate) nextSettings.mens_expire_date = nextDueDate;
+
   return {
     state: {
       ...state,
       players: nextPlayers,
-      settings: { ...settings, mens_last_reset_month: currentMonth },
+      settings: nextSettings,
     },
     changed: true,
     reset: true,
     zerados,
+    dueDate: nextDueDate,
+    dueDateMoved: !!nextDueDate && nextDueDate !== dueDate,
   };
 }

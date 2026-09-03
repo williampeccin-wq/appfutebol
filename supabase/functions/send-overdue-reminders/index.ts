@@ -8,6 +8,9 @@
 //   - joga futebol (data.plays_football !== false) e não é "só carne"
 //   - data.mens_ok === false  (explicitamente inadimplente)
 //   - hoje (BRT) já passou do vencimento global (app_meta.data.settings.mens_expire_date)
+//   - E já passou do prazo DESTE mês (mesmo dia, projetado no mês corrente) —
+//     trava contra vencimento parado no passado, que fazia o lembrete disparar
+//     desde o dia 1º da virada. Ver dueDateThisMonth.
 //
 // Auditoria: cada envio vira uma linha em push_log (status sent/failed/expired).
 // A entrega no aparelho e a abertura chegam depois, via push-receipt.
@@ -34,6 +37,34 @@ function corsHeaders(req: Request): Record<string, string> {
 function todayBrtIso(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
   return brt.toISOString().slice(0, 10);
+}
+
+// Prazo do MÊS CORRENTE: o dia configurado (10, 15, ...) projetado no mês de
+// hoje. O vencimento guardado é do ciclo, e quem o empurra para o mês novo é o
+// app (rules.engine/rollMensDueDateToMonth) — mas ele só roda quando um ADMIN
+// abre o app. Enquanto isso não acontece, `mens_expire_date` fica no passado e o
+// `today > dueDate` sozinho diz "venceu" desde o dia 1º.
+//
+// Foi assim que o clube levou 19 pushes/dia a partir de 01/09/2026, com a data
+// parada num 10/09/2020 digitado errado: a virada zerou todo mundo e o prazo
+// velho já estava vencido havia anos. Exigir as DUAS condições (venceu a data
+// guardada E venceu o prazo deste mês) é estritamente mais conservador que a
+// regra antiga — nunca manda um push que antes não seria mandado.
+//
+// Efeito de borda conhecido: vencimento no ÚLTIMO dia do mês não gera lembrete
+// nesse mês (o "1º dia após o vencimento" já é do ciclo seguinte, onde o app
+// zerou todo mundo). Vale para dia 30/31 e para fevereiro.
+function dueDateThisMonth(dueDate: string, today: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return dueDate;
+  const [year, month] = today.slice(0, 7).split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const day = Math.min(Math.max(Number(dueDate.slice(8, 10)) || 1, 1), lastDay);
+  return `${today.slice(0, 7)}-${String(day).padStart(2, "0")}`;
+}
+
+// 2026-09-10 -> "10/09"
+function ddmm(iso: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : "";
 }
 
 const KIND = "mensalidade_atrasada";
@@ -147,6 +178,8 @@ Deno.serve(async (req) => {
     const today = todayBrtIso();
     if (!dueDate) return { skipped: "sem_vencimento" };
     if (today <= dueDate) return { skipped: "ainda_nao_venceu", dueDate, today };
+    const dueThisMonth = dueDateThisMonth(dueDate, today);
+    if (today <= dueThisMonth) return { skipped: "prazo_do_mes_nao_venceu", dueDate, dueThisMonth, today };
 
     const playersQuery = admin.from("players").select("id, data");
     const { data: players } = await (singleTenant ? playersQuery : playersQuery.eq("club_id", clubId));
@@ -156,7 +189,7 @@ Deno.serve(async (req) => {
       const playsFootball = d.plays_football !== false && !carneOnly;
       return playsFootball && d.mens_ok === false;
     });
-    if (!overdue.length) return { dueDate, today, overdue: 0, sent: 0 };
+    if (!overdue.length) return { dueDate, dueThisMonth, today, overdue: 0, sent: 0 };
 
     let alreadyToday = new Set<string>();
     if (!force) {
@@ -180,7 +213,12 @@ Deno.serve(async (req) => {
       if (!subs || !subs.length) continue;
 
       const title = "Convocados — mensalidade";
-      const body = `Oi, ${firstName}! Sua mensalidade está em atraso. Fala com o ADM do grupo pra acertar e evitar bloqueios. 💛⚽`;
+      // A data do prazo no corpo é pedido do clube: sem ela o aviso parece
+      // "cobrança do nada" para quem não lembra o vencimento.
+      const prazo = ddmm(dueThisMonth);
+      const body = prazo
+        ? `Oi, ${firstName}! Sua mensalidade venceu em ${prazo} e está em atraso. Fala com o ADM do grupo pra acertar e evitar bloqueios. 💛⚽`
+        : `Oi, ${firstName}! Sua mensalidade está em atraso. Fala com o ADM do grupo pra acertar e evitar bloqueios. 💛⚽`;
 
       for (const sub of subs) {
         targets += 1;
@@ -207,7 +245,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return { dueDate, today, overdue: overdue.length, targets, sent, failed, removed };
+    return { dueDate, dueThisMonth, today, overdue: overdue.length, targets, sent, failed, removed };
   }
 
   // Cron → todos os clubes PRO. Admin manual → só o clube dele (com gate Pro).

@@ -86,6 +86,16 @@ Novidades e correções desta rodada de testes:
 - **v1.184.1 (31/08)** — sócio de carnê volta a votar na dupla.
 - **v1.185.0 (01/09)** — "Grupo" como dupla de quem sobra no rodízio ímpar.
 
+### Mensalidade
+- **v1.186.0 (01/09)** — virada de mês: no dia 1º todo mundo volta a "Pendente" automaticamente.
+  Antes o único reset era manual (admin salvando uma data nova no Config).
+- **v1.188.0 (03/09)** — **vindo do teste fechado:** o lembrete de atraso passou a chegar todo dia
+  desde o dia 1º. Duas causas somadas: a virada zerava o clube inteiro mas deixava o vencimento
+  no mês velho (logo, já "vencido" no dia 1º), e a data guardada no clube estava num ano errado
+  digitado no Config (10/09/**2020**) — nunca corrigido porque nada nunca a movia. Agora o
+  vencimento acompanha o ciclo (mesmo dia, mês novo), o servidor só cobra depois do prazo **deste
+  mês**, e o push diz a data: *"sua mensalidade venceu em 10/09"*.
+
 ### Distribuição e infraestrutura (invisível ao testador)
 - **(15/08)** — banner e depois modal de atualização para Android, criados ao descobrir pela
   telemetria que os testadores estavam em três versões diferentes ao mesmo tempo.
