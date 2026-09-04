@@ -93,16 +93,34 @@ Deno.serve(async (req) => {
   async function pushTo(subs: Array<{ endpoint: string; p256dh: string; auth: string }>, title: string, body: string) {
     const payload = JSON.stringify({ title, body, url: "./" });
     let sent = 0, removed = 0;
+    // 04/09/2026: os erros que não fossem 404/410 eram engolidos e o resultado do
+    // envio era descartado pelo chamador. O push_log gravava status "sent" ANTES
+    // de enviar (é linha de dedup), então 10 falhas de 403 ficavam invisíveis:
+    // do banco, parecia entregue. Agora o motivo sobe junto.
+    const errors: string[] = [];
     for (const sub of subs || []) {
       try {
         await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
         sent += 1;
       } catch (err) {
-        const sc = (err as { statusCode?: number })?.statusCode;
-        if (sc === 404 || sc === 410) { await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); removed += 1; }
+        const e = err as { statusCode?: number; body?: string; message?: string };
+        const sc = e?.statusCode;
+        const corpo = String(e?.body || e?.message || err);
+        // 404/410 = inscrição expirada. VapidPkHashMismatch = inscrição amarrada a
+        // uma chave VAPID anterior à rotação; é irrecuperável do lado do servidor e
+        // ficaria falhando para sempre. Nos dois casos apagamos: sem inscrição, o
+        // app volta a mostrar o convite "Avisos no celular" e a pessoa reativa,
+        // gerando uma inscrição nova com a chave atual.
+        // Cada serviço de push redige diferente: FCM devolve 400 {"reason":"VapidPkHashMismatch"},
+        // outros devolvem 403 "the VAPID credentials ... do not correspond". Casar os dois.
+        const chaveVelha = /VapidPkHashMismatch|do not correspond to the credentials/i.test(corpo);
+        if (sc === 404 || sc === 410 || chaveVelha) {
+          await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+          removed += 1;
+        } else if (errors.length < 3) errors.push(`${sc ?? "?"} ${corpo.slice(0, 100)}`);
       }
     }
-    return { sent, removed };
+    return { sent, removed, errors };
   }
   // Insere a linha de dedup (POR CLUBE); true se é a primeira vez (deve enviar).
   async function claim(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
@@ -234,7 +252,18 @@ Deno.serve(async (req) => {
                 const gameKey = String(g.game_key || g.id || "");
                 const title = "Inscrições abertas ⚽";
                 const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
-                if (await claim(KIND_OPEN, gameKey, title, body, clubId)) await pushTo(subs || [], title, body);
+                if (await claim(KIND_OPEN, gameKey, title, body, clubId)) {
+                  const r = await pushTo(subs || [], title, body);
+                  out.push_sent = (out.push_sent as number || 0) + r.sent;
+                  out.push_failed = (out.push_failed as number || 0) + r.errors.length;
+                  if (r.errors.length) out.push_error = r.errors[0];
+                  // Corrige a linha de dedup com o que REALMENTE aconteceu.
+                  const upd = admin.from("push_log")
+                    .update({ status: r.sent > 0 ? "sent" : "failed",
+                              error: r.errors.length ? r.errors.join(" | ").slice(0, 500) : null })
+                    .eq("kind", KIND_OPEN).eq("game_key", gameKey);
+                  await (singleTenant ? upd : upd.eq("club_id", clubId));
+                }
               }
             }
           }
