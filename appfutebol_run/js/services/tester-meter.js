@@ -80,9 +80,34 @@ function mount() {
   nudgeEl = root.querySelector('.tester-meter-nudge');
 }
 
+// Zera o relógio e o contador de ações, preservando o que já foi gravado.
+function reset(novoPlayer) {
+  player = novoPlayer;
+  focusSecs = 0;
+  loggedSecs = 0;
+  acoes = 0;
+  lastActionAt = Date.now();
+}
+
 export function startTesterMeter(currentPlayer, clubId) {
-  if (root) return;                                  // já montado
   if (String(clubId || '') !== CLUBE_TESTE) return;  // só no clube de teste
+  const novoId = currentPlayer ? String(currentPlayer.id) : null;
+
+  if (root) {
+    // Troca de usuário na MESMA carga da página (logout/login sem recarregar).
+    // Sem isto o relógio seguia correndo e — pior — o `player` continuava sendo
+    // o anterior, então o tempo de quem entrou era gravado no log sob o ID de
+    // quem saiu. Fecha a sessão do anterior ANTES de trocar, senão o flush
+    // atribui errado.
+    if (novoId !== (player ? String(player.id) : null)) {
+      flush();
+      reset(currentPlayer);
+      paint();
+    }
+    root.style.display = novoId ? '' : 'none';       // sem usuário, some
+    return;
+  }
+  if (!novoId) return;                               // nada a medir deslogado
   player = currentPlayer;
 
   mount();
