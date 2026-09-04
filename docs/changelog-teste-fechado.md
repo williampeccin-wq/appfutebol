@@ -30,15 +30,15 @@ Correções que vieram do teste fechado:
 • Campeonato: o resultado não some quando outra pessoa mexe no ranking ao mesmo tempo.
 ```
 
-## RELEASE B — notas da versão (423 caracteres, pronto para colar)
+## RELEASE B — notas da versão (475 caracteres, pronto para colar)
 
 ```
-Novidades e correções desta rodada de testes:
+Correções e novidades desta rodada:
 
-• Campeonato: agora dá para encerrar e editar uma temporada, e a janela da temporada passa a valer no ranking.
-• As notas recomeçam a cada temporada, e a tela inicial mostra a temporada certa.
-• Votação do churrasco: só quem esteve no jogo vota, e o sócio do carnê voltou a poder votar na dupla.
-• Rodízio da carne: quando sobra alguém no número ímpar, ele entra como "Grupo".
+• Os avisos de "inscrições abertas" voltaram a chegar no celular — o envio automático estava falhando e ninguém era notificado.
+• Quem tinha bloqueado as notificações agora vê como liberar, em vez de um aviso sem saída.
+• Campeonato: dá para encerrar e editar a temporada, e as notas recomeçam a cada uma.
+• Churrasco: só quem esteve no jogo vota, e o rodízio trata número ímpar.
 ```
 
 ---
@@ -118,3 +118,60 @@ A resposta sobre mudanças **não pode** dizer "11 versões publicadas": nos reg
 ```
 Publiquei 11 atualizações de conteúdo durante o teste. O app é uma TWA: o conteúdo é servido pela web e chega ao testador sem novo pacote, por isso o histórico de versões da faixa não reflete cada uma.
 ```
+
+
+---
+
+## Mudanças de 01 a 04/09 (entram no Release B)
+
+### Notificações que nunca chegavam — o achado mais importante da semana
+- **04/09 · agendador (cron)** — a abertura automática de inscrições **nunca funcionou**
+  neste projeto. O `pg_cron` reportava "succeeded" em toda execução, mas isso só significa
+  que a requisição foi enfileirada: a resposta HTTP real era **401
+  `UNAUTHORIZED_NO_AUTH_HEADER`** em 100% das rodadas, a cada 5 minutos. O comando
+  agendado mandava `Content-Type` e `x-cron-secret`, mas **faltava o header
+  `Authorization`**, que o gateway exige antes de chegar na função. Consequência para o
+  testador: nenhum aviso de "inscrições abertas" jamais saiu.
+  **Como só se descobre testando:** o painel do agendador dizia sucesso. A verdade estava
+  em `net._http_response`. Sem alguém reclamar de não receber aviso, isso ficaria invisível.
+
+### Ativar notificações era difícil demais
+- **01/09 (v1.187.0)** — o convite "Avisos no celular" ficava no **rodapé** da home e
+  dentro de Perfil → Editar cadastro. Subiu para o **topo absoluto da tela inicial**, com
+  destaque e botão de largura total.
+- **03/09** — quem já tinha recusado a permissão via um aviso **sem botão nenhum**,
+  mandando "reative nas configurações do navegador", sem dizer onde. Como o Android não
+  pergunta duas vezes, era um beco sem saída. Agora há o link **"Ver como liberar"** para
+  um guia com as telas (`/guia-notificacoes`).
+
+### Medição do teste (interno — não vai nas notas da loja)
+- **01/09** — medidor de sessão no clube de teste: tempo com o app em foco e número de
+  interações reais (toque/tecla; scroll não conta).
+- **03/09 (v1.188.0)** — ao trocar de usuário sem recarregar, o relógio seguia correndo e,
+  pior, o `player` não trocava: o tempo de quem entrava era gravado sob o ID de quem saiu.
+- **02/09** — o log passou a distinguir **app instalado pela Play** de **aba do navegador**
+  (`twa`) e a registrar a **versão do pacote Android** (`av`), via
+  `getInstalledRelatedApps()` — exigiu declarar `related_applications` no manifest.
+- **01/09** — log de `push_enabled` / `push_denied` (com motivo) / `push_disabled`.
+
+### Fora do app (não é mudança de código, mas conta na submissão)
+- **04/09** — a credencial de teste declarada ao Google (`Detalhes do login`) apontava para
+  uma **conta que nunca existiu**. Estava assim desde 22/07, nas duas revisões. Conta criada,
+  aprovada e promovida a administradora; instruções reescritas em inglês explicando que o
+  login é por **telefone**, não e-mail.
+
+---
+
+## Para o formulário de acesso à produção
+
+O campo "mudanças feitas com base no que aprendeu no teste" ganha um exemplo forte, porque
+mostra um problema que **só o teste com gente real revela**:
+
+```
+Descobri que os avisos automáticos de "inscrições abertas" nunca chegavam aos testadores. O agendador reportava sucesso a cada execução, mas a chamada era rejeitada com 401 por falta de um cabeçalho de autorização. Corrigi e os avisos voltaram a sair. Também movi o atalho de ativar notificações para o topo da tela inicial.
+```
+
+*(437 caracteres — cabe em campo de 500; se o limite for 300, corte a última frase.)*
+
+**Deixe de fora** a correção da credencial de revisor: é higiene de submissão, não melhoria
+do app, e não ajuda a narrativa de "evoluí o produto com o feedback".
