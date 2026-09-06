@@ -1860,16 +1860,35 @@ document.addEventListener("click", async (e) => {
       // em vez de depender do cron que só roda 1h após o início do jogo.
       // Fire-and-forget: não bloqueia nem mostra erro ao admin se falhar.
       if (builtResult.game_key && SUPABASE_CONFIG?.url) {
-        try {
-          const token = JSON.parse(localStorage.getItem('harmonia_auth_session') || 'null')?.access_token || null;
-          if (token) {
-            fetch(`${SUPABASE_CONFIG.url}/functions/v1/send-push`, {
+        // 06/09/2026: era fire-and-forget com .catch(() => {}). O aviso de votação
+        // não saiu depois de um resultado lançado e NÃO houve rastro em lugar
+        // nenhum — nem toast, nem push_log, nem console. Agora a falha aparece
+        // para o admin, que é quem pode reagir; segue sem bloquear o fluxo.
+        (async () => {
+          try {
+            const token = JSON.parse(localStorage.getItem('harmonia_auth_session') || 'null')?.access_token || null;
+            if (!token) { showToast('Resultado salvo. Aviso de votação não enviado: sessão expirada.', 'error'); return; }
+            const resp = await fetch(`${SUPABASE_CONFIG.url}/functions/v1/send-push`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              headers: {
+                'Content-Type': 'application/json',
+                apikey: SUPABASE_CONFIG.anonKey,   // as demais chamadas mandam; esta não mandava
+                Authorization: `Bearer ${token}`,
+              },
               body: JSON.stringify({ action: 'trigger_voting', kind: 'desempenho', game_key: builtResult.game_key }),
-            }).catch(() => {});
+            });
+            const out = await resp.json().catch(() => ({}));
+            if (!resp.ok || out?.error) {
+              showToast(`Resultado salvo, mas o aviso de votação não saiu (${out?.error || resp.status}).`, 'error');
+            } else if (out?.skipped) {
+              showToast('Resultado salvo. O aviso de votação já tinha sido enviado.', 'success');
+            } else {
+              showToast(`Aviso de votação enviado para ${out?.sent ?? 0} pessoa(s).`, 'success');
+            }
+          } catch (error) {
+            showToast('Resultado salvo, mas falhou ao enviar o aviso de votação.', 'error');
           }
-        } catch (_) { /* fire-and-forget */ }
+        })();
       }
     }
     return;
