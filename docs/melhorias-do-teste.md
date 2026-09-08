@@ -69,3 +69,37 @@ de novo em 27/08. Ela ficou sem acesso por 12 dias, e só se descobriu porque el
 **Para o formulário:** é o exemplo mais forte de "problema que só aparece com gente real
 usando" — nenhum teste automatizado encontraria, porque depende de um humano interpretar
 um roteiro de um jeito não previsto.
+
+## 3. Linha da lista de Jogadores empilha demais no celular (visão do admin)
+
+**Descoberto em:** 08/09/2026 · **origem:** uso real no teste fechado · **status:** na fila
+
+Para quem é admin, cada linha carrega **seis elementos** competindo pela largura: avatar,
+nome, subtítulo (posição · acesso), interruptor Pago/Pendente e quatro botões de ícone
+(editar, chave/criar acesso, sair do jogo, excluir). Num aparelho de ~390px o resultado é
+que o nome — a única coisa que identifica a pessoa — é o primeiro a ser cortado:
+
+```
+Caetano H...     Zagueiro · A...
+Dougla...        Atacante...
+Fabiana D...     Meia · Acess...
+```
+
+**Comportamento desejado:**
+
+- O nome nunca é truncado antes das ações. Se algo tem que sobrar, é ícone, não identidade.
+- Ações secundárias vão para um menu de excesso (⋮), deixando na linha só o que se usa toda
+  semana: o interruptor de mensalidade.
+- **A lixeira sai da linha principal.** Hoje a ação destrutiva fica a um toque de distância
+  das rotineiras, num alvo pequeno e espremido — e em 24/08 e 27/08 um testador excluiu o
+  jogador errado por aí, deixando outra pessoa sem acesso por 12 dias (ver item 2).
+
+**Pontos a decidir:**
+
+- Menu de excesso por linha, ou modo de edição que revela as ações?
+- Duas linhas por jogador em telas estreitas (nome em cima, controles embaixo) resolveria sem
+  esconder nada — custa altura, ganha legibilidade.
+- O subtítulo precisa mesmo mostrar "Acesso"? O ícone de chave já comunica isso.
+
+**Para as notas de versão:** entra quando for implementado. Como o R3 sai em 11/09, cabe na
+janela se for feito até lá.
