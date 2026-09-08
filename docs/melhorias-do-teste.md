@@ -38,3 +38,34 @@ jogador daquele time recebe um push dizendo qual camiseta usar. Exemplo:
 
 **Por que vale:** é exatamente o tipo de melhoria que o teste fechado existe para
 produzir — não é bug, é atrito real que só aparece com gente usando de verdade.
+
+## 2. Excluir jogador com login ativo deixa a pessoa órfã
+
+**Descoberto em:** 08/09/2026 · **origem:** incidente real no teste fechado · **status:** na fila
+
+Um admin pode excluir qualquer jogador, inclusive um que tenha conta de login vinculada.
+A pessoa continua autenticando, mas o app não acha perfil e mostra *"Login autenticado, mas
+nenhum jogador está vinculado a esse usuário"* — sem caminho de recuperação dentro do app.
+
+**Como aconteceu:** no passo 8 do roteiro ("exclua o jogador de teste"), um testador pulou o
+passo de criar e excluiu um registro pré-existente — o da ANDRIELE FABRO, que tinha login
+ativo. Fez duas vezes: 24/08 e, depois de o registro reaparecer pela máquina de concorrência,
+de novo em 27/08. Ela ficou sem acesso por 12 dias, e só se descobriu porque ela reclamou.
+
+**Comportamento desejado:**
+
+- Ao excluir um jogador **com `auth_user_id`**, exigir confirmação diferente da comum, dizendo
+  o nome e que a pessoa perderá o acesso.
+- Ou bloquear de vez: quem tem login só sai pela auto-exclusão de conta (que já existe).
+- A tela de "nenhum jogador vinculado" precisa de saída: hoje é beco sem saída, igual ao card
+  de notificações bloqueadas que corrigimos em 03/09.
+
+**Pontos a decidir:**
+
+- Avisar o excluído por push? (existe infra, ver item 1)
+- Registrar edições de perfil no activity_log — hoje só há `player_added` e `player_deleted`,
+  e por isso não dá para saber quem renomeou o cadastro dela para "Ben" nem quando.
+
+**Para o formulário:** é o exemplo mais forte de "problema que só aparece com gente real
+usando" — nenhum teste automatizado encontraria, porque depende de um humano interpretar
+um roteiro de um jeito não previsto.
