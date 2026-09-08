@@ -2470,9 +2470,18 @@ if (action === "delete-player") {
 
   const currentPlayerId = snapshot.session?.playerId;
 
+  // 08/09/2026: a trava de digitar o nome já existia, e mesmo assim um admin
+  // excluiu um cadastro que carregava o login de OUTRA pessoa — ela ficou 12 dias
+  // autenticando sem perfil, sem nenhum caminho de volta pelo app. O nome sozinho
+  // não diz que há uma conta pendurada ali; agora diz.
+  const temLogin = !!player.auth_user_id;
+  const aviso = temLogin
+    ? `\n\nATENÇÃO: ${player.name} tem acesso ao app. Excluindo, essa pessoa perde o login e não consegue mais entrar — nem recuperar sozinha. Se a intenção é só tirar do time, use "Marcar que saiu do time".`
+    : '';
+
   const typedName = await showConfirmModal({
-    title: 'Excluir jogador',
-    message: `Essa é uma operação crítica. Para excluir ${player.name}, digite exatamente o nome do jogador abaixo.`,
+    title: temLogin ? 'Excluir jogador COM acesso' : 'Excluir jogador',
+    message: `Essa é uma operação crítica. Para excluir ${player.name}, digite exatamente o nome do jogador abaixo.${aviso}`,
     confirmText: 'Excluir jogador',
     cancelText: 'Cancelar',
     requiredText: player.name,

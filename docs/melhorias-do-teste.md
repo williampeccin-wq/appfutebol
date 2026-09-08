@@ -52,13 +52,19 @@ passo de criar e excluiu um registro pré-existente — o da ANDRIELE FABRO, que
 ativo. Fez duas vezes: 24/08 e, depois de o registro reaparecer pela máquina de concorrência,
 de novo em 27/08. Ela ficou sem acesso por 12 dias, e só se descobriu porque ela reclamou.
 
-**Comportamento desejado:**
+**CORREÇÃO DO DIAGNÓSTICO (08/09):** não foi toque acidental. O app **já exigia digitar o
+nome exato** do jogador para excluir — o admin digitou "Ben" deliberadamente. O que faltava
+era o app dizer que aquele cadastro carregava o login de outra pessoa.
 
-- Ao excluir um jogador **com `auth_user_id`**, exigir confirmação diferente da comum, dizendo
-  o nome e que a pessoa perderá o acesso.
-- Ou bloquear de vez: quem tem login só sai pela auto-exclusão de conta (que já existe).
-- A tela de "nenhum jogador vinculado" precisa de saída: hoje é beco sem saída, igual ao card
-  de notificações bloqueadas que corrigimos em 03/09.
+**PARCIALMENTE IMPLEMENTADO (v1.192.0):** quando o jogador tem `auth_user_id`, o modal muda
+de título para "Excluir jogador COM acesso" e avisa que a pessoa perde o login e não consegue
+recuperar sozinha, sugerindo "Marcar que saiu do time" como alternativa.
+
+**Ainda na fila:**
+
+- A tela de "nenhum jogador vinculado" continua sendo beco sem saída — quem cair nela não tem
+  como voltar pelo app, igual ao card de notificações bloqueadas que corrigimos em 03/09.
+- Registrar edições de perfil no activity_log (ver abaixo).
 
 **Pontos a decidir:**
 
