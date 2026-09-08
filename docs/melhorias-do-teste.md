@@ -102,6 +102,7 @@ Fabiana D...     Meia · Acess...
 - O subtítulo precisa mesmo mostrar "Acesso"? O ícone de chave já comunica isso.
 
 **IMPLEMENTADO em 08/09/2026 (v1.190.0).** Menu de excesso (⋮) com editar, acesso, "saiu do
-time" e excluir; a exclusão separada por uma linha e em vermelho. Abaixo de 480px a linha
-quebra em duas — nome com a largura toda em cima, controles embaixo — porque só tirar botões
-não bastava: em 375px o nome continuava cortado. Entra nas notas do R3.
+time" e excluir; a exclusão separada por uma linha e em vermelho. Uma linha por jogador: o
+avatar desta lista caiu de 62px para 38px (via `--player-avatar-size` no escopo da lista) e as
+folgas encolheram, devolvendo ~40px ao nome. A tentativa de quebrar em duas linhas foi
+descartada — desperdiçava altura numa lista de 24 pessoas. Entra nas notas do R3.

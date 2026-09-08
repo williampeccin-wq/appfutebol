@@ -7350,16 +7350,24 @@ body.vote-open { overflow: hidden; }
   border-radius: 0 0 8px 8px;
 }
 .row-menu-item.is-destructive:hover { background: rgba(248, 113, 113, 0.12); }
-.player-compact-main { flex: 1 1 60%; }
-/* Em tela estreita nem com o menu o nome cabe ao lado dos controles: some antes
-   deles, que é exatamente o que queríamos evitar. Abaixo de 480px a linha quebra
-   em duas — nome em cima com a largura toda, controles embaixo à direita. */
-@media (max-width: 480px) {
-  .player-compact-row { flex-wrap: wrap; row-gap: 8px; }
-  .player-compact-main { flex: 1 1 100%; }
-  .player-compact-right { flex: 1 1 100%; justify-content: flex-end; }
-  .player-compact-text .row-title { white-space: normal; }
-}
+/* Uma linha só: com apenas o interruptor e o ⋮ à direita, o nome ocupa todo o
+   resto. Quebrar em duas linhas (tentado em 08/09) desperdiçava altura numa lista
+   de 24 pessoas para resolver um caso — nome muito longo — que a reticência
+   resolve.
+
+   Medido em 375px: dos ~319px úteis da linha, o avatar de 50px e as folgas de
+   12px comiam quase 90px e cortavam até "ANDRIELE FABRO". Nesta lista o avatar é
+   decorativo — 38px identifica igual e devolve a largura para o nome, que é o
+   dado que importa. */
+.player-compact-main { flex: 1 1 auto; min-width: 0; gap: 8px; }
+.player-compact-right { flex-wrap: nowrap; gap: 6px; }
+.player-compact-row { gap: 8px; }
+/* O tamanho do avatar vem de uma regra com !important via var(--player-avatar-size).
+   Em vez de brigar por especificidade, redefinimos a variável só nesta lista — o
+   !important resolve o var() no escopo local e obedece. */
+.player-compact-list { --player-avatar-size: 38px; }
+.player-compact-list .avatar { font-size: 13px; }
+.player-compact-list .switch-label { font-size: 0.66rem; }
 
 /* ===== Identidade visual distinta das votações (jogo x churrasco) ===== */
 /* Marca d'água atrás do conteúdo nos dois modais. */
