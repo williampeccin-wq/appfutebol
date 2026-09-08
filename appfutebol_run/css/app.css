@@ -7308,6 +7308,59 @@ body.vote-open { overflow: hidden; }
 .player-compact-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .carne-edit-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
+/* Menu de excesso da linha de Jogadores (08/09/2026). Só o interruptor de
+   mensalidade fica na linha; editar, acesso, saiu do time e excluir vão para cá.
+   Com menos botões disputando a largura, o NOME deixa de ser truncado. */
+.row-menu { position: relative; }
+.row-menu > summary {
+  list-style: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  color: var(--hfc-text-muted, #9fb0cc);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.10));
+  cursor: pointer;
+}
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > summary:hover { color: var(--hfc-text, #e8eefc); background: rgba(255, 255, 255, 0.10); }
+.row-menu[open] > summary { color: var(--hfc-gold, #f0a500); border-color: rgba(240, 165, 0, 0.45); }
+.row-menu-items {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 70;
+  min-width: 208px; padding: 6px;
+  display: flex; flex-direction: column;
+  background: rgba(12, 20, 40, 0.98);
+  border: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.row-menu-item {
+  appearance: none; border: 0; background: none;
+  text-align: left; width: 100%;
+  padding: 10px 11px; border-radius: 8px;
+  font: inherit; font-size: 14px;
+  color: var(--hfc-text, #e8eefc);
+  cursor: pointer;
+}
+.row-menu-item:hover { background: rgba(255, 255, 255, 0.07); }
+/* A ação destrutiva fica separada e em vermelho — nunca colada nas rotineiras. */
+.row-menu-item.is-destructive {
+  color: #f87171;
+  margin-top: 5px; padding-top: 12px;
+  border-top: 1px solid var(--hfc-glass-border, rgba(255, 255, 255, 0.10));
+  border-radius: 0 0 8px 8px;
+}
+.row-menu-item.is-destructive:hover { background: rgba(248, 113, 113, 0.12); }
+.player-compact-main { flex: 1 1 60%; }
+/* Em tela estreita nem com o menu o nome cabe ao lado dos controles: some antes
+   deles, que é exatamente o que queríamos evitar. Abaixo de 480px a linha quebra
+   em duas — nome em cima com a largura toda, controles embaixo à direita. */
+@media (max-width: 480px) {
+  .player-compact-row { flex-wrap: wrap; row-gap: 8px; }
+  .player-compact-main { flex: 1 1 100%; }
+  .player-compact-right { flex: 1 1 100%; justify-content: flex-end; }
+  .player-compact-text .row-title { white-space: normal; }
+}
+
 /* ===== Identidade visual distinta das votações (jogo x churrasco) ===== */
 /* Marca d'água atrás do conteúdo nos dois modais. */
 .game-vote-modal, .carne-vote-modal { overflow: hidden; }

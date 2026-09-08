@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.189.0-aviso-de-votacao-deixa-de-falhar-calado';
+export const APP_VERSION = 'v1.190.0-lista-de-jogadores-respira';

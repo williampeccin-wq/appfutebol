@@ -721,8 +721,14 @@ function renderChurrascoRanking(snapshot) {
 }
 
 // Linha compacta unificada (jogadores e somente-carne): avatar + nome/subtítulo
-// à esquerda; à direita, o controle de mensalidade (quando jogador) e as ações,
-// distribuídos. Linha curta, ocupa melhor a largura em vez do grid de 5 colunas.
+// à esquerda; à direita, o controle de mensalidade e um menu de excesso.
+//
+// 08/09/2026: a linha carregava seis elementos disputando a largura e o NOME era
+// o primeiro a ser cortado ("Caetano H...", "Fabiana D..."). Só o interruptor de
+// mensalidade fica visível — é o que se usa toda semana; o resto foi para o menu.
+// A exclusão saiu da linha de propósito: ela ficava a um toque das ações
+// rotineiras, num alvo pequeno, e foi por aí que um testador excluiu o jogador
+// errado em 24 e 27/08 e deixou outra pessoa 12 dias sem acesso.
 function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null) {
   const admin = isAdmin(currentPlayer);
   const currentFlag = isCurrentPlayer(player, currentPlayer);
@@ -733,6 +739,28 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
   const statusLabel = leftTeam ? 'Saiu do time' : (carneOnly ? 'Somente churrasco' : getPositionLabel(player.position));
   const subtitle = `${statusLabel}${!leftTeam && access ? ` · ${access}` : ''}`;
   const rowPeriodGame = { mens_expire_date: String(snapshot?.settings?.mens_expire_date || '').slice(0, 10) };
+
+  const item = (action, label, destrutivo = false) =>
+    `<button class="row-menu-item${destrutivo ? ' is-destructive' : ''}" type="button" role="menuitem"`
+    + ` data-action="${action}" data-id="${player.id}">${label}</button>`;
+
+  const itens = (leftTeam
+    ? [!currentFlag ? item('delete-player', 'Excluir jogador', true) : '']
+    : [
+      item('edit-player', 'Editar cadastro'),
+      player.auth_user_id ? item('reset-player-password', 'Resetar senha') : item('create-player-access', 'Criar acesso'),
+      !currentFlag ? item('leave-team-player', 'Marcar que saiu do time') : '',
+      !currentFlag ? item('delete-player', 'Excluir jogador', true) : '',
+    ]).filter(Boolean).join('');
+
+  // name= no <details> deixa só um menu aberto por vez, sem JS.
+  const menu = itens ? `
+    <details class="row-menu" name="player-row-menu">
+      <summary class="row-menu-trigger" title="Mais ações" aria-label="Mais ações de ${escapeHtml(player.name || '')}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+      </summary>
+      <div class="row-menu-items" role="menu">${itens}</div>
+    </details>` : '';
 
   return `
     <div class="player-compact-row ${currentFlag ? 'is-current' : ''} ${isEditing ? 'is-editing' : ''} ${leftTeam ? 'is-left-team' : ''}" role="row">
@@ -747,17 +775,8 @@ function renderPlayerRow(player, snapshot, currentPlayer, editingPlayerId = null
         ${!leftTeam && !carneOnly ? renderFinanceControls(player, currentPlayer, rowPeriodGame) : ''}
         ${admin ? `
           <div class="carne-edit-actions">
-            ${leftTeam ? `
-              <button class="access-action-button" type="button" data-action="reactivate-left-player" data-id="${player.id}">Reativar</button>
-              <button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>
-            ` : `
-              <button class="icon-action-button player-edit-near-paid" type="button" data-action="edit-player" data-id="${player.id}" title="Editar" aria-label="Editar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-              ${player.auth_user_id
-                ? `<button class="icon-action-button player-reset-password-near-paid" type="button" data-action="reset-player-password" data-id="${player.id}" title="Resetar senha" aria-label="Resetar senha"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M16.5 6.5l3 3"/></svg></button>`
-                : `<button class="access-action-button" type="button" data-action="create-player-access" data-id="${player.id}">Criar acesso</button>`}
-              ${!currentFlag ? `<button class="icon-action-button player-leave-team-near-paid" type="button" data-action="leave-team-player" data-id="${player.id}" title="Saiu do time" aria-label="Saiu do time"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>` : ''}
-              ${!currentFlag ? `<button class="icon-action-button player-delete-near-paid" type="button" data-action="delete-player" data-id="${player.id}" title="Excluir" aria-label="Excluir"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg></button>` : ''}
-            `}
+            ${leftTeam ? `<button class="access-action-button" type="button" data-action="reactivate-left-player" data-id="${player.id}">Reativar</button>` : ''}
+            ${menu}
           </div>
         ` : ''}
       </div>

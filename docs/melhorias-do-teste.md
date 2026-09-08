@@ -101,5 +101,7 @@ Fabiana D...     Meia · Acess...
   esconder nada — custa altura, ganha legibilidade.
 - O subtítulo precisa mesmo mostrar "Acesso"? O ícone de chave já comunica isso.
 
-**Para as notas de versão:** entra quando for implementado. Como o R3 sai em 11/09, cabe na
-janela se for feito até lá.
+**IMPLEMENTADO em 08/09/2026 (v1.190.0).** Menu de excesso (⋮) com editar, acesso, "saiu do
+time" e excluir; a exclusão separada por uma linha e em vermelho. Abaixo de 480px a linha
+quebra em duas — nome com a largura toda em cima, controles embaixo — porque só tirar botões
+não bastava: em 375px o nome continuava cortado. Entra nas notas do R3.
