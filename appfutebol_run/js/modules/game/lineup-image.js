@@ -14,7 +14,8 @@
 // Sem foto (ou se a foto falhar), cai nas iniciais: a imagem nunca deixa de sair.
 
 import { getInitials, getPlayerPhoto } from '../players/players.service.js';
-import { rotuloDoTime, timesDoSorteio } from '../../domain/draw-teams.js';
+import { rotuloDoTime, semQuemCancelou, timesDoSorteio } from '../../domain/draw-teams.js';
+import { getGameKey } from '../../domain/projection.js';
 import { buildStrengthResolver } from './game.service.js';
 
 const W = 1080;
@@ -373,7 +374,9 @@ function formatarData(iso, hora) {
 const ESCUDO_PADRAO = new URL('../../../assets/harmonia-crest.jpeg', import.meta.url).href;
 
 export async function gerarImagemEscalacao(snapshot, { titulo = 'ESCALAÇÃO', escudoUrl = ESCUDO_PADRAO, marcaRodape = 'Harmonia FC' } = {}) {
-  const sort = snapshot?.game?.sort_result;
+  // Mesma regra da tela: quem cancelou a presença depois do sorteio não entra
+  // na imagem que vai para o grupo.
+  const sort = semQuemCancelou(snapshot?.game?.sort_result, snapshot?.confirmations, getGameKey(snapshot?.game));
   const listas = timesDoSorteio(sort);
   if (!listas.some((t) => t.length)) return null;
 
