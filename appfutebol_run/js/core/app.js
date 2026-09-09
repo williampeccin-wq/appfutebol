@@ -2913,7 +2913,7 @@ import { renderFinanceScreen, renderPublicFinanceScreen } from '../modules/finan
 import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publishSummary, loadPublicSummary, getPublicSummary, ledgerSummary, getCachedLedger } from '../modules/finance/finance.ledger.service.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline, showProUpsellModal } from '../domain/gating.js';
-import { idDaEntrada, rotuloDoTime, timesDoSorteio } from '../domain/draw-teams.js';
+import { idDaEntrada, rotuloDoTime, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
 import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
@@ -5482,11 +5482,12 @@ function renderChampionship(snapshot, currentPlayer) {
 }
 
 function buildTeamDrawShareText(snapshot) {
-  const sortResult = snapshot.game?.sort_result;
+  const game = getActiveGameFromSnapshot(snapshot);
+  // Quem cancelou a presença depois do sorteio não vai no texto do grupo.
+  const sortResult = semQuemCancelou(snapshot.game?.sort_result, snapshot.confirmations, getGameKey(game));
   if (!sortResult) return '';
 
   const playerById = new Map((snapshot.players || []).map((player) => [player.id, player]));
-  const game = getActiveGameFromSnapshot(snapshot);
   // Mesma força combinada do selo (nota + campeonato), normalizada no conjunto sorteado.
   const drawnPlayers = timesDoSorteio(sortResult).flat()
     .map((entry) => (entry && typeof entry === 'object') ? entry : playerById.get(String(idDaEntrada(entry))))
@@ -6057,10 +6058,13 @@ function sortDrawEntriesForDisplay(entries = [], playerById = new Map()) {
 }
 
 function renderTeamDraw(snapshot, currentPlayer) {
-  const sortResult = snapshot.game?.sort_result;
   const playerById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
   const game = getActiveGameFromSnapshot(snapshot);
   const gameKey = getGameKey(game);
+  // A presença manda: quem cancelou depois do sorteio sai do time na hora de
+  // exibir, mesmo que a remoção não tenha conseguido ser gravada (jogador não
+  // grava `app_meta`). Ver semQuemCancelou.
+  const sortResult = semQuemCancelou(snapshot.game?.sort_result, snapshot.confirmations, gameKey);
   const confirmedCount = buildGameView(snapshot, currentPlayer?.id || null).confirmedCount;
   const isAdmin = authzIsAdmin(currentPlayer);
 

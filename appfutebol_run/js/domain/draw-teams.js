@@ -15,6 +15,8 @@
 // Os dois primeiros times NUNCA mudam de posição, então um sorteio de 2 times
 // lido por código velho é idêntico ao que era.
 
+import { belongsToGame, isConfirmedEntry } from './confirmations.js';
+
 export const ROTULOS_DE_TIME = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 export function rotuloDoTime(indice) {
@@ -90,4 +92,47 @@ export function semJogador(draw, playerId) {
   const alvo = String(playerId);
   return comTimes(draw, timesDoSorteio(draw).map((time) =>
     time.filter((entrada) => String(idDaEntrada(entrada)) !== alvo)));
+}
+
+/**
+ * Sorteio sem quem cancelou a presença depois que ele foi feito.
+ *
+ * O sorteio é uma FOTO do momento em que o admin sorteou. Cancelar presença
+ * remove a pessoa do time (`buildDrawRemovalPatch`), mas essa remoção só chega
+ * ao servidor quando quem cancela é ADMIN: o sorteio mora no blob `app_meta`,
+ * que é admin-only. Jogador cancelando a própria presença via app não consegue
+ * reescrever o sorteio — a presença some e o time segue mostrando quem não vai
+ * jogar. Foi o que aconteceu no Harmonia em 09/09/2026.
+ *
+ * Por isso a exibição não confia mais só no que está gravado: cruza o sorteio
+ * com a presença na hora de mostrar. A presença é a verdade sobre quem joga; o
+ * sorteio, só sobre quem ficou em qual time.
+ *
+ * Sai apenas quem tem PROVA de que saiu: uma entrada de presença deste jogo
+ * dizendo que não está confirmado. Convidado e goleiro de aluguel não têm linha
+ * de presença — ficam, como devem.
+ */
+export function semQuemCancelou(draw, confirmacoes = [], gameKey = '') {
+  if (!draw || typeof draw !== 'object') return draw;
+
+  const cancelados = new Set(
+    (Array.isArray(confirmacoes) ? confirmacoes : [])
+      .filter((entrada) => belongsToGame(entrada, gameKey))
+      .filter((entrada) => !isConfirmedEntry(entrada))
+      .map((entrada) => String(entrada?.player_id || ''))
+      .filter(Boolean)
+  );
+
+  if (!cancelados.size) return draw;
+
+  const times = timesDoSorteio(draw);
+  const restantes = times.map((time) =>
+    time.filter((entrada) => !cancelados.has(String(idDaEntrada(entrada)))));
+
+  // Devolve o MESMO objeto quando nada saiu: `comTimes` reescreve o sorteio no
+  // formato novo, e fazer isso a cada render sujaria o diff do save com uma
+  // mudança que não é do usuário.
+  if (restantes.every((time, i) => time.length === times[i].length)) return draw;
+
+  return comTimes(draw, restantes);
 }
