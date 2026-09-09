@@ -32,7 +32,7 @@ aprovado — duas passadas de pesquisa, ~200 agentes, zero relatos fechando o ci
 |---|---|---|---|
 | R1 | 01/09 | 4 · 2.0.2.0 | backlog v1.171–1.181 |
 | R2 | 05/09, após o jogo de quinta | 5 · 2.0.3.0 | v1.182–1.185 + o que sair |
-| R3 | 11/09, após os jogos de 06 e 10 | 6 · 2.0.4.0 | o que vier da rodada |
+| R3 | 11/09, após os jogos de 06 e 10 | 6 · 2.0.4.0 | v1.193.0 (contraste) + v1.194.0 (recado na home) + o que vier da rodada — notas em [changelog-teste-fechado.md](changelog-teste-fechado.md) |
 
 - **Cada lançamento vem DEPOIS de um jogo.** É o que transforma "subi três builds" em
   "coletei feedback e agi sobre ele", que é a frase da reprovação.

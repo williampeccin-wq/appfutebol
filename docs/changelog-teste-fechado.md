@@ -10,7 +10,8 @@
 | Pacote | Quando | Cobre | versionCode |
 |---|---|---|---|
 | Release A | agora (01/09) | v1.171.0 → v1.181.0 (17–25/08) | 4 |
-| Release B | ~11/09, antes do reenvio | v1.182.0 → v1.185.0 + o que vier | 5 |
+| Release B | 08/09 (2.0.3.0) | v1.186.0 → v1.192.0 | 5 |
+| Release C (R3) | 11/09, último antes do reenvio | v1.193.0 → o que fechar dia 11 | 6 · 2.0.4.0 |
 
 Build: `bubblewrap build` com o versionCode incrementado, assinado com a chave de upload
 `6D:68:E2:C1:95:69:4E:40:A6:CC:4D:F2:C2:61:25:AA:58:63:5D:CE:B3:EB:F3:99:CC:E8:2A:8B:F5:8F:C2:E3`.
@@ -175,3 +176,33 @@ Descobri que os avisos automáticos de "inscrições abertas" nunca chegavam aos
 
 **Deixe de fora** a correção da credencial de revisor: é higiene de submissão, não melhoria
 do app, e não ajuda a narrativa de "evoluí o produto com o feedback".
+
+---
+
+## RELEASE C (R3) — pacote 6 · 2.0.4.0 · subir 11/09
+
+**Último lançamento antes do reenvio do dia 14.** Fecha a janela de teste: depois dele
+só sobe pacote se algo quebrar.
+
+### O que já está dentro (no ar no PWA, falta empacotar)
+
+- **09/09 (v1.194.0)** — a tela inicial mostrava `Avisos · 1 recado(s)` e o recado não
+  aparecia em lugar nenhum; o bloco também não é clicável. Agora cada recado aparece por
+  inteiro, como a Config sempre prometeu. Terceiro caso do padrão "contador sem destino"
+  corrigido nesta rodada — os outros dois foram o card de push sem botão (03/09) e o
+  aviso de notificação bloqueada sem saída.
+- **08/09 (v1.193.0)** — texto secundário e cards sumiam no topo de várias telas: o vidro
+  das superfícies clareava o fundo o suficiente para o cinza legado reprovar em contraste.
+  Paleta ajustada, `--hfc-text-dim` aposentado.
+
+### Notas da versão — rascunho (fechar no dia 11, limite 500 caracteres)
+
+```
+Correções desta rodada de testes:
+
+• Os recados do administrador agora aparecem por inteiro na tela inicial — antes o app só dizia quantos havia, sem mostrar nenhum.
+• Textos e cards que ficavam apagados demais no topo de algumas telas voltaram a ficar legíveis.
+```
+
+*(268 caracteres — sobra espaço para o que sair dos jogos de 09 e 10/09.)*
+
