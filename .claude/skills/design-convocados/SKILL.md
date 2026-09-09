@@ -251,7 +251,7 @@ termo genérico de software.
 | Certo | Errado |
 |---|---|
 | convocado / convocação | selecionado, escalação |
-| carnê | mensalidade, cobrança, fatura |
+| churrasco | carnê, rodízio, escala |
 | sorteio | balanceamento, geração de times |
 | nota | rating, avaliação, score |
 | presença | check-in, RSVP |
@@ -261,6 +261,34 @@ termo genérico de software.
 
 Texto de interface em português do Brasil, sem ponto final em rótulo de botão, sem
 CAIXA ALTA em título (só em `.boot-subtitle`, que é assinatura de marca).
+
+### A armadilha do "carnê"
+
+No Convocados a palavra de interface é **Churrasco**. "Carnê" é nome interno legado
+e **não aparece para o usuário** — mas está por todo o código, o que faz qualquer um
+escrever a palavra errada na tela:
+
+| Camada | Palavra |
+|---|---|
+| Rótulo na navegação | **Churrasco** — `items.push(['carne', 'Churrasco'])`, `core/app.js` |
+| Chave da aba, seletor CSS, classes | `carne` — `.content--carne`, `.carne-rotation-item`, `.carne-date-box` |
+| Papel do jogador | `getPlayerRole() === 'carne'`, exibido como "Grupo do churrasco" |
+| Flag de módulo que liga a aba | `isModuleOn(snapshot, 'churrasco')` |
+
+Ou seja: **classe e chave em `carne`, texto visível em "churrasco"**. Ao criar
+markup nessa tela, mantenha o prefixo `carne-` nas classes (é a convenção do
+arquivo) e escreva "churrasco" em tudo que a pessoa lê.
+
+Duas notas para não tropeçar em documentação antiga:
+
+- `docs/club-profile-design.md` trata `carne` e `churrasco` como **dois módulos
+  distintos** (`carne` = rodízio de pagamento, `churrasco` = rodízio de duplas).
+  No código, `modules.carne` existe no perfil padrão mas **nunca é consultado** —
+  só `campeonato`, `votacao_desempenho` e `churrasco` são. O doc descreve plano,
+  não o que está implementado.
+- Na branch `production` (Harmonia FC) a palavra de interface é **"carnê"**, não
+  "churrasco". Ao portar um commit para lá, mantenha a palavra da branch de
+  destino — é o conflito mais comum do cherry-pick.
 
 ## Não faça
 
