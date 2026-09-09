@@ -94,6 +94,12 @@ export function semJogador(draw, playerId) {
     time.filter((entrada) => String(idDaEntrada(entrada)) !== alvo)));
 }
 
+/** Timestamp em milissegundos, ou 0 quando a data não dá para ler. */
+function quando(valor) {
+  const ms = new Date(String(valor || '')).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 /**
  * Sorteio sem quem cancelou a presença depois que ele foi feito.
  *
@@ -115,10 +121,21 @@ export function semJogador(draw, playerId) {
 export function semQuemCancelou(draw, confirmacoes = [], gameKey = '') {
   if (!draw || typeof draw !== 'object') return draw;
 
+  // Quando o admin mexeu no sorteio DEPOIS do cancelamento, o que está lá é
+  // decisão dele — o app não desfaz. Só filtra quem saiu depois do último toque
+  // no sorteio, ou quando não há como comparar as duas datas.
+  const toqueNoSorteio = quando(draw.adjusted_at || draw.created_at);
+  const saiuDepoisDoSorteio = (entrada) => {
+    const cancelamento = quando(entrada?.cancelled_at || entrada?.timestamp);
+    if (!toqueNoSorteio || !cancelamento) return true;
+    return cancelamento > toqueNoSorteio;
+  };
+
   const cancelados = new Set(
     (Array.isArray(confirmacoes) ? confirmacoes : [])
       .filter((entrada) => belongsToGame(entrada, gameKey))
       .filter((entrada) => !isConfirmedEntry(entrada))
+      .filter(saiuDepoisDoSorteio)
       .map((entrada) => String(entrada?.player_id || ''))
       .filter(Boolean)
   );
