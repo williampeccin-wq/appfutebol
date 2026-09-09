@@ -5478,12 +5478,23 @@ button.filter-pill:focus-visible {
   --hfc-gold: #f0a500;
   --hfc-gold-200: #ffc23d;
   --hfc-grass: #19c37d;
-  --hfc-glass: rgba(255, 255, 255, 0.06);
-  --hfc-glass-2: rgba(255, 255, 255, 0.05);
+  /* 08/09/2026: o vidro era branco e CLAREAVA o fundo — sobre o topo do
+     gradiente derrubava --hfc-text-muted para 3,90:1 e --hfc-grass para
+     4,05:1, ou seja, o card reprovava AA justamente onde quase todo texto
+     do app mora. Vidro escuro inverte isso: sobre navy-700 fica muted 5,43,
+     grass 5,65, accent-blue 6,27, gold-200 8,05, text 11,56.
+     Efeito colateral aceito: sobre navy-900 (base do gradiente) a superfície
+     fica praticamente indistinguível do fundo (1,01:1) — quem separa passa a
+     ser só --hfc-glass-border. Ver .claude/skills/design-convocados. */
+  --hfc-glass: rgba(0, 0, 0, 0.18);
+  --hfc-glass-2: rgba(0, 0, 0, 0.15);
   --hfc-glass-border: rgba(255, 255, 255, 0.12);
   --hfc-line: rgba(150, 195, 255, 0.16);
   --hfc-text: #eef2f9;
-  --hfc-text-muted: #8b97b0;
+  /* 08/09/2026: #8b97b0 dava 3.77:1 sobre --hfc-navy-700 (topo do gradiente,
+     onde as telas põem informação) — reprovava AA. #9ea8bd sobe para 4.63:1
+     mantendo o matiz. Ver .claude/skills/design-convocados. */
+  --hfc-text-muted: #9ea8bd;
   --hfc-text-dim: #7e8aa3;
   --hfc-accent-blue: #8fb4ff;
   --hfc-radius-lg: 20px;
@@ -6988,7 +6999,11 @@ body {
   max-width: 420px;
   width: 100%;
   text-align: center;
-  background: var(--hfc-glass-2, rgba(255,255,255,0.05));
+  /* EXCEÇÃO ao vidro escuro (08/09/2026): .fatal-screen tem fundo --hfc-navy-900,
+     o mais escuro do app. Vidro escuro sobre ele dá 1,01:1 — o card desaparece e
+     sobra só a borda. Aqui a superfície precisa CLAREAR (1,13:1). Não trocar por
+     --hfc-glass: ele também é preto e some igual. */
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--hfc-glass-border, rgba(255,255,255,0.12));
   border-radius: 18px;
   padding: 28px 24px;
@@ -7557,7 +7572,7 @@ body.vote-open { overflow: hidden; }
   margin-top: 6px;
 }
 .club-profile-points label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.club-profile-points small { color: var(--hfc-text-muted, #8b97b0); font-size: 12px; }
+.club-profile-points small { color: var(--hfc-text-muted, #9ea8bd); font-size: 12px; }
 .club-profile-points .input { width: 100%; text-align: center; }
 
 @media (max-width: 420px) {

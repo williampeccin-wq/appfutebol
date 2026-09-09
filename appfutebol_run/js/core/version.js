@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.192.0-excluir-quem-tem-acesso-avisa';
+export const APP_VERSION = 'v1.193.0-contraste-vidro-escuro';
