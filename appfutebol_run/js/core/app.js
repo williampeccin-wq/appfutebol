@@ -5246,11 +5246,17 @@ function renderHome(snapshot, currentPlayer) {
       title: 'Aniversariante',
       text: String(notification.playerName || 'Jogador') + (notification.birthdayDate ? ' · ' + notification.birthdayDate : '')
     })),
-    storedNotifications.length ? {
-      icon: '📢',
-      title: 'Avisos',
-      text: String(storedNotifications.length) + ' recado(s)'
-    } : null
+    // O item mostrava só "N recado(s)" e não abria nada: a pessoa era avisada de
+    // que existe um recado e não tinha como lê-lo em lugar nenhum do app. A
+    // config promete "mensagem fixa que aparece na home de todos" — agora aparece.
+    ...storedNotifications
+      .map((aviso) => String(aviso?.message || '').trim())
+      .filter(Boolean)
+      .map((mensagem) => ({
+        icon: '📢',
+        title: 'Recado',
+        text: mensagem
+      }))
   ].filter(Boolean);
 
 

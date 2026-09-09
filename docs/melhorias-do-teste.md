@@ -112,3 +112,23 @@ time" e excluir; a exclusão separada por uma linha e em vermelho. Uma linha por
 avatar desta lista caiu de 62px para 38px (via `--player-avatar-size` no escopo da lista) e as
 folgas encolheram, devolvendo ~40px ao nome. A tentativa de quebrar em duas linhas foi
 descartada — desperdiçava altura numa lista de 24 pessoas. Entra nas notas do R3.
+
+## 4. "Avisos · 1 recado(s)" na home: contava e não mostrava
+
+**Descoberto em:** 09/09/2026 · **origem:** revisão da home antes do pacote 6 · **status:** corrigido
+
+A home listava um item **Avisos** com o texto *"1 recado(s)"*. O recado em si não
+aparecia ali nem em nenhuma outra tela, e o item não é clicável — é uma `div`, não um
+botão. Ou seja: o app informava que existe um aviso e não dava caminho nenhum para
+lê-lo. Na Config, o mesmo campo se descreve como *"mensagem fixa que aparece na home
+de todos"* — a promessa não era cumprida.
+
+É o terceiro caso do mesmo padrão nesta rodada (card de push sem botão, "nenhum
+jogador vinculado" sem saída): **contador sem destino**. Vale registrar porque é
+exatamente o tipo de coisa que um revisor da Play abre, toca, nada acontece, e anota
+como defeito.
+
+**IMPLEMENTADO em 09/09/2026 (v1.194.0).** O item deixou de contar e passou a mostrar:
+cada recado vira uma linha própria, com título "Recado" e o texto integral (o bloco já
+quebra em várias linhas, então mensagem longa cabe). Recado em branco não gera linha.
+Entra nas notas do R3.
