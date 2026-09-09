@@ -196,6 +196,35 @@ export async function triggerWaitlistPromotion(gameKey, playerIds) {
   }
 }
 
+// Avisa os ADMINS que alguém que estava escalado cancelou a presença (Edge
+// Function notify-draw-dropout). Best-effort: o servidor confere no banco que a
+// pessoa está mesmo fora e que estava no sorteio, e deduplica por (jogador +
+// jogo) — pode ser chamado de qualquer cliente sem risco de aviso repetido.
+export async function triggerDrawDropout(gameKey, playerId) {
+  const jogo = String(gameKey || '');
+  const jogador = String(playerId || '');
+  if (!jogo || !jogador) return { ok: false, reason: 'no_player' };
+  const { url: base, anonKey } = getSupabase();
+  if (!base || !anonKey) return { ok: false, reason: 'not_configured' };
+  const token = getAccessToken();
+  try {
+    const response = await fetch(`${base}/functions/v1/notify-draw-dropout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${token || anonKey}`,
+      },
+      body: JSON.stringify({ game_key: jogo, player_id: jogador }),
+    });
+    if (!response.ok) return { ok: false, reason: `dropout_${response.status}` };
+    return { ok: true, data: await response.json().catch(() => ({})) };
+  } catch (error) {
+    console.warn('[push] Falha ao avisar o admin do desfalque:', error);
+    return { ok: false, reason: 'network' };
+  }
+}
+
 // Dispara o lembrete de mensalidade atrasada agora (Edge Function
 // send-overdue-reminders). Uso: botão de teste do admin. `force: true` ignora a
 // deduplicação do dia, para permitir reenvio durante o teste.

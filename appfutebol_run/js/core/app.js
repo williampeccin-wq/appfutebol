@@ -2707,7 +2707,7 @@ import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, con
 import { renderAuthScreen } from '../modules/auth/auth.view.js';
 import { renderPlayersScreen, renderCarneScreen } from '../modules/players/players.view.js';
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
-import { semQuemCancelou } from '../domain/draw-teams.js';
+import { idDaEntrada, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
@@ -2715,7 +2715,7 @@ import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
-import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, syncExistingPushSubscription } from '../services/push.service.js';
+import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, triggerDrawDropout, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
@@ -2742,6 +2742,20 @@ function notifyWaitlistPromotion(result) {
   if (!promotedId) return;
   if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
   triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
+}
+
+// Avisa os ADMINS quando quem estava escalado cancela a presença. Esconder a
+// pessoa do time (semQuemCancelou) conserta a tela, mas não avisa ninguém — e
+// quem decide se re-sorteia ou remaneja é o admin. Precisa do estado ANTES do
+// cancelamento, porque o próprio cancelamento já tira a pessoa do sorteio local.
+function notifyDrawDropout(snapshotAntes, playerId, result) {
+  if (!result?.ok) return;
+  if (!isNotifEnabled(getState(), 'saiu_da_escalacao')) return; // central de notificações
+  const game = getActiveGameFromSnapshot(snapshotAntes);
+  const estavaEscalado = timesDoSorteio(game?.sort_result).flat()
+    .some((entrada) => String(idDaEntrada(entrada)) === String(playerId));
+  if (!estavaEscalado) return;
+  triggerDrawDropout(getGameKey(game), playerId).catch(() => {});
 }
 
 // Sugestão padrão de abertura automática: segunda-feira 21h da semana do jogo.
@@ -4075,7 +4089,11 @@ function bindAppEvents(currentPlayer) {
   });
 
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
+    const antes = getState(); // o sorteio de antes do cancelamento, para saber se ela estava escalada
     const result = toggleConfirmation(currentPlayer.id);
+    if (result?.ok && result.message?.includes('cancelad')) {
+      notifyDrawDropout(antes, currentPlayer.id, result);
+    }
     if (result?.message) showToast(result.message, result.ok ? 'success' : 'error');
     notifyWaitlistPromotion(result);
   });
@@ -5685,6 +5703,7 @@ const NOTIF_TYPES = [
   { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
   { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
   { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla da carne (23h do dia do jogo). Para todos.' },
+  { key: 'saiu_da_escalacao', label: 'Saiu da escalação', desc: 'Quando alguém já sorteado cancela a presença. Só para os administradores.' },
 ];
 function isNotifEnabled(snapshot, key) {
   const n = snapshot?.settings?.notifications;

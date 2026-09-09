@@ -74,4 +74,29 @@ const naFila = semQuemCancelou(sorteio, [conf('p2', { confirmed: false, status: 
 assert.deepEqual(timesDoSorteio(naFila), [['p1'], ['p3', 'p4']],
   'quem virou fila de espera sai do time escalado');
 
-console.log('OK — 13 asserções. O sorteio exibido segue a presença, não a foto do momento do sorteio.');
+// ------------------------------------------------- o que o admin já arrumou
+
+// Se o admin mexeu no sorteio DEPOIS do cancelamento, o que está lá é decisão
+// dele — o app não desfaz. Foi o pedido explícito ao corrigir o Harmonia: o
+// admin já tinha remontado os times na mão quando a correção subiu.
+const sorteioAjustadoDepois = { ...sorteio, created_at: '2026-09-11T18:00:00.000Z', adjusted_at: '2026-09-11T20:30:00.000Z' };
+const cancelouAntes = { ...cancelou('p2'), cancelled_at: '2026-09-11T19:00:00.000Z' };
+assert.deepEqual(timesDoSorteio(semQuemCancelou(sorteioAjustadoDepois, [cancelouAntes], JOGO)), [['p1', 'p2'], ['p3', 'p4']],
+  'admin mexeu no sorteio depois do cancelamento: a escalação dele fica como está');
+
+// E o contrário: cancelou depois do último toque do admin, sai.
+const cancelouDepois = { ...cancelou('p2'), cancelled_at: '2026-09-11T21:00:00.000Z' };
+assert.deepEqual(timesDoSorteio(semQuemCancelou(sorteioAjustadoDepois, [cancelouDepois], JOGO)), [['p1'], ['p3', 'p4']],
+  'cancelou depois do último ajuste: sai do time');
+
+// Sem adjusted_at, vale a data do sorteio.
+const soCriado = { ...sorteio, created_at: '2026-09-11T18:00:00.000Z' };
+assert.deepEqual(timesDoSorteio(semQuemCancelou(soCriado, [cancelouAntes], JOGO)), [['p1'], ['p3', 'p4']],
+  'sem ajuste posterior, quem cancelou depois do sorteio sai');
+
+// Sorteio antigo sem data nenhuma: não dá para comparar, e a presença manda —
+// senão a correção não alcançaria justamente os sorteios já gravados.
+assert.deepEqual(timesDoSorteio(semQuemCancelou(sorteio, [cancelouAntes], JOGO)), [['p1'], ['p3', 'p4']],
+  'sorteio sem data: filtra, porque o cancelamento é a única evidência disponível');
+
+console.log('OK — 17 asserções. O sorteio exibido segue a presença — sem desfazer o que o admin ajustou depois.');
