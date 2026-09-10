@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.196.0-aviso-de-desfalque';
+export const APP_VERSION = 'v1.197.0-comprovante-ilegivel';

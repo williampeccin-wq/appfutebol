@@ -186,6 +186,12 @@ só sobe pacote se algo quebrar.
 
 ### O que já está dentro (no ar no PWA, falta empacotar)
 
+- **09/09 (v1.197.0)** — comprovante de PIX legítimo era recusado com "o valor não bate":
+  o print do jogador vinha recortado e a leitura devolvia valor/data em branco, que a
+  validação tratava como conteúdo errado em vez de leitura falha. Agora "não consegui ler"
+  é uma recusa própria, com a instrução que resolve; a data do pagamento passa a sair do
+  próprio identificador do PIX quando o campo não é lido; e toda recusa deixa registro.
+  Incidente real do Harmonia — ver item 5 de [melhorias-do-teste.md](melhorias-do-teste.md).
 - **09/09 (v1.194.0)** — a tela inicial mostrava `Avisos · 1 recado(s)` e o recado não
   aparecia em lugar nenhum; o bloco também não é clicável. Agora cada recado aparece por
   inteiro, como a Config sempre prometeu. Terceiro caso do padrão "contador sem destino"
@@ -202,7 +208,8 @@ Correções desta rodada de testes:
 
 • Os recados do administrador agora aparecem por inteiro na tela inicial — antes o app só dizia quantos havia, sem mostrar nenhum.
 • Textos e cards que ficavam apagados demais no topo de algumas telas voltaram a ficar legíveis.
+• Mensalidade por PIX: quando o comprovante vem cortado, o app agora pede o print inteiro em vez de dizer que o valor está errado.
 ```
 
-*(268 caracteres — sobra espaço para o que sair dos jogos de 09 e 10/09.)*
+*(393 caracteres — ainda sobra espaço para o que sair dos jogos de 09 e 10/09.)*
 

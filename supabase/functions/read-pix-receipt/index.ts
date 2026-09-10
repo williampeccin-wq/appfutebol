@@ -7,10 +7,16 @@
 // Regra (todas precisam passar p/ marcar pago automático):
 //   - beneficiário do comprovante == nome configurado (settings.mens_beneficiary)
 //   - valor == valor configurado (settings.mens_amount), exato em centavos
-//   - data dentro do mês corrente (BRT)
+//   - data dentro do mês corrente (BRT) — lida do comprovante ou, se o campo
+//     estiver ilegível, derivada do próprio E2E (ver dateFromE2e)
 //   - E2E ID presente e INÉDITO (tabela pix_receipts, anti-reuso)
 // Se beneficiário+valor+mês batem mas faltou o E2E → NÃO marca; sinaliza
 // players.data.mens_review p/ o admin revisar. Demais falhas → rejeita.
+//
+// "Não consegui ler" e "está errado" são recusas DIFERENTES (amount_unreadable
+// × amount_mismatch, date_unreadable × date_not_current_month): a primeira pede
+// print melhor, a segunda diz que o pagamento não serve. Misturar as duas fazia
+// o app acusar de valor errado quem só tinha mandado o print pela metade.
 //
 // A chave da API e a service_role ficam só aqui. A imagem não é armazenada.
 
@@ -46,6 +52,50 @@ function normName(value: string): string {
 function currentMonthBrt(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
   return brt.toISOString().slice(0, 7);
+}
+
+// ---- Data do pagamento a partir do E2E ----
+//
+// O E2E do PIX carrega o instante da transação: "E" + ISPB da instituição de
+// origem (8 dígitos) + AAAAMMDDHHMM em UTC + 11 alfanuméricos = 32 caracteres.
+// Ex.: E03419786202609100158IIMVEFW5KVF → 10/09 01:58 UTC → 09/09 22:58 BRT.
+//
+// Serve de rede de segurança para o campo de data: o print que o jogador manda
+// costuma ser foto de tela e às vezes vem recortado ou ilegível justo na data,
+// enquanto o E2E aparece embaixo, em campo próprio e rotulado.
+//
+// Devolve "" quando o E2E falta, não tem o formato, ou traz uma data que não
+// existe (30 de fevereiro) — nesse caso a recusa é "não consegui ler a data",
+// nunca um palpite.
+function dateFromE2e(e2e: string): string {
+  const m = /^E\d{8}(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(String(e2e || ""));
+  if (!m) return "";
+  const [, y, mo, d, h, mi] = m;
+  if (Number(mo) < 1 || Number(mo) > 12 || Number(d) < 1 || Number(d) > 31) return "";
+  if (Number(h) > 23 || Number(mi) > 59) return "";
+  const utc = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi)));
+  if (Number.isNaN(utc.getTime())) return "";
+  // Rejeita data que "virou" no Date.UTC (ex.: 31 de fevereiro).
+  if (utc.toISOString().slice(0, 10) !== `${y}-${mo}-${d}`) return "";
+  return new Date(utc.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// Recusa do valor, ou "" quando passa. O prompt devolve 0 para valor ilegível,
+// então zero NÃO é "pagou o valor errado" — é "não deu para ler".
+function amountReject(amount: number, cfgAmount: number): string {
+  if (!(amount > 0)) return "amount_unreadable";
+  if (Math.round(amount * 100) !== Math.round(cfgAmount * 100)) return "amount_mismatch";
+  return "";
+}
+
+// Data do pagamento a usar e a recusa correspondente ("" quando passa). A data
+// lida do comprovante manda; sem ela, cai no E2E; sem os dois, é ilegível.
+function resolvePaidDate(ocrDate: string, e2e: string, monthBrt: string): { date: string; reject: string } {
+  const ocr = /^\d{4}-\d{2}-\d{2}$/.test(String(ocrDate || "")) ? String(ocrDate) : "";
+  const date = ocr || dateFromE2e(e2e);
+  if (!date) return { date: "", reject: "date_unreadable" };
+  if (date.slice(0, 7) !== monthBrt) return { date, reject: "date_not_current_month" };
+  return { date, reject: "" };
 }
 
 const PROMPT = [
@@ -229,7 +279,23 @@ Deno.serve(async (req) => {
     bank: extracted.bank,
     e2e_tail: extracted.e2e_id ? extracted.e2e_id.slice(-6) : "",
   };
-  const reject = (reason: string) => json({ ok: true, result: "rejected", reason, extracted: view });
+  // Uma recusa não deixava rastro nenhum: a única forma de saber por que um
+  // comprovante caiu era pedir o print ao jogador e deduzir (09/09, Digão do
+  // Harmonia). Log compacto e SEM PII — nada de nome de beneficiário, pagador
+  // ou E2E completo; o que o admin precisa é do motivo e dos números.
+  const reject = (reason: string) => {
+    console.log("[pix] recusado:", JSON.stringify({
+      reason,
+      player_id: String(playerRow.id),
+      is_receipt: extracted.is_receipt,
+      amount: extracted.amount,
+      cfg_amount: cfgAmount,
+      date: extracted.date,
+      date_from_e2e: dateFromE2e(extracted.e2e_id),
+      has_e2e: !!extracted.e2e_id,
+    }));
+    return json({ ok: true, result: "rejected", reason, extracted: view });
+  };
 
   if (!extracted.is_receipt) return reject("not_receipt");
 
@@ -245,13 +311,20 @@ Deno.serve(async (req) => {
   if (!allCfgPresent) return reject("beneficiary_mismatch");
   const nameUncertain = !(benefTokens.length > 0 && benefTokens.every((t) => cfgSet.has(t)));
 
-  // 2) Valor exato (em centavos).
-  if (Math.round(extracted.amount * 100) !== Math.round(cfgAmount * 100)) return reject("amount_mismatch");
+  // 2) Valor. Ilegível (0) e divergente são recusas diferentes — quem mandou o
+  // print pela metade era acusado de ter pago outro valor (09/09, Digão do
+  // Harmonia) e não tinha como saber que bastava reenviar o comprovante inteiro.
+  const amountBad = amountReject(extracted.amount, cfgAmount);
+  if (amountBad) return reject(amountBad);
 
-  // 3) Data no mês corrente.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(extracted.date) || extracted.date.slice(0, 7) !== currentMonthBrt()) {
-    return reject("date_not_current_month");
+  // 3) Data no mês corrente, com o E2E de reserva quando o campo não foi lido.
+  const paid = resolvePaidDate(extracted.date, extracted.e2e_id, currentMonthBrt());
+  // A data resolvida é a que vale daqui pra frente (tela, recibo, livro-caixa).
+  if (paid.date) {
+    extracted.date = paid.date;
+    view.date = paid.date;
   }
+  if (paid.reject) return reject(paid.reject);
 
   // Nome com tokens extras (homônimo possível) → revisão do admin, não marca automático.
   if (nameUncertain) {

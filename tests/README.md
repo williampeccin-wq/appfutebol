@@ -44,6 +44,7 @@ opina sobre formatação.
 | `temporada-encerramento.regression.mjs` | `end_date` era só texto no hero: o jogo de setembro entrava no Inverno 26 e a classificação final do quadrimestre nunca era congelada (31/08) |
 | `nota-por-temporada.regression.mjs` | a temporada nova abriu no Harmonia com 0 ponto e 0 jogo mostrando as notas da anterior — a média nunca teve recorte; e o hero anunciava a temporada anterior porque o `label` não era normalizado (31/08) |
 | `churrasco-grupo-impar.regression.mjs` | rodízio com número ímpar de integrantes: o "Grupo" escalado como par de quem sobrou é um id reservado, e guard, auditoria e servidor não podem tratá-lo como jogador inexistente (01/09) |
+| `pix-comprovante-ilegivel.regression.mjs` | comprovante PIX legítimo recusado como "valor não bate" porque o print veio recortado: `amount=0`/`date=""` são o código de **ilegível** no prompt de visão e caíam no balde de "errado"; e a data do pagamento tem de sair do E2E quando o campo não é lido (09/09, Digão do Harmonia) |
 | `mensalidade-virada-de-mes.regression.mjs` | a virada de mês não zerava a mensalidade de ninguém (não havia gatilho — 58fdb1f tentou pela leitura e a97d6ad reverteu); e a estreia da regra não pode atropelar os status que já estão no ar, nem o carimbo do mês pode cair no whitelist do `settings` (01/09) |
 
 ## Como escrever uma nova
