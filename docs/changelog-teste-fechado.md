@@ -186,12 +186,21 @@ só sobe pacote se algo quebrar.
 
 ### O que já está dentro (no ar no PWA, falta empacotar)
 
-- **09/09 (v1.197.0)** — comprovante de PIX legítimo era recusado com "o valor não bate":
+- **10/09 (v1.197.0)** — comprovante de PIX legítimo era recusado com "o valor não bate":
   o print do jogador vinha recortado e a leitura devolvia valor/data em branco, que a
   validação tratava como conteúdo errado em vez de leitura falha. Agora "não consegui ler"
   é uma recusa própria, com a instrução que resolve; a data do pagamento passa a sair do
   próprio identificador do PIX quando o campo não é lido; e toda recusa deixa registro.
   Incidente real do Harmonia — ver item 5 de [melhorias-do-teste.md](melhorias-do-teste.md).
+- **09/09 (v1.196.0)** — o administrador passa a ser avisado no celular quando alguém já
+  sorteado cancela: quem saiu, de qual time e com quantos o time ficou. Esconder o
+  desfalque conserta a tela, mas quem decide se re-sorteia é o admin — e ele não ficava
+  sabendo. Depende de publicar a Edge Function `notify-draw-dropout`.
+- **09/09 (v1.195.0)** — quem cancelava a presença **depois** do sorteio continuava
+  escalado para todo mundo: o sorteio mora num blob que só administrador grava, então a
+  remoção do time nunca chegava ao servidor. Agora a exibição cruza sorteio e presença —
+  na tela, no texto do grupo e na imagem da escalação — sem desfazer o que o admin
+  ajustou depois do cancelamento. Incidente real do Harmonia, no jogo de 09/09.
 - **09/09 (v1.194.0)** — a tela inicial mostrava `Avisos · 1 recado(s)` e o recado não
   aparecia em lugar nenhum; o bloco também não é clicável. Agora cada recado aparece por
   inteiro, como a Config sempre prometeu. Terceiro caso do padrão "contador sem destino"
@@ -206,10 +215,12 @@ só sobe pacote se algo quebrar.
 ```
 Correções desta rodada de testes:
 
-• Os recados do administrador agora aparecem por inteiro na tela inicial — antes o app só dizia quantos havia, sem mostrar nenhum.
-• Textos e cards que ficavam apagados demais no topo de algumas telas voltaram a ficar legíveis.
-• Mensalidade por PIX: quando o comprovante vem cortado, o app agora pede o print inteiro em vez de dizer que o valor está errado.
+• Quem cancela a presença depois do sorteio sai do time na hora — antes continuava escalado para todo mundo.
+• O administrador é avisado no celular quando alguém já sorteado desiste, e consegue remanejar a tempo.
+• Mensalidade por PIX: comprovante cortado agora pede o print inteiro em vez de acusar valor errado.
+• Os recados do administrador aparecem por inteiro na tela inicial.
+• Textos apagados demais no topo de algumas telas voltaram a ficar legíveis.
 ```
 
-*(393 caracteres — ainda sobra espaço para o que sair dos jogos de 09 e 10/09.)*
+*(493 caracteres, de 500. Fechar no dia 11 com o que sair do jogo de hoje.)*
 
