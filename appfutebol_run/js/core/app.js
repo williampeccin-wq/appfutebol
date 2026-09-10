@@ -5165,6 +5165,11 @@ const PIX_REJECT_MESSAGES = {
   not_receipt: 'A imagem não parece um comprovante de pagamento. Envie o print do PIX.',
   beneficiary_mismatch: 'O beneficiário do comprovante não confere com o do clube. Confira para quem você pagou.',
   amount_mismatch: 'O valor do comprovante não bate com o valor da mensalidade.',
+  // Ilegível é diferente de errado: aqui o pagamento pode estar certíssimo e o
+  // que faltou foi print. A instrução tem que ser o que resolve — mandar o
+  // comprovante inteiro — e não uma acusação sobre o valor ou a data.
+  amount_unreadable: 'Não consegui ler o valor no print. Envie o comprovante inteiro, com o valor e a data visíveis.',
+  date_unreadable: 'Não consegui ler a data no print. Envie o comprovante inteiro, com o valor e a data visíveis.',
   date_not_current_month: 'O comprovante não é deste mês. Envie o pagamento do mês corrente.',
   duplicate_e2e: 'Este comprovante já foi usado antes.',
 };
