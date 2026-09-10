@@ -152,7 +152,7 @@ em vez da única instrução que resolvia ("reenvie o comprovante inteiro").
 conta**. Aqui pesa mais, porque é o caminho pelo qual as pessoas pagam — quem desiste na
 primeira recusa vai cobrar o admin no grupo, e o recurso deixa de existir na prática.
 
-**CORRIGIDO em 09/09/2026 (v1.197.0)**, em três frentes:
+**CORRIGIDO em 10/09/2026 (v1.197.0)**, em três frentes:
 
 1. **Ilegível virou recusa própria.** `amount_unreadable` e `date_unreadable` agora existem ao
    lado de `amount_mismatch` e `date_not_current_month`, com a mensagem que resolve: *"Não
@@ -160,8 +160,14 @@ primeira recusa vai cobrar o admin no grupo, e o recurso deixa de existir na pr�
 2. **A data sai do E2E quando o campo não é lido.** O identificador do PIX carrega o instante
    da transação (`E` + ISPB + `AAAAMMDDHHMM` em UTC + 11 alfanuméricos). No comprovante do
    Digão, `E03419786202609100158…` = 10/09 01:58 UTC = **09/09 22:58 BRT**, batendo com o
-   horário impresso. Só isso já teria salvado o comprovante dele. A conversão para BRT importa
-   na virada do mês: um PIX das 22h do dia 30 carimba o dia 1º em UTC.
+   horário impresso. A conversão para BRT importa na virada do mês: um PIX das 22h do dia 30
+   carimba o dia 1º em UTC.
+
+   **Isso sozinho não teria aprovado o comprovante dele:** o valor também estava fora do
+   quadro, e o valor é checado antes da data ([read-pix-receipt](../supabase/functions/read-pix-receipt/index.ts),
+   passo 2). O print dele continuaria recusado — com `amount_unreadable` e a instrução de
+   reenviar inteiro, em vez da acusação de valor errado. O E2E resolve o caso mais comum, que
+   é o print onde só a data ficou ilegível.
 3. **Recusa agora deixa rastro no log.** Antes não havia registro nenhum: a única forma de
    saber por que um comprovante caiu era pedir o print e deduzir. O log é compacto e sem PII
    (motivo, valor lido × configurado, data, se havia E2E) — nome de beneficiário e E2E inteiro
