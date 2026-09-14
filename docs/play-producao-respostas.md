@@ -1,5 +1,60 @@
 # Respostas — Solicitar acesso de produção (Play Console)
 
+> **ENVIADO em 14/09/2026, 13:11.** O painel confirmou "Recebemos seu pedido de acesso de
+> produção"; a resposta vem por e-mail ao proprietário da conta, em até sete dias. Um toast
+> de erro (5838FAEE) apareceu no rodapé no mesmo momento — ruído do painel, não do envio: se
+> o formulário tivesse falhado, a tela continuaria oferecendo "Solicitar o acesso de produção".
+> Terceira tentativa; as duas anteriores foram reprovadas em 14/08 e 30/08.
+
+## O formulário MUDOU (conferido na tela em 14/09/2026)
+
+São **4 etapas** e **300 caracteres por campo** — não mais os 7 campos longos descritos
+abaixo, que valiam até agosto. Enunciados exatos, como aparecem hoje:
+
+**1 · Sobre seu teste fechado**
+- [escolha] Foi fácil recrutar testadores? (Muito difícil … Muito fácil, com "Nem difícil nem fácil" no meio)
+- [texto] Como você recrutou usuários para o teste fechado? Por exemplo, você convidou amigos e familiares ou usou um provedor de testes pago?
+- [texto] Descreva o engajamento dos testadores durante o teste fechado. Inclua se os testadores usaram ou não todos os recursos do app e se isso foi consistente com o esperado de um usuário real. Caso contrário, descreva as diferenças previstas.
+- [texto] Envie um resumo do feedback recebido dos testadores. Especifique como ele foi coletado.
+
+**2 · Sobre o app** — público-alvo, proposta de valor e faixa estimada de instalações.
+
+**3 · Preparação para produção**
+- [texto] Quais mudanças você fez no app com base no que aprendeu durante o teste fechado?
+- [texto] Como você decidiu que o app está pronto para produção?
+
+**4 · Testes adicionais** — "Conte o que mudou no seu último teste fechado."
+- [texto] O que você fez diferente desta vez?
+
+A etapa 4 é nova e existe por causa das reprovações: ela pergunta o que mudou **desde a
+última revisão**, não o que o teste inteiro foi. Responder ali com telemetria e cobertura —
+que é a resposta certa para a etapa 3 — repete o que já foi reprovado duas vezes. O que
+mudou desta vez: a credencial do revisor (apontava para conta inexistente nas duas revisões,
+corrigida em 03/09), os avisos automáticos que nunca saíam (401, corrigidos em 04/09) e três
+pacotes publicados no período (4, 5 e 7, em 01, 08 e 10/09), cada um depois de um jogo real.
+
+## Respostas levadas ao formulário (recomendadas; o texto final foi ajustado na hora)
+
+| Campo | Texto |
+|---|---|
+| Recrutamento | Convite direto por WhatsApp e em grupos de futebol: jogadores e organizadores do meu time amador, que já usavam o app como site (PWA) antes da Play. Alguns testadores são familiares e amigos de fora do time. Não usei provedor pago de testes nem recrutamento aberto. |
+| Engajamento | 3 roteiros guiados medidos por telemetria: 468 aberturas, 158 ações de presença, 14 de 17 fizeram 7 ou 8 dos 8 passos do fluxo admin. Recursos centrais cobertos; pós-jogo, não. Difere do uso real: quase todos como admin (produção é 1 para 15-30) e uso diário em vez de no dia do jogo. |
+| Feedback | Coleta por WhatsApp (conversa pessoal), telemetria própria que mostra onde cada um parou e observação do aparelho quando o relato não batia. Resumo: ajustes de UX, regras de mensalidade, filtros de jogadores, perda de login e salvamento que não persistia. Houve também sugestões de evolução. |
+| Mudanças | Corrigi o que o teste revelou: o aviso de inscrições abertas não chegava, porque o servidor recusava a chamada; erro falso de "não salvei" com a gravação já feita; promoção a admin que dizia ter dado certo sem aplicar; filtro que não filtrava; e PIX que recusava comprovante válido. |
+| Prontidão | 30+ dias de uso por organizadores reais, com mensalidade e PIX de verdade. Fluxos centrais percorridos de ponta a ponta e medidos por telemetria, não por relato. Nenhum defeito relatado em aberto, e cada correção virou teste automatizado. Dado isolado por clube com RLS ativo no banco. |
+| O que fiz diferente | Corrigi a credencial declarada ao revisor, que apontava para uma conta inexistente nas duas revisões — sem ela ninguém entrava no app. Fiz os avisos automáticos voltarem a chegar aos testadores. E lancei 3 versões no período, cada uma depois de um jogo real, com correções vindas do uso. |
+
+Guardar isto importa: se vier outra reprovação, a primeira pergunta é o que exatamente foi
+declarado — foi não ter esse registro que deixou a segunda tentativa no escuro.
+
+---
+
+# HISTÓRICO — formulário antigo (7 campos longos, válido até agosto/2026)
+
+> O que está abaixo era a estrutura das duas primeiras tentativas. Mantido porque o texto
+> longo é a matéria-prima das versões curtas e porque os números das duas rodadas de teste
+> estão aqui.
+
 > App: br.app.convocados · Liberação prevista: **28/08/2026** (14 dias após a revisão de 14/08).
 > Perguntas conferidas no artigo oficial (answer/14151465) em 25/08/2026.
 > ⚠️ `[CONFIRMAR]` = depende de você. Não invente nada aqui.
