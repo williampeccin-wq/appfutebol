@@ -2709,7 +2709,7 @@ import { renderPlayersScreen, renderCarneScreen } from '../modules/players/playe
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { idDaEntrada, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
-import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
+import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, removeDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
@@ -4219,6 +4219,37 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
+  appElement.querySelectorAll('[data-action="remove-drawn-player"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const snapshot = getState();
+      if (!requireAdmin(snapshot)) return;
+      const alvo = String(button.dataset.playerId || '');
+      // Convidado e goleiro de aluguel não têm linha em `players`: o nome deles
+      // mora na própria entrada do sorteio.
+      const entradaNoSorteio = timesDoSorteio(getActiveGameFromSnapshot(snapshot)?.sort_result).flat()
+        .find((entrada) => String(idDaEntrada(entrada)) === alvo);
+      const nome = (snapshot.players || []).find((item) => String(item.id) === alvo)?.name
+        || (entradaNoSorteio && typeof entradaNoSorteio === 'object' ? entradaNoSorteio.name : '')
+        || 'este jogador';
+      const time = button.dataset.teamLabel || 'time';
+      const seguir = await showConfirmModal({
+        title: 'Tirar do time',
+        message: `Tirar ${nome} do ${time}? A presença dele não muda — se ainda estiver confirmado, ele volta para a lista de fora do sorteio.`,
+        confirmText: 'Tirar do time',
+        cancelText: 'Cancelar',
+      });
+      if (!seguir) return;
+
+      const result = removeDrawnPlayer(alvo);
+      if (result.ok) {
+        const safeSnapshot = repairManualSnapshot(getState());
+        savePersistedState(safeSnapshot);
+        render(safeSnapshot);
+      }
+      showToast(result.message, result.ok ? 'success' : 'error');
+    });
+  });
+
   appElement.querySelectorAll('[data-action="add-player-to-draw"]').forEach((button) => {
     button.addEventListener('click', () => {
       const result = addConfirmedPlayerToDraw(button.dataset.playerId, button.dataset.team);
@@ -5636,18 +5667,32 @@ function renderTeamDraw(snapshot, currentPlayer) {
                 </div>
               </div>
               ${isAdmin && id && player ? `
-                <button
-                  class="team-inline-move-button"
-                  type="button"
-                  data-action="move-drawn-player"
-                  data-player-id="${id}"
-                  data-from-team="${teamKey}"
-                  aria-label="Mover ${player.name || 'jogador'} para ${targetLabel}"
-                  title="Mover para ${targetLabel}"
-                >
-                  ⇄
-                  <span>Mover</span>
-                </button>
+                <div class="team-draw-player-actions">
+                  <button
+                    class="team-inline-move-button"
+                    type="button"
+                    data-action="move-drawn-player"
+                    data-player-id="${id}"
+                    data-from-team="${teamKey}"
+                    aria-label="Mover ${escapeHtml(player.name || 'jogador')} para ${targetLabel}"
+                    title="Mover para ${targetLabel}"
+                  >
+                    ⇄
+                    <span>Mover</span>
+                  </button>
+                  <button
+                    class="team-inline-remove-button"
+                    type="button"
+                    data-action="remove-drawn-player"
+                    data-player-id="${id}"
+                    data-team-label="${title}"
+                    aria-label="Tirar ${escapeHtml(player.name || 'jogador')} do ${title}"
+                    title="Tirar do ${title}"
+                  >
+                    ✕
+                    <span>Tirar</span>
+                  </button>
+                </div>
               ` : ''}
             </div>
           `;
