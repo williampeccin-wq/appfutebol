@@ -6083,6 +6083,49 @@ body {
 }
 .content--weekly_game .team-inline-move-button span { display: none; }
 
+/* Sorteio: "Mover" e "Tirar do time" lado a lado no fim da linha. O alvo do
+   Mover sobe para 44px (o mínimo do app); o Tirar é destrutivo, então vai a
+   48px e fica a 8px do vizinho, para ninguém tirar alguém do time com o
+   polegar torto na beira do campo. */
+.team-draw-player-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.team-inline-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.content--weekly_game .team-inline-move-button {
+  width: 44px;
+  height: 44px;
+}
+
+.content--weekly_game .team-inline-remove-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  background: rgba(240, 137, 123, 0.16);
+  border: 1px solid rgba(240, 137, 123, 0.35);
+  color: #f0897b;
+}
+
+.content--weekly_game .team-inline-remove-button:active {
+  transform: translateY(1px);
+}
+
+.content--weekly_game .team-inline-remove-button span { display: none; }
+
 /* Jogo da semana: linhas de jogador (presença/fora) em vidro — corrige nome
    claro sobre card branco (contraste) */
 .content--weekly_game .weekly-player-row,

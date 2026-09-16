@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.197.0-comprovante-ilegivel';
+export const APP_VERSION = 'v1.198.0-tirar-do-time';
