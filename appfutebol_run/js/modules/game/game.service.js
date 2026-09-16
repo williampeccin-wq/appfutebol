@@ -5,6 +5,7 @@ import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages, rollingRatingWindow } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
 import { isGoalkeeperPlayer } from '../../domain/confirmations.js';
+import { semQuemCancelou } from '../../domain/draw-teams.js';
 
 
 function activeGame(snapshot = getState()) { return getActiveGame(snapshot); }
@@ -67,9 +68,37 @@ function patchForActiveGame(snapshot, updatedGame) {
   };
 }
 
+// O sorteio COMO A TELA MOSTRA — base de toda edição do admin.
+//
+// INCIDENTE 16/09 (Harmonia): o Broquinha cancelou depois do sorteio e sumiu do
+// time, como manda o semQuemCancelou. Mas sumir é só exibição: a remoção nasce
+// no estado local de quem cancelou e, sendo jogador comum, nunca chega ao
+// servidor (o sorteio mora em `app_meta`, admin-only). Quando o admin foi pôr o
+// Bignotti no lugar, o `adjusted_at` da edição passou a ser mais novo que o
+// cancelamento — e a trava "o admin mexeu depois, não desfaz" devolveu o
+// Broquinha ao time.
+//
+// Editar a partir do exibido fecha o buraco: o que o admin salva é o que ele
+// estava vendo, e quem tinha saído sai de vez do que fica gravado.
+function sorteioExibido(snapshot, game = activeGame(snapshot)) {
+  const sortResult = game?.sort_result;
+  if (!sortResult) return sortResult;
+
+  const filtrado = semQuemCancelou(sortResult, scopedConfirmations(snapshot), activeGameKey(snapshot));
+  if (filtrado === sortResult) return sortResult;
+
+  // Aqui o sorteio é gravado como team_a/team_b. O semQuemCancelou devolve
+  // TAMBÉM um `teams` (formato de N times), que ficaria congelado no primeiro
+  // ajuste seguinte — e as telas leem `teams` primeiro, então o ajuste do admin
+  // é que sumiria. Fora deste retorno, `teams` não existe nesta branch.
+  const { teams, ...doisTimes } = filtrado;
+  void teams;
+  return doisTimes;
+}
+
 function buildDrawRemovalPatch(snapshot, playerId, now = new Date().toISOString()) {
   const game = activeGame(snapshot);
-  const sortResult = game?.sort_result;
+  const sortResult = sorteioExibido(snapshot, game);
 
   if (!sortResult) {
     return {};
@@ -741,7 +770,7 @@ export function drawTeams() {
 export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
   const snapshot = getState();
   const game = activeGame(snapshot);
-  const sortResult = game?.sort_result;
+  const sortResult = sorteioExibido(snapshot, game);
 
   if (!sortResult) {
     return { ok: false, message: 'Nenhum sorteio disponível para editar.' };
@@ -809,7 +838,7 @@ export function addConfirmedPlayerToDraw(playerId, targetTeamKey = 'team_a') {
 export function moveDrawnPlayer(playerId, fromTeamKey) {
   const snapshot = getState();
   const game = activeGame(snapshot);
-  const sortResult = game?.sort_result;
+  const sortResult = sorteioExibido(snapshot, game);
 
   if (!sortResult) {
     return { ok: false, message: 'Nenhum sorteio disponível para ajustar.' };
@@ -851,6 +880,55 @@ export function moveDrawnPlayer(playerId, fromTeamKey) {
   });
 
   return { ok: true, message: 'Jogador movido.' };
+}
+
+// Tira alguém do time SEM mexer na presença dele.
+//
+// Faltava a contrapartida do "Mover": quando alguém desiste depois do sorteio e
+// a remoção automática não pega — porque o admin já tinha ajustado o time
+// depois, ou porque o dado veio torto de uma versão antiga —, o admin não tinha
+// como arrumar a mão. A única saída era re-sortear tudo, desmanchando times que
+// já estavam combinados.
+//
+// Quem sai daqui e continua confirmado reaparece em "confirmados fora do
+// sorteio", de onde dá para recolocar. Por isso não se mexe na presença: tirar
+// do time é decisão de escalação, não de convocação.
+export function removeDrawnPlayer(playerId) {
+  const snapshot = getState();
+  const game = activeGame(snapshot);
+  const sortResult = sorteioExibido(snapshot, game);
+
+  if (!sortResult) {
+    return { ok: false, message: 'Nenhum sorteio disponível para ajustar.' };
+  }
+
+  const alvo = String(playerId);
+  const getEntryId = (entry) => (entry && typeof entry === 'object') ? entry.id : entry;
+  const teamA = Array.isArray(sortResult.team_a) ? sortResult.team_a : [];
+  const teamB = Array.isArray(sortResult.team_b) ? sortResult.team_b : [];
+
+  if (![...teamA, ...teamB].some((entry) => String(getEntryId(entry)) === alvo)) {
+    return { ok: false, message: 'Jogador não está no sorteio.' };
+  }
+
+  const semOAlvo = (team) => team.filter((entry) => String(getEntryId(entry)) !== alvo);
+  const adjustedDraw = {
+    ...sortResult,
+    team_a: semOAlvo(teamA),
+    team_b: semOAlvo(teamB),
+    adjusted_at: new Date().toISOString(),
+  };
+  const drawHistory = Array.isArray(game.draw_history) ? game.draw_history : [];
+
+  patchActiveGame(snapshot, {
+    ...game,
+    sort_result: adjustedDraw,
+    draw_history: drawHistory.map((entry) => (
+      String(entry?.id || '') === String(sortResult.id || '') ? adjustedDraw : entry
+    )),
+  });
+
+  return { ok: true, message: 'Jogador tirado do time.' };
 }
 
 // Limpa APENAS o sorteio ativo. O draw_history fica: resultados de campeonato já
