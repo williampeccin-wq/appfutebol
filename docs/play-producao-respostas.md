@@ -6,6 +6,30 @@
 > o formulário tivesse falhado, a tela continuaria oferecendo "Solicitar o acesso de produção".
 > Terceira tentativa; as duas anteriores foram reprovadas em 14/08 e 30/08.
 
+## 3ª REPROVAÇÃO (16/09/2026, 18:06) — o gargalo NUNCA foi o formulário
+
+O painel mostra três critérios. Os dois primeiros riscados; o terceiro, aberto:
+
+> Faça o teste fechado com pelo menos 12 testadores **por mais 14 dias a partir da data de
+> revisão** — *12 testadores estão participando continuamente há 1 dia*
+
+E o botão "Solicitar a produção" fica **desabilitado** enquanto esse contador não chega a 14.
+É automático: nenhuma resposta de formulário destrava isso.
+
+Daí as três reprovações (14/08, 30/08, 16/09):
+
+1. **Cada revisão zera o contador.** Pedir antes de fechar 14 dias não adianta — atrasa, porque
+   a análise reinicia o relógio.
+2. **Margem zero.** A faixa Alpha tem 28 e-mails convidados (listas "Testadores", 1, e
+   "Testadores convocados", 27), mas só **12 aceitaram**. O critério exige 12 CONTINUAMENTE:
+   uma saída, troca de conta Google ou desinstalação derruba para 11 e zera a contagem.
+
+**Plano:** levar os aceites de 12 para 18–20 (link de opt-in
+https://play.google.com/apps/testing/br.app.convocados, aceitar com a mesma conta Google do
+celular); não mexer nas listas; esperar o contador marcar 14 dias (≈30/09) e só então pedir,
+reaproveitando as respostas registradas abaixo. Acompanhar a linha do contador no painel: se
+ela voltar para "há 1 dia", alguém saiu.
+
 ## O formulário MUDOU (conferido na tela em 14/09/2026)
 
 São **4 etapas** e **300 caracteres por campo** — não mais os 7 campos longos descritos
