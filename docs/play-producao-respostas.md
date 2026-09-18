@@ -57,6 +57,66 @@ Questions:
 3. What should I produce in the next 14 days?
 ```
 
+## CAMINHO ALTERNATIVO — conta de organização (18/09/2026)
+
+A exigência de teste fechado é definida para **contas pessoais criadas após 13/11/2023** — está
+no título e no corpo do artigo oficial (answer/14151465). Fontes de fornecedor e da comunidade
+dizem que **contas de organização (com D-U-N-S) ficam de fora dela**; o Google não afirma isso
+em lugar nenhum que eu tenha achado. É a diferença entre "escopo escrito" e "isenção deduzida".
+
+Também é oficial que dá para **converter** a conta pessoal em organização sem criar conta nova
+nem transferir app: novo perfil de pagamentos do tipo organização + D-U-N-S; apps, avaliações e
+histórico ficam. Depois da transição, esperar 72h antes de enviar app novo.
+
+Custos e efeitos colaterais: D-U-N-S é gratuito mas demora dias/semanas; exige site oficial da
+organização para verificação; e a página do app passa a exibir **razão social e endereço** da
+empresa.
+
+**O que decide, e que eu não sei:** se a exigência para de valer para um app que já está em
+teste fechado numa conta que era pessoal. A regra é do tipo de conta, então em tese sim — mas
+"em tese" já custou três reprovações.
+
+### Tíquete 2 (enviar SEPARADO do tíquete da reprovação — 967 caracteres)
+
+Vai em tíquete próprio de propósito: no tíquete da reprovação, a pergunta cairia na resposta
+pronta de "continue testando". Não menciona a reprovação por isso mesmo.
+
+```
+Question about developer account type and the closed testing requirement.
+
+My developer account is a personal account created after 13 November 2023, so my app (br.app.convocados) is subject to the closed testing requirement: 12 testers opted in for 14 continuous days before production access.
+
+I am considering changing this account to an organization account, by creating a new payments profile with my company D-U-N-S number.
+
+Before I start the D-U-N-S process, I would like to confirm one point:
+
+After the account type changes from personal to organization, does the closed testing requirement still apply to this existing app before I can request production access? Or does the requirement stop applying, since it is defined for personal accounts created after 13 November 2023?
+
+The app is already published on a closed testing track with active testers, which is why I want to confirm whether the requirement follows the app or the account type.
+
+Thank you.
+```
+
+### Enquanto a resposta não vem
+
+O teste fechado segue rodando sozinho: os 12 continuam inscritos e ninguém precisa fazer nada.
+Não gastar com serviço de testadores e não implementar push por causa da métrica da Play — os
+dois pushes (time sorteado/uniforme e votação aberta) valem como produto, não como teatro.
+
+### O que a medição mostrou (02 a 14/09, dados nossos)
+
+- Uso está DENTRO do app da Play, não no navegador: a hipótese de que o Google não enxergava o
+  uso foi **refutada** pelos nossos próprios dados.
+- 14 testadores, mediana de **3 dias** cada em 13 dias; ninguém acima de 4 dias.
+- Mediana de **4min19s** de tempo total em foco; 8 de 14 passaram de 4 minutos; ~3.600 toques.
+  Um toque a cada 1–4 segundos: quem abriu, usou de verdade.
+- A conta "Revisor Google" só registra a sessão do próprio dono testando a credencial em 03/09.
+  **Não há registro de nenhum revisor do Google ter entrado no app** em nenhuma das 3 análises.
+
+Consultas em `supabase/ADHOC_engajamento_visivel_google.sql` e
+`supabase/ADHOC_sessoes_janela_google.sql` — rodar antes de pedir de novo, para medir em vez de
+apostar.
+
 ## O formulário MUDOU (conferido na tela em 14/09/2026)
 
 São **4 etapas** e **300 caracteres por campo** — não mais os 7 campos longos descritos
