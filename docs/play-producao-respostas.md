@@ -97,6 +97,24 @@ The app is already published on a closed testing track with active testers, whic
 Thank you.
 ```
 
+### Tíquete 2 ENVIADO em 18/09/2026 — e a IA do Console já respondeu
+
+Tema escolhido: "Conta e verificação de desenvolvedor do Google Play" → "Conta de desenvolvedor
+geral" → "Tenho dúvidas sobre a edição de perfis de desenvolvedor". De propósito fora da fila de
+testes/produção. Status: Pendente, resposta por e-mail em até 2 dias úteis.
+
+Antes de abrir o tíquete, o assistente de IA do próprio Console respondeu (em inglês):
+
+> A exigência obrigatória de teste fechado (12 testadores por 14 dias contínuos) se aplica
+> estritamente a contas pessoais criadas após 13/11/2023. **Contas de organização não têm essa
+> exigência. Assim que você atualizar o tipo da conta para organização, a exigência de teste
+> deixa de se aplicar ao seu app existente.** Para mudar o tipo, é preciso atualizar os dados da
+> organização e vincular um perfil de pagamentos organizacional com D-U-N-S válido.
+
+⚠️ É resposta de IA, e a própria tela avisa que pode errar — por isso o tíquete humano foi aberto
+mesmo assim. Mas é a primeira vez que a resposta vem de dentro do Google, e não de blog de
+fornecedor, e ela é explícita no ponto que decide: vale para o **app existente**.
+
 ### Enquanto a resposta não vem
 
 O teste fechado segue rodando sozinho: os 12 continuam inscritos e ninguém precisa fazer nada.
