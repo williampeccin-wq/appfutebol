@@ -6,29 +6,56 @@
 > o formulário tivesse falhado, a tela continuaria oferecendo "Solicitar o acesso de produção".
 > Terceira tentativa; as duas anteriores foram reprovadas em 14/08 e 30/08.
 
-## 3ª REPROVAÇÃO (16/09/2026, 18:06) — o gargalo NUNCA foi o formulário
+## 3ª REPROVAÇÃO (16/09/2026, 18:06) — o que sabemos e o que não
 
-O painel mostra três critérios. Os dois primeiros riscados; o terceiro, aberto:
+**Correção do que eu (Claude) escrevi em 17/09 neste arquivo:** eu disse que o gargalo era o
+contador de 14 dias e que o botão desabilitado provava isso. Errado. O botão fica desabilitado
+DEPOIS da reprovação, porque a análise reinicia o relógio. **Em 14/09 ele estava habilitado** —
+e ele só habilita com os três critérios cumpridos. Ou seja: a parte automática passou, e quem
+reprovou foi a análise.
 
-> Faça o teste fechado com pelo menos 12 testadores **por mais 14 dias a partir da data de
-> revisão** — *12 testadores estão participando continuamente há 1 dia*
+### O que é fato
 
-E o botão "Solicitar a produção" fica **desabilitado** enquanto esse contador não chega a 14.
-É automático: nenhuma resposta de formulário destrava isso.
+- O botão estava habilitado em 14/09 → 12+ testadores inscritos por 14 dias consecutivos, ok.
+- O critério "pelo menos 12 testadores que aceitaram" segue riscado no painel.
+- O artigo oficial (answer/14151465) lista dois motivos para "precisa de mais testes": menos de
+  12 testadores que aceitaram **ou engajamento insuficiente no período de teste**. O primeiro
+  está descartado pelo próprio painel.
+- **A página "Feedback de teste" do Console está VAZIA.** Nenhum testador enviou feedback pela
+  Play em dois meses — todo o feedback veio por WhatsApp, e a telemetria fica no nosso banco.
+- Definição oficial de participação contínua (FAQ do mesmo artigo): conta permanecer inscrito;
+  quem sai antes dos 14 dias não conta, e quem sai e volta recomeça. Não mede uso.
 
-Daí as três reprovações (14/08, 30/08, 16/09):
+### O que é hipótese (não provado)
 
-1. **Cada revisão zera o contador.** Pedir antes de fechar 14 dias não adianta — atrasa, porque
-   a análise reinicia o relógio.
-2. **Margem zero.** A faixa Alpha tem 28 e-mails convidados (listas "Testadores", 1, e
-   "Testadores convocados", 27), mas só **12 aceitaram**. O critério exige 12 CONTINUAMENTE:
-   uma saída, troca de conta Google ou desinstalação derruba para 11 e zera a contagem.
+Que a reprovação venha do engajamento **medido pelo Google** — instalações e aberturas — e que
+tudo o que comprova o teste de verdade esteja invisível para ele: 468 aberturas e 158 ações de
+presença na nossa telemetria, roteiros cumpridos por 14 de 17, feedback detalhado no WhatsApp,
+uso real no PWA fora da Play. 22 pessoas instalaram e testaram; a Play enxerga quase nada disso.
 
-**Plano:** levar os aceites de 12 para 18–20 (link de opt-in
-https://play.google.com/apps/testing/br.app.convocados, aceitar com a mesma conta Google do
-celular); não mexer nas listas; esperar o contador marcar 14 dias (≈30/09) e só então pedir,
-reaproveitando as respostas registradas abaixo. Acompanhar a linha do contador no painel: se
-ela voltar para "há 1 dia", alguém saiu.
+### Plano até 30/09
+
+1. Pedir a 8–10 testadores que mandem feedback **pela Play Store do celular** (app → fim da
+   página → seção do programa de teste). É o único sinal de engajamento que o Google registra
+   sozinho, e hoje está zerado.
+2. Manter as aberturas nos dias de jogo — o push voltou a funcionar e isso o Google conta.
+3. Não mexer nas listas de testadores (sair e voltar reinicia a contagem individual).
+4. Abrir tíquete de suporte perguntando o que é medido. Texto em inglês, 998 caracteres:
+
+```
+App: br.app.convocados (personal developer account).
+
+I requested production access on 14 Sep 2026 — the "Request production" button was enabled, so the automated criteria (12+ testers opted in for 14 consecutive days) were met. It was rejected on 16 Sep with "your app needs more testing". The 12-tester criterion still shows as met, so I assume the reason is insufficient engagement.
+
+I need to understand what engagement is measured, because it does not match what I see. The app organises weekly amateur football matches, so real use concentrates on match days, twice a week. During the test: 22 devices with the app installed, 3 releases published, 468 app opens and 158 presence actions in my telemetry, and 14 of 17 testers completed a guided 8-step script.
+
+My "Test feedback" page is empty: feedback came over WhatsApp, not through Play.
+
+Questions:
+1. Which engagement signals do you evaluate?
+2. Which is below the expected level for my app?
+3. What should I produce in the next 14 days?
+```
 
 ## O formulário MUDOU (conferido na tela em 14/09/2026)
 
