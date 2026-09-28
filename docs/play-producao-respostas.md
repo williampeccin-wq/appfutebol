@@ -115,6 +115,41 @@ Antes de abrir o tíquete, o assistente de IA do próprio Console respondeu (em 
 mesmo assim. Mas é a primeira vez que a resposta vem de dentro do Google, e não de blog de
 fornecedor, e ela é explícita no ponto que decide: vale para o **app existente**.
 
+### O que dizem quem já fez (levantamento 28/09/2026)
+
+**Conta CRIADA como organização: isenta.** BenMcc, Diamond Product Expert, na comunidade oficial
+(29/12/2025): *"Organizations don't need to do the 14 days testing or wait the 14 days."* Resposta
+marcada como solução e endossada por outro Diamond. Bate com o escopo do artigo oficial.
+
+**Conta CONVERTIDA de pessoal para organização: relatos conflitantes.** Thread 409685281
+(13/02/2026), de alguém na situação idêntica à nossa — app em teste fechado, conversão em
+andamento:
+
+- Rajat Patel, Gold Product Expert: *"No, the 14-day testing requirement remains in place for the
+  app created under a Personal account, even after the account is upgraded to Organization
+  status."* Sugeriu apagar o app e recriar sob a organização.
+- **O próprio autor voltou 6 dias depois (19/02/2026):** *"As soon as the account converted to an
+  organization, I got the option to send for production without deleting. Now it's been in review
+  for the last 3 days."* A thread foi trancada e o desfecho da análise nunca apareceu.
+
+Ou seja: o único relato de primeira mão da nossa situação exata diz que **o botão de produção
+apareceu após a conversão, sem apagar o app** — contrariando o especialista da mesma thread.
+Amostra de um, sem desfecho conhecido.
+
+⚠️ Os "Product Experts" são voluntários, não funcionários do Google. O rótulo Diamond/Gold indica
+volume de participação no fórum, não autoridade sobre política.
+
+**A sugestão de apagar e recriar é ruim para nós.** Regra oficial: package de app deletado **com
+instalações na vida** nunca mais pode ser reutilizado, nem pela mesma conta. Apagar custaria o
+`br.app.convocados` para sempre — package novo, assetlinks e TWA refeitos, testadores
+reinstalando do zero. Só faria sentido para app sem nenhuma instalação.
+
+**Onde isso deixa a decisão:** o caminho da organização tem um relato a favor e um especialista
+contra, e a resposta do suporte por e-mail se contradiz nos dois parágrafos. Nada disso é
+conclusivo. O plano B (contador chegando a 14 em ~01/10) continua sendo o único caminho que não
+depende de interpretação — lembrando que o motivo da 3ª reprovação foi engajamento, não o
+contador, e que a janela 16/09–01/10 ficou vazia de propósito.
+
 ### Enquanto a resposta não vem
 
 O teste fechado segue rodando sozinho: os 12 continuam inscritos e ninguém precisa fazer nada.
