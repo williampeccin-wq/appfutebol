@@ -1,3 +1,7 @@
+-- ⚠️ HISTÓRICO: a tabela public.activity_log foi removida em 29/09/2026 junto com a
+-- telemetria do piloto (v1.199.0). Esta consulta não roda mais — fica como registro
+-- do que foi medido. Ver supabase/ADHOC_remover_activity_log.sql.
+
 -- QUEM ATIVOU AS NOTIFICAÇÕES — e, principalmente, quem tentou e não conseguiu.
 --
 -- Duas fontes, porque uma só não conta a história inteira:

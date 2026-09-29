@@ -1,3 +1,7 @@
+-- ⚠️ HISTÓRICO: a tabela public.activity_log foi removida em 29/09/2026 junto com a
+-- telemetria do piloto (v1.199.0). Esta consulta não roda mais — fica como registro
+-- do que foi medido. Ver supabase/ADHOC_remover_activity_log.sql.
+
 -- QUANTO TEMPO O TESTE DUROU, NA JANELA QUE O GOOGLE OLHOU
 --
 -- Complemento de ADHOC_engajamento_visivel_google.sql. Aquela consulta mostrou

@@ -1,3 +1,7 @@
+-- ⚠️ HISTÓRICO: a tabela public.activity_log foi removida em 29/09/2026 junto com a
+-- telemetria do piloto (v1.199.0). Esta consulta não roda mais — fica como registro
+-- do que foi medido. Ver supabase/ADHOC_remover_activity_log.sql.
+
 -- Consultas de apoio do roteiro do testador. RODE UMA DE CADA VEZ: o SQL Editor
 -- só mostra o resultado da última instrução do arquivo (selecione a query com o
 -- mouse e aperte Run). O checklist principal está em ADHOC_roteiro_testadores.sql.

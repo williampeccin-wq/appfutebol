@@ -1,3 +1,7 @@
+-- ⚠️ HISTÓRICO: a tabela public.activity_log foi removida em 29/09/2026 junto com a
+-- telemetria do piloto (v1.199.0). Esta consulta não roda mais — fica como registro
+-- do que foi medido. Ver supabase/ADHOC_remover_activity_log.sql.
+
 -- QUEM FEZ E QUEM NÃO FEZ O ROTEIRO — uma query só, a rodada inteira.
 --
 -- Cole no SQL Editor e aperte Run. É uma instrução única de propósito: o editor

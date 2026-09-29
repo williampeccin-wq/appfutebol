@@ -2253,7 +2253,6 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
-  if (!isEditing) logPlayerAdded(currentPlayer, { name });
   showToast(isEditing ? "Jogador atualizado com sucesso" : "Jogador adicionado", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
   return;
@@ -2516,7 +2515,6 @@ if (action === "delete-player") {
     // Último passo do roteiro do testador (limpar o jogador de teste) era o
     // único sem rastro no activity_log — sem ele não dava para saber se a
     // pessoa chegou ao fim.
-    logPlayerDeleted(currentPlayer, { target_id: String(player.id) });
     showToast(result.message || 'Jogador removido.', 'success');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (error) {
@@ -2861,7 +2859,6 @@ if (action === "admin-add-to-game") {
     replaceState(safeSnapshot);
 
     uiActionInFlight = false;
-    logPaymentToggled(currentPlayer, { paid: action === "mark-paid", target_id: id });
     showToast(action === "mark-paid" ? "Mensalidade marcada como paga" : "Jogador marcado como inadimplente", "success");
     return;
   }
@@ -2924,8 +2921,6 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, triggerDrawDropout, syncExistingPushSubscription } from '../services/push.service.js';
 // TEMPORÁRIO (piloto): log de movimentação dos testers. Remover antes do go-live.
-import { startTesterMeter } from '../services/tester-meter.js';
-import { logAppOpen, logTab, logPresenceConfirmed, logPresenceCancelled, logTeamDraw, logPlayerAdded, logPaymentToggled, logPlayerDeleted, logPushEnabled, logPushDenied, logPushDisabled } from '../services/activity-log.js';
 import { submitPixReceipt } from '../services/pix.service.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
@@ -4398,7 +4393,6 @@ async function bindPushControl(card, currentPlayer) {
     let activated = false;
     if (isCurrentlyOn) {
       await disablePush();
-      logPushDisabled(currentPlayer, null);
     } else {
       const result = await enablePush(currentPlayer?.id);
       if (!result.ok) {
@@ -4408,12 +4402,10 @@ async function bindPushControl(card, currentPlayer) {
           unsupported: 'Este navegador não suporta notificações.',
           subscribe_failed: 'Não foi possível ativar agora. Tente novamente.',
         };
-        logPushDenied(currentPlayer, { reason: result.reason || 'unknown' });
         showToast(messages[result.reason] || 'Não foi possível ativar as notificações.', 'error');
       } else {
         activated = true;
         setPushOnboarded();
-        logPushEnabled(currentPlayer, { where: isHomeCard ? 'home' : 'config' });
         showToast('Notificações ativadas.', 'success');
       }
     }
@@ -4526,11 +4518,6 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
-  // TEMPORÁRIO (piloto): registra que o app foi aberto (throttle interno de 5min).
-  logAppOpen(currentPlayer, APP_VERSION);
-  // TEMPORÁRIO (teste fechado): medidor de sessão. Só monta no clube de teste.
-  startTesterMeter(currentPlayer, getCurrentClubId());
-
   const buttons = appElement.querySelectorAll('[data-tab]');
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -4543,7 +4530,6 @@ function bindAppEvents(currentPlayer) {
         // cortada sem lembrar do porquê é pegadinha.
         if (nextTab !== 'players') playersFilter = 'all';
         window.scrollTo({ top: 0 });
-        logTab(currentPlayer, nextTab); // TEMPORÁRIO (piloto)
       }
     });
   });
@@ -4551,11 +4537,8 @@ function bindAppEvents(currentPlayer) {
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
     const antes = getState(); // o sorteio de antes do cancelamento, para saber se ela estava escalada
     const result = toggleConfirmation(currentPlayer.id);
-    if (result?.ok) {
-      if (result.message?.includes('cancelad')) {
-        logPresenceCancelled(currentPlayer);
-        notifyDrawDropout(antes, currentPlayer.id, result);
-      } else if (result.message?.includes('confirmad')) logPresenceConfirmed(currentPlayer);
+    if (result?.ok && result.message?.includes('cancelad')) {
+      notifyDrawDropout(antes, currentPlayer.id, result);
     }
     if (result?.message) showToast(result.message, result.ok ? 'success' : 'error');
     notifyWaitlistPromotion(result);
@@ -4566,7 +4549,6 @@ function bindAppEvents(currentPlayer) {
     // balanceamento por nota cai no fallback neutro sem o admin perceber).
     if (isVotingEnabled()) { try { await loadRatingsCache(); } catch (_) { /* segue só por posição */ } }
     const result = drawTeams();
-    if (result?.ok) logTeamDraw(currentPlayer, { players: result.sortResult?.total_players || null });
     showToast(result.message, result.ok ? 'success' : 'error');
   });
 

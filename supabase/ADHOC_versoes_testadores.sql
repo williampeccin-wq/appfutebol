@@ -1,3 +1,7 @@
+-- ⚠️ HISTÓRICO: a tabela public.activity_log foi removida em 29/09/2026 junto com a
+-- telemetria do piloto (v1.199.0). Esta consulta não roda mais — fica como registro
+-- do que foi medido. Ver supabase/ADHOC_remover_activity_log.sql.
+
 -- QUEM JÁ ESTÁ NO PACOTE NOVO DA PLAY — e quem ficou para trás.
 --
 -- O campo `av` é gravado a cada `app_open` desde 02/09/2026, via
