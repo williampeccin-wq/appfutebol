@@ -2507,9 +2507,15 @@ if (action === "admin-remove-from-game") {
     return;
   }
 
+  // Se há fila, remover NÃO deixa a vaga aberta: o primeiro da fila entra no
+  // mesmo toque. Calar isso fez o admin remover alguém, ver outro entrar sem
+  // entender e tentar desfazer na mão (INCIDENTE 29/09/2026).
+  const primeiroDaFila = getWaitlistView(snapshot)[0]?.player || null;
   const confirmedRemoval = await showConfirmModal({
     title: 'Remover do jogo',
-    message: `Remover ${player.name} do jogo vigente? A vaga será liberada e ele poderá confirmar novamente depois.`,
+    message: primeiroDaFila
+      ? `Remover ${player.name} do jogo? A vaga vai na hora para ${primeiroDaFila.name}, o primeiro da fila. ${player.name} sai do jogo e NÃO fica na fila — para ceder a vaga e continuar esperando, use "Ceder vaga".`
+      : `Remover ${player.name} do jogo vigente? A vaga será liberada e ele poderá confirmar novamente depois.`,
     confirmText: 'Remover',
     cancelText: 'Cancelar',
   });
@@ -2526,6 +2532,47 @@ if (action === "admin-remove-from-game") {
 
   uiActionInFlight = false;
   showToast(result.message, result.ok ? "success" : "error");
+  notifyWaitlistPromotion(result);
+  return;
+}
+
+if (action === "admin-ceder-vaga") {
+  const current = snapshot.players.find((p) => p.id === snapshot.session?.playerId);
+  const player = snapshot.players.find((p) => p.id === id);
+
+  if (!authzIsAdmin(current)) {
+    showToast("Apenas administrador pode ceder a vaga de um jogador", "error");
+    return;
+  }
+
+  if (!player) return;
+
+  const proximo = getWaitlistView(snapshot).find((entry) => String(entry.player_id) !== String(id))?.player || null;
+
+  if (!proximo) {
+    showToast("Não há ninguém na fila de espera para assumir a vaga", "error");
+    return;
+  }
+
+  const cede = await showConfirmModal({
+    title: 'Ceder vaga',
+    message: `${player.name} cede a vaga e ${proximo.name} entra no jogo. ${player.name} passa a ser o primeiro da fila: se abrir outra vaga, volta na frente de todo mundo.`,
+    confirmText: 'Ceder vaga',
+    cancelText: 'Cancelar',
+  });
+
+  if (!cede) return;
+
+  uiActionInFlight = true;
+  setActionBusy(trigger, 'Cedendo...');
+
+  const result = cederVagaParaPrimeiroDaFila(id);
+  const safeSnapshot = repairManualSnapshot(getState());
+  savePersistedState(safeSnapshot);
+  render(safeSnapshot);
+
+  uiActionInFlight = false;
+  showToast(result.ok ? `${player.name} cedeu a vaga para ${proximo.name}.` : result.message, result.ok ? "success" : "error");
   notifyWaitlistPromotion(result);
   return;
 }
@@ -2547,6 +2594,21 @@ if (action === "admin-add-to-game") {
   if (isPlayerConfirmed) {
     showToast("Jogador já está confirmado no jogo", "error");
     return;
+  }
+
+  // Com o jogo cheio, incluir manda para a FILA, não para dentro. Antes isso
+  // acontecia calado: o admin achava que tinha reincluído a pessoa e ela ficava
+  // de fora (INCIDENTE 29/09/2026).
+  const ehGoleiro = isGoalkeeperPlayer(player);
+  if (!ehGoleiro && !hasCapacity()) {
+    const aceitaFila = await showConfirmModal({
+      title: 'Jogo cheio',
+      message: `O jogo já está com as vagas de linha completas. Colocar ${player.name} na fila de espera? Ele entra assim que alguém sair.`,
+      confirmText: 'Pôr na fila',
+      cancelText: 'Cancelar',
+    });
+
+    if (!aceitaFila) return;
   }
 
   uiActionInFlight = true;
@@ -2718,7 +2780,7 @@ import { renderChampionshipScreen } from '../modules/championship/championship.v
 import { idDaEntrada, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, removeDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
-import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao } from '../modules/game/game.service.js';
+import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao, cederVagaParaPrimeiroDaFila } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
@@ -5368,6 +5430,10 @@ function renderPresenceList(snapshot, currentPlayer) {
   const pendingGoalkeepers = pendingPlayers.filter(isGoalkeeperPlayer);
   const pendingLinePlayers = pendingPlayers.filter((player) => !isGoalkeeperPlayer(player));
 
+  // "Ceder vaga" só faz sentido com alguém esperando: sai quem está dentro,
+  // entra o primeiro da fila, e quem cedeu assume a frente da fila.
+  const temFila = waitlistEntries.length > 0;
+
   const renderWeeklyRow = (player, confirmed = false) => `
     <div class="weekly-player-row">
       <div class="players-switch-player">
@@ -5379,6 +5445,9 @@ function renderPresenceList(snapshot, currentPlayer) {
       </div>
       <div class="weekly-player-meta">
         <span class="tag ${isMensOkEffective(player, game) ? 'is-ok' : 'is-warn'}">${isMensOkEffective(player, game) ? 'Pago' : 'Pendente'}</span>
+        ${adminMode && confirmed && temFila ? `
+          <button class="btn btn-secondary btn-sm" type="button" data-action="admin-ceder-vaga" data-id="${player.id}">Ceder vaga</button>
+        ` : ''}
         ${adminMode ? `
           <button
             class="switch-control switch-control-inline ${confirmed ? 'is-on' : 'is-off'}"
