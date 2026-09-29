@@ -544,6 +544,72 @@ export function adminRemovePlayerFromGame(playerId) {
   };
 }
 
+// CEDER A VAGA: quem está dentro sai para o primeiro da fila entrar, e assume o
+// primeiro lugar da fila — continua na disputa, na frente de todo mundo.
+//
+// INCIDENTE 29/09/2026 (Harmonia): era isso que o admin queria fazer, e não
+// havia como. Ele removeu um confirmado (o que promoveu o primeiro da fila na
+// hora, sem dizer nada), viu o jogador sumir da lista e tocou "incluir no jogo"
+// para devolvê-lo — o que, com o jogo cheio, o mandou calado para o fim da fila.
+// Três toques, dois efeitos surpresa e um rastro no banco que parecia bug.
+//
+// Diferente de `adminRemovePlayerFromGame`, que é para quem NÃO vai jogar: lá o
+// jogador sai do jogo e da fila. Aqui ele cede e espera.
+export function cederVagaParaPrimeiroDaFila(playerId) {
+  const snapshot = getState();
+  const gameKey = activeGameKey(snapshot);
+  const scoped = scopedConfirmations(snapshot);
+  const targetId = String(playerId);
+  const now = new Date().toISOString();
+
+  const atual = scoped.find((entry) => String(entry.player_id) === targetId);
+  if (!atual || atual.confirmed !== true) {
+    return { ok: false, message: 'Este jogador não está confirmado no jogo.' };
+  }
+
+  const fila = getWaitlistEntries(scoped).filter((entry) => String(entry.player_id) !== targetId);
+  if (!fila.length) {
+    return { ok: false, message: 'Não há ninguém na fila de espera para assumir a vaga.' };
+  }
+
+  // Entra na FRENTE da fila: a ordem sai de `waitlisted_at`, então o carimbo de
+  // quem cede fica um passo antes do primeiro atual.
+  const referencia = Date.parse(fila[0]?.waitlisted_at || fila[0]?.timestamp || now);
+  const carimbo = new Date((Number.isFinite(referencia) ? referencia : Date.parse(now)) - 1000).toISOString();
+
+  const cedida = scoped.map((entry) => (String(entry.player_id) === targetId
+    ? {
+        ...entry,
+        confirmed: false,
+        status: 'waitlist',
+        removed_by_admin: false,
+        confirmed_at: null,
+        cancelled_at: null,
+        waitlisted_at: carimbo,
+        waitlist_position: 1,
+        timestamp: now,
+      }
+    : entry));
+
+  // Exclui quem acabou de ceder da promoção: ele é o mais antigo da fila agora e
+  // voltaria direto para a vaga que acabou de liberar.
+  const promovido = promoteFirstWaitlisted(cedida, now, targetId);
+  const scrub = scrubPlayerFromGameResults(snapshot.championship, gameKey, targetId);
+
+  patchState({
+    confirmations: mergeScopedConfirmations(snapshot, normalizeWaitlistPositions(promovido.confirmations)),
+    ...(scrub.changed ? { championship: scrub.championship } : {}),
+    ...buildDrawRemovalPatch(snapshot, targetId, now),
+  });
+
+  return {
+    ok: true,
+    message: 'Vaga cedida. Quem estava na frente da fila entrou no jogo.',
+    promotedPlayerId: promovido.promoted || null,
+    gameKey,
+  };
+}
+
 
 function getPositionBucket(player) {
   const raw = String(player?.position || 'meia')

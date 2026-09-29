@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.200.0-trava-lotacao';
+export const APP_VERSION = 'v1.201.0-ceder-vaga';

@@ -24,7 +24,7 @@
 import assert from 'node:assert/strict';
 import { isGameFull } from '../appfutebol_run/js/domain/rules.engine.js';
 import { replaceState, getState } from '../appfutebol_run/js/core/state.js';
-import { moverParaFilaPorRecusaDeLotacao } from '../appfutebol_run/js/modules/game/game.service.js';
+import { moverParaFilaPorRecusaDeLotacao, cederVagaParaPrimeiroDaFila } from '../appfutebol_run/js/modules/game/game.service.js';
 
 const JOGO = 'game_2026-09-30_2030';
 
@@ -62,7 +62,9 @@ assert.equal(isGameFull(comConvidadoGoleiro, quinze), false, 'convidado goleiro 
 
 // ------------------------------------------------- a rendição da interface
 
-const players = [...Array.from({ length: 16 }, (_, i) => linha(i + 1)), goleiro(90), goleiro(91)];
+// p17 e p18 existem para os testes de fila: confirmação de jogador inexistente é
+// descartada pelo guard do replaceState (confirmação órfã).
+const players = [...Array.from({ length: 18 }, (_, i) => linha(i + 1)), goleiro(90), goleiro(91)];
 const confirmacoes = [
   ...Array.from({ length: 16 }, (_, i) => conf(`p${i + 1}`)),
   conf('p90', { goalkeeper: true }),
@@ -104,5 +106,52 @@ assert.equal(semConfirmacao.ok, false, 'recusa de quem não tem confirmação lo
 // cirúrgica, não um "recarrega tudo".
 const aindaConfirmados = getState().confirmations.filter((entry) => entry.confirmed === true);
 assert.equal(aindaConfirmados.length, 17, 'só a confirmação recusada saiu');
+
+// ------------------------------------------------- ceder vaga
+
+// Era isto que o admin queria no dia 29/09 e não existia: tirar quem está dentro
+// para o primeiro da fila entrar, SEM que quem saiu perca o lugar na fila.
+replaceState({
+  players,
+  game: jogo,
+  games: [jogo],
+  active_game_id: JOGO,
+  confirmations: [
+    ...Array.from({ length: 16 }, (_, i) => conf(`p${i + 1}`)),
+    conf('p90', { goalkeeper: true }),
+    conf('p91', { goalkeeper: true }),
+    { game_key: JOGO, player_id: 'p17', confirmed: false, status: 'waitlist', waitlisted_at: '2026-09-29T18:00:00.000Z', waitlist_position: 1 },
+    { game_key: JOGO, player_id: 'p18', confirmed: false, status: 'waitlist', waitlisted_at: '2026-09-29T19:00:00.000Z', waitlist_position: 2 },
+  ],
+  settings: {},
+  session: { playerId: 'p1' },
+  ui: { currentTab: 'weekly_game' },
+});
+
+const troca = cederVagaParaPrimeiroDaFila('p3');
+assert.equal(troca.ok, true, 'quem está dentro pode ceder a vaga');
+assert.equal(troca.promotedPlayerId, 'p17', 'e quem entra é o primeiro da fila');
+
+const estado = getState().confirmations;
+const quemCedeu = estado.find((entry) => entry.player_id === 'p3');
+const quemEntrou = estado.find((entry) => entry.player_id === 'p17');
+
+assert.equal(quemEntrou.confirmed, true, 'o primeiro da fila entrou no jogo');
+assert.equal(quemCedeu.status, 'waitlist', 'quem cedeu foi para a fila');
+assert.equal(quemCedeu.waitlist_position, 1, 'e assumiu a FRENTE da fila, não o fim');
+assert.equal(estado.find((entry) => entry.player_id === 'p18').waitlist_position, 2,
+  'quem já esperava não perde posição para quem cedeu depois');
+
+// O total não muda: sai um, entra um. É troca, não vaga nova.
+const linhaDepois = estado.filter((entry) => entry.confirmed === true && !entry.goalkeeper).length;
+assert.equal(linhaDepois, 16, 'a troca mantém o jogo em 16 de linha');
+
+// Sem fila não há o que ceder — o botão nem aparece, mas a regra é do domínio.
+replaceState({
+  players, game: jogo, games: [jogo], active_game_id: JOGO,
+  confirmations: Array.from({ length: 16 }, (_, i) => conf(`p${i + 1}`)),
+  settings: {}, session: { playerId: 'p1' }, ui: { currentTab: 'weekly_game' },
+});
+assert.equal(cederVagaParaPrimeiroDaFila('p3').ok, false, 'sem fila, ceder vaga não faz nada');
 
 console.log('ok - lotação: banco manda, interface obedece');

@@ -6094,6 +6094,13 @@ body {
 .content--weekly_game .weekly-presence-section { border-top-color: var(--hfc-glass-border); }
 .content--weekly_game .weekly-presence-main-title { color: var(--hfc-text); }
 
+/* "Ceder vaga" divide a linha com o interruptor de presença. O .btn-sm existe
+   para botão de apoio em bloco (copiar presença) e tem 30px; aqui ele é alvo de
+   toque numa lista rolável, onde a regra do app é 44px. */
+.content--weekly_game .weekly-player-meta .btn {
+  min-height: 44px;
+}
+
 /* ---------- JOGADORES (Stadium Glass) ---------- */
 .content--players {
   background: radial-gradient(130% 50% at 50% -6%, var(--hfc-navy-700) 0%, var(--hfc-navy-800) 38%, var(--hfc-navy-900) 100%);
