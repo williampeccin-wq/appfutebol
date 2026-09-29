@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.190.0-tirar-do-time';
+export const APP_VERSION = 'v1.191.0-trava-lotacao';

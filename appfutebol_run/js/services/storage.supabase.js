@@ -726,6 +726,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
     if (stableStringify(previousConfirmations.get(key)) !== stableStringify(normalizedConfirmation)) {
       operations.push({
         type: 'upsert_presence_confirmation',
+        // O player_id viaja junto porque a recusa do servidor (trigger de
+        // lotação) precisa dizer DE QUEM é a confirmação que não entrou —
+        // sem isso o app só sabe que "algo" foi recusado.
+        playerId: String(normalizedConfirmation.player_id || ''),
         run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, ownGameKey),
       });
     }
@@ -1009,6 +1013,18 @@ function mergeChangedFields(base, previous, next) {
   return merged;
 }
 
+// Mensagem crua do Postgres/PostgREST no corpo do erro. Sem ela o app só sabe
+// "400" e não tem como distinguir recusa de guarda (trigger) de erro de dados.
+function serverMessageFrom(body) {
+  if (!body) return null;
+  try {
+    const parsed = JSON.parse(body);
+    return String(parsed?.message || parsed?.error || '').slice(0, 120) || null;
+  } catch (_) {
+    return String(body).slice(0, 120) || null;
+  }
+}
+
 async function runSaveOperations(config, state, previousParts, parts, now, { rebased = false } = {}) {
   const operations = buildGranularOperations(config, previousParts, parts, now);
 
@@ -1019,10 +1035,24 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
 
   const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
   const results = await Promise.all(operations.map((operation) => operation.run()));
-  const failed = results.find((result) => !result.ok);
+  const failedIndex = results.findIndex((result) => !result.ok);
+  const failed = failedIndex >= 0 ? results[failedIndex] : null;
+  const failedOperation = failedIndex >= 0 ? operations[failedIndex] : null;
 
   if (failed) {
-    return { ok: false, conflict: false, reason: `split_granular_save_failed_${failed.status}` };
+    // O status vai junto: quem avisa o usuário precisa saber se foi rede (culpar
+    // a internet faz sentido) ou recusa do servidor (culpar a internet mente).
+    // A mensagem do Postgres vai junto também: é a ÚNICA pista do que aconteceu
+    // quando um trigger de guarda recusa (trg_presence_line_capacity, por ex.).
+    return {
+      ok: false,
+      conflict: false,
+      status: failed.status || null,
+      serverMessage: serverMessageFrom(failed.body),
+      failedOperation: failedOperation?.type || null,
+      failedPlayerId: failedOperation?.playerId || null,
+      reason: `split_granular_save_failed_${failed.status}`,
+    };
   }
 
   // O baseline tem de refletir o que foi REALMENTE gravado. Depois de um rebase

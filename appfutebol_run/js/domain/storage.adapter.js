@@ -174,7 +174,14 @@ function createHybridStorageAdapter() {
           if (!result.ok) {
             console.warn("[storage.adapter] remote save skipped/failed:", result.reason);
             window.dispatchEvent(new CustomEvent("harmonia:remote-save-failed", {
-              detail: { reason: result.reason, conflict: false },
+              detail: {
+                reason: result.reason,
+                status: result.status || null,
+                serverMessage: result.serverMessage || null,
+                failedOperation: result.failedOperation || null,
+                failedPlayerId: result.failedPlayerId || null,
+                conflict: false,
+              },
             }));
           }
 
