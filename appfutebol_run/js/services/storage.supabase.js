@@ -933,6 +933,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
       }
       operations.push({
         type: 'upsert_presence_confirmation',
+        // O player_id viaja junto porque a recusa do servidor (trigger de
+        // lotação) precisa dizer DE QUEM é a confirmação que não entrou —
+        // sem isso o app só sabe que "algo" foi recusado.
+        playerId: String(normalizedConfirmation.player_id || ''),
         run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, ownGameKey),
       });
     }
@@ -1257,7 +1261,9 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
 
   const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
   const results = await Promise.all(operations.map((operation) => operation.run()));
-  const failed = results.find((result) => !result.ok);
+  const failedIndex = results.findIndex((result) => !result.ok);
+  const failed = failedIndex >= 0 ? results[failedIndex] : null;
+  const failedOperation = failedIndex >= 0 ? operations[failedIndex] : null;
 
   if (failed) {
     // O status vai junto: quem avisa o usuário precisa saber se foi rede (culpar
@@ -1270,6 +1276,8 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
       conflict: false,
       status: failed.status || null,
       serverMessage: serverMessageFrom(failed.body),
+      failedOperation: failedOperation?.type || null,
+      failedPlayerId: failedOperation?.playerId || null,
       reason: `split_granular_save_failed_${failed.status}`,
     };
   }

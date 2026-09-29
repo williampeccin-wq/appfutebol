@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.199.0-sem-telemetria';
+export const APP_VERSION = 'v1.200.0-trava-lotacao';

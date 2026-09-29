@@ -371,6 +371,32 @@ export function getWaitlistView(snapshot = getState()) {
 }
 
 
+// O SERVIDOR recusou a confirmação por lotação (trigger trg_presence_line_capacity,
+// INCIDENTE 29/09/2026 — 17/16 no Harmonia). A tela já mostrava "Confirmado",
+// porque o local salva antes de subir; aqui a interface se rende à verdade do
+// banco e põe a pessoa na fila, em vez de exibir uma vaga que não existe.
+export function moverParaFilaPorRecusaDeLotacao(playerId) {
+  const snapshot = getState();
+  const confirmations = scopedConfirmations(snapshot);
+  const existing = confirmations.find((entry) => String(entry.player_id) === String(playerId));
+
+  // Nada a desfazer: a recusa pode chegar depois de a pessoa já ter cancelado.
+  if (!existing || existing.confirmed !== true) {
+    return { ok: false, position: null };
+  }
+
+  const now = new Date().toISOString();
+  const updated = normalizeWaitlistPositions(
+    upsertWaitlistEntry({ ...snapshot, confirmations }, playerId, now)
+  );
+  patchScopedConfirmations(snapshot, updated);
+
+  const position = getWaitlistEntries(updated)
+    .findIndex((entry) => String(entry.player_id) === String(playerId)) + 1;
+
+  return { ok: true, position: position || null };
+}
+
 export function toggleConfirmation(playerId, options = {}) {
   const snapshot = getState();
   const game = activeGame(snapshot);

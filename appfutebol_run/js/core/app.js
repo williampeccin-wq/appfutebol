@@ -323,7 +323,15 @@ function promoteWaitlistForGameCapacity(snapshot, game) {
     .filter((entry) => !isGoalkeeper(playersById.get(String(entry.player_id))))
     .length;
 
-  let availableSlots = Math.max(maxPlayers - lineConfirmedCount, 0);
+  // Convidado de LINHA ocupa vaga igual a um confirmado — é assim que
+  // `isGameFull` conta. Sem somá-los aqui, a promoção automática enxergava
+  // vagas que não existem e empurrava gente da fila para dentro de um jogo já
+  // cheio (parte do INCIDENTE 29/09/2026: 17/16 no Harmonia).
+  const guestLineCount = Array.isArray(game?.guest_players)
+    ? game.guest_players.filter((guest) => !['gol', 'goleiro'].includes(String(guest?.position || '').toLowerCase())).length
+    : 0;
+
+  let availableSlots = Math.max(maxPlayers - lineConfirmedCount - guestLineCount, 0);
   if (!availableSlots) {
     return confirmations;
   }
@@ -2914,7 +2922,7 @@ import { idDaEntrada, rotuloDoTime, semQuemCancelou, timesDoSorteio } from '../d
 import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, removeDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
-import { hasCapacity, buildStrengthResolver } from '../modules/game/game.service.js';
+import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
@@ -3192,6 +3200,34 @@ const RECUSAS_DO_SERVIDOR = {
   pending_is_admin_only: 'Só o administrador aprova um cadastro pendente.',
 };
 
+// O servidor recusou a confirmação porque o jogo já estava lotado (trigger
+// trg_presence_line_capacity). Diferente das outras recusas, esta NÃO é só um
+// aviso: a tela ficou mostrando uma vaga que não existe. Põe a pessoa na fila
+// na hora — é o mesmo destino que ela teria se o aparelho soubesse da lotação.
+function aplicarRecusaDeLotacao(playerId) {
+  if (!playerId) {
+    showToast('O jogo já estava lotado: esta confirmação não foi aceita pelo servidor.', 'error');
+    return;
+  }
+
+  const resultado = moverParaFilaPorRecusaDeLotacao(playerId);
+  if (!resultado.ok) return;
+
+  const snapshot = getState();
+  // Sem repairManualSnapshot aqui de propósito: ele repromove a fila, e quem
+  // acabou de ser recusado por lotação voltaria para a mesma recusa.
+  savePersistedState(snapshot);
+  render(snapshot);
+
+  const posicao = resultado.position ? ` na posição ${resultado.position}` : '';
+  const souEu = String(snapshot.session?.playerId || '') === String(playerId);
+  const nome = (snapshot.players || []).find((player) => String(player.id) === String(playerId))?.name || 'O jogador';
+
+  showToast(souEu
+    ? `O jogo lotou antes da sua confirmação: você entrou na fila de espera${posicao}.`
+    : `${nome} não coube no jogo (lotado) e foi para a fila de espera${posicao}.`, 'error');
+}
+
 function mensagemDeFalhaRemota(status, serverMessage) {
   const bruta = String(serverMessage || '');
   const conhecida = Object.keys(RECUSAS_DO_SERVIDOR).find((chave) => bruta.includes(chave));
@@ -3238,6 +3274,16 @@ function bindGlobalSystemEvents() {
   let lastRemoteSaveFailAt = 0;
   window.addEventListener('harmonia:remote-save-failed', (event) => {
     if (event.detail?.conflict) return; // conflito já tratado silenciosamente pelo remote-conflict
+
+    // Lotação recusada pelo servidor não entra no throttle: é ação (manda para
+    // a fila), não aviso — engolir a segunda seguidas deixaria uma confirmação
+    // fantasma na tela até o próximo poll.
+    if (String(event.detail?.serverMessage || '').includes('JOGO_LOTADO')) {
+      console.warn('[app] confirmação recusada por lotação:', event.detail?.serverMessage);
+      aplicarRecusaDeLotacao(event.detail?.failedPlayerId);
+      return;
+    }
+
     const now = Date.now();
     if (now - lastRemoteSaveFailAt < 30000) return;
     lastRemoteSaveFailAt = now;
@@ -5237,9 +5283,15 @@ function renderHome(snapshot, currentPlayer) {
   // de jogo). Removido o recálculo local que divergia do resto e do banco.
   const sortByName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR');
   const homeGuestPlayers = Array.isArray(game && game.guest_players) ? game.guest_players : [];
-  // Convidados ocupam vaga de linha → entram na contagem e nas vagas restantes.
-  const homeLinePlayers = [...gameView.confirmed, ...homeGuestPlayers].sort(sortByName);
-  const homeGoalkeepers = [...gameView.confirmedGoalkeepers].sort(sortByName);
+  const ehGoleiroConvidado = (guest) => ['gol', 'goleiro'].includes(String(guest?.position || '').toLowerCase());
+  // Convidados de LINHA ocupam vaga de linha → entram na contagem e nas vagas
+  // restantes. Convidado GOLEIRO conta no teto de goleiros (é assim que o
+  // `isGameFull` e o `addGuestPlayer` já contavam) — listá-lo na linha inflava
+  // o "17/16" da tela sem que houvesse confirmação a mais no banco.
+  const homeGuestLinePlayers = homeGuestPlayers.filter((guest) => !ehGoleiroConvidado(guest));
+  const homeGuestGoalkeepers = homeGuestPlayers.filter(ehGoleiroConvidado);
+  const homeLinePlayers = [...gameView.confirmed, ...homeGuestLinePlayers].sort(sortByName);
+  const homeGoalkeepers = [...gameView.confirmedGoalkeepers, ...homeGuestGoalkeepers].sort(sortByName);
   const homeRentalGoalkeepers = Array.isArray(game && game.rental_goalkeepers) ? game.rental_goalkeepers : [];
   const homeGoalkeeperCount = homeGoalkeepers.length + homeRentalGoalkeepers.length;
   const homeRemainingLine = Math.max((maxPlayers || 0) - homeLinePlayers.length, 0);
@@ -5479,9 +5531,11 @@ function renderWeeklyGame(snapshot, currentPlayer) {
   const confirmed = isConfirmed(currentPlayer?.id);
   const activeGame = view.game || getActiveGameFromSnapshot(snapshot);
   const capacity = activeGame?.max_players || 8;
-  // Convidados ocupam vaga de linha → entram na contagem e nas vagas restantes,
-  // igual à lista de presença e à home.
-  const guestCount = (Array.isArray(activeGame?.guest_players) ? activeGame.guest_players : []).length;
+  // Convidados de LINHA ocupam vaga de linha → entram na contagem e nas vagas
+  // restantes, igual à lista de presença e à home. Convidado goleiro não: ele
+  // conta no teto de goleiros (mesma regra do `isGameFull`).
+  const guestCount = (Array.isArray(activeGame?.guest_players) ? activeGame.guest_players : [])
+    .filter((guest) => !['gol', 'goleiro'].includes(String(guest?.position || '').toLowerCase())).length;
   const confirmedWithGuests = view.confirmedCount + guestCount;
   const remaining = Math.max(capacity - confirmedWithGuests, 0);
   const canAct = currentPlayer && currentPlayer.plays_football !== false;

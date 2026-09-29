@@ -191,6 +191,8 @@ function createHybridStorageAdapter() {
                 reason: result.reason,
                 status: result.status || null,
                 serverMessage: result.serverMessage || null,
+                failedOperation: result.failedOperation || null,
+                failedPlayerId: result.failedPlayerId || null,
                 conflict: false,
               },
             }));
