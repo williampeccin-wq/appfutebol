@@ -8,7 +8,8 @@
   *(o `br.app.convocados` está queimado: package de app com instalações nunca é reutilizável)*
 - **Categoria:** Esportes
 - **Tags/target:** futebol amador, pelada, organização de grupo
-- **E-mail de contato:** `williampeccin@gmail.com`
+- **E-mail de contato:** `suporte@convocados.app.br` *(o e-mail aparece público na ficha; com conta de organização, endereço da marca em vez do pessoal)*
+- **Nome do desenvolvedor (público):** será a razão social verificada — `Tambre Ltda`. Conta de organização exibe razão social e endereço na página do app.
 - **Política de privacidade (URL):** `https://convocados.app.br/privacidade`  *(URL canônica — o Cloudflare Pages remove o `.html`; evita redirect na validação do Google)*
 
 ## Descrição curta *(máx. 80 caracteres)*
@@ -24,13 +25,13 @@ A sua pelada organizada do começo ao fim — e a mensalidade que se confere soz
 Chega de planilha, de "quem confirmou?" no grupo do zap e de ficar conferindo comprovante de PIX na mão.
 
 🤖 A MENSALIDADE QUE SE CONFERE SOZINHA
-O jogador paga o PIX e manda o comprovante. O Convocados lê o comprovante e dá baixa automaticamente — você não confere mais nada na mão. O admin vê na hora quem está em dia e quem está devendo. Ninguém mais faz isso.
+O jogador paga o PIX e manda o comprovante. O Convocados lê o comprovante e dá baixa automaticamente — você não confere mais nada na mão. O admin vê na hora quem está em dia e quem está devendo. Se o print vier cortado, o app pede o comprovante inteiro em vez de acusar erro.
 
 ⚽ CONFIRMAÇÃO DE PRESENÇA EM UM TOQUE
-Abra a lista da semana e confirme. Vagas de linha e goleiros contadas na hora, com fila de espera automática quando lota.
+Abra a lista da semana e confirme. Vagas de linha e goleiros contadas na hora, com fila de espera automática quando lota — e quem está na fila entra sozinho assim que abre vaga.
 
 🎽 SORTEIO DE TIMES EQUILIBRADO — E DE GRAÇA
-Times sorteados pelo equilíbrio de cada jogador. Chega de time desbalanceado. E o sorteio é, e sempre vai ser, de graça.
+Times sorteados pelo equilíbrio de cada jogador. Chega de time desbalanceado. Desistiu depois do sorteio? O time se atualiza na hora e o administrador é avisado para remanejar antes de todo mundo chegar no campo. E o sorteio é, e sempre vai ser, de graça.
 
 🏆 CAMPEONATO E RANKING
 Registre resultados, acompanhe o "Rei da Quadra" e o histórico de campeões do grupo.
@@ -39,7 +40,10 @@ Registre resultados, acompanhe o "Rei da Quadra" e o histórico de campeões do 
 O grupo dá nota ao desempenho (e ao churrasco!). Anônimo, sem climão.
 
 🔔 AVISOS NA HORA
-Inscrições abertas, mensalidade vencendo, novo cadastro pra aprovar — tudo na notificação, sem precisar ficar de olho.
+Inscrições abertas, desfalque no time depois do sorteio, votação aberta, mensalidade vencendo, cadastro novo para aprovar. O administrador escolhe quais avisos o grupo recebe.
+
+📣 RECADOS DO GRUPO
+O administrador escreve um recado e ele aparece na tela inicial de todo mundo, por inteiro.
 
 👥 FEITO PRA GRUPOS FECHADOS
 Novo cadastro entra como pendente e só acessa depois que o admin aprova. Você controla quem entra.
@@ -58,7 +62,8 @@ Convoca. Joga. Resenha.
 ## Assets visuais (você gera — não dá pra eu produzir)
 - **Ícone hi-res 512×512:** usar `img/icon-512.png` (já existe).
 - **Feature graphic 1024×500:** criar (banner com o escudo Convocados + slogan).
-- **Screenshots do telefone (mín. 2, ideal 4–8):** capturar do app rodando — sugestões: tela de login, home (Hoje no Convocados), lista de confirmados, sorteio de times, tela de mensalidade/PIX, ranking do campeonato.
+- **Screenshots do telefone (mín. 2, ideal 4–8):** capturar do app rodando — sugestões: home (Hoje no Convocados, com o card de presença), lista de confirmados com a fila de espera, sorteio de times, envio de comprovante PIX, lista de jogadores com o interruptor de mensalidade, ranking do campeonato.
+  *(evite a tela de login como primeira imagem — a primeira é a que aparece na busca)*
 
 ## Data Safety
 - Preencher conforme [store-privacy-labels.md](store-privacy-labels.md) (coleta declarada, exclusão de conta = sim, criptografia em trânsito = sim, sem publicidade/tracking).
