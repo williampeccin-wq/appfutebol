@@ -4,7 +4,8 @@
 
 ## Identidade
 - **Nome do app:** `Convocados` *(máx. 30 caracteres)*
-- **Package name:** `br.app.convocados` *(definitivo — casa com o assetlinks.json)*
+- **Package name (app novo, conta de organização):** `br.app.convocados.android`
+  *(o `br.app.convocados` está queimado: package de app com instalações nunca é reutilizável)*
 - **Categoria:** Esportes
 - **Tags/target:** futebol amador, pelada, organização de grupo
 - **E-mail de contato:** `williampeccin@gmail.com`

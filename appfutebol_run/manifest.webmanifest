@@ -37,6 +37,11 @@
   "related_applications": [
     {
       "platform": "play",
+      "id": "br.app.convocados.android",
+      "url": "https://play.google.com/store/apps/details?id=br.app.convocados.android"
+    },
+    {
+      "platform": "play",
       "id": "br.app.convocados",
       "url": "https://play.google.com/store/apps/details?id=br.app.convocados"
     }
