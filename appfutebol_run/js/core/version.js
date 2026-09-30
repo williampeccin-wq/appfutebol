@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.201.0-ceder-vaga';
+export const APP_VERSION = 'v1.202.0-fila-em-dia';

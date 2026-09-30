@@ -67,6 +67,31 @@ export function shouldBlockPresenceForFinance(player, game, mode = MENSALIDADE_M
 }
 
 
+// PREFERÊNCIA NA FILA (settings.fila_prioriza_em_dia, desligada por padrão).
+//
+// Eixo diferente dos modos de bloqueio: aqui ninguém é impedido de confirmar nem
+// removido do jogo. A inadimplência só decide a ORDEM da fila de espera — quem
+// está em dia entra primeiro quando abre uma vaga. É a regra que o admin do
+// Harmonia aplicou na mão em 29/09/2026, tirando um inadimplente para pôr quem
+// estava esperando.
+//
+// Mesmo predicado do bloqueio, de propósito: vale só DEPOIS do vencimento e só
+// para quem é EXPLICITAMENTE inadimplente (mens_ok === false). Registro sem o
+// campo não é atraso, e isento (carne ou goleiro não-pagante) nunca cede a vez.
+// Duas regras com definições diferentes de "em atraso" seria a próxima
+// divergência a caçar.
+export function filaPrioridadeEmDia(settings) {
+  return settings?.fila_prioriza_em_dia === true;
+}
+
+export function cedeVezNaFilaPorMensalidade(player, game, settings, referenceDate = getLocalDateString()) {
+  if (!filaPrioridadeEmDia(settings)) return false;
+  if (!player) return false;
+  if (authzIsMensalidadeExempt(player)) return false;
+  return player.mens_ok === false && isAfterMensalidadeDueDate(game, referenceDate);
+}
+
+
 export function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
