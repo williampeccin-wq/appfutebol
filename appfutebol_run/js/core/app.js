@@ -326,15 +326,11 @@ function promoteWaitlistForGameCapacity(snapshot, game) {
   }
 
   const now = new Date().toISOString();
-  const waitlistEntries = scoped
-    .filter((entry) => entry?.confirmed !== true)
-    .filter((entry) => entry?.status === 'waitlist' || entry?.status === 'waitlisted')
-    .sort((a, b) => {
-      const posA = Number(a?.waitlist_position || 9999);
-      const posB = Number(b?.waitlist_position || 9999);
-      if (posA !== posB) return posA - posB;
-      return String(a?.waitlisted_at || '').localeCompare(String(b?.waitlisted_at || ''));
-    });
+  // Mesma ordem do resto do app (chegada, com quem está em dia na frente se a
+  // preferência estiver ligada). Antes esta reconciliação ordenava por conta
+  // própria pelo `waitlist_position` gravado — que pode ter vindo de um cliente
+  // velho — e promoveria alguém diferente do que a tela mostra.
+  const waitlistEntries = ordemDaFila(scoped, snapshot);
 
   const promoteIds = new Set(waitlistEntries.slice(0, availableSlots).map((entry) => String(entry.player_id)));
 
@@ -2765,7 +2761,7 @@ import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/c
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
-import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective, reconcileMensalidadeMonthTurn } from "../domain/rules.engine.js";
+import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective, reconcileMensalidadeMonthTurn, cedeVezNaFilaPorMensalidade } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
@@ -2780,7 +2776,7 @@ import { renderChampionshipScreen } from '../modules/championship/championship.v
 import { idDaEntrada, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, removeDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
-import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao, cederVagaParaPrimeiroDaFila } from '../modules/game/game.service.js';
+import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao, cederVagaParaPrimeiroDaFila, ordemDaFila } from '../modules/game/game.service.js';
 import { canConfirm } from '../modules/finance/finance.service.js';
 import { canAccessConfig, canManageCarne, canManageChampionship, canManageFinance, canManagePlayers, canManagePresence as canManagePresenceAuthz, exposeAuthz, getPlayerRole, isAdmin as authzIsAdmin, isCarneOnly as authzIsCarneOnly } from '../domain/authz.js';
 import { SUPABASE_CONFIG } from "../config/supabase.config.js";
@@ -4501,9 +4497,10 @@ function bindAppEvents(currentPlayer) {
       const mensAmount = Math.max(0, Number(formData.get('mens_amount')) || 0);
       const mensBeneficiary = String(formData.get('mens_beneficiary') || '').trim();
       const goalkeepersPay = formData.get('goalkeepers_pay') === 'on';
+      const filaPriorizaEmDia = formData.get('fila_prioriza_em_dia') === 'on';
       const next = structuredClone(getState());
       const oldExpireDate = String(next.settings?.mens_expire_date || '').slice(0, 10);
-      next.settings = { ...(next.settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary, goalkeepers_pay: goalkeepersPay };
+      next.settings = { ...(next.settings || {}), mens_expire_date: mensExpireDate, mens_enforcement_mode: mensMode, mens_amount: mensAmount, mens_beneficiary: mensBeneficiary, goalkeepers_pay: goalkeepersPay, fila_prioriza_em_dia: filaPriorizaEmDia };
       // Nova data de vencimento = novo período de cobrança: zera mens_ok de todos.
       if (mensExpireDate && mensExpireDate !== oldExpireDate) {
         (next.players || []).forEach((p) => { p.mens_ok = false; });
@@ -5619,8 +5616,8 @@ function renderPresenceList(snapshot, currentPlayer) {
                 <div class="players-switch-player">
                   ${renderAvatarForApp(player)}
                   <div>
-                    <div class="row-title">#${index + 1} · ${player.name}</div>
-                    <div class="row-subtitle">${getPositionLabel(player.position)} · aguardando vaga</div>
+                    <div class="row-title">#${index + 1} · ${escapeHtml(player.name)}</div>
+                    <div class="row-subtitle">${getPositionLabel(player.position)} · ${cedeVezNaFilaPorMensalidade(player, game, snapshot.settings) ? 'cede a vez a quem está em dia' : 'aguardando vaga'}</div>
                   </div>
                 </div>
                 <div class="weekly-player-meta">
@@ -6131,6 +6128,12 @@ function renderConfig(snapshot, currentPlayer) {
               </label>
             `).join('')}
           </fieldset>
+          <label class="checkbox-line">
+            <input type="checkbox" name="fila_prioriza_em_dia" ${snapshot.settings?.fila_prioriza_em_dia ? 'checked' : ''} />
+            Quem está em dia tem preferência na fila de espera
+          </label>
+          <small class="footer-note">Independente da regra acima: ninguém é bloqueado nem removido. Quando abre uma vaga, ela vai primeiro para quem está em dia; quem está em atraso espera atrás, na ordem de chegada. Vale só depois do vencimento.</small>
+
           <p class="footer-note">O administrador sempre pode confirmar e remover qualquer jogador, mesmo inadimplente.</p>
 
           <div class="player-admin-actions game-config-actions">

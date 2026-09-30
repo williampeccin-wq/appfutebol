@@ -1,6 +1,6 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
-import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES } from '../../domain/rules.engine.js';
+import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES, filaPrioridadeEmDia, cedeVezNaFilaPorMensalidade } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages, rollingRatingWindow } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
@@ -294,10 +294,30 @@ function isWaitlistEntry(entry) {
   return !!entry && entry.confirmed !== true && (entry.status === 'waitlist' || entry.status === 'waitlisted');
 }
 
-function getWaitlistEntries(confirmations = []) {
-  return (Array.isArray(confirmations) ? confirmations : [])
+// A FILA TEM UMA ORDEM SÓ. Esta função é ela: quem promove, quem numera as
+// posições e quem desenha a lista na tela passam todos por aqui. Foi de propósito
+// — a fila que a tela mostra tem de ser a fila que entra, senão volta a confusão
+// de 29/09/2026 (a pessoa lia "#1" e via outra entrar).
+//
+// Ordem base: chegada. Com a preferência ligada (Config › Mensalidade), quem está
+// em atraso cede a vez para todo mundo que está em dia — sem perder o lugar entre
+// os atrasados.
+function getWaitlistEntries(confirmations = [], snapshot = getState()) {
+  const porChegada = (Array.isArray(confirmations) ? confirmations : [])
     .filter(isWaitlistEntry)
     .sort((a, b) => String(a.waitlisted_at || a.timestamp || '').localeCompare(String(b.waitlisted_at || b.timestamp || '')));
+
+  if (!filaPrioridadeEmDia(snapshot?.settings)) return porChegada;
+
+  const game = activeGame(snapshot);
+  const playersById = new Map((snapshot?.players || []).map((player) => [String(player.id), player]));
+  const cedeAVez = (entry) => cedeVezNaFilaPorMensalidade(
+    playersById.get(String(entry?.player_id)),
+    game,
+    snapshot?.settings
+  );
+
+  return [...porChegada.filter((entry) => !cedeAVez(entry)), ...porChegada.filter(cedeAVez)];
 }
 
 function promoteFirstWaitlisted(confirmations = [], now = new Date().toISOString(), excludedPlayerId = null) {
@@ -334,7 +354,7 @@ function promoteFirstWaitlisted(confirmations = [], now = new Date().toISOString
 }
 
 function upsertWaitlistEntry(snapshot, playerId, now = new Date().toISOString()) {
-  const currentWaitlist = getWaitlistEntries(snapshot.confirmations);
+  const currentWaitlist = getWaitlistEntries(snapshot.confirmations, snapshot);
   const existing = (snapshot.confirmations || []).find((entry) => String(entry.player_id) === String(playerId));
 
   const waitlistEntry = {
@@ -376,9 +396,16 @@ function normalizeWaitlistPositions(confirmations = []) {
   });
 }
 
+// A ordem da fila para quem está fora deste módulo (a reconciliação por
+// capacidade, no app.js). Mesma função que numera e promove — é o que garante
+// que a fila mostrada, a fila numerada e a fila que entra sejam a mesma.
+export function ordemDaFila(confirmations = [], snapshot = getState()) {
+  return getWaitlistEntries(confirmations, snapshot);
+}
+
 export function getWaitlistView(snapshot = getState()) {
   const playersById = new Map((snapshot.players || []).map((player) => [String(player.id), player]));
-  return getWaitlistEntries(scopedConfirmations(snapshot))
+  return getWaitlistEntries(scopedConfirmations(snapshot), snapshot)
     .map((entry, index) => ({
       ...entry,
       position: index + 1,
