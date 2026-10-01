@@ -215,6 +215,16 @@ function createHybridStorageAdapter() {
         return remoteSaveQueue;
       }
 
+      // Gravação só local. Com o Supabase configurado, isso NÃO é sucesso: o
+      // dado vive num aparelho só e some no próximo sync — foi assim que o
+      // resultado do jogo de 30/09/2026 sumiu no Harmonia depois de a tela
+      // dizer "lançado". Quem chama precisa saber para poder avisar o usuário.
+      // Sem Supabase (dev/local puro), gravar local é o comportamento esperado.
+      if (isSupabaseConfigured()) {
+        console.warn('[storage.adapter] sessão ausente: gravado só neste aparelho, não no servidor.');
+        return Promise.resolve({ ok: false, reason: 'local_only_no_session' });
+      }
+
       return Promise.resolve({ ok: true, reason: 'local_saved' });
     },
 

@@ -1856,7 +1856,7 @@ document.addEventListener("click", async (e) => {
 
     // Não afirmar sucesso sem ter certeza: se a gravação remota falhou, o
     // resultado vive só neste aparelho e some no próximo sync.
-    if (gravacao && gravacao.ok !== true) {
+    if (!gravacao || gravacao.ok !== true) {
       showToast('Resultado NÃO foi salvo no servidor. Verifique a conexão e lance de novo.', 'error');
     } else {
       showToast("Resultado lançado e classificação recalculada", "success");
@@ -1959,7 +1959,7 @@ document.addEventListener("click", async (e) => {
     render(safeSnapshot);
     uiActionInFlight = false;
 
-    if (gravacao && gravacao.ok !== true) {
+    if (!gravacao || gravacao.ok !== true) {
       showToast('A temporada NÃO foi salva no servidor. Verifique a conexão e tente de novo.', 'error');
     } else {
       showToast('Temporada atualizada', "success");
@@ -2048,7 +2048,7 @@ document.addEventListener("click", async (e) => {
     render(safeSnapshot);
     uiActionInFlight = false;
 
-    if (gravacao && gravacao.ok !== true) {
+    if (!gravacao || gravacao.ok !== true) {
       showToast('A temporada NÃO foi encerrada no servidor. Verifique a conexão e tente de novo.', 'error');
     } else {
       showToast(`${fechamento.frozen.name} encerrada. ${fechamento.next.name} começou.`, "success");
@@ -2246,7 +2246,7 @@ document.addEventListener("click", async (e) => {
   resetPlayerForm();
   uiActionInFlight = false;
 
-  if (gravacao && gravacao.ok !== true) {
+  if (!gravacao || gravacao.ok !== true) {
     showToast(
       gravacao.conflict
         ? 'Outro aparelho salvou antes. Abra o cadastro de novo e refaça a alteração.'
