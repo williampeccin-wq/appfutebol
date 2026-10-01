@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.193.0-fila-em-dia';
+export const APP_VERSION = 'v1.194.0-nao-mente-que-salvou';
