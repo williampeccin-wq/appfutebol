@@ -72,3 +72,25 @@ Instale o APK e confira:
 - `<head>` com manifest, theme-color, apple metas, `viewport-fit=cover`.
 - Safe-area no header e na bottom-nav (ativada pelo viewport-fit=cover).
 - `.well-known/assetlinks.json` (template — falta o fingerprint) + regra no `_headers`.
+
+## Comprovante PIX pelo "Compartilhar" (share target) — v1.204.0
+
+O manifest declara `share_target`: no Android, o app aparece na folha de
+compartilhamento do banco e recebe a imagem do comprovante direto
+(`service-worker.js` guarda, `js/services/receipt-inbox.js` retira e envia).
+
+- **PWA instalada pelo Chrome:** não precisa de nada. O Chrome relê o manifest e
+  atualiza o WebAPK sozinho — costuma levar até um dia depois do deploy.
+- **App da Play (TWA):** o pacote Android precisa ser regerado, porque o filtro de
+  compartilhamento mora no `AndroidManifest`. Na pasta do projeto Bubblewrap:
+
+  ```bash
+  bubblewrap merge     # traz o share_target do manifest publicado
+  bubblewrap update    # regenera o projeto e sobe o versionCode
+  bubblewrap build
+  ```
+
+  Antes do build, confira que o `twa-manifest.json` ganhou o bloco `shareTarget`.
+  Depois é subir o `.aab` novo como qualquer release.
+- **iPhone:** não existe. O iOS não deixa PWA entrar na folha de compartilhamento;
+  lá o caminho curto é "Copiar" no banco e "Colar comprovante copiado" no perfil.

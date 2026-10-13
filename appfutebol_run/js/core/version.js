@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.203.0-nao-mente-que-salvou';
+export const APP_VERSION = 'v1.204.0-comprovante-compartilhar-colar';

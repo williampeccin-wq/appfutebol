@@ -6256,6 +6256,13 @@ body {
 }
 .self-pix-block .footer-note { margin: 0; }
 .self-pix-submit-btn { width: 100%; }
+/* "Colar comprovante": secundário no vidro, igual ao de .profile-view-actions —
+   sem isto ele herda o .btn-secondary cinza-claro do tema antigo. */
+.content--home .self-pix-block .btn-secondary {
+  background: var(--hfc-glass);
+  color: var(--hfc-text);
+  border: 1px solid var(--hfc-glass-border);
+}
 .self-pix-result { margin-top: 4px; }
 
 /* Chip "revisar comprovante" / "PIX" no painel do admin */
