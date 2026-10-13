@@ -2804,6 +2804,7 @@ import { SUPABASE_CONFIG } from "../config/supabase.config.js";
 import { assertCriticalOperationAllowed, isLocalhostWithProdSupabase, getRuntimeSupabaseConfig } from '../services/environment.guard.js';
 import { registerServiceWorker, getPushState, enablePush, disablePush, triggerServerPush, triggerOverdueReminders, triggerWaitlistPromotion, triggerDrawDropout, syncExistingPushSubscription } from '../services/push.service.js';
 import { submitPixReceipt } from '../services/pix.service.js';
+import { hasSharedReceipt, takeSharedReceipt, readSharedReceiptFlag, isClipboardImageSupported, readClipboardImage } from '../services/receipt-inbox.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
 
@@ -3028,6 +3029,9 @@ async function initInner() {
     const current = getCurrentPlayer();
     if (current) syncExistingPushSubscription(current.id);
   });
+
+  // Comprovante PIX que chegou pelo "Compartilhar" do Android.
+  initSharedReceipt();
 }
 
 // O servidor recusou a confirmação porque o jogo já estava lotado (trigger
@@ -3381,6 +3385,8 @@ function render(snapshot) {
     // pelo re-render. Best-effort/async.
     maybeShowPerfVote(snapshot, getCurrentPlayer());
     maybeShowCarneVote(snapshot, getCurrentPlayer());
+    // Comprovante compartilhado à espera do login (ver deliverSharedReceipt).
+    if (sharedReceiptWaiting && !sharedReceiptDelivering) deliverSharedReceipt();
   } catch (err) {
     console.error('[harmonia] Falha ao renderizar a tela:', err);
     renderFatalError();
@@ -5045,6 +5051,8 @@ function renderProfilePanel(activePlayer, game) {
           `}
           <button class="btn btn-primary self-pix-submit-btn" type="button" id="self-pix-btn">📷 Enviar comprovante PIX</button>
           <input id="self-pix-file" type="file" accept="image/*" hidden />
+          ${isClipboardImageSupported() ? `<button class="btn btn-secondary self-pix-submit-btn" type="button" id="self-pix-paste-btn">📋 Colar comprovante copiado</button>` : ''}
+          ${renderSelfPixShortcutHint()}
           <div id="self-pix-result" class="self-pix-result" hidden></div>
         </div>
       ` : ''}
@@ -5355,24 +5363,52 @@ function renderPixSubmitResult(container, res) {
   container.hidden = false;
 }
 
-// Jogador envia o próprio comprovante. Servidor valida e grava (ou marca p/ revisão).
-function wireSelfPixReceipt(appElement) {
-  const btn = appElement.querySelector('#self-pix-btn');
-  const fileInput = appElement.querySelector('#self-pix-file');
-  const result = appElement.querySelector('#self-pix-result');
-  if (!btn || !fileInput || !result) return;
+// Dica do caminho curto, logo abaixo dos botões. No Android o app entra na
+// folha de compartilhamento do banco (share_target); no iPhone o sistema não
+// deixa, e o caminho curto é copiar lá e colar aqui.
+function renderSelfPixShortcutHint() {
+  if (/Android/i.test(String(navigator.userAgent || ''))) {
+    return `<p class="footer-note">Atalho: no app do banco, toque em Compartilhar e escolha o Harmonia (precisa do app instalado).</p>`;
+  }
+  if (isClipboardImageSupported()) {
+    return `<p class="footer-note">Atalho: no app do banco, toque em Compartilhar → Copiar e depois em “Colar” aqui.</p>`;
+  }
+  return '';
+}
 
-  btn.addEventListener('click', () => fileInput.click());
+const PIX_PASTE_MESSAGES = {
+  unsupported: 'Este navegador não deixa colar imagem. Use “Enviar comprovante PIX”.',
+  empty: 'Não achei imagem copiada. No app do banco, toque em Compartilhar → Copiar e tente de novo.',
+  denied: 'Para colar, toque em “Colar” no balão que o aparelho mostra.',
+};
 
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    fileInput.value = '';
-    if (!file) return;
+// Os botões e o painel do resultado são buscados A CADA passo, e não guardados:
+// o envio leva segundos e um sync remoto no meio redesenha o perfil — a
+// referência antiga ficaria apontando para um nó que já saiu da tela.
+function setSelfPixBusy(busy) {
+  ['self-pix-btn', 'self-pix-paste-btn'].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) button.disabled = busy;
+  });
+}
 
-    btn.disabled = true;
-    result.hidden = false;
-    result.innerHTML = '<div class="pix-receipt-card"><p class="footer-note">Enviando e lendo o comprovante…</p></div>';
+function showSelfPixNote(text) {
+  const result = document.getElementById('self-pix-result');
+  if (!result) return;
+  result.innerHTML = `<div class="pix-receipt-card"><p class="footer-note">${escapeHtml(text)}</p></div>`;
+  result.hidden = false;
+}
 
+// Caminho ÚNICO do comprovante, venha ele do seletor de arquivo, do "Colar" ou
+// do compartilhamento do Android. Servidor valida e grava (ou marca p/ revisão).
+let selfPixSending = false;
+async function sendSelfPixReceipt(file) {
+  if (!file || selfPixSending) return;
+  selfPixSending = true;
+  setSelfPixBusy(true);
+  showSelfPixNote('Enviando e lendo o comprovante…');
+
+  try {
     let dataUrl;
     try {
       // Comprime ANTES de enviar. A foto vinha crua do celular (3–8 MB, +33% em
@@ -5389,14 +5425,14 @@ function wireSelfPixReceipt(appElement) {
       }
       if (!dataUrl) dataUrl = await readFileAsDataUrl(file);
     } catch (_) {
-      result.innerHTML = '<div class="pix-receipt-card"><p class="footer-note">Não consegui abrir a imagem.</p></div>';
-      btn.disabled = false;
+      showSelfPixNote('Não consegui abrir a imagem.');
+      showToast('Não consegui abrir a imagem.', 'error');
       return;
     }
 
     const res = await submitPixReceipt(dataUrl);
-    renderPixSubmitResult(result, res);
-    btn.disabled = false;
+    const result = document.getElementById('self-pix-result');
+    if (result) renderPixSubmitResult(result, res);
 
     // Marcou pago ou caiu p/ revisão → recarrega do servidor (re-renderiza e
     // some o painel inline); o toast garante o feedback após o re-render.
@@ -5413,7 +5449,106 @@ function wireSelfPixReceipt(appElement) {
     } else if (res.result === 'rejected') {
       showToast(PIX_REJECT_MESSAGES[res.reason] || 'Não consegui validar o comprovante.', 'error');
     }
+  } finally {
+    selfPixSending = false;
+    setSelfPixBusy(false);
+  }
+}
+
+function wireSelfPixReceipt(appElement) {
+  const btn = appElement.querySelector('#self-pix-btn');
+  const fileInput = appElement.querySelector('#self-pix-file');
+  if (!btn || !fileInput) return;
+
+  // Redesenho no meio de um envio: os botões novos nascem travados também.
+  if (selfPixSending) setSelfPixBusy(true);
+
+  btn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (file) await sendSelfPixReceipt(file);
   });
+
+  // "Colar": a leitura da área de transferência precisa nascer deste toque —
+  // o iPhone mostra o balão "Colar" e só entrega a imagem depois dele.
+  appElement.querySelector('#self-pix-paste-btn')?.addEventListener('click', async () => {
+    const pasted = await readClipboardImage();
+    if (!pasted.ok) {
+      const msg = PIX_PASTE_MESSAGES[pasted.reason] || PIX_PASTE_MESSAGES.empty;
+      showSelfPixNote(msg);
+      showToast(msg, 'error');
+      return;
+    }
+    await sendSelfPixReceipt(pasted.blob);
+  });
+}
+
+// Comprovante que chegou pelo "Compartilhar" do Android. O service worker só
+// guardou a imagem; aqui ela é retirada e segue pelo mesmo envio do botão.
+// Sem jogador logado ela FICA guardada (validade curta, ver receipt-inbox.js) e
+// é entregue assim que o login acontece — por isso o render() chama isto.
+let sharedReceiptWaiting = false;
+let sharedReceiptDelivering = false;
+
+async function initSharedReceipt() {
+  const flag = readSharedReceiptFlag();
+  if (flag === 'falhou') {
+    showToast('Não consegui receber o comprovante compartilhado. Envie pelo seu perfil.', 'error');
+    return;
+  }
+  sharedReceiptWaiting = await hasSharedReceipt();
+  if (!sharedReceiptWaiting) return;
+  if (!getCurrentPlayer()) {
+    showToast('Entre na sua conta: o comprovante é enviado em seguida.', 'success');
+    return;
+  }
+  await deliverSharedReceipt();
+}
+
+async function deliverSharedReceipt() {
+  if (!sharedReceiptWaiting || sharedReceiptDelivering) return;
+  if (!getCurrentSnapshotPlayer(getState())) return;
+  sharedReceiptDelivering = true;
+  try {
+    const file = await takeSharedReceipt();
+    sharedReceiptWaiting = false;
+    if (!file) {
+      showToast('O comprovante compartilhado expirou. Compartilhe de novo.', 'error');
+      return;
+    }
+
+    // Abre o perfil: é lá que o resultado do envio aparece.
+    const snapshot = getState();
+    selfProfileOpen = true;
+    selfProfileEditOpen = false;
+    selfPhotoPending = '';
+    if (snapshot.ui?.currentTab !== 'home') {
+      patchState({ ui: { ...(snapshot.ui || {}), currentTab: 'home' } });
+    } else {
+      render(snapshot);
+    }
+
+    // Quem decide se há envio é a tela: se o botão não foi desenhado
+    // (mensalidade em dia, comprovante já em revisão, clube sem leitura
+    // automática), não existe para onde mandar — e a regra não é duplicada aqui.
+    if (!document.getElementById('self-pix-btn')) {
+      const player = getCurrentSnapshotPlayer(getState());
+      const msg = player && isMensOkEffective(player, getActiveGameFromSnapshot(getState()))
+        ? 'Sua mensalidade já está em dia — o comprovante não foi enviado.'
+        : player?.mens_review
+          ? 'Você já tem um comprovante aguardando o administrador.'
+          : 'O envio de comprovante não está disponível para você agora.';
+      showToast(msg, 'error');
+      return;
+    }
+
+    document.getElementById('self-profile-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    await sendSelfPixReceipt(file);
+  } finally {
+    sharedReceiptDelivering = false;
+  }
 }
 
 function renderPresenceList(snapshot, currentPlayer) {

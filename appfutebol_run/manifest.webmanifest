@@ -15,5 +15,18 @@
       "sizes": "640x640",
       "purpose": "any"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "./receber-comprovante",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "comprovante",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  }
 }
