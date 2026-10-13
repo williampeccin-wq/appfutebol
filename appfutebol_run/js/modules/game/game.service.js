@@ -485,7 +485,7 @@ export function toggleConfirmation(playerId, options = {}) {
 
   let updated;
   if (existing) {
-    updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? normalizeGoalkeeperConfirmation({ ...entry, confirmed: true, status: 'confirmed', waitlisted_at: null, waitlist_position: null, removed_by_admin: false, confirmed_at: now, cancelled_at: null, timestamp: now, game_key: gameKey }, player) : entry);
+    updated = confirmations.map((entry) => String(entry.player_id) === String(playerId) ? normalizeGoalkeeperConfirmation({ ...entry, confirmed: true, status: 'confirmed', waitlisted_at: null, waitlist_position: null, removed_by_admin: false, confirmed_at: now, cancelled_at: null, timestamp: now, game_key: gameKey, auto: false }, player) : entry);
   } else {
     updated = [...confirmations, normalizeGoalkeeperConfirmation({ player_id: playerId, game_key: gameKey, confirmed: true, status: 'confirmed', removed_by_admin: false, confirmed_at: now, cancelled_at: null, waitlisted_at: null, waitlist_position: null, timestamp: now }, player)];
   }

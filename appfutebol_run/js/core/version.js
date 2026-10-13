@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.205.0-agendamento-no-free';
+export const APP_VERSION = 'v1.206.0-presenca-automatica';
