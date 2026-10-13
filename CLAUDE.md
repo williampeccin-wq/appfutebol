@@ -31,15 +31,14 @@ git push origin production
 O que esperar do conflito: `js/domain/*` e `supabase/functions/*` costumam estar
 idênticos; o atrito fica em `core/app.js` e `players.view.js`, e quase sempre é
 **vocabulário** — o Harmonia diz "carnê" onde o Convocados diz "churrasco".
-Resolva mantendo a palavra desta branch. A suíte daqui é menor (12 arquivos contra
-24) e não há `tests/README.md`: o cherry-pick conflita nele, é só remover.
+Resolva mantendo a palavra desta branch. A suíte daqui é menor (18 arquivos contra
+29) e não há `tests/README.md`: o cherry-pick conflita nele, é só remover.
 
 ## Antes de mexer em qualquer tela
 
 Leia a skill **`design-harmonia`** (`.claude/skills/design-harmonia/SKILL.md`):
 tokens de cor válidos, tema escuro, escala, alvos de toque, vocabulário e as
-armadilhas do `app.css`. Ela também registra **dois bugs de contraste já corrigidos
-no `main` e ainda não portados para cá** — vale ler antes de criar tela nova.
+armadilhas do `app.css`.
 
 Quem usa Claude Code carrega a skill automaticamente. Quem não usa, leia o arquivo.
 
@@ -54,7 +53,6 @@ appfutebol_run/          o app inteiro (é isso que o Pages publica)
   js/services/           Supabase, auth, push, PIX
 tests/*.regression.mjs   suíte de regressão (node --test, sem dependência)
 supabase/                migrations, edge functions e SQL avulso (ADHOC_*, CRON_*)
-docs/                    decisões de produto e design
 ```
 
 Não há tela de financeiro nesta branch: `finance.service.js` existe, view não.
@@ -64,12 +62,14 @@ config ainda moram no `core/app.js`. Tabela completa na skill.
 ## Rodar local
 
 ```bash
-python3 .claude/dev-server.py     # http://localhost:8000
+python3 -m http.server 8000 --directory appfutebol_run     # http://localhost:8000
 ```
 
-Serve `appfutebol_run` sem cache e injeta `?v=mtime` nos imports. Não abra o
-`index.html` por `file://` — módulos ES exigem HTTP. O `env.js` aponta para o
-Supabase **dev**; o guard bloqueia credencial de produção em localhost de propósito.
+Não abra o `index.html` por `file://` — módulos ES exigem HTTP. O `env.js`
+versionado aponta para o Supabase de **produção**, e o guard de ambiente bloqueia
+isso em localhost de propósito (tela "AMBIENTE BLOQUEADO"). Para rodar local, troque
+para o ambiente dev com `scripts/use-dev.sh` — e não commite o `env.js` trocado. O
+`.claude/dev-server.py` (sem cache, `?v=mtime` nos imports) só existe no `main`.
 
 ## Antes de commitar
 
@@ -105,8 +105,3 @@ fim: `feat(carne): "Grupo" como dupla de quem sobra no rodízio ímpar (v1.185.0
   e o rótulo da aba; churrasco é a **dupla** sorteada da semana. Detalhe na skill.
 - **Cache.** O `_headers` manda `Cache-Control: no-cache` em `/*`: um F5 normal já
   traz o deploy, sem `?v=` manual.
-
-## Sobre o `docs/`
-
-Boa parte descreve **plano, não implementação**. Ao usar um doc como fonte,
-confirme no código antes.

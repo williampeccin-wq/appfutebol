@@ -75,12 +75,12 @@ da linha 5474). Ele é o tema atual.
 | `--hfc-gold` | `#f0a500` | acento: borda de foco, marca |
 | `--hfc-gold-200` | `#ffc23d` | **acento em texto** (link, aviso, destaque) |
 | `--hfc-grass` | `#19c37d` | sucesso, confirmado, pago |
-| `--hfc-glass` | `rgba(255,255,255,.06)` | superfície de card — **clareia** o fundo (ver aviso abaixo) |
-| `--hfc-glass-2` | `rgba(255,255,255,.05)` | superfície aninhada |
+| `--hfc-glass` | `rgba(0,0,0,.18)` | superfície de card — **escurece** o fundo |
+| `--hfc-glass-2` | `rgba(0,0,0,.15)` | superfície aninhada — escurece menos, logo fica *mais clara* que `--hfc-glass` |
 | `--hfc-glass-border` | `rgba(255,255,255,.12)` | borda de qualquer superfície |
 | `--hfc-line` | `rgba(150,195,255,.16)` | divisória |
 | `--hfc-text` | `#eef2f9` | texto principal |
-| `--hfc-text-muted` | `#8b97b0` | texto secundário — **3.77:1 no topo do gradiente, reprova AA** |
+| `--hfc-text-muted` | `#9ea8bd` | texto secundário — 4.63:1 no topo do gradiente |
 | `--hfc-text-dim` | `#7e8aa3` | **LEGADO, não usar.** 3.19:1 sobre `--hfc-navy-700`: reprova no topo de qualquer tela. Ao tocar numa regra que o usa, converta para `--hfc-text-muted` |
 | `--hfc-accent-blue` | `#8fb4ff` | informação, neutro ativo |
 | `--hfc-radius-lg` | `20px` | card, modal |
@@ -90,21 +90,24 @@ da linha 5474). Ele é o tema atual.
 reprova em qualquer critério. Sobre navy dá 8.26:1, e aí pode. Em texto sobre
 escuro prefira `--hfc-gold-200`.
 
-> **Esta branch está com dois bugs de contraste já corrigidos no Convocados.**
-> Em 08/09/2026 o `main` (v1.193.0) escureceu o vidro e clareou o `--hfc-text-muted`
-> porque, medido contra `--hfc-navy-700` — o topo do gradiente, onde as telas põem a
-> informação —, o texto secundário dava **3.77:1** e dentro do card caía para
-> **3.90:1**, e o `--hfc-grass` para **4.05:1**. Tudo reprovando AA. O port para cá
-> ainda não foi feito. Enquanto não for, os valores da tabela acima são o que está
-> no arquivo, não o que deveria estar; ao criar tela nova prefira `--hfc-text` para
-> qualquer coisa que precise ser lida.
+**Contraste se verifica contra o fundo composto — `--hfc-navy-700` com a superfície
+de vidro por cima**, que é onde quase todo texto do app está. Navy-700 é o topo do
+gradiente radial, e é exatamente onde esta skill manda pôr informação.
 
-**Contraste se verifica contra `--hfc-navy-700`, não contra `--hfc-navy-800`.**
-Navy-700 é o topo do gradiente radial, e é exatamente onde esta skill manda pôr
-informação. É o pior caso de toda tela, não o fundo médio.
+O vidro **escurece**. Isso significa que o pior caso é **texto solto direto no
+gradiente, sem card** — a coluna "puro" abaixo. Um texto que passa lá passa em
+qualquer lugar. Referência medida sobre navy-700:
 
-O `--hfc-text-dim` reprova em qualquer fundo deste app (3.19:1 sobre navy-700) —
-tratado como legado, não use em código novo.
+| Token | puro | vidro | aninhado |
+|---|---|---|---|
+| `--hfc-text` | 9.85 | 11.56 | 11.32 |
+| `--hfc-text-muted` | 4.63 | 5.43 | 5.32 |
+| `--hfc-gold-200` | 6.86 | 8.05 | 7.89 |
+| `--hfc-accent-blue` | 5.34 | 6.27 | 6.14 |
+| `--hfc-grass` | 4.81 | 5.65 | 5.53 |
+| `--hfc-text-dim` (legado) | **3.19** | **3.74** | **3.66** |
+
+O `--hfc-text-dim` reprova nas três colunas — não há fundo neste app onde ele passe.
 
 Não crie token novo para resolver uma tela. Se precisou de uma cor que não está
 aqui, ou é caso de reusar uma existente, ou é decisão de paleta — pergunte antes.
@@ -146,9 +149,9 @@ Antes de escrever CSS novo, procure a classe existente. `grep -n '^\.' css/app.c
 **Superfície de vidro** — `background: var(--hfc-glass)`, `border: 1px solid
 var(--hfc-glass-border)`, `border-radius: var(--hfc-radius-lg)`, `padding: 16px`.
 Superfície dentro de superfície usa `--hfc-glass-2` e raio 16 px.
-Nesta branch o vidro **clareia** o fundo, e `--hfc-glass-2` (menos branco) é a
-superfície aninhada mais escura. Se o port do `main` for feito, essa relação
-inverte — ver o aviso na seção de tokens.
+Desde o porte do Convocados v1.193.0 (aqui, v1.196.0) o vidro escurece, então `--hfc-glass-2` (menos preto)
+fica **mais claro** que `--hfc-glass` — a superfície aninhada sobe, como elevação em
+tema escuro.
 
 `--hfc-glass-2` é sempre aninhado: solto direto no gradiente ele compete com o card
 que deveria contê-lo. São 28 declarações no `app.css`.
@@ -160,13 +163,21 @@ injetados noutro lugar. Quem determina o pai é o **consumidor** do fragmento, n
 que está acima dele no arquivo. Rastreie a chamada — no `main` essa confusão gerou
 uma classificação errada de 7 componentes.
 
-### `.fatal-card` está errado aqui
+### Exceção: card sobre `--hfc-navy-900`
 
-`.fatal-screen` tem fundo `--hfc-navy-900`, o mais escuro do app, e `.fatal-card`
-usa `--hfc-glass-2` por cima. Com o vidro branco desta branch isso ainda funciona
-(1.13:1 de separação), mas é frágil: no dia em que o vidro escuro for portado, o
-card **desaparece** (1.01:1). No `main` a correção foi declarar superfície clara
-explícita, sem token. Porte junto, ou porte nenhum dos dois.
+O vidro escuro pressupõe fundo com alguma luz. Sobre `--hfc-navy-900` — a base do
+gradiente, e o fundo cheio de telas como `.fatal-screen` — ele deixa de funcionar:
+
+| Superfície sobre navy-900 | separação vs. fundo |
+|---|---|
+| `--hfc-glass-2` | 1.01 |
+| `--hfc-glass` | 1.01 |
+| branco `rgba(255,255,255,.06)` | 1.13 |
+
+Em 1.01:1 o card e o fundo são a mesma cor, e só a borda sobra. Trocar um token de
+vidro pelo outro não resolve — os dois são pretos. **Card cujo fundo é navy-900
+declara superfície clara explícita**, sem token de vidro. É o caso de `.fatal-card`
+(`appfutebol_run/css/app.css`, procure "EXCEÇÃO ao vidro escuro").
 
 ## Onde mora o markup
 
