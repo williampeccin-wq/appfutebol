@@ -18,7 +18,6 @@ const PRO_FEATURES = [
   '🎯 Sorteio inteligente equilibrado pelas notas dos jogadores',
   '🔔 Lembrete automático de mensalidade em atraso',
   '👥 Membros ilimitados e múltiplos administradores',
-  '📅 Abertura automática de inscrições',
 ];
 
 export function showProUpsellModal() {

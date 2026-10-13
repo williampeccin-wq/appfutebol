@@ -215,7 +215,6 @@ Deno.serve(async (req) => {
     // tratados abaixo continuam usando `continue`; este catch é para o resto.
     try {
       const clubId = String(club.id);
-      const isPro = String(club.plan || "free") === "pro";
 
       const { data: metaRow, error: metaErr } = await admin
         .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
@@ -230,8 +229,11 @@ Deno.serve(async (req) => {
       const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
       out.clubs = (out.clubs as number) + 1;
 
-      // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
-      if (isPro) {
+      // ---------- 1) Abertura automática de inscrições (TODOS os planos) ----------
+      // Agendar a abertura é do JOGO, não da gestão do clube: vale no Free também.
+      // Enquanto foi Pro só aqui, o formulário aceitava o horário de qualquer clube,
+      // a home anunciava "Abre automaticamente" e, no Free, nada abria — sem aviso.
+      {
         const toOpen: Array<Record<string, unknown>> = [];
         const nextGames = games.map((g) => {
           const at = String(g?.auto_open_at || "").slice(0, 16);

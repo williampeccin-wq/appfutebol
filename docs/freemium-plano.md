@@ -22,6 +22,7 @@ O núcleo tem que ser **genuinamente útil sozinho**, senão não há adoção (
 | Convidados + goleiro de aluguel | Faz parte do jogo |
 | **Compartilhar** lista/times no WhatsApp | Canal de aquisição — traz clubes novos |
 | Foto de perfil | Cosmético |
+| ⚡ **Abertura automática de inscrições** (agendada) | É do jogo, não da gestão; o cron já roda e não tem custo por uso |
 | Push essencial ("inscrições abertas") | Retenção, custo ~zero |
 | **Limites:** até ~25 membros · 1 admin · histórico de 3 jogos | Segmenta por tamanho, não por dor |
 
@@ -37,7 +38,6 @@ Onde está **dinheiro, competição, inteligência e escala**. Aqui moram os cus
 | ⭐ Avaliações/notas (desempenho + churrasco) | Engajamento avançado |
 | 🎽 **Sorteio inteligente** (índice de força = notas + pontos do campeonato) | Diferencial real; depende das notas |
 | 📅 Carnê / rodízio de duplas | Gestão do clube |
-| ⚡ Abertura automática de inscrições (agendada) | Automação (cron) |
 | 👥 **Membros ilimitados + multi-admin** | Escala |
 | 📈 **Histórico completo** (jogos, presença, financeiro) | Valor acumulado → lock-in |
 
