@@ -318,6 +318,9 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
       // do estado "armando" — mesma falha silenciosa do `uniforms` (30/07).
       mens_last_reset_month: String(meta.settings?.mens_last_reset_month || '').slice(0, 7),
       ratings_perf_window_hours: Number(meta.settings?.ratings_perf_window_hours) || 0,
+      // Notas da rodada (modules/notas): 'completo' | 'so_minha' | 'desligado'.
+      // Ausente = 'completo'; a normalização fica com modoNotasDaRodada.
+      ratings_reveal_mode: String(meta.settings?.ratings_reveal_mode || ''),
       mens_amount: Number(meta.settings?.mens_amount) || 0,
       mens_beneficiary: String(meta.settings?.mens_beneficiary || ''),
       notifications: (meta.settings?.notifications && typeof meta.settings.notifications === 'object') ? meta.settings.notifications : {},
@@ -356,6 +359,7 @@ function splitState(state) {
         mens_enforcement_mode: String(state.settings?.mens_enforcement_mode || 'none'),
         mens_last_reset_month: String(state.settings?.mens_last_reset_month || '').slice(0, 7),
         ratings_perf_window_hours: Number(state.settings?.ratings_perf_window_hours) || 0,
+        ratings_reveal_mode: String(state.settings?.ratings_reveal_mode || ''),
         mens_amount: Number(state.settings?.mens_amount) || 0,
         mens_beneficiary: String(state.settings?.mens_beneficiary || ''),
         notifications: (state.settings?.notifications && typeof state.settings.notifications === 'object') ? state.settings.notifications : {},

@@ -2991,6 +2991,8 @@ import { submitPixReceipt } from '../services/pix.service.js';
 import { hasSharedReceipt, takeSharedReceipt, readSharedReceiptFlag, isClipboardImageSupported, readClipboardImage } from '../services/receipt-inbox.js';
 import { submitRatings, fetchRatings, loadRatingsCache, getTopRatedPlayerId, getCachedRatings, playerRatingAverages, deleteGameRatings, checkHasVoted, setRatingSeasonWindow } from '../services/ratings.service.js';
 import { isVotingEnabled, isPasskeyEnabled } from './flags.js';
+import { janelaDaVotacao, janelaDasNotas, jogoComNotasAMostra, modoNotasDaRodada, notasDaRodada, NOTAS_RODADA_MODOS } from '../modules/notas/notas.service.js';
+import { renderNotasRodadaCard, renderNotasRodadaModal } from '../modules/notas/notas.view.js';
 
 // Carrega as notas (uma vez por sessão) para os rankings da aba Campeonato e
 // re-renderiza quando chegarem.
@@ -3650,6 +3652,7 @@ function render(snapshot) {
     // pelo re-render. Best-effort/async.
     maybeShowPerfVote(snapshot, getCurrentPlayer());
     maybeShowCarneVote(snapshot, getCurrentPlayer());
+    maybeShowNotasRodada(snapshot, getCurrentPlayer());
     // Comprovante compartilhado à espera do login (ver deliverSharedReceipt).
     if (sharedReceiptWaiting && !sharedReceiptDelivering) deliverSharedReceipt();
   } catch (err) {
@@ -3677,22 +3680,15 @@ function parseGameDateTimeMs(game) {
 }
 
 function getPerfWindow(snapshot, game) {
-  const hours = Number(snapshot?.settings?.ratings_perf_window_hours) || 0;
-  if (hours <= 0) return null;
-  const gameDate = String(game?.game_date || '').slice(0, 10);
-  if (!gameDate) return null;
   // A votação SÓ abre depois que o admin LANÇA O RESULTADO deste jogo — dá tempo
   // de reorganizar times / tirar quem não apareceu antes de liberar as notas.
-  // Casado por DATA (o game_key do resultado é inconsistente: às vezes null, às
-  // vezes com ':' no horário). Dura ratings_perf_window_hours a partir do lançamento.
-  const results = snapshot?.championship?.active?.results || [];
-  const markedMs = results
-    .filter((r) => String(r?.date || '').slice(0, 10) === gameDate)
-    .map((r) => Date.parse(r?.created_at || ''))
-    .filter((ms) => Number.isFinite(ms))
-    .sort((a, b) => b - a)[0];
-  if (!markedMs) return null; // sem resultado lançado → votação fechada
-  return { openMs: markedMs, closeMs: markedMs + hours * 60 * 60 * 1000 };
+  // Dura ratings_perf_window_hours a partir do lançamento. A regra mora em
+  // notas.service.js porque as Notas da rodada abrem exatamente quando ela fecha.
+  return janelaDaVotacao(
+    snapshot?.championship?.active?.results || [],
+    game?.game_date,
+    snapshot?.settings?.ratings_perf_window_hours,
+  );
 }
 
 // Jogo cuja janela de votação está ABERTA agora, do mais recente para o mais
@@ -4081,6 +4077,110 @@ async function submitCarneVote() {
   loadRatingsCache(true).then(() => render(getState())).catch(() => {});
 }
 // =================== fim votação do churrasco ===================
+
+// ===================== Notas da rodada =====================
+// Média de cada jogador no jogo cuja votação acabou de fechar, à mostra por 12h
+// (regra em modules/notas/notas.service.js). Card na home + popup, que abre
+// sozinho uma vez por jogo. Os votos são lidos do servidor na hora — o cache
+// geral foi carregado no boot, antes de a votação terminar.
+let notasRodada = { gameKey: null, linhas: null, carregando: false };
+
+function getNotasRodadaAMostra(snapshot) {
+  if (!isVotingEnabled()) return null;
+  if (!isModuleOn(snapshot, 'votacao_desempenho')) return null;
+  const modo = modoNotasDaRodada(snapshot?.settings);
+  if (modo === 'desligado') return null;
+  const results = snapshot?.championship?.active?.results || [];
+  const horas = snapshot?.settings?.ratings_perf_window_hours;
+  const jogo = jogoComNotasAMostra(getCurrentGames(snapshot), results, horas);
+  if (!jogo) return null;
+  const janela = janelaDasNotas(results, jogo.game_date, horas);
+  return { jogo, janela, modo, gameKey: getGameKey(jogo) };
+}
+
+// Linhas do ranking do jogo à mostra; null enquanto a leitura não chega.
+function linhasDasNotasRodada(aMostra) {
+  if (!aMostra) return null;
+  if (notasRodada.gameKey === aMostra.gameKey) return notasRodada.linhas;
+  if (notasRodada.carregando) return null;
+  notasRodada = { gameKey: aMostra.gameKey, linhas: null, carregando: true };
+  fetchRatings({ kind: 'desempenho', gameKey: aMostra.gameKey })
+    .then((res) => {
+      if (notasRodada.gameKey !== aMostra.gameKey) return;
+      // Falhou: libera nova tentativa no próximo render em vez de travar vazio.
+      notasRodada = res.ok
+        ? { gameKey: aMostra.gameKey, linhas: notasDaRodada(res.rows, aMostra.gameKey), carregando: false }
+        : { gameKey: null, linhas: null, carregando: false };
+      render(getState());
+    })
+    .catch(() => { notasRodada = { gameKey: null, linhas: null, carregando: false }; });
+  return null;
+}
+
+function renderNotasRodadaHomeCard(snapshot, currentPlayer) {
+  const aMostra = getNotasRodadaAMostra(snapshot);
+  if (!aMostra) return '';
+  return renderNotasRodadaCard({
+    jogo: aMostra.jogo,
+    linhas: linhasDasNotasRodada(aMostra),
+    meuId: currentPlayer?.id,
+    jogadores: snapshot.players || [],
+    fechaEmMs: aMostra.janela.closeMs,
+  });
+}
+
+const NOTAS_RODADA_VISTA = 'convocados_notas_rodada_vista';
+
+function notasRodadaJaVista(gameKey) {
+  try { return localStorage.getItem(NOTAS_RODADA_VISTA) === gameKey; } catch (_) { return true; }
+}
+function marcarNotasRodadaVista(gameKey) {
+  try { localStorage.setItem(NOTAS_RODADA_VISTA, gameKey); } catch (_) { /* sem storage: abre de novo, sem dano */ }
+}
+
+// Abre o popup sozinho uma vez por jogo. Espera os modais de votação: um voto
+// pendente tem prioridade sobre ver nota.
+function maybeShowNotasRodada(snapshot, currentPlayer) {
+  if (!currentPlayer) return;
+  if (document.querySelector('.vote-overlay')) return;
+  const aMostra = getNotasRodadaAMostra(snapshot);
+  if (!aMostra || notasRodadaJaVista(aMostra.gameKey)) return;
+  const linhas = linhasDasNotasRodada(aMostra);
+  if (!linhas || !linhas.length) return;
+  openNotasRodada(snapshot, currentPlayer);
+}
+
+function openNotasRodada(snapshot, currentPlayer) {
+  const aMostra = getNotasRodadaAMostra(snapshot);
+  const linhas = linhasDasNotasRodada(aMostra);
+  if (!aMostra || !linhas || !linhas.length) return;
+  marcarNotasRodadaVista(aMostra.gameKey);
+  let el = document.getElementById('notas-rodada-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'notas-rodada-overlay';
+    el.className = 'vote-overlay';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = renderNotasRodadaModal({
+    jogo: aMostra.jogo,
+    linhas,
+    modo: aMostra.modo,
+    meuId: currentPlayer?.id,
+    jogadores: snapshot.players || [],
+    renderAvatar: renderAvatarForApp,
+  });
+  el.onclick = (ev) => {
+    if (ev.target.closest('[data-notas-rodada-fechar]')) closeNotasRodada();
+  };
+  syncVoteBodyLock();
+}
+
+function closeNotasRodada() {
+  document.getElementById('notas-rodada-overlay')?.remove();
+  syncVoteBodyLock();
+}
+// =================== fim notas da rodada ===================
 
 // Tela de espera do auto-cadastro (pending). Ver portão em renderInner.
 function renderPendingScreen(currentPlayer) {
@@ -4644,6 +4744,10 @@ function bindAppEvents(currentPlayer) {
     });
   });
 
+  appElement.querySelector('[data-notas-rodada-abrir]')?.addEventListener('click', () => {
+    openNotasRodada(getState(), currentPlayer);
+  });
+
   appElement.querySelector('#confirm-btn')?.addEventListener('click', () => {
     const antes = getState(); // o sorteio de antes do cancelamento, para saber se ela estava escalada
     const result = toggleConfirmation(currentPlayer.id);
@@ -5011,8 +5115,10 @@ function bindAppEvents(currentPlayer) {
     ratingsForm.addEventListener('submit', (event) => {
       event.preventDefault();
       if (!requireAdmin(getState(), 'Apenas administrador pode alterar a votação')) return;
-      const hours = Math.max(0, Math.round(Number(new FormData(ratingsForm).get('ratings_perf_window_hours')) || 0));
-      patchState({ settings: { ...(getState().settings || {}), ratings_perf_window_hours: hours } });
+      const formData = new FormData(ratingsForm);
+      const hours = Math.max(0, Math.round(Number(formData.get('ratings_perf_window_hours')) || 0));
+      const revealMode = modoNotasDaRodada({ ratings_reveal_mode: formData.get('ratings_reveal_mode') });
+      patchState({ settings: { ...(getState().settings || {}), ratings_perf_window_hours: hours, ratings_reveal_mode: revealMode } });
       const safeSnapshot = repairManualSnapshot(getState());
       savePersistedState(safeSnapshot);
       render(safeSnapshot);
@@ -5504,6 +5610,8 @@ function renderHome(snapshot, currentPlayer) {
       `}
 
       ${renderPendingApprovalsHomeCard(pendingApprovals)}
+
+      ${renderNotasRodadaHomeCard(snapshot, currentPlayer)}
 
       <section class="home-v2-card">
         <div class="home-v2-card-head">
@@ -6553,6 +6661,7 @@ const NOTIF_TYPES = [
   { key: 'mensalidade_atrasada', label: 'Mensalidade atrasada', desc: 'Aviso diário (7h) para quem está em atraso.' },
   { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
   { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
+  { key: 'notas_da_rodada', label: 'Notas da rodada', desc: 'Quando a votação de desempenho fecha e as notas do jogo ficam à mostra. Para todos.' },
   { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla do churrasco (23h do dia do jogo). Para todos.' },
   { key: 'saiu_da_escalacao', label: 'Saiu da escalação', desc: 'Quando alguém já sorteado cancela a presença. Só para os administradores.' },
 ];
@@ -6893,12 +7002,19 @@ function renderConfig(snapshot, currentPlayer) {
 
       <section class="card ratings-config-card">
         <div class="card-title">Votação de desempenho</div>
-        <p class="footer-note">A votação abre automaticamente 1h após o início do jogo e dura a quantidade de horas abaixo. Aparece como aviso obrigatório só para quem esteve dentro do jogo. 0 = desativada.</p>
+        <p class="footer-note">A votação abre quando o resultado do jogo é lançado e dura a quantidade de horas abaixo. Aparece como aviso obrigatório só para quem esteve dentro do jogo. 0 = desativada.</p>
         <form id="ratings-config-form" class="player-admin-form game-config-form">
           <label class="field-label">
             Janela de votação (horas)
             <input class="input" type="number" min="0" max="48" step="1" name="ratings_perf_window_hours" value="${Number(snapshot.settings?.ratings_perf_window_hours) || 0}" />
           </label>
+          <label class="field-label">
+            Notas da rodada
+            <select class="select" name="ratings_reveal_mode">
+              ${Object.entries(NOTAS_RODADA_MODOS).map(([valor, rotulo]) => `<option value="${valor}" ${modoNotasDaRodada(snapshot.settings) === valor ? 'selected' : ''}>${rotulo}</option>`).join('')}
+            </select>
+          </label>
+          <small class="footer-note">Quando a votação fecha, a média de cada um naquele jogo fica à mostra por 12 horas, e todos recebem um aviso. Ninguém vê quem votou.</small>
           <div class="player-admin-actions game-config-actions">
             <button class="btn btn-primary" type="submit">Salvar votação</button>
           </div>

@@ -35,6 +35,7 @@ opina sobre formatação.
 | `conflito-sobrescrita.regression.mjs` | gravação concorrente apagava alteração alheia em silêncio (15/07); e o merge de um nível levava junto resultado de campeonato que o cliente nunca viu (20/08) |
 | `churrasco-alvo-servidor.regression.mjs` | alvo do voto de churrasco não era validado; e a validação nova não pode divergir do cálculo do cliente, senão recusa voto legítimo (20/08) |
 | `votacao-confirmacoes.regression.mjs` | votação sumia da tela ao criar o próximo jogo: elegibilidade vinha das confirmações do jogo ATIVO, não do jogo com janela aberta (20/08) |
+| `notas-da-rodada.regression.mjs` | notas do jogo só aparecem depois que a votação fecha e somem 12h depois; ranking só daquele jogo; push de "votação encerrada" com a mesma regra (15/10) |
 | `notas-paginacao.regression.mjs` | leitura de notas truncava no teto do PostgREST sem erro, e a média truncada desequilibrava o sorteio (20/08) |
 | `campeonato-pontuacao.regression.mjs` | heurística de remoção atropelava a declaração do admin; substituição muda |
 | `club-profile.regression.mjs` | clube novo herdava pontos de outro clube por coincidência de nome |

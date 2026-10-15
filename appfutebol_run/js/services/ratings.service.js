@@ -174,6 +174,11 @@ export function playerRatingAverages(rows, window = null) {
   return aggregateByTarget(rows, 'desempenho', { window });
 }
 
+// Média por jogador (desempenho) de UM jogo — as "Notas da rodada".
+export function gameRatingAverages(rows, gameKey) {
+  return aggregateByTarget(rows, 'desempenho', { gameKeys: [gameKey] });
+}
+
 // Janela móvel: os últimos `meses` a partir de hoje. O sorteio usa isto em vez
 // da temporada de propósito — se o índice de força zerasse junto com a
 // classificação, o primeiro sorteio de cada temporada (e pior, o primeiro do
