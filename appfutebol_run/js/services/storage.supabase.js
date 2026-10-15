@@ -937,6 +937,10 @@ function buildGranularOperations(config, previousParts, nextParts, now) {
         // lotação) precisa dizer DE QUEM é a confirmação que não entrou —
         // sem isso o app só sabe que "algo" foi recusado.
         playerId: String(normalizedConfirmation.player_id || ''),
+        // Confirmação ocupa vaga: só vai ao servidor depois de quem libera vaga
+        // (ver runSaveOperations). Mesmo critério do status gravado em
+        // presencePayloadFromConfirmation.
+        ocupaVaga: normalizedConfirmation.confirmed === true,
         run: () => upsertPresenceConfirmation(config, normalizedConfirmation, now, ownGameKey),
       });
     }
@@ -1260,7 +1264,21 @@ async function runSaveOperations(config, state, previousParts, parts, now, { reb
   }
 
   const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
-  const results = await Promise.all(operations.map((operation) => operation.run()));
+  // Duas levas: primeiro tudo que NÃO ocupa vaga (inclusive quem sai do jogo),
+  // depois as confirmações.
+  //
+  // INCIDENTE 14/10/2026 (Harmonia): o admin removeu o Caue e a promoção do
+  // Feijó saiu no MESMO lote, em paralelo. A trava de lotação do banco
+  // (trg_presence_line_capacity) avaliou a entrada do Feijó antes de a saída do
+  // Caue estar gravada, viu 16/16 e recusou — o app devolveu o Feijó para a
+  // fila e ele só entrou 7 minutos depois, no sync seguinte do admin. Toda
+  // troca "sai um, entra outro" dependia de qual gravação chegava primeiro.
+  const results = new Array(operations.length);
+  for (const leva of [false, true]) {
+    const indices = operations.map((_, i) => i).filter((i) => !!operations[i].ocupaVaga === leva);
+    const feitos = await Promise.all(indices.map((i) => operations[i].run()));
+    indices.forEach((i, k) => { results[i] = feitos[k]; });
+  }
   const failedIndex = results.findIndex((result) => !result.ok);
   const failed = failedIndex >= 0 ? results[failedIndex] : null;
   const failedOperation = failedIndex >= 0 ? operations[failedIndex] : null;
