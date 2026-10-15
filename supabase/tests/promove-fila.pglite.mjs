@@ -9,7 +9,8 @@
 //
 // Cobre: admin remove e o primeiro da fila entra (incidente 14/10), jogador
 // cancela, linha apagada, goleiro, convidado de linha, preferência para quem
-// está em dia, jogo sem limite, trava recusando a promoção e multi-tenant.
+// está em dia, jogo sem limite, trava recusando a promoção, dado torto e
+// multi-tenant.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -173,6 +174,18 @@ for (const [nome, settings, vencimento, esperado] of [
   assert.equal((await status(db, 'caue')).status, 'removed', 'a saída é gravada mesmo se a promoção for barrada');
   assert.equal((await status(db, 'feijo')).ds, 'waitlist', 'e a promoção barrada volta atrás sozinha');
   console.log('ok - promoção recusada não desfaz a saída');
+}
+
+// ---------------------------------------------------------------- dado torto não impede ninguém de sair
+{
+  const db = await banco();
+  await meta(db, { max_players: 16 });
+  await jogoCheio(db);
+  await q(db, `update app_meta set data = jsonb_set(data, '{games,0,max_players}', '"dezesseis"')`);
+  await sair(db, 'caue', 'removed');
+  assert.equal((await status(db, 'caue')).status, 'removed', 'com max_players inválido, a saída vale');
+  assert.equal((await status(db, 'feijo')).ds, 'waitlist', 'e ninguém é promovido');
+  console.log('ok - erro dentro do trigger não bloqueia a saída');
 }
 
 // ---------------------------------------------------------------- multi-tenant (convocados-prod)
