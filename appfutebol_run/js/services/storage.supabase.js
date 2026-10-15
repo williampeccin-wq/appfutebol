@@ -1492,6 +1492,21 @@ export async function fetchConfirmationsForGame(gameKey) {
   return { ok: true, rows };
 }
 
+// Quem o BANCO tirou da fila desde `desdeIso` (trg_presence_promove_fila marca
+// data.source). Quem saiu nem sempre sabe quem entrou: o aparelho dele pode ter
+// a fila defasada, ou outra ordem — e é o aparelho dele que pede o push.
+export async function fetchPromovidosPeloBanco(gameKey, desdeIso) {
+  const key = String(gameKey || '').trim();
+  if (!key || !isSupabaseConfigured()) return [];
+  const config = getConfig();
+  const res = await requestJson(
+    config,
+    tableUrl(config, SPLIT_TABLES.presence, `game_key=eq.${encodeURIComponent(key)}&status=eq.confirmed&data->>source=eq.banco_promove_fila&updated_at=gte.${encodeURIComponent(desdeIso)}&select=player_id`),
+    { method: 'GET' }
+  );
+  return res.ok && Array.isArray(res.data) ? res.data.map((row) => String(row.player_id)).filter(Boolean) : [];
+}
+
 export async function loadRemoteState() {
   const config = getConfig();
 

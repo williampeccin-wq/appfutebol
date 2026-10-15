@@ -531,6 +531,10 @@ function scrubPlayerFromGameResults(championship, gameKey, playerId) {
  * - remove o jogador do resultado de campeonato já lançado deste jogo;
  * - libera a vaga para nova confirmação futura.
  */
+function nomeDoJogador(snapshot, playerId) {
+  return (snapshot?.players || []).find((player) => String(player.id) === String(playerId))?.name || 'O primeiro da fila';
+}
+
 export function adminRemovePlayerFromGame(playerId) {
   const snapshot = getState();
 
@@ -567,7 +571,9 @@ export function adminRemovePlayerFromGame(playerId) {
   return {
     ok: true,
     message: promoted.promoted
-      ? 'Jogador removido. Primeiro da fila entrou automaticamente.'
+      ? (sorteioExibido(snapshot)
+          ? `Jogador removido. ${nomeDoJogador(snapshot, promoted.promoted)} entrou pela fila e está fora do sorteio: escale-o ou sorteie de novo.`
+          : 'Jogador removido. Primeiro da fila entrou automaticamente.')
       : (scrub.changed
           ? 'Jogador removido do jogo e dos pontos deste jogo no campeonato.'
           : 'Jogador removido do jogo pelo admin.'),
@@ -637,6 +643,8 @@ export function cederVagaParaPrimeiroDaFila(playerId) {
   return {
     ok: true,
     message: 'Vaga cedida. Quem estava na frente da fila entrou no jogo.',
+    // Com time sorteado, quem entra fica fora dos times: o admin escala.
+    foraDoSorteio: !!(promovido.promoted && sorteioExibido(snapshot)),
     promotedPlayerId: promovido.promoted || null,
     gameKey,
   };
