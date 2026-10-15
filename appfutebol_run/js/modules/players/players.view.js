@@ -18,6 +18,7 @@ import { getCachedRatings, duoRatingAverages } from '../../services/ratings.serv
 import { isVotingEnabled } from '../../core/flags.js';
 import { isMensalidadeExempt } from '../../domain/authz.js';
 import { isPro } from '../../domain/gating.js';
+import { presencaAutomatica } from '../../domain/club-profile.js';
 import { isMensOkEffective } from '../../domain/rules.engine.js';
 import { CARNE_GROUP_ID, CARNE_GROUP_NAME, isCarneGroupId } from '../../domain/carne.js';
 
@@ -113,7 +114,7 @@ function renderAdminGameRemovalControl(player, currentPlayer, confirmed) {
   `;
 }
 
-function renderPlayerManagementCard(currentPlayer) {
+function renderPlayerManagementCard(currentPlayer, snapshot) {
   if (!isAdmin(currentPlayer)) return '';
 
   return `
@@ -154,6 +155,9 @@ function renderPlayerManagementCard(currentPlayer) {
           : `<label class="pro-lock-toggle" data-action="pro-upsell" data-feature="Multi-admin"><input id="new-admin" type="checkbox" disabled /> 🔒 Admin <span style="opacity:.7;">(Pro)</span></label>`}
         <label><input id="new-mens" type="checkbox" checked /> Mensalidade OK</label>
         <label id="gk-pays-group" style="display:none;"><input id="new-gk-pays" type="checkbox" /> Goleiro paga mensalidade</label>
+        ${presencaAutomatica(snapshot)
+          ? '<label><input id="new-auto-presenca" type="checkbox" checked /> Entra automaticamente nos jogos</label>'
+          : ''}
 
         <div class="player-admin-actions"><button class="btn btn-primary" type="button" data-action="add-player">Adicionar</button><button class="btn btn-secondary" type="button" data-action="cancel-edit" id="cancel-edit-button" style="display:none;">Cancelar</button></div>
       </div>
@@ -243,7 +247,7 @@ export function renderPlayersScreen(snapshot, currentPlayer, projectedPlayers = 
 
   return `
     <section class="section-stack">
-      ${renderPlayerManagementCard(currentPlayer)}
+      ${renderPlayerManagementCard(currentPlayer, snapshot)}
       ${renderPendingApprovalCard(pendingPlayers, currentPlayer)}
       ${renderSelfProfileCard(currentPlayer)}
       <section class="players-admin-panel">

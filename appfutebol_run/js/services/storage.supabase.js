@@ -499,6 +499,10 @@ function presencePayloadFromConfirmation(confirmation, now, gameKey = 'default')
     waitlisted_at: isWaitlist ? (confirmation?.waitlisted_at || timestamp) : null,
     waitlist_position: isWaitlist ? (confirmation?.waitlist_position || null) : null,
     removed_by_admin: removedByAdmin,
+    // Presença automática (domain/presenca-automatica.js): entrou ao abrir o
+    // jogo, sem a pessoa tocar em nada. Só existe enquanto estiver confirmado
+    // ou na fila por esse caminho.
+    ...(confirmation?.auto === true && (confirmed || isWaitlist) ? { auto: true } : {}),
     source: 'presence_confirmations_app_write',
     actor_auth_user_id: actorAuthUserId,
   };

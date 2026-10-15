@@ -47,6 +47,14 @@ export const DEFAULT_PROFILE = {
     set: ['gol', 'zag', 'meia', 'atk'],
   },
 
+  // Como o grupo confirma presença.
+  //  - 'opt_in'  : cada um confirma a sua (o costume do Harmonia, e o padrão).
+  //  - 'opt_out' : o jogo abre com os fixos já dentro; quem não vai avisa.
+  // A regra de quem entra mora em domain/presenca-automatica.js.
+  presence: {
+    mode: 'opt_in',
+  },
+
   modules: {
     mensalidade: true,
     campeonato: true,
@@ -140,6 +148,7 @@ export function getClubProfile(state, options = null) {
     schema_version: stored?.schema_version || DEFAULT_PROFILE.schema_version,
     game: mergeSection(DEFAULT_PROFILE.game, stored?.game),
     positions: mergeSection(DEFAULT_PROFILE.positions, stored?.positions),
+    presence: mergeSection(DEFAULT_PROFILE.presence, stored?.presence),
     modules: mergeSection(DEFAULT_PROFILE.modules, stored?.modules),
     championship: mergeSection(championshipDefaults, stored?.championship),
   };
@@ -298,6 +307,11 @@ export function perfilDoFormulario(campos, perfilAtual) {
       day_of_week: inteiro('day_of_week', atual.game.day_of_week),
     },
     positions: { ...atual.positions, enabled: ligado('usa_posicoes') },
+    presence: {
+      ...atual.presence,
+      // Só os dois modos conhecidos: valor estranho no formulário não vira modo.
+      mode: texto('presence_mode', atual.presence?.mode) === 'opt_out' ? 'opt_out' : 'opt_in',
+    },
     modules: {
       ...atual.modules,
       churrasco: ligado('mod_churrasco'),
@@ -314,6 +328,11 @@ export function perfilDoFormulario(campos, perfilAtual) {
       },
     },
   };
+}
+
+/** O jogo deste clube abre com os fixos já confirmados? */
+export function presencaAutomatica(state, options = null) {
+  return getClubProfile(state, options).presence.mode === 'opt_out';
 }
 
 /** Módulo ligado para este clube? Usado para esconder abas e ações. */

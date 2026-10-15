@@ -8,6 +8,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+// Cópia idêntica de appfutebol_run/js/domain/presenca-automatica.js (o teste
+// tests/presenca-automatica.regression.mjs exige as duas iguais byte a byte).
+import {
+  entradasDaPresencaAutomatica, linhaDoBanco, planejarPresencaAutomatica, presencaAutomaticaLigada,
+} from "./presenca-automatica.js";
 
 // CORS por allowlist de Origin (consistente com as demais funções), em vez de
 // wildcard "*". Na prática esta função é cron-only (exige x-cron-secret) e
@@ -167,10 +172,36 @@ Deno.serve(async (req) => {
   // Sem a tabela `clubs`, as colunas club_id das tabelas de push também não existem
   // (mesmas migrations). Como nesse projeto há um clube só, ler tudo == filtrar.
   async function subsOfClub(clubId: string) {
-    const query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
+    const query = admin.from("push_subscriptions").select("endpoint, p256dh, auth, player_id");
     const { data, error } = await (singleTenant ? query : query.eq("club_id", clubId));
     if (error) { console.error("[auto-open] subs read", clubId, error.message); return []; }
     return data || [];
+  }
+
+  // Aviso de abertura em clube de presença automática: cada um recebe a SUA
+  // situação. "Inscrições abertas" para quem já está dentro mandaria a pessoa
+  // confirmar de novo — e tocar no botão, ali, é avisar que não vai.
+  async function pushDeFixos(
+    subs: Array<{ endpoint: string; p256dh: string; auth: string; player_id?: string | null }>,
+    fixos: { dentro: string[]; fila: string[] },
+    quando: string,
+  ) {
+    const dentro = new Set(fixos.dentro);
+    const fila = new Set(fixos.fila);
+    const de = (grupo: Set<string> | null) => subs.filter((sub) => {
+      const id = String(sub.player_id || "");
+      return grupo ? grupo.has(id) : !dentro.has(id) && !fila.has(id);
+    });
+    const partes = [
+      await pushTo(de(dentro), "Você está no jogo ⚽", `Jogo${quando}: você já está confirmado. Não vai? Avise no app.`),
+      await pushTo(de(fila), "Você está na fila ⏳", `O jogo${quando} abriu cheio e você entrou na fila de espera. Abrindo vaga, você entra.`),
+      await pushTo(de(null), "Jogo aberto ⚽", `O jogo${quando} abriu com os fixos já dentro. Quer jogar? Confirme no app.`),
+    ];
+    return {
+      sent: partes.reduce((n, p) => n + p.sent, 0),
+      removed: partes.reduce((n, p) => n + p.removed, 0),
+      errors: partes.flatMap((p) => p.errors),
+    };
   }
 
   // Assinaturas de quem pode votar no CHURRASCO: quem esteve no jogo, mais os
@@ -207,6 +238,64 @@ Deno.serve(async (req) => {
     return data || [];
   }
 
+  // PRESENÇA AUTOMÁTICA (perfil do clube: presence.mode = 'opt_out'): o jogo abre
+  // com os fixos já confirmados. Grava ANTES de abrir, e as duas gravações são
+  // idempotentes — se a abertura perder a corrida do updated_at, o próximo tick
+  // refaz o plano, não acha ninguém sem resposta e só abre. `ignoreDuplicates`
+  // garante o "nunca sobrescreve": quem já tem linha neste jogo fica como está.
+  // Devolve null quando não conseguiu gravar (aí o jogo NÃO abre neste tick).
+  async function confirmarFixos(clubId: string, data: Record<string, unknown>, game: Record<string, unknown>) {
+    const gameKey = String(game.game_key || game.id || "");
+    if (!gameKey) return null;
+
+    const playersQuery = admin.from("players").select("id, is_admin, data");
+    const { data: ps, error: pErr } = await (singleTenant ? playersQuery : playersQuery.eq("club_id", clubId));
+    if (pErr) { console.error("[auto-open] fixos: players read", clubId, pErr.message); return null; }
+    const players = (ps || []).map((row) => ({
+      ...((row.data || {}) as Record<string, unknown>), id: String(row.id), is_admin: row.is_admin === true,
+    }));
+
+    const confsQuery = admin.from("presence_confirmations").select("player_id, game_key, status, data").eq("game_key", gameKey);
+    const { data: confs, error: cErr } = await (singleTenant ? confsQuery : confsQuery.eq("club_id", clubId));
+    if (cErr) { console.error("[auto-open] fixos: confs read", clubId, cErr.message); return null; }
+    // Mesmo formato que o app enxerga: a fila mora em data.status (a coluna diz 'cancelled').
+    const confirmations = (confs || []).map((row) => {
+      const d = (row.data || {}) as Record<string, unknown>;
+      const naFila = d.status === "waitlist" || d.status === "waitlisted";
+      const status = naFila ? "waitlist" : String(row.status || d.status || "");
+      return { ...d, player_id: String(row.player_id), game_key: gameKey, status, confirmed: status === "confirmed" };
+    });
+
+    const profile = (data.profile || {}) as { game?: { goalkeepers_per_game?: unknown } };
+    const teto = Number(profile.game?.goalkeepers_per_game);
+    const plano = planejarPresencaAutomatica({
+      players,
+      game,
+      settings: (data.settings || {}) as Record<string, unknown>,
+      confirmations,
+      tetoGoleiros: Number.isFinite(teto) && teto >= 0 ? teto : 2,
+      hoje: nowBrt.slice(0, 10),
+    });
+
+    const agora = new Date().toISOString();
+    const rows = entradasDaPresencaAutomatica(plano, agora)
+      .map((entrada: Record<string, unknown>) => linhaDoBanco(entrada, agora, singleTenant ? null : clubId));
+    if (rows.length) {
+      const { error: wErr } = await admin.from("presence_confirmations")
+        .upsert(rows, { onConflict: "game_key,player_id", ignoreDuplicates: true });
+      if (wErr) { console.error("[auto-open] fixos: write", clubId, gameKey, wErr.message); return null; }
+    }
+    // Para o aviso vale a situação FINAL de cada um, não só quem entrou agora:
+    // num tick repetido o plano vem vazio e todo mundo já estava gravado.
+    const jaDentro = confirmations.filter((c) => c.confirmed).map((c) => c.player_id);
+    const jaNaFila = confirmations.filter((c) => c.status === "waitlist").map((c) => c.player_id);
+    return {
+      agora,
+      dentro: [...jaDentro, ...plano.linha, ...plano.goleiros] as string[],
+      fila: [...jaNaFila, ...plano.fila] as string[],
+    };
+  }
+
   const failures: Array<{ club: string; error: string }> = [];
   for (const club of (clubList || [])) {
     // Falha de UM clube não pode calar o cron dos outros: sem este catch, um
@@ -215,7 +304,6 @@ Deno.serve(async (req) => {
     // tratados abaixo continuam usando `continue`; este catch é para o resto.
     try {
       const clubId = String(club.id);
-      const isPro = String(club.plan || "free") === "pro";
 
       const { data: metaRow, error: metaErr } = await admin
         .from("app_meta").select("data, updated_at").eq("key", clubId).maybeSingle();
@@ -230,14 +318,30 @@ Deno.serve(async (req) => {
       const games = Array.isArray(data.games) ? (data.games as Array<Record<string, unknown>>) : [];
       out.clubs = (out.clubs as number) + 1;
 
-      // ---------- 1) Abertura automática de inscrições (recurso PRO) ----------
-      if (isPro) {
+      // ---------- 1) Abertura automática de inscrições (TODOS os planos) ----------
+      // Agendar a abertura é do JOGO, não da gestão do clube: vale no Free também.
+      // Enquanto foi Pro só aqui, o formulário aceitava o horário de qualquer clube,
+      // a home anunciava "Abre automaticamente" e, no Free, nada abria — sem aviso.
+      {
         const toOpen: Array<Record<string, unknown>> = [];
-        const nextGames = games.map((g) => {
+        const fixosPorJogo = new Map<string, { dentro: string[]; fila: string[] }>();
+        const comFixos = presencaAutomaticaLigada(data.profile);
+        const nextGames: Array<Record<string, unknown>> = [];
+        for (const g of games) {
           const at = String(g?.auto_open_at || "").slice(0, 16);
-          if (at && g?.open !== true && nowBrt >= at) { toOpen.push(g); return { ...g, open: true }; }
-          return g;
-        });
+          if (!(at && g?.open !== true && nowBrt >= at)) { nextGames.push(g); continue; }
+          let aberto: Record<string, unknown> = { ...g, open: true };
+          if (comFixos && !g.auto_confirmed_at) {
+            const fixos = await confirmarFixos(clubId, data, g);
+            // Não gravou os fixos: deixa fechado e tenta de novo no próximo tick,
+            // em vez de abrir um jogo "todo mundo dentro" com ninguém dentro.
+            if (!fixos) { nextGames.push(g); out.fixos_failed = (out.fixos_failed as number || 0) + 1; continue; }
+            aberto = { ...aberto, presence_mode: "opt_out", auto_confirmed_at: fixos.agora };
+            fixosPorJogo.set(String(g.game_key || g.id || ""), fixos);
+          }
+          toOpen.push(g);
+          nextGames.push(aberto);
+        }
         if (toOpen.length) {
           const { data: upd, error: upErr } = await admin
             .from("app_meta")
@@ -250,10 +354,16 @@ Deno.serve(async (req) => {
               const subs = await subsOfClub(clubId);
               for (const g of toOpen) {
                 const gameKey = String(g.game_key || g.id || "");
-                const title = "Inscrições abertas ⚽";
-                const body = `Já dá para confirmar presença no jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}.`;
+                const quando = g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : "";
+                const fixos = fixosPorJogo.get(gameKey);
+                const title = fixos ? "Jogo aberto ⚽" : "Inscrições abertas ⚽";
+                const body = fixos
+                  ? `Quem é fixo já está no jogo${quando}. Não vai? Avise no app.`
+                  : `Já dá para confirmar presença no jogo${quando}.`;
                 if (await claim(KIND_OPEN, gameKey, title, body, clubId)) {
-                  const r = await pushTo(subs || [], title, body);
+                  const r = fixos
+                    ? await pushDeFixos(subs || [], fixos, quando)
+                    : await pushTo(subs || [], title, body);
                   out.push_sent = (out.push_sent as number || 0) + r.sent;
                   out.push_failed = (out.push_failed as number || 0) + r.errors.length;
                   if (r.errors.length) out.push_error = r.errors[0];

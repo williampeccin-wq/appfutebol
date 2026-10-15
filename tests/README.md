@@ -46,6 +46,8 @@ opina sobre formatação.
 | `churrasco-grupo-impar.regression.mjs` | rodízio com número ímpar de integrantes: o "Grupo" escalado como par de quem sobrou é um id reservado, e guard, auditoria e servidor não podem tratá-lo como jogador inexistente (01/09) |
 | `pix-comprovante-ilegivel.regression.mjs` | comprovante PIX legítimo recusado como "valor não bate" porque o print veio recortado: `amount=0`/`date=""` são o código de **ilegível** no prompt de visão e caíam no balde de "errado"; e a data do pagamento tem de sair do E2E quando o campo não é lido (09/09, Digão do Harmonia) |
 | `mensalidade-virada-de-mes.regression.mjs` | a virada de mês não zerava a mensalidade de ninguém (não havia gatilho — 58fdb1f tentou pela leitura e a97d6ad reverteu); e a estreia da regra não pode atropelar os status que já estão no ar, nem o carimbo do mês pode cair no whitelist do `settings` (01/09) |
+| `agendamento-no-free.regression.mjs` | abertura agendada era Pro só no cron: no Free o formulário aceitava o horário, a home prometia e nada abria (13/10) |
+| `presenca-automatica.regression.mjs` | presença automática ("todos dentro, quem não vai avisa"): a regra roda no app e no cron — as duas cópias têm de ser idênticas, os predicados copiados têm de concordar com authz/rules.engine, e o plano não passa do limite nem mexe em quem já respondeu |
 
 ## Como escrever uma nova
 

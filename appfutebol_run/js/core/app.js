@@ -249,6 +249,8 @@ function resetPlayerForm() {
   if (mensInput) mensInput.checked = true;
   const gkPaysReset = document.getElementById("new-gk-pays");
   if (gkPaysReset) gkPaysReset.checked = false;
+  const autoPresencaReset = document.getElementById("new-auto-presenca");
+  if (autoPresencaReset) autoPresencaReset.checked = true;
   syncGkPaysVisibility();
   if (photoInput) {
     photoInput.value = "";
@@ -390,6 +392,52 @@ function confirmationsFingerprint(confirmations) {
     .map((entry) => `${entry?.player_id}:${entry?.confirmed === true ? 1 : 0}:${String(entry?.status || '')}`)
     .sort()
     .join('|');
+}
+
+// Clube de presença automática: abrir o jogo já põe os fixos dentro. Devolve o
+// jogo carimbado e as confirmações novas; em clube 'opt_in' (ou em jogo que já
+// passou por aqui) devolve tudo como veio. A regra mora no domínio — o cron
+// `auto-open-games` roda a mesma, do lado do servidor.
+function abrirJogoComFixos(snapshot, game, confirmations) {
+  if (!presencaAutomatica(snapshot)) return { game, confirmations, plano: null };
+  return abrirComPresencaAutomatica({
+    players: snapshot.players || [],
+    game,
+    settings: snapshot.settings || {},
+    confirmations,
+    tetoGoleiros: goleirosPorJogo(snapshot),
+    hoje: carneTodayIso(),
+    agora: new Date().toISOString(),
+  });
+}
+
+// O que o admin precisa saber antes de o jogo abrir sozinho com gente dentro:
+// quantos são fixos e, se passarem das vagas, quantos vão parar na fila.
+function avisoDaPresencaAutomatica(snapshot, perfil) {
+  if (perfil.presence.mode !== 'opt_out') {
+    return '<small class="footer-note">No modo "todos dentro", o jogo abre com os fixos já confirmados e cada um só avisa quando não vai.</small>';
+  }
+  const vagas = limiteSugeridoDeJogo(snapshot);
+  const plano = planejarPresencaAutomatica({
+    players: snapshot.players || [],
+    game: { game_key: '__previa__', max_players: vagas },
+    settings: snapshot.settings || {},
+    confirmations: [],
+    tetoGoleiros: goleirosPorJogo(snapshot),
+    hoje: carneTodayIso(),
+  });
+  const fixosDeLinha = plano.linha.length + plano.fila.length;
+  const sobra = plano.fila.length
+    ? `<p class="footer-note club-profile-alerta">⚠️ São <strong>${fixosDeLinha} fixos de linha para ${vagas} vagas</strong>: ${plano.fila.length} ${plano.fila.length === 1 ? 'vai' : 'vão'} para a fila de espera a cada jogo. Para tirar quem só aparece de vez em quando, desmarque "Entra automaticamente nos jogos" no cadastro do jogador.</p>`
+    : `<small class="footer-note">Hoje são ${fixosDeLinha} fixos de linha para ${vagas} vagas. Quem só aparece de vez em quando sai da lista em "Entra automaticamente nos jogos", no cadastro do jogador.</small>`;
+  return `<small class="footer-note">Ao abrir o jogo, os fixos já entram confirmados e cada um só avisa quando não vai. Quem está bloqueado por mensalidade não entra sozinho.</small>${sobra}`;
+}
+
+function resumoDaPresencaAutomatica(plano) {
+  if (!plano) return '';
+  const dentro = plano.linha.length + plano.goleiros.length;
+  const fila = plano.fila.length ? ` e ${plano.fila.length} na fila de espera` : '';
+  return ` ${dentro} fixo${dentro === 1 ? '' : 's'} já dentro${fila}.`;
 }
 
 // Reconcilia a fila de espera do jogo ativo contra a capacidade de linha ao
@@ -765,6 +813,8 @@ function hydratePlayerEditForm(playerToEdit) {
   mensInput.checked = !!playerToEdit.mens_ok;
   const gkPaysInput = document.getElementById("new-gk-pays");
   if (gkPaysInput) gkPaysInput.checked = !!playerToEdit.gk_pays;
+  const autoPresencaInput = document.getElementById("new-auto-presenca");
+  if (autoPresencaInput) autoPresencaInput.checked = playerToEdit.auto_presenca !== false;
   syncGkPaysVisibility();
 
   // PREVIEW pode ser qualquer URL de exibição (assinada/pública/base64); mas o
@@ -2098,6 +2148,11 @@ document.addEventListener("click", async (e) => {
   const is_admin = document.getElementById("new-admin")?.checked;
   const mens_ok = document.getElementById("new-mens")?.checked;
   const gk_pays = document.getElementById("new-gk-pays")?.checked; // só relevante p/ goleiro
+  // "Entra automaticamente nos jogos": o campo só existe em clube de presença
+  // automática. Sem ele na tela, não se grava nada — o que o jogador já tinha
+  // fica como está (ausente = entra, que é o padrão).
+  const autoPresencaEl = document.getElementById("new-auto-presenca");
+  const autoPresencaFields = autoPresencaEl ? { auto_presenca: autoPresencaEl.checked } : {};
   // Só é FOTO NOVA se for um data: URL (arquivo recém-selecionado). O form
   // pré-preenche o dataset com a foto atual (agora URL assinada) — que NÃO deve
   // virar upload. base64 legado (data:) ainda migra normalmente.
@@ -2145,6 +2200,7 @@ document.addEventListener("click", async (e) => {
       mens_ok: role === "player" ? !!mens_ok : false,
       gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
+      ...autoPresencaFields,
       ...(photoDataUrl ? { photoDataUrl } : {}),
     });
 
@@ -2201,6 +2257,7 @@ document.addEventListener("click", async (e) => {
     playerToEdit.position = role === "player" ? position : null;
     playerToEdit.mens_ok = role === "player" ? !!mens_ok : false;
     playerToEdit.gk_pays = role === "player" ? !!gk_pays : false;
+    Object.assign(playerToEdit, autoPresencaFields);
     playerToEdit.is_admin = !!is_admin;
     if (photoDataUrl) {
       const up = await uploadPlayerPhoto(photoDataUrl, playerToEdit.id);
@@ -2227,6 +2284,7 @@ document.addEventListener("click", async (e) => {
       mens_ok: role === "player" ? !!mens_ok : false,
       gk_pays: role === "player" ? !!gk_pays : false,
       is_admin: !!is_admin,
+      ...autoPresencaFields,
       ...photoFields,
       active: true,
       deleted: false
@@ -2977,7 +3035,8 @@ import { loadLedgerCache, addLedgerEntry, deleteLedgerEntry, chargeMember, publi
 import { renderChampionshipScreen } from '../modules/championship/championship.view.js';
 import { isPro, renderProLock, renderProLockInline, showProUpsellModal } from '../domain/gating.js';
 import { idDaEntrada, rotuloDoTime, semQuemCancelou, timesDoSorteio } from '../domain/draw-teams.js';
-import { campeonatoDisponivel, FORMATOS, getClubProfile, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, proximaDataDeJogo } from '../domain/club-profile.js';
+import { campeonatoDisponivel, FORMATOS, getClubProfile, goleirosPorJogo, horarioPadraoDeJogo, isModuleOn, limiteSugeridoDeJogo, perfilDoFormulario, presencaAutomatica, proximaDataDeJogo } from '../domain/club-profile.js';
+import { abrirComPresencaAutomatica, planejarPresencaAutomatica } from '../domain/presenca-automatica.js';
 import { buildTeamResultStatuses, calculateCurrentRanking, closeSeason, deleteChampionshipResult, findReplacedChampionshipResult, getSeasonStatus, getSeasonWindow, persistChampionshipResult, seasonWindowChangeImpact, updateSeason } from '../modules/championship/championship.service.js';
 import { canManagePresence, isConfirmed, toggleConfirmation, drawTeams, clearTeamDraw, moveDrawnPlayer, removeDrawnPlayer, adminRemovePlayerFromGame, getWaitlistView, addRentalGoalkeeper, removeRentalGoalkeeper, addGuestPlayer, removeGuestPlayer, getActiveGuestPlayers, addConfirmedPlayerToDraw } from '../modules/game/game.service.js';
 import { hasCapacity, buildStrengthResolver, moverParaFilaPorRecusaDeLotacao, cederVagaParaPrimeiroDaFila, ordemDaFila } from '../modules/game/game.service.js';
@@ -4858,25 +4917,30 @@ function bindAppEvents(currentPlayer) {
       const isActiveGame = originalGameKey === activeGameKey;
 
       const promotedConfirmations = promoteWaitlistForGameCapacity(currentState, updatedGame);
+      const acabouDeAbrir = !existingGame.open && updatedGame.open;
+      const aberto = acabouDeAbrir
+        ? abrirJogoComFixos(currentState, updatedGame, promotedConfirmations)
+        : { game: updatedGame, confirmations: promotedConfirmations, plano: null };
 
       patchState({
-        confirmations: promotedConfirmations,
-        game: isActiveGame ? updatedGame : getActiveGameFromSnapshot(currentState),
-        games: replaceGameInSnapshot(currentState, updatedGame),
+        confirmations: aberto.confirmations,
+        game: isActiveGame ? aberto.game : getActiveGameFromSnapshot(currentState),
+        games: replaceGameInSnapshot(currentState, aberto.game),
         active_game_id: activeGameKey,
       });
 
       // Gatilho de push: inscrições acabaram de ABRIR (fechado -> aberto).
-      if (!existingGame.open && updatedGame.open && isNotifEnabled(getState(), 'inscricoes_abertas')) {
+      if (acabouDeAbrir && isNotifEnabled(getState(), 'inscricoes_abertas')) {
         triggerServerPush({
           target: 'all',
-          title: 'Inscrições abertas ⚽',
-          body: `Já dá para confirmar presença no jogo de ${formatDate(updatedGame.game_date)}.`,
+          ...(aberto.plano
+            ? { title: 'Jogo aberto ⚽', body: `Quem é fixo já está no jogo de ${formatDate(updatedGame.game_date)}. Não vai? Avise no app.` }
+            : { title: 'Inscrições abertas ⚽', body: `Já dá para confirmar presença no jogo de ${formatDate(updatedGame.game_date)}.` }),
           url: './',
         });
       }
 
-      showToast(isActiveGame ? 'Jogo ativo atualizado.' : 'Jogo atualizado. O jogo ativo não foi alterado.');
+      showToast((isActiveGame ? 'Jogo ativo atualizado.' : 'Jogo atualizado. O jogo ativo não foi alterado.') + resumoDaPresencaAutomatica(aberto.plano));
     });
   });
 
@@ -4927,14 +4991,19 @@ function bindAppEvents(currentPlayer) {
         draw_history: [],
       };
 
+      const aberto = newGame.open
+        ? abrirJogoComFixos(currentState, newGame, currentState.confirmations || [])
+        : { game: newGame, confirmations: currentState.confirmations || [], plano: null };
+
       patchState({
-        game: newGame,
-        games: replaceGameInSnapshot(currentState, newGame),
+        ...(aberto.plano ? { confirmations: aberto.confirmations } : {}),
+        game: aberto.game,
+        games: replaceGameInSnapshot(currentState, aberto.game),
         active_game_id: newGameKey,
       });
 
       createGameForm.reset();
-      showToast('Novo jogo criado e selecionado como ativo.');
+      showToast('Novo jogo criado e selecionado como ativo.' + resumoDaPresencaAutomatica(aberto.plano));
     });
   }
 
@@ -5364,8 +5433,17 @@ function renderHome(snapshot, currentPlayer) {
   const homeClosedSubline = (game && game.auto_open_at)
     ? `Abre automaticamente: ${formatAutoOpenLabel(game.auto_open_at)}`
     : ((game && game.game_date) ? 'Abertura das inscrições em breve.' : 'Aguarde o próximo jogo ser marcado.');
-  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? 'Pendente' : 'Abertura das inscrições em breve')));
-  const homeActionText = confirmed ? 'Cancelar presença' : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : 'Confirmar presença'));
+  // Jogo de presença automática (aberto com os fixos já dentro): a pergunta se
+  // inverte. Quem está dentro não "cancela", avisa que não vai; e quem avisou
+  // não está "pendente", está fora — e pode voltar enquanto houver vaga.
+  const jogoDeFixos = !!game && game.presence_mode === 'opt_out';
+  const avisouQueNaoVai = jogoDeFixos && !confirmed && !waitlisted
+    && (workingSnapshot.confirmations || []).some((entry) =>
+      String(entry?.game_key || '') === String(getGameKey(game)) && String(entry?.player_id || '') === String(activePlayer.id));
+  const homePresenceText = waitlisted ? 'Na fila' : (confirmed ? 'Confirmado' : (financeBlocked ? 'Inadimplente' : ((game && game.open) ? (avisouQueNaoVai ? 'Fora' : 'Pendente') : 'Abertura das inscrições em breve')));
+  const homeActionText = confirmed
+    ? (jogoDeFixos ? 'Não vou' : 'Cancelar presença')
+    : (waitlisted ? 'Sair da fila' : (!capacityOk ? 'Entrar na fila' : (avisouQueNaoVai ? 'Voltar pro jogo' : 'Confirmar presença')));
   const homeLineAvatars = homeLinePlayers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')).join('');
   const homeGoalkeeperAvatars = [
     ...homeGoalkeepers.map((player) => renderAvatarForApp(player, 'home-v2-avatar')),
@@ -6801,6 +6879,15 @@ function renderConfig(snapshot, currentPlayer) {
                 .map((l, i) => `<option value="${i}" ${Number(perfil.game.day_of_week) === i ? 'selected' : ''}>${l}</option>`).join('')}
             </select>
           </label>
+
+          <div class="form-group">
+            <label class="form-label" for="club-presence-mode">Como o grupo confirma presença</label>
+            <select name="presence_mode" id="club-presence-mode" class="input">
+              <option value="opt_in" ${perfil.presence.mode === 'opt_out' ? '' : 'selected'}>Cada um confirma a sua</option>
+              <option value="opt_out" ${perfil.presence.mode === 'opt_out' ? 'selected' : ''}>Todos dentro, quem não vai avisa</option>
+            </select>
+            ${avisoDaPresencaAutomatica(snapshot, perfil)}
+          </div>
 
           <div class="form-group">
             <span class="form-label">O que o clube usa</span>
