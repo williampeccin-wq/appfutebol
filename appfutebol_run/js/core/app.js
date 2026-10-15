@@ -2589,7 +2589,9 @@ if (action === "admin-ceder-vaga") {
   render(safeSnapshot);
 
   uiActionInFlight = false;
-  showToast(result.ok ? `${player.name} cedeu a vaga para ${proximo.name}.` : result.message, result.ok ? "success" : "error");
+  showToast(result.ok
+    ? `${player.name} cedeu a vaga para ${proximo.name}.${result.foraDoSorteio ? ` ${proximo.name} está fora do sorteio: escale-o ou sorteie de novo.` : ''}`
+    : result.message, result.ok ? "success" : "error");
   notifyWaitlistPromotion(result);
   return;
 }
@@ -2787,7 +2789,7 @@ import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
 import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites, aguardarGravacoes } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
-import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, fetchConfirmationsForGame } from '../services/storage.supabase.js';
+import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, fetchConfirmationsForGame, fetchPromovidosPeloBanco } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, leaveTeamOperation, reactivateLeftPlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
 import { getCurrentPlayer, login, logout, register, restoreSession, prepareStoredSession, refreshSession, updateOwnPassword, loginWithPasskeySession } from '../services/auth.service.js';
 import { signInWithPasskey, registerPasskeyForCurrentUser, passkeySupported, conditionalMediationAvailable } from '../services/passkey.service.js';
@@ -2836,23 +2838,37 @@ function ensureRatingsLoaded() {
 // num aparelho de jogador comum a promoção nunca grava e o ciclo se repete.
 // Daí o limite: cada (jogo, jogador) é conferido no máximo uma vez por minuto
 // e, depois de avisado, não é mais.
+//
+// Desde 15/10/2026 quem promove é o BANCO (trg_presence_promove_fila), na mesma
+// transação da saída. O aparelho de quem saiu pode nem saber quem entrou — fila
+// defasada, ou outra ordem —, então depois de uma saída ele também pergunta ao
+// banco quem foi promovido por lá nos últimos minutos (checarBanco).
 const filaAvisoChecadoEm = new Map();
 async function notifyWaitlistPromotion(result) {
+  const gameKey = result?.gameKey;
+  if (!gameKey) return;
+  if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
   const agora = Date.now();
-  const chave = (id) => `${result?.gameKey}|${id}`;
+  const desde = new Date(agora - 2 * 60 * 1000).toISOString();
+  const chave = (id) => `${gameKey}|${id}`;
   const ids = (result?.promotedPlayerIds || [result?.promotedPlayerId]).filter(Boolean).map(String)
     .filter((id) => agora - (filaAvisoChecadoEm.get(chave(id)) ?? -Infinity) > 60000);
-  if (!ids.length || !result?.gameKey) return;
-  if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
+  const checarBanco = result?.checarBanco !== false;
+  if (!ids.length && !checarBanco) return;
   ids.forEach((id) => filaAvisoChecadoEm.set(chave(id), agora));
   try {
     await aguardarGravacoes();
-    const servidor = await fetchConfirmationsForGame(result.gameKey);
-    if (!servidor.ok) return;
-    const dentro = ids.filter((id) => servidor.rows.some((entry) => String(entry.player_id) === id && entry.confirmed === true));
-    if (!dentro.length) return;
+    const [servidor, doBanco] = await Promise.all([
+      ids.length ? fetchConfirmationsForGame(gameKey) : { ok: true, rows: [] },
+      checarBanco ? fetchPromovidosPeloBanco(gameKey, desde) : [],
+    ]);
+    const dentro = new Set(servidor.ok
+      ? ids.filter((id) => servidor.rows.some((entry) => String(entry.player_id) === id && entry.confirmed === true))
+      : []);
+    doBanco.filter((id) => filaAvisoChecadoEm.get(chave(id)) !== Infinity).forEach((id) => dentro.add(id));
+    if (!dentro.size) return;
     dentro.forEach((id) => filaAvisoChecadoEm.set(chave(id), Infinity));
-    await triggerWaitlistPromotion(result.gameKey, dentro);
+    await triggerWaitlistPromotion(gameKey, [...dentro]);
   } catch (_) { /* push é acessório */ }
 }
 
@@ -3328,7 +3344,7 @@ async function syncRemoteOnce() {
         console.info('[remote-sync] Fila reconciliada: jogador(es) promovido(s) por vaga aberta.');
         // Era o único caminho de promoção sem aviso — e é por ele que a fila
         // anda quando quem cancelou foi um jogador comum.
-        notifyWaitlistPromotion({ promotedPlayerIds: promovidos, gameKey: getGameKey(getActiveGameFromSnapshot(safeRemoteState)) });
+        notifyWaitlistPromotion({ promotedPlayerIds: promovidos, gameKey: getGameKey(getActiveGameFromSnapshot(safeRemoteState)), checarBanco: false });
       }
 
       const currentFingerprint = getDomainFingerprint(localSnapshot);

@@ -14,6 +14,12 @@
 //   4) deduplica por (kind, player_id, game_key): um aviso por saída, por jogo,
 //      mesmo que vários clientes detectem a mesma saída;
 //   5) envia para os administradores (menos quem saiu, se for admin).
+//
+// Desde 15/10/2026 o aviso também diz QUEM ENTROU. O banco promove o primeiro
+// da fila na mesma transação do cancelamento (trg_presence_promove_fila), mas o
+// sorteio não muda sozinho: quem entrou fica em "Confirmados fora do sorteio" e
+// pode não jogar na posição de quem saiu — saiu um atacante, entrou um zagueiro.
+// A decisão de onde ele joga é do admin.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
@@ -57,6 +63,15 @@ function formatGameDate(raw: string): string {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[3]}/${m[2]}`;
   return s;
+}
+
+function primeiroNome(nome: unknown): string {
+  return String(nome || "").trim().split(/\s+/)[0] || "";
+}
+
+// "Feijó", "Feijó e Bignoti", "Feijó, Bignoti e Dano".
+function lista(nomes: string[]): string {
+  return nomes.length <= 1 ? (nomes[0] || "") : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
 }
 
 Deno.serve(async (req) => {
@@ -128,10 +143,31 @@ Deno.serve(async (req) => {
   const restantes = Math.max(0, (times[indiceDoTime]?.length || 1) - 1);
   const dataDoJogo = formatGameDate(String(game?.game_date || game?.date || ""));
 
-  const title = "Time desfalcado ⚠️";
-  const body = `${nome} cancelou a presença e saiu do Time ${rotulo}`
-    + `${dataDoJogo ? ` (jogo de ${dataDoJogo})` : ""}. `
-    + `O time ficou com ${restantes}. Abra o app para remanejar ou sortear de novo.`;
+  // Confirmados fora dos times: quase sempre quem acabou de entrar pela fila.
+  const noSorteio = new Set(times.flat().map(idDaEntrada));
+  const { data: confirmados } = await admin
+    .from("presence_confirmations").select("player_id, data")
+    .eq("game_key", gameKey).eq("status", "confirmed");
+  const fora = (confirmados || []).filter((c) => !noSorteio.has(String(c.player_id)));
+  const { data: nomesFora } = fora.length
+    ? await admin.from("players").select("id, data").in("id", fora.map((c) => String(c.player_id)))
+    : { data: [] };
+  const nomeDe = new Map((nomesFora || []).map((r) => [String(r.id), primeiroNome((r.data as Record<string, unknown> | null)?.name)]));
+  const veioDaFila = (c: { data: unknown }) => (c.data as Record<string, unknown> | null)?.source === "banco_promove_fila";
+  const daFila = fora.filter(veioDaFila).map((c) => nomeDe.get(String(c.player_id))).filter(Boolean) as string[];
+  const outros = fora.filter((c) => !veioDaFila(c)).map((c) => nomeDe.get(String(c.player_id))).filter(Boolean) as string[];
+
+  const saida = `${nome} cancelou a presença e saiu do Time ${rotulo}`
+    + `${dataDoJogo ? ` (jogo de ${dataDoJogo})` : ""}. O time ficou com ${restantes}.`;
+  const entrada = (daFila.length
+    ? ` ${lista(daFila)} ${daFila.length === 1 ? "entrou pela fila e está" : "entraram pela fila e estão"} fora do sorteio.`
+    : "")
+    + (outros.length ? ` ${daFila.length ? "Também fora" : "Fora"} do sorteio: ${lista(outros)}.` : "");
+
+  const title = entrada ? "Revise a escalação ⚠️" : "Time desfalcado ⚠️";
+  const body = entrada
+    ? `${saida}${entrada} Escale quem entrou ou sorteie de novo — a posição dele pode não ser a de quem saiu.`
+    : `${saida} Abra o app para remanejar ou sortear de novo.`;
 
   // 3) Dedup: um aviso por (jogador que saiu + jogo). O SELECT resolve o caso
   //    comum e o índice único (uq_push_log_dropout) fecha a corrida entre dois
