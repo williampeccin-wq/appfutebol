@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.197.0-fila-troca-de-vaga';
+export const APP_VERSION = 'v1.198.0-aviso-fila-e-presenca-pos-jogo';

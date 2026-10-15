@@ -2631,7 +2631,7 @@ if (action === "admin-add-to-game") {
   uiActionInFlight = true;
   setActionBusy(trigger, 'Incluindo...');
 
-  const result = toggleConfirmation(id, { bypassFinance: true });
+  const result = toggleConfirmation(id, { bypassFinance: true, porAdmin: true });
   const safeSnapshot = repairManualSnapshot(getState());
   savePersistedState(safeSnapshot);
   render(safeSnapshot);
@@ -2782,10 +2782,10 @@ import { isConfirmedEntry, isGoalkeeperPlayer, belongsToGame } from "../domain/c
 import { classifyGameConfirmations } from "../domain/confirmations.js";
 import { validateAndRepairState } from "../domain/state.guard.js";
 import { runIntegrityAudit } from "../domain/audit.service.js";
-import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective, reconcileMensalidadeMonthTurn, cedeVezNaFilaPorMensalidade } from "../domain/rules.engine.js";
+import { getMensalidadeMode, MENSALIDADE_MODES, isMensOkEffective, reconcileMensalidadeMonthTurn, cedeVezNaFilaPorMensalidade, jogoJaComecou } from "../domain/rules.engine.js";
 import { APP_VERSION } from "./version.js";
 import { getState, patchState, replaceState, subscribe } from './state.js';
-import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites } from '../domain/storage.adapter.js';
+import { getState as loadPersistedState, saveState as savePersistedState, getStorageMeta, hasPendingRemoteWrites, aguardarGravacoes } from '../domain/storage.adapter.js';
 import { saveLocalState } from '../services/storage.local.js';
 import { loadRemoteState, fetchRemoteHeartbeat, getLastRemoteUpdatedAt, uploadPlayerPhoto, signPlayerPhotos, fetchConfirmationsForGame } from '../services/storage.supabase.js';
 import { createPlayerAccessOperation, deletePlayerOperation, leaveTeamOperation, reactivateLeftPlayerOperation, resetPlayerPasswordOperation, restoreDeletedPlayerByPhoneOperation } from '../modules/players/player-operations.service.js';
@@ -2825,11 +2825,45 @@ function ensureRatingsLoaded() {
 // Avisa por push quem foi promovido da fila. Best-effort, fora do fluxo de UI;
 // o servidor deduplica por (jogo + jogador), então é seguro chamar de qualquer
 // cliente que tenha detectado a promoção.
-function notifyWaitlistPromotion(result) {
-  const promotedId = result?.promotedPlayerId;
-  if (!promotedId) return;
+//
+// Só avisa quem o SERVIDOR já tem como confirmado. INCIDENTE 14/10/2026
+// (Harmonia): o Feijó recebeu "Você está dentro!" às 16:56, mas a trava de
+// lotação tinha recusado a promoção e ele só entrou às 17:03. A promoção feita
+// no aparelho de um jogador comum também nunca chega ao banco (ele só grava a
+// própria linha) — e o aviso saía do mesmo jeito.
+//
+// A reconciliação do sync chama isto a cada ciclo enquanto houver vaga e fila;
+// num aparelho de jogador comum a promoção nunca grava e o ciclo se repete.
+// Daí o limite: cada (jogo, jogador) é conferido no máximo uma vez por minuto
+// e, depois de avisado, não é mais.
+const filaAvisoChecadoEm = new Map();
+async function notifyWaitlistPromotion(result) {
+  const agora = Date.now();
+  const chave = (id) => `${result?.gameKey}|${id}`;
+  const ids = (result?.promotedPlayerIds || [result?.promotedPlayerId]).filter(Boolean).map(String)
+    .filter((id) => agora - (filaAvisoChecadoEm.get(chave(id)) ?? -Infinity) > 60000);
+  if (!ids.length || !result?.gameKey) return;
   if (!isNotifEnabled(getState(), 'fila_promovido')) return; // central de notificações
-  triggerWaitlistPromotion(result.gameKey, [promotedId]).catch(() => {});
+  ids.forEach((id) => filaAvisoChecadoEm.set(chave(id), agora));
+  try {
+    await aguardarGravacoes();
+    const servidor = await fetchConfirmationsForGame(result.gameKey);
+    if (!servidor.ok) return;
+    const dentro = ids.filter((id) => servidor.rows.some((entry) => String(entry.player_id) === id && entry.confirmed === true));
+    if (!dentro.length) return;
+    dentro.forEach((id) => filaAvisoChecadoEm.set(chave(id), Infinity));
+    await triggerWaitlistPromotion(result.gameKey, dentro);
+  } catch (_) { /* push é acessório */ }
+}
+
+// Quem a reconciliação tirou da fila e pôs para dentro (waitlist -> confirmado).
+function promovidosDaFila(antes, depois) {
+  const estavaNaFila = new Set((antes?.confirmations || [])
+    .filter((entry) => entry?.confirmed !== true && ['waitlist', 'waitlisted'].includes(String(entry?.status || '')))
+    .map((entry) => `${entry.game_key}|${entry.player_id}`));
+  return (depois?.confirmations || [])
+    .filter((entry) => entry?.confirmed === true && estavaNaFila.has(`${entry.game_key}|${entry.player_id}`))
+    .map((entry) => String(entry.player_id));
 }
 
 // Avisa os ADMINS quando quem estava escalado cancela a presença. Esconder a
@@ -3287,10 +3321,14 @@ async function syncRemoteOnce() {
       // aberta e alguém na fila, promove e persiste o estado curado de volta,
       // para o DB convergir e a fila não ficar presa em nenhum cliente.
       const reconciled = reconcileWaitlistOnLoad(safeRemoteState);
+      const promovidos = promovidosDaFila(safeRemoteState, reconciled.state);
       safeRemoteState = reconciled.state;
       if (reconciled.changed) {
         savePersistedState(safeRemoteState);
         console.info('[remote-sync] Fila reconciliada: jogador(es) promovido(s) por vaga aberta.');
+        // Era o único caminho de promoção sem aviso — e é por ele que a fila
+        // anda quando quem cancelou foi um jogador comum.
+        notifyWaitlistPromotion({ promotedPlayerIds: promovidos, gameKey: getGameKey(getActiveGameFromSnapshot(safeRemoteState)) });
       }
 
       const currentFingerprint = getDomainFingerprint(localSnapshot);
@@ -4730,6 +4768,8 @@ function renderHome(snapshot, currentPlayer) {
   const presenceReasons = Array.isArray(presenceGuard?.decision?.reasons) ? presenceGuard.decision.reasons : [];
   const financeBlocked = !!(game && game.open) && !confirmed && !waitlisted && presenceReasons.includes('mensalidade_pendente');
   const canRenderPresenceAction = confirmed || waitlisted || presenceGuard.ok || presenceGuard.decision?.reasonBlocked === 'game_full';
+  // Depois do horário do jogo o botão sai: o toggleConfirmation recusaria.
+  const jogoComecou = jogoJaComecou(game);
   const statusNote = waitlisted
     ? `Você está na fila de espera${waitlistPosition ? ` na posição ${waitlistPosition}` : ''}.`
     : !confirmed && !capacityOk
@@ -4930,12 +4970,13 @@ function renderHome(snapshot, currentPlayer) {
         </div>
 
         <div class="home-v2-actions">
-          ${financeBlocked
+          ${jogoComecou ? '' : financeBlocked
             ? '<button class="home-v2-primary is-blocked" type="button" disabled title="Mensalidade pendente e vencimento já passou. Regularize para confirmar.">Bloqueado · Inadimplente</button>'
             : (canRenderPresenceAction ? '<button class="home-v2-primary" type="button" id="confirm-btn">' + homeActionText + '</button>' : '')}
           <button class="home-v2-secondary" type="button" data-tab="weekly_game">Ver jogo</button>
         </div>
-        ${financeBlocked ? '<p class="home-v2-blocked-note">Mensalidade pendente e o vencimento já passou. Regularize com o administrador para confirmar presença.</p>' : ''}
+        ${jogoComecou ? '<p class="footer-note">O jogo já começou: a presença não muda mais pelo app. Se precisar, fale com o admin.</p>' : ''}
+        ${!jogoComecou && financeBlocked ? '<p class="home-v2-blocked-note">Mensalidade pendente e o vencimento já passou. Regularize com o administrador para confirmar presença.</p>' : ''}
       </section>
 
       <section class="home-v2-metrics">

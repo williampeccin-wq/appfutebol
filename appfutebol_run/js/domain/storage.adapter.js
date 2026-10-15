@@ -21,6 +21,13 @@ export function hasPendingRemoteWrites() {
   return pendingRemoteWrites > 0;
 }
 
+// Resolve quando tudo que já foi enfileirado até agora chegou (ou falhou) no
+// servidor. Para quem precisa agir só DEPOIS da gravação — o push de "entrou
+// pela fila", por exemplo.
+export function aguardarGravacoes() {
+  return remoteSaveQueue.catch(() => null);
+}
+
 function cloneSnapshot(snapshot) {
   return JSON.parse(JSON.stringify(snapshot));
 }
