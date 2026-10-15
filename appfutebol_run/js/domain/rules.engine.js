@@ -165,6 +165,25 @@ function getBlockMessage(reason) {
   }
 }
 
+// Depois do horário marcado, a presença não muda mais pelo botão do jogador.
+//
+// INCIDENTE 14/10/2026 (Harmonia): o jogo das 20h30 continuou sendo o jogo
+// ativo madrugada adentro, e à 00:28 um jogador escalado tocou em "Cancelar
+// presença" — o app mandou "Time desfalcado" para os admins depois do jogo
+// jogado, e por pouco ele não sai da votação de desempenho, que já estava
+// aberta. Ajuste depois do apito é com o admin, pelas ações dele.
+//
+// Hora local do aparelho, como o resto do app lê game_date/game_time. Sem data
+// não há o que travar; sem horário, trava só na virada do dia (24h), para não
+// fechar a presença no próprio dia do jogo.
+export function jogoJaComecou(game, agora = Date.now()) {
+  const d = String(game?.game_date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!d) return false;
+  const t = String(game?.game_time || '').match(/^(\d{2}):(\d{2})/);
+  const inicio = new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), t ? Number(t[1]) : 24, t ? Number(t[2]) : 0, 0).getTime();
+  return agora >= inicio;
+}
+
 export function getPresenceDecision({ player, game, confirmations = [], mode = MENSALIDADE_MODES.NONE }) {
   const reasons = getPlayerBlockReasons(player, game, mode);
   const isConfirmed = confirmations.some((entry) => entry?.player_id === player?.id && entry?.confirmed);

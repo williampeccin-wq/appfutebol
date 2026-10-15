@@ -1,6 +1,6 @@
 import { isCarneOnly, playsFootball as authzPlaysFootball } from '../../domain/authz.js';
 import { getState, patchState } from '../../core/state.js';
-import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES, filaPrioridadeEmDia, cedeVezNaFilaPorMensalidade } from '../../domain/rules.engine.js';
+import { getPresenceDecision, isGameFull, isGoalkeeperEntry, getMensalidadeMode, MENSALIDADE_MODES, filaPrioridadeEmDia, cedeVezNaFilaPorMensalidade, jogoJaComecou } from '../../domain/rules.engine.js';
 import { getActiveGame, getGameKey } from '../../domain/projection.js';
 import { getCachedRatings, playerRatingAverages, rollingRatingWindow } from '../../services/ratings.service.js';
 import { calculateAnnualRanking } from '../championship/championship.service.js';
@@ -427,6 +427,11 @@ export function moverParaFilaPorRecusaDeLotacao(playerId) {
 export function toggleConfirmation(playerId, options = {}) {
   const snapshot = getState();
   const game = activeGame(snapshot);
+  // O admin segue podendo incluir alguém depois do horário (porAdmin); o
+  // jogador, não — ver jogoJaComecou.
+  if (!options.porAdmin && jogoJaComecou(game)) {
+    return { ok: false, message: 'O jogo já começou: a presença não muda mais pelo app. Se precisar, fale com o admin.' };
+  }
   // Admin pode confirmar inadimplente a qualquer momento: ignora o bloqueio
   // financeiro tratando o modo como 'none' só para esta decisão.
   const effectiveMode = options.bypassFinance ? MENSALIDADE_MODES.NONE : getMensalidadeMode(snapshot.settings);
