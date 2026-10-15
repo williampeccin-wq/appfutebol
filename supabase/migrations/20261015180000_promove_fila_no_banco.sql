@@ -59,6 +59,11 @@ begin
     return null;
   end if;
 
+  -- Tudo daqui para baixo é melhor-esforço: um erro inesperado (dado torto no
+  -- app_meta, coluna que não existe num dos schemas) NÃO pode impedir ninguém de
+  -- sair do jogo. Vira aviso no log do Postgres e a fila fica para o app.
+  begin
+
   v_club := nullif(v_old ->> 'club_id', '');
   v_meta_key := coalesce(v_club, 'default');
 
@@ -74,7 +79,7 @@ begin
 
   v_max := nullif(v_game ->> 'max_players', '')::int;
   if v_max is null or v_max < 1 then
-    return null;
+    return null; -- jogo desconhecido ou sem limite
   end if;
 
   v_prioriza := coalesce(v_meta -> 'settings' ->> 'fila_prioriza_em_dia', '') = 'true';
@@ -157,6 +162,10 @@ begin
     exit when v_linhas = 0;
     v_proximo := null;
   end loop;
+
+  exception when others then
+    raise warning 'presence_promove_fila (%): % [%]', old.game_key, sqlerrm, sqlstate;
+  end;
 
   return null;
 end;
