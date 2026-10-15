@@ -2,6 +2,8 @@
 // pela Central de Notificações (app_meta.data.settings.notifications):
 //   1) Abre inscrições de jogos com auto_open_at vencido e avisa todos.
 //   2) Avisa todos quando abre a votação do CHURRASCO (23h do dia do jogo).
+//   3) Avisa todos quando a votação de DESEMPENHO fecha e as Notas da rodada
+//      ficam à mostra (12h, ver appfutebol_run/js/modules/notas/notas.service.js).
 // O push de votação de DESEMPENHO é disparado pelo admin ao lançar resultado
 // (send-push trigger_voting via app.js), não mais por este cron.
 // Cada aviso é único por jogo (índices uq_push_log_open / uq_push_log_voting).
@@ -52,6 +54,21 @@ function isMissingColumn(err: { code?: string; message?: string } | null): boole
 
 const KIND_OPEN = "inscricoes_abertas";
 const KIND_CHURR = "votacao_churrasco";
+const KIND_NOTAS = "notas_da_rodada";
+// Espelho de NOTAS_RODADA_HORAS e janelaDaVotacao (notas.service.js): Deno não
+// importa o módulo do app. Mexeu lá, mexa aqui.
+const NOTAS_RODADA_HORAS = 12;
+function fimDaVotacaoMs(results: Array<Record<string, unknown>>, gameDate: string, horas: number): number {
+  if (!(horas > 0)) return NaN;
+  const data = String(gameDate || "").slice(0, 10);
+  if (!data) return NaN;
+  const lancado = results
+    .filter((r) => String(r?.date || "").slice(0, 10) === data)
+    .map((r) => Date.parse(String(r?.created_at || "")))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => b - a)[0];
+  return lancado ? lancado + horas * 3600_000 : NaN;
+}
 
 function nowBrtMinute(): string {
   const brt = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -141,7 +158,20 @@ Deno.serve(async (req) => {
     return !retry.error;
   }
 
-  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, churrasco: 0 };
+  // Variante do claim() que confere ANTES de inserir. O índice único de
+  // notas_da_rodada vem numa migration; se ela ainda não foi aplicada, o insert
+  // nunca colide e o mesmo aviso sairia a cada 5 min durante as 12h. Com o
+  // SELECT antes, o pior caso sem o índice é uma corrida rara de duas
+  // invocações, não uma enxurrada.
+  async function claimUmaVez(kind: string, gameKey: string, title: string, body: string, clubId: string): Promise<boolean> {
+    const q = admin.from("push_log").select("id").eq("kind", kind).eq("game_key", gameKey).limit(1);
+    const { data, error } = await (singleTenant ? q : q.eq("club_id", clubId));
+    if (error) { console.error("[auto-open] push_log read", clubId, error.message); return false; }
+    if (data && data.length) return false;
+    return claim(kind, gameKey, title, body, clubId);
+  }
+
+  const out: Record<string, unknown> = { now: nowBrtMinute(), clubs: 0, opened: 0, churrasco: 0, notas: 0 };
   const nowMs = Date.now();
   const nowBrt = nowBrtMinute();
 
@@ -393,6 +423,36 @@ Deno.serve(async (req) => {
           if (!(await claim(KIND_CHURR, gameKey, title, body, clubId))) continue;
           await pushTo(await subsOfChurrasco(clubId, gameKey), title, body);
           out.churrasco = (out.churrasco as number) + 1;
+        }
+      }
+
+      // ---------- 3) Votação de desempenho encerrada → Notas da rodada → todos ----------
+      // Mesmas condições em que o app mostra o card (getNotasRodadaAMostra):
+      // módulo de votação ligado, modo diferente de 'desligado', janela > 0.
+      const profile = (data.profile || {}) as Record<string, unknown>;
+      const modules = (profile.modules || {}) as Record<string, unknown>;
+      const modoNotas = String(settings.ratings_reveal_mode || "completo");
+      const horasVotacao = Number(settings.ratings_perf_window_hours) || 0;
+      if (enabled(KIND_NOTAS) && modules.votacao_desempenho !== false && modoNotas !== "desligado" && horasVotacao > 0) {
+        const champ = (data.championship || {}) as Record<string, unknown>;
+        const active = (champ.active || {}) as Record<string, unknown>;
+        const results = Array.isArray(active.results) ? (active.results as Array<Record<string, unknown>>) : [];
+        for (const g of games) {
+          const fimMs = fimDaVotacaoMs(results, String(g.game_date || ""), horasVotacao);
+          if (!Number.isFinite(fimMs)) continue;
+          if (nowMs < fimMs || nowMs >= fimMs + NOTAS_RODADA_HORAS * 3600_000) continue;
+          const gameKey = String(g.game_key || g.id || "");
+          if (!gameKey) continue;
+          const title = "Votação encerrada ⭐";
+          const body = `Saíram as notas do jogo${g.game_date ? ` de ${formatGameDate(String(g.game_date))}` : ""}. Veja quem foi o craque.`;
+          if (!(await claimUmaVez(KIND_NOTAS, gameKey, title, body, clubId))) continue;
+          const r = await pushTo(await subsOfClub(clubId), title, body);
+          out.notas = (out.notas as number) + 1;
+          const upd = admin.from("push_log")
+            .update({ status: r.sent > 0 ? "sent" : "failed",
+                      error: r.errors.length ? r.errors.join(" | ").slice(0, 500) : null })
+            .eq("kind", KIND_NOTAS).eq("game_key", gameKey);
+          await (singleTenant ? upd : upd.eq("club_id", clubId));
         }
       }
     } catch (err) {

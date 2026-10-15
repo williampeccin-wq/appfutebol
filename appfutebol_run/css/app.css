@@ -7634,3 +7634,78 @@ body.vote-open { overflow: hidden; }
   margin: 10px 0 4px;
   background: #060a16;
 }
+
+/* ===================== Notas da rodada ===================== */
+/* Card na home + popup (família perf-vote). Só tokens --hfc-*. */
+.content--home .notas-rodada-card {
+  border-color: rgba(240, 165, 0, 0.42);
+}
+.notas-rodada-resumo {
+  margin: 12px 0 0;
+  color: var(--hfc-text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.notas-rodada-resumo strong { color: var(--hfc-text); font-weight: 600; }
+.notas-rodada-cta { margin-top: 12px; min-height: 44px; }
+
+.notas-rodada-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 40px);
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.notas-rodada-titulo { font-size: 20px; font-weight: 800; color: var(--hfc-text); }
+.notas-rodada-sub { margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--hfc-text-muted); }
+
+.notas-rodada-minha {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: var(--hfc-radius);
+  background: var(--hfc-glass-2);
+  border: 1px solid var(--hfc-glass-border);
+}
+.notas-rodada-minha span { font-size: 13px; color: var(--hfc-text-muted); }
+.notas-rodada-minha strong { font-size: 24px; font-weight: 800; color: var(--hfc-gold-200); }
+.notas-rodada-minha small { font-size: 13px; color: var(--hfc-text-muted); }
+
+.notas-rodada-lista {
+  --player-avatar-size: 36px;
+  --player-avatar-font-size: 13px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.notas-rodada-linha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+.notas-rodada-linha + .notas-rodada-linha { border-top: 1px solid var(--hfc-line); }
+.notas-rodada-linha.is-craque { background: rgba(240, 165, 0, 0.16); }
+.notas-rodada-linha.is-eu { background: rgba(143, 180, 255, 0.16); }
+.notas-rodada-pos { width: 20px; text-align: center; font-size: 13px; font-weight: 600; color: var(--hfc-text-muted); }
+.notas-rodada-nome {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hfc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notas-rodada-nome small { display: block; font-size: 11px; font-weight: 400; color: var(--hfc-text-muted); }
+.notas-rodada-nota { font-size: 20px; font-weight: 800; color: var(--hfc-text); }
+.notas-rodada-linha.is-craque .notas-rodada-nota { color: var(--hfc-gold-200); }
+.notas-rodada-nota.is-poucos { font-size: 13px; font-weight: 600; color: var(--hfc-text-muted); }
+.notas-rodada-modal .perf-vote-actions { margin-top: 12px; }
