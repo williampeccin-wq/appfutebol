@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.198.0-aviso-fila-e-presenca-pos-jogo';
+export const APP_VERSION = 'v1.199.0-fila-em-dia-persiste';

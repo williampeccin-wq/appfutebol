@@ -238,6 +238,10 @@ function composeState({ players = [], game = null, confirmations = [], meta = {}
       // Biblioteca de uniformes do clube (photo = URL do Storage, não base64).
       uniforms: Array.isArray(meta.settings?.uniforms) ? meta.settings.uniforms : [],
       goalkeepers_pay: meta.settings?.goalkeepers_pay === true,
+      // Preferência na fila para quem está em dia (rules.engine e o cron
+      // auto-open-games leem). Fora deste whitelist e do splitState, a chave
+      // sumia no primeiro sync e o servidor nunca a via ligada (v1.199.0).
+      fila_prioriza_em_dia: meta.settings?.fila_prioriza_em_dia === true,
     },
     deleted_player_ids: deletedPlayerIds,
     deleted_player_phones: deletedPlayerPhones,
@@ -275,6 +279,7 @@ function splitState(state) {
         // Biblioteca de uniformes do clube (photo = URL do Storage, não base64).
         uniforms: Array.isArray(state.settings?.uniforms) ? state.settings.uniforms : [],
         goalkeepers_pay: state.settings?.goalkeepers_pay === true,
+        fila_prioriza_em_dia: state.settings?.fila_prioriza_em_dia === true,
       },
       deleted_player_ids: Array.isArray(state.deleted_player_ids) ? state.deleted_player_ids.map((id) => String(id)) : [],
       deleted_player_phones: Array.isArray(state.deleted_player_phones) ? state.deleted_player_phones.map((phone) => String(phone)) : [],
