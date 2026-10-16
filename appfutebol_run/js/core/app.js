@@ -3377,13 +3377,24 @@ const RECUSAS_DO_SERVIDOR = {
 // trg_presence_line_capacity). Diferente das outras recusas, esta NÃO é só um
 // aviso: a tela ficou mostrando uma vaga que não existe. Põe a pessoa na fila
 // na hora — é o mesmo destino que ela teria se o aparelho soubesse da lotação.
-function aplicarRecusaDeLotacao(playerId) {
+async function aplicarRecusaDeLotacao(playerId) {
   if (!playerId) {
     showToast('O jogo já estava lotado: esta confirmação não foi aceita pelo servidor.', 'error');
     return;
   }
 
-  const resultado = moverParaFilaPorRecusaDeLotacao(playerId);
+  // Quem foi recusado vindo da fila mantém o lugar que tinha: o servidor ainda
+  // guarda a entrada dele. Sem leitura (rede), vai para o fim, como antes.
+  let filaDesde = null;
+  try {
+    const servidor = await fetchConfirmationsForGame(getGameKey(getActiveGameFromSnapshot(getState())));
+    const linha = servidor.ok ? servidor.rows.find((entry) => String(entry.player_id) === String(playerId)) : null;
+    if (linha && linha.confirmed !== true && ['waitlist', 'waitlisted'].includes(String(linha.status || ''))) {
+      filaDesde = linha.waitlisted_at || null;
+    }
+  } catch (_) { /* segue sem o lugar original */ }
+
+  const resultado = moverParaFilaPorRecusaDeLotacao(playerId, { filaDesde });
   if (!resultado.ok) return;
 
   const snapshot = getState();

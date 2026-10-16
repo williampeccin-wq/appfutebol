@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.211.0-aviso-quem-entrou';
+export const APP_VERSION = 'v1.212.0-fila-recusa-mantem-lugar';
