@@ -353,7 +353,9 @@ function promoteFirstWaitlisted(confirmations = [], now = new Date().toISOString
   };
 }
 
-function upsertWaitlistEntry(snapshot, playerId, now = new Date().toISOString()) {
+// `filaDesde`: quando a pessoa já tinha lugar na fila e só está VOLTANDO para
+// ela (recusa de lotação), o lugar original — sem isso ela ia para o fim.
+function upsertWaitlistEntry(snapshot, playerId, now = new Date().toISOString(), filaDesde = null) {
   const currentWaitlist = getWaitlistEntries(snapshot.confirmations, snapshot);
   const existing = (snapshot.confirmations || []).find((entry) => String(entry.player_id) === String(playerId));
 
@@ -365,7 +367,7 @@ function upsertWaitlistEntry(snapshot, playerId, now = new Date().toISOString())
     removed_by_admin: false,
     confirmed_at: null,
     cancelled_at: null,
-    waitlisted_at: existing?.waitlisted_at || now,
+    waitlisted_at: existing?.waitlisted_at || filaDesde || now,
     waitlist_position: currentWaitlist.some((entry) => String(entry.player_id) === String(playerId))
       ? currentWaitlist.findIndex((entry) => String(entry.player_id) === String(playerId)) + 1
       : currentWaitlist.length + 1,
@@ -419,7 +421,12 @@ export function getWaitlistView(snapshot = getState()) {
 // INCIDENTE 29/09/2026 — 17/16 no Harmonia). A tela já mostrava "Confirmado",
 // porque o local salva antes de subir; aqui a interface se rende à verdade do
 // banco e põe a pessoa na fila, em vez de exibir uma vaga que não existe.
-export function moverParaFilaPorRecusaDeLotacao(playerId) {
+//
+// `filaDesde` é a data de entrada na fila que o SERVIDOR ainda tem: a gravação
+// recusada não chegou lá, então a linha dele segue intacta. A promoção local
+// tinha apagado essa data, e sem ela a pessoa voltava para o FIM da fila — por
+// um erro que não foi dela (aparelho e banco discordando de quem era o 1º).
+export function moverParaFilaPorRecusaDeLotacao(playerId, { filaDesde = null } = {}) {
   const snapshot = getState();
   const confirmations = scopedConfirmations(snapshot);
   const existing = confirmations.find((entry) => String(entry.player_id) === String(playerId));
@@ -431,7 +438,7 @@ export function moverParaFilaPorRecusaDeLotacao(playerId) {
 
   const now = new Date().toISOString();
   const updated = normalizeWaitlistPositions(
-    upsertWaitlistEntry({ ...snapshot, confirmations }, playerId, now)
+    upsertWaitlistEntry({ ...snapshot, confirmations }, playerId, now, filaDesde)
   );
   patchScopedConfirmations(snapshot, updated);
 

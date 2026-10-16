@@ -107,6 +107,30 @@ assert.equal(semConfirmacao.ok, false, 'recusa de quem não tem confirmação lo
 const aindaConfirmados = getState().confirmations.filter((entry) => entry.confirmed === true);
 assert.equal(aindaConfirmados.length, 17, 'só a confirmação recusada saiu');
 
+// ------------------------------------------------- recusado vindo da fila mantém o lugar
+// Aparelho e banco discordaram de quem era o 1º da fila: o aparelho promoveu o
+// p17, o banco (que já promoveu o p18) recusa. O p17 tinha chegado à fila ANTES
+// do p18 — voltar para o fim seria castigá-lo por um erro que não foi dele.
+replaceState({
+  players,
+  game: jogo,
+  games: [jogo],
+  active_game_id: JOGO,
+  confirmations: [
+    ...Array.from({ length: 15 }, (_, i) => conf(`p${i + 1}`)),
+    conf('p17', { waitlisted_at: null }), // promoção local: a data de entrada na fila some
+    { game_key: JOGO, player_id: 'p18', confirmed: false, status: 'waitlist', waitlisted_at: '2026-09-29T12:00:00.000Z' },
+  ],
+  settings: {},
+  session: { playerId: 'p1' },
+  ui: { currentTab: 'weekly_game' },
+});
+
+const voltou = moverParaFilaPorRecusaDeLotacao('p17', { filaDesde: '2026-09-29T10:00:00.000Z' });
+assert.equal(voltou.position, 1, 'com a data que o servidor guarda, ele volta na frente de quem chegou depois');
+assert.equal(getState().confirmations.find((e) => e.player_id === 'p17').waitlisted_at, '2026-09-29T10:00:00.000Z',
+  'e a data original fica gravada');
+
 // ------------------------------------------------- ceder vaga
 
 // Era isto que o admin queria no dia 29/09 e não existia: tirar quem está dentro
