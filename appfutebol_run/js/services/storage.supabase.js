@@ -386,6 +386,16 @@ function stableStringify(value) {
   return JSON.stringify(value ?? null);
 }
 
+// Como o stableStringify, mas indiferente à ordem das chaves dos objetos: o
+// merge parte da linha do servidor, então a mesma informação volta com as
+// chaves em outra ordem e não pode contar como "mudou".
+function canonicalStringify(value) {
+  return JSON.stringify(value ?? null, (_key, v) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+    return Object.keys(v).sort().reduce((out, k) => { out[k] = v[k]; return out; }, {});
+  });
+}
+
 // Maior timestamp de uma lista, ignorando nulos. Compara por valor numérico e
 // não por texto: o Postgres omite dígitos à direita nos milissegundos
 // (".5+00" vs ".559+00"), e aí a ordem lexicográfica mente.
@@ -1048,6 +1058,25 @@ async function fetchSharedUpdatedAt(config) {
   };
 }
 
+// Lê as linhas compartilhadas (game/meta) inteiras, para o merge de 3 vias do
+// save. Mesmo número de requisições do fetchSharedUpdatedAt; muda só o payload.
+async function fetchSharedRows(config) {
+  const clubKey = currentClubKey(config);
+  const [gameRes, metaRes] = await Promise.all([
+    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
+    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
+  ]);
+  if (!gameRes?.ok || !metaRes?.ok) return { ok: false, game: null, meta: null, updatedAt: null };
+  const gameRow = Array.isArray(gameRes.data) ? gameRes.data[0] : null;
+  const metaRow = Array.isArray(metaRes.data) ? metaRes.data[0] : null;
+  return {
+    ok: true,
+    game: gameRow?.data || null,
+    meta: metaRow?.data || null,
+    updatedAt: maxTimestamp([gameRow?.updated_at, metaRow?.updated_at]),
+  };
+}
+
 async function saveSplitState(config, state) {
   const parts = splitState(state);
 
@@ -1087,42 +1116,37 @@ async function saveSplitState(config, state) {
     return { ok: true, conflict: false, reason: 'split_no_changes', updatedAt: lastRemoteUpdatedAt };
   }
 
-  // Concorrência otimista para os objetos compartilhados (game/meta): se vamos
-  // sobrescrever um deles e o remoto avançou além do que conhecemos (outro admin
-  // gravou), REBASEIA a alteração local sobre o estado fresco em vez de carimbar
-  // o snapshot inteiro por cima. Só desiste (conflito) se nem o rebase for
-  // possível. Nossas próprias gravações avançam lastSharedUpdatedAt, então saves
-  // sequenciais do mesmo usuário não geram falso-positivo.
+  // Concorrência para os objetos compartilhados (game/meta), gravados inteiros:
+  // antes de gravar, relê o que está no servidor e REBASEIA a alteração local
+  // sobre ele (merge de 3 vias), em vez de carimbar o snapshot inteiro por cima.
+  //
+  // INCIDENTE 04/11/2026: a decisão "outro cliente gravou?" era tomada pelo
+  // updated_at — carimbado pelo RELÓGIO DO CELULAR de quem grava. Com o relógio
+  // de quem lançou o resultado atrasado, o carimbo novo parecia velho, o merge
+  // era pulado e um cliente defasado apagou o resultado. Agora a detecção é pelo
+  // CONTEÚDO: a mesma leitura que trazia só o carimbo traz a linha, e o merge
+  // roda sempre. Só conta como "rebased" quando o merge mudou o que ia gravar.
   const touchesShared = operations.some((op) => op.type === 'upsert_game' || op.type === 'cleanup_game_draw_fields' || op.type === 'upsert_meta');
-  if (touchesShared && lastSharedUpdatedAt) {
-    const freshShared = await fetchSharedUpdatedAt(config);
+  if (touchesShared) {
+    const fresh = await fetchSharedRows(config);
 
     // Não conseguimos ler o estado do servidor — não dá para afirmar que é
     // seguro sobrescrever. Aborta como conflito.
-    if (!freshShared.ok) {
+    if (!fresh.ok) {
       console.warn('[storage.supabase] não foi possível verificar o estado do servidor; abortando o save compartilhado.');
       return { ok: false, conflict: true, reason: 'shared_freshness_unavailable' };
     }
 
-    // Compara por timestamp numérico (robusto a diferenças de formato/precisão
-    // entre o que gravamos e o que o Postgres devolve). Só conflita se o remoto
-    // for MAIS NOVO que o baseline compartilhado — ou seja, outro cliente
-    // gravou. Margem de 1s evita ruído de precisão.
-    const freshMs = freshShared.updatedAt ? new Date(freshShared.updatedAt).getTime() : 0;
-    const baseMs = new Date(lastSharedUpdatedAt).getTime() || 0;
-    if (freshMs && baseMs && freshMs - baseMs > 1000) {
-      // Antes descartávamos a alteração local aqui. Isso destruía o trabalho do
-      // usuário mesmo quando os dois clientes mexeram em campos DIFERENTES (o
-      // caso comum: um lança resultado, outro confirma presença/abre jogo).
-      console.warn('[storage.supabase] remoto avançou desde a última sync; rebaseando a alteração local sobre o estado fresco.');
-      const rebased = await rebaseSharedParts(config, previousParts, parts);
-
-      if (!rebased.ok) {
-        console.warn('[storage.supabase] rebase impossível; abortando para não sobrescrever (conflito):', rebased.reason);
-        return { ok: false, conflict: true, reason: rebased.reason || 'remote_advanced' };
+    // Sem linha nenhuma no servidor (clube novo, primeiro save): não há o que
+    // rebasear nem o que apagar.
+    if (fresh.game || fresh.meta) {
+      const rebased = rebaseSharedParts(fresh, previousParts, parts);
+      const mudou = canonicalStringify(rebased.parts.game) !== canonicalStringify(parts.game)
+        || canonicalStringify(rebased.parts.meta) !== canonicalStringify(parts.meta);
+      if (mudou) {
+        console.warn('[storage.supabase] o servidor tem alterações que este cliente não viu; rebaseando a alteração local sobre o estado fresco.');
+        return await runSaveOperations(config, state, previousParts, rebased.parts, now, { rebased: true });
       }
-
-      return await runSaveOperations(config, state, previousParts, rebased.parts, now, { rebased: true });
     }
   }
 
@@ -1133,34 +1157,21 @@ async function saveSplitState(config, state) {
 // campo. Só sobrescreve o que este cliente realmente mudou em relação ao próprio
 // baseline; todo o resto vem do servidor. É o que separa "salvar minha edição"
 // de "carimbar meu snapshot inteiro por cima do de todo mundo".
-async function rebaseSharedParts(config, previousParts, parts) {
-  const clubKey = currentClubKey(config);
-  const [gameRes, metaRes] = await Promise.all([
-    requestJson(config, tableUrl(config, SPLIT_TABLES.game, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
-    requestJson(config, tableUrl(config, SPLIT_TABLES.meta, `key=eq.${encodeURIComponent(clubKey)}&select=data,updated_at&limit=1`), { method: 'GET' }),
-  ]);
-
-  if (!gameRes?.ok || !metaRes?.ok) return { ok: false, reason: 'rebase_read_failed' };
-
-  const remoteGame = Array.isArray(gameRes.data) ? (gameRes.data[0]?.data || null) : null;
-  const remoteMeta = Array.isArray(metaRes.data) ? (metaRes.data[0]?.data || null) : null;
-
-  // Sem estado remoto legível não há o que rebasear — e gravar por cima seria
-  // exatamente o apagão que estamos tentando impedir.
-  if (!remoteGame && !remoteMeta) return { ok: false, reason: 'rebase_remote_empty' };
+function rebaseSharedParts(fresh, previousParts, parts) {
+  const remoteGame = fresh.game;
+  const remoteMeta = fresh.meta;
 
   const rebasedParts = {
     ...parts,
-    game: remoteGame ? mergeChangedFields(remoteGame, previousParts?.game, parts.game) : parts.game,
+    // O sorteio volátil nunca volta ao game_state (a fonte é app_meta.games): o
+    // merge parte da linha do servidor, que pode ainda tê-lo.
+    game: remoteGame ? stripVolatileDrawFields(mergeChangedFields(remoteGame, previousParts?.game, parts.game)) : parts.game,
     meta: remoteMeta
       ? mergeChampionshipFrozen(remoteMeta, mergeChampionshipResults(remoteMeta, previousParts?.meta, mergeChangedFields(remoteMeta, previousParts?.meta, parts.meta)))
       : parts.meta,
   };
 
-  lastSharedUpdatedAt = maxTimestamp([
-    Array.isArray(gameRes.data) ? gameRes.data[0]?.updated_at : null,
-    Array.isArray(metaRes.data) ? metaRes.data[0]?.updated_at : null,
-  ]) || lastSharedUpdatedAt;
+  if (fresh.updatedAt) lastSharedUpdatedAt = fresh.updatedAt;
 
   return { ok: true, parts: rebasedParts };
 }
@@ -1216,10 +1227,12 @@ function mergeChampionshipResults(base, previous, next) {
 function mergeFrozenList(baseList, nextList) {
   const base = Array.isArray(baseList) ? baseList : [];
   const next = Array.isArray(nextList) ? nextList : [];
-  if (!base.length) return next;
+  // Nada a resgatar: devolve a lista do jeito que veio (inclusive ausente), para
+  // o merge não "mudar" o que ia ser gravado só por normalizar.
+  if (!base.length) return nextList;
   const idsLocais = new Set(next.map((item) => String(item?.id ?? item?.year ?? '')));
   const resgatados = base.filter((item) => !idsLocais.has(String(item?.id ?? item?.year ?? '')));
-  if (!resgatados.length) return next;
+  if (!resgatados.length) return nextList;
   console.warn('[storage.supabase] preservando ' + resgatados.length + ' temporada(s)/ano(s) encerrado(s) que este cliente não tinha.');
   return [...next, ...resgatados];
 }
@@ -1247,7 +1260,14 @@ function mergeChangedFields(base, previous, next) {
   for (const key of keys) {
     const before = previous ? previous[key] : undefined;
     const after = next[key];
-    if (stableStringify(before) === stableStringify(after)) continue;   // não mexemos
+    if (stableStringify(before) === stableStringify(after)) {
+      // Não mexemos: vale o servidor. Mas campo que o servidor nem tem (default
+      // que o composeState fabrica, active_game_id derivado do jogo) fica com o
+      // nosso valor — ausência no servidor não é exclusão, e o merge roda em
+      // TODA gravação compartilhada desde 04/11/2026.
+      if (!Object.prototype.hasOwnProperty.call(base, key) && after !== undefined) merged[key] = after;
+      continue;
+    }
     if (after === undefined) delete merged[key];
     else merged[key] = after;
   }

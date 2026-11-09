@@ -322,4 +322,53 @@ assert.deepEqual(
   'exclusão deliberada de resultado não pode ser desfeita pelo resgate',
 );
 
-console.log('OK — 18 asserções em 5 cenários. Gravação concorrente preserva os dois lados; nada é sobrescrito em silêncio.');
+// ---------------------------------------------------------------- cenário 6
+//
+// INCIDENTE 04/11/2026 (Harmonia): o resultado lançado às 22:37 sumiu antes das
+// 23:00 — dois jogadores votaram às 22:39, os outros oito só viram a votação do
+// churrasco, e a pontuação da quarta não entrou. O admin relançou no dia
+// seguinte.
+//
+// CAUSA: a trava decidia "outro cliente gravou?" comparando updated_at — e quem
+// escreve esse carimbo é o RELÓGIO DO CELULAR que gravou, não o servidor. Se o
+// aparelho de quem lança o resultado está atrasado em relação ao de quem grava
+// depois, o carimbo novo parece velho, a trava não dispara, o merge de 3 vias
+// (que resgata resultados) é pulado e o cliente defasado grava o blob inteiro
+// por cima. A detecção não pode depender de relógio de cliente.
+
+const servidor6 = criarServidor();
+instalarFetch(servidor6);
+
+const carga6 = await storage.loadRemoteState();
+assert.equal(carga6.ok, true, 'o estado remoto deveria carregar');
+
+// O admin lança o resultado de um celular com o relógio ATRASADO: o carimbo
+// (T8) fica mais velho que o app_meta que o cliente defasado já conhecia (T10).
+servidor6.meta = {
+  key: 'default',
+  data: {
+    ...servidor6.meta.data,
+    championship: { active: { id: 'inverno-2026', results: [{ id: 'r1', date: '2026-07-15' }, { id: 'r2', date: '2026-07-22' }] } },
+  },
+  updated_at: T(8),
+};
+
+// O cliente defasado recalcula o ranking e grava.
+const estado6 = carga6.state;
+estado6.championship = { ...estado6.championship, ranking: [{ player_id: 'p1', points: 3 }] };
+
+const gravacao6 = await storage.saveRemoteState(estado6);
+assert.equal(gravacao6.ok, true, 'a gravação do cliente defasado deveria ser concluída');
+
+assert.deepEqual(
+  servidor6.meta.data.championship.active.results.map((r) => r.date).sort(),
+  ['2026-07-15', '2026-07-22'],
+  'um carimbo de horário atrasado não pode deixar um cliente defasado apagar o resultado',
+);
+assert.deepEqual(
+  servidor6.meta.data.championship.ranking,
+  [{ player_id: 'p1', points: 3 }],
+  'a alteração que o cliente realmente fez (o ranking) precisa ter sido gravada',
+);
+
+console.log('OK — 21 asserções em 6 cenários. Gravação concorrente preserva os dois lados; nada é sobrescrito em silêncio.');
