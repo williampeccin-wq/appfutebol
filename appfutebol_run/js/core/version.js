@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.201.0-fila-recusa-mantem-lugar';
+export const APP_VERSION = 'v1.202.0-resultado-nao-some';
