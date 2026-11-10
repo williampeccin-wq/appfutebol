@@ -20,11 +20,48 @@ const PRO_FEATURES = [
   '👥 Membros ilimitados e múltiplos administradores',
 ];
 
+// O app do Google Play pode MOSTRAR que o Pro existe, mas não pode levar
+// ninguém para pagar fora do Play. A política de pagamentos proíbe
+// "in-app webviews, buttons, links, messaging (...) or other calls to action"
+// que levem a outro meio de pagamento, e o FAQ dela abre a exceção que a gente
+// usa: app "consumption-only" pode dar "additional information about purchasing
+// options WITHOUT DIRECT LINKS" — o exemplo do próprio Google é "Go to our
+// website to upgrade your subscription to Premium".
+//
+// Fora do app a regra não vale ("Outside of your app, you are free to
+// communicate with your users about alternative purchase options"), e o
+// convocados.app.br aberto no navegador é fora do app. Como o MESMO código
+// serve os dois, a decisão é em tempo de execução.
+//
+// FALHA PARA O LADO SEGURO: só devolve true quando dá para afirmar que é aba de
+// navegador. Na dúvida — matchMedia ausente, exceção, display-mode que não
+// conheço — não mostra link.
+export function linkExternoPermitido(win = (typeof window !== 'undefined' ? window : null)) {
+  try {
+    if (!win) return false;
+    // TWA do Play: a página é aberta pelo app Android e o referrer entrega isso.
+    if (String(win.document?.referrer || '').startsWith('android-app://')) return false;
+    // PWA instalada no iOS.
+    if (win.navigator?.standalone === true) return false;
+    if (typeof win.matchMedia !== 'function') return false;
+    return win.matchMedia('(display-mode: browser)').matches === true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export function showProUpsellModal() {
   if (document.querySelector('.pro-upsell-overlay')) return;
 
   const msg = encodeURIComponent('Olá, quero contratar o Plano Pro do Convocados para o meu clube 🏆');
   const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`;
+  const podeLinkar = linkExternoPermitido();
+  const chamada = podeLinkar
+    ? `<a class="btn btn-primary pro-upsell-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">
+        💬 Falar no WhatsApp para contratar
+      </a>`
+    : `<p class="pro-upsell-fora">O Plano Pro é contratado fora do app, no site
+        <strong>convocados.app.br</strong>.</p>`;
 
   const overlay = document.createElement('div');
   overlay.className = 'confirm-modal-overlay pro-upsell-overlay';
@@ -38,10 +75,8 @@ export function showProUpsellModal() {
       <ul class="pro-upsell-features">
         ${PRO_FEATURES.map(f => `<li>${f}</li>`).join('')}
       </ul>
-      <a class="btn btn-primary pro-upsell-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">
-        💬 Falar no WhatsApp para contratar
-      </a>
-      <button type="button" class="btn btn-secondary pro-upsell-dismiss">Agora não</button>
+      ${chamada}
+      <button type="button" class="btn btn-secondary pro-upsell-dismiss">${podeLinkar ? 'Agora não' : 'Fechar'}</button>
     </div>
   `;
 

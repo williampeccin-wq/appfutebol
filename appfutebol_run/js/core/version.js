@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.214.0-acesso-do-jogador';
+export const APP_VERSION = 'v1.215.0-upsell-sem-link';

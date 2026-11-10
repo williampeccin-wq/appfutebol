@@ -7580,6 +7580,29 @@ body.vote-open { overflow: hidden; }
   display: block;
 }
 
+/* Dentro do app do Play não pode haver link que leve a pagar fora (política de
+   pagamentos, §4). No lugar do botão do WhatsApp entra este texto — informação
+   sobre como contratar, sem link. Ver linkExternoPermitido() em domain/gating.js. */
+.pro-upsell-fora {
+  /* ATENÇÃO: .confirm-modal ainda tem `background: var(--white)` — este modal é
+     uma superfície CLARA dentro de um app escuro. Por isso aqui não entra vidro
+     nem --hfc-text: seria quase branco sobre branco. Texto em navy (17:1 sobre
+     branco) e destaque em navy-700 (10,6:1). Ouro sobre claro dá 2:1 e reprova. */
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(13, 31, 60, 0.14);
+  border-radius: var(--hfc-radius, 16px);
+  background: rgba(13, 31, 60, 0.05);
+  color: var(--hfc-navy-800, #0c1a38);
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: center;
+}
+.pro-upsell-fora strong {
+  color: var(--hfc-navy-700, #1b3a73);
+  font-weight: 600;
+}
+
 /* "Como o clube joga" (Config) — os quatro campos de pontuação lado a lado,
    quebrando em duas linhas no celular em vez de espremerem. */
 .club-profile-points {
