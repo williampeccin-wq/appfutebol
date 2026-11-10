@@ -71,11 +71,23 @@ Duas regras que vieram de erro real nesta base:
   sirva com o `app.css` real e olhe. Não é automático, mas é barato.
 - **O caminho completo com Supabase real.** O `fetch` é falso nas suítes.
 
-## Autoteste de ponta a ponta (`/autoteste.html`)
+## Autoteste de ponta a ponta (`tools/autoteste.html`)
 
 As suítes acima usam `fetch` falso. Para exercitar o caminho REAL — gravar no
-Supabase, reler do servidor, conferir que o app enxerga — abra `/autoteste.html`
+Supabase, reler do servidor, conferir que o app enxerga — use o autoteste
 **já logado** no Convocados.
+
+Ele **não mora no diretório publicado**: até 10/11/2026 ficava em
+`appfutebol_run/` e o Cloudflare Pages o servia em
+`https://convocados.app.br/autoteste.html`, aberto a quem soubesse a URL. Como
+ele grava configuração de clube, saiu de lá. Para rodar, copie e apague depois:
+
+```bash
+cp tools/autoteste.html appfutebol_run/ && python3 .claude/dev-server.py
+```
+
+Abra http://localhost:8000/autoteste.html e, ao terminal, `rm
+appfutebol_run/autoteste.html`. O `.gitignore` barra a cópia.
 
 Ele grava um perfil bem diferente do default (futsal, 0 goleiros, churrasco
 desligado, pontuação 2/1/0/0), relê, confere, e **devolve a configuração
@@ -84,6 +96,10 @@ original** — inclusive se estourar no meio (o restore roda no `catch`).
 Duas travas, em código e não em cuidado do operador:
 - recusa rodar se o Supabase configurado for o do **Harmonia de produção**;
 - recusa rodar sem sessão (não faz login sozinho).
+
+⚠️ A primeira trava só conhece o Harmonia: contra o **convocados-prod** ela
+deixa rodar. Era o risco de estar publicada; fora do diretório servido, deixa
+de ser exposição, mas continue sem apontar para o banco de um clube real.
 
 Não roda em CI: precisa de sessão autenticada. É o preço de testar o caminho de
 verdade sem guardar senha em segredo de repositório.

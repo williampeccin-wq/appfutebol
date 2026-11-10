@@ -17,3 +17,6 @@ oauth_credentials.json
 
 # Build local do Wrangler
 .wrangler/
+
+# cópia de trabalho da ferramenta interna (a fonte mora em tools/)
+appfutebol_run/autoteste.html

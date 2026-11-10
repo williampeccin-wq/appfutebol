@@ -1,4 +1,23 @@
 <!doctype html>
+<!--
+  FERRAMENTA INTERNA — NÃO MORA NO DIRETÓRIO PUBLICADO.
+
+  Esta página GRAVA a configuração do clube. Enquanto ela viveu em
+  `appfutebol_run/`, o Cloudflare Pages a servia em
+  https://convocados.app.br/autoteste.html, aberta a qualquer um que
+  soubesse a URL — e a trava embutida só recusa o Supabase do HARMONIA,
+  então contra o convocados-prod ela rodava.
+
+  Para usar: copie para `appfutebol_run/`, rode o dev-server, use, e APAGUE
+  a cópia. Os imports são relativos a `appfutebol_run/` e só resolvem lá.
+
+      cp tools/autoteste.html appfutebol_run/
+      python3 .claude/dev-server.py        # http://localhost:8000/autoteste.html
+      rm appfutebol_run/autoteste.html
+
+  O `.gitignore` barra `appfutebol_run/autoteste.html` para a cópia não
+  voltar ao repositório por engano.
+-->
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
