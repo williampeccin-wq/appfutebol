@@ -111,15 +111,25 @@ O que falta: dos **6 módulos declarados** no perfil padrão
 Ou seja: um clube que desligar `mensalidade`, `carne` ou `pix_ia` no perfil
 continua vendo tudo. A chave existe, a tela ignora.
 
-## 5. Prioridade sugerida
+## 5. Prioridade — os três primeiros, feitos em 10/11/2026
 
-Antes de mandar o app novo para análise:
+1. ✅ **`landing.html` e `autoteste.html` fora do diretório publicado**
+   (commit `2d20b8a`). A landing foi apagada; o autoteste foi para `tools/`,
+   com receita de uso e `.gitignore` para a cópia de trabalho.
+2. ✅ **`admin-reset-password` no `main`** (commit `c815bcc`, v1.214.0).
+   Reescrita multi-clube: autoriza pelo JWT de quem chama, exige admin E
+   mesmo `club_id`, resolve o `auth_user_id` no servidor. Sumiu o prompt do
+   segredo nas duas telas. Descobriu-se no caminho que eram **duas** operações
+   quebradas, não uma: "Criar acesso" também.
+   ⚠️ **Falta publicar à mão no projeto `convocados-prod`** — push não publica
+   Edge Function.
+3. ✅ **Upsell do Pro sem link para fora** (commit `51e4748`, v1.215.0).
+   `linkExternoPermitido()` decide em tempo de execução e falha para o lado
+   seguro. 11 asserções em `tests/upsell-fora-do-app.regression.mjs`.
 
-1. **Tirar `landing.html` e `autoteste.html` do diretório publicado.** Uma é
-   marca errada exposta, a outra é ferramenta de escrita aberta na internet.
-2. **Portar `admin-reset-password`** para o `main` e publicar no
-   `convocados-prod` — é recurso quebrado hoje.
-3. **Resolver o upsell do Pro** (Play Billing) — ver análise à parte.
+**Nada disso vai para a branch `production`.** O Harmonia não tem `gating.js`,
+não tem `autoteste.html`, e `players` lá não tem `club_id` — a função nova
+quebraria. A versão antiga dele continua certa para o contexto dele.
 
 Depois, sem pressa:
 
@@ -127,3 +137,6 @@ Depois, sem pressa:
 5. Decidir se vale migrar o domínio técnico `harmonia.app`. Hoje: não vale.
 6. Renomear `window.HARMONIA_SUPABASE` e os eventos `harmonia:*`. Deixar
    `harmonia_auth_session` quieto.
+7. `.confirm-modal` ainda é `background: var(--white)` — uma superfície clara
+   dentro de um app escuro, que obriga cada conteúdo novo de modal a inverter
+   a paleta. Achado ao estilizar o texto do upsell.
