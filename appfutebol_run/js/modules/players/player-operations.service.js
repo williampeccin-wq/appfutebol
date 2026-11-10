@@ -54,7 +54,7 @@ async function callAdminPasswordFunction(payload) {
   return { ok: true, data };
 }
 
-export async function createPlayerAccessOperation({ player, newPassword, adminSecret }) {
+export async function createPlayerAccessOperation({ player, newPassword }) {
   const allowed = ensureAllowed('criar acesso de jogador');
   if (!allowed.ok) return allowed;
 
@@ -73,13 +73,8 @@ export async function createPlayerAccessOperation({ player, newPassword, adminSe
     return { ok: false, reason: 'invalid_password', message: 'Senha deve ter pelo menos 6 caracteres.' };
   }
 
-  if (!adminSecret) {
-    return { ok: false, reason: 'missing_admin_secret', message: 'Segredo admin não informado.' };
-  }
-
   const authResult = await callAdminPasswordFunction({
     mode: 'create_access',
-    admin_secret: adminSecret,
     player_id: player.id,
     name: player.name,
     phone,
@@ -92,6 +87,18 @@ export async function createPlayerAccessOperation({ player, newPassword, adminSe
   const data = authResult.data || {};
   if (!data?.user_id) {
     return { ok: false, reason: 'auth_user_id_not_returned', message: 'Acesso criado sem retorno de usuário Auth.' };
+  }
+
+  // A Edge Function já vincula o jogador ao usuário do Auth (service_role, numa
+  // operação só). O caminho abaixo é a rede de segurança para quando ela cria o
+  // usuário mas falha ao gravar o vínculo — aí ela devolve linked:false.
+  if (data.linked === true) {
+    return {
+      ok: true,
+      reason: data.reused_existing_user ? 'existing_access_relinked' : 'access_created_and_linked',
+      message: data.reused_existing_user ? 'Acesso existente atualizado e vinculado.' : 'Acesso criado com sucesso.',
+      data,
+    };
   }
 
   const linkResult = await savePlayerAccessLink({
@@ -119,7 +126,7 @@ export async function createPlayerAccessOperation({ player, newPassword, adminSe
   };
 }
 
-export async function resetPlayerPasswordOperation({ player, newPassword, adminSecret }) {
+export async function resetPlayerPasswordOperation({ player, newPassword }) {
   const allowed = ensureAllowed('resetar senha de jogador');
   if (!allowed.ok) return allowed;
 
@@ -133,14 +140,11 @@ export async function resetPlayerPasswordOperation({ player, newPassword, adminS
     return { ok: false, reason: 'invalid_password', message: 'Senha deve ter pelo menos 6 caracteres.' };
   }
 
-  if (!adminSecret) {
-    return { ok: false, reason: 'missing_admin_secret', message: 'Segredo admin não informado.' };
-  }
-
+  // Manda o ID DO JOGADOR, não o auth_user_id: quem resolve o usuário do Auth
+  // é o servidor, depois de conferir que o jogador é do clube de quem chama.
   const result = await callAdminPasswordFunction({
     mode: 'reset_password',
-    admin_secret: adminSecret,
-    user_id: player.auth_user_id,
+    player_id: player.id,
     new_password: newPassword,
   });
 

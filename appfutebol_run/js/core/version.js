@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.213.0-resultado-nao-some';
+export const APP_VERSION = 'v1.214.0-acesso-do-jogador';

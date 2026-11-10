@@ -2457,13 +2457,10 @@ if (action === "create-player-access") {
   const newPassword = window.prompt(`Senha inicial para ${player.name}:`);
   if (!newPassword) return;
 
-  const adminSecret = window.prompt("Informe o segredo admin para criar acesso:");
-  if (!adminSecret) return;
-
   setActionBusy(trigger, "Criando...");
 
   try {
-    const result = await createPlayerAccessOperation({ player, newPassword, adminSecret });
+    const result = await createPlayerAccessOperation({ player, newPassword });
     clearActionBusy(trigger);
 
     if (!result.ok) {
@@ -2496,13 +2493,10 @@ if (action === "reset-player-password") {
   const newPassword = window.prompt(`Nova senha para ${player.name}:`);
   if (!newPassword) return;
 
-  const adminSecret = window.prompt("Informe o segredo admin da recuperação de senha:");
-  if (!adminSecret) return;
-
   setActionBusy(trigger, "Resetando...");
 
   try {
-    const result = await resetPlayerPasswordOperation({ player, newPassword, adminSecret });
+    const result = await resetPlayerPasswordOperation({ player, newPassword });
     clearActionBusy(trigger);
 
     if (!result.ok) {
