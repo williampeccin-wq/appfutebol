@@ -117,8 +117,12 @@ Deno.serve(async (req) => {
   if (!caller.club_id) return json({ ok: false, error: "caller_without_club" }, 403);
 
   // --- 3) O alvo é do MESMO clube? ---
+  // ATENÇÃO: `players` NÃO tem colunas `name` nem `phone` — o cadastro inteiro
+  // mora no jsonb `data`. As colunas reais são id, auth_user_id, club_id,
+  // is_admin, data (e updated_at). Pedir `phone` aqui devolvia
+  // "column phone does not exist" e derrubava as duas operações.
   const { data: target, error: targetErr } = await admin
-    .from("players").select("id, club_id, auth_user_id, phone, data").eq("id", playerId).maybeSingle();
+    .from("players").select("id, club_id, auth_user_id, data").eq("id", playerId).maybeSingle();
   if (targetErr) {
     console.error("[admin-reset-password] lookup target:", targetErr.message);
     return json({ ok: false, error: "lookup_failed" }, 500);
@@ -147,7 +151,8 @@ Deno.serve(async (req) => {
   if (mode === "create_access") {
     if (target.auth_user_id) return json({ ok: false, error: "player_already_has_access" }, 409);
 
-    const phone = normalizePhone(body.phone || target.phone);
+    const alvoData = (target.data && typeof target.data === "object" ? target.data : {}) as Record<string, unknown>;
+    const phone = normalizePhone(body.phone || alvoData.login_phone || alvoData.phone);
     if (phone.length < 10 || phone.length > 11) {
       return json({ ok: false, error: "invalid_player_phone" }, 400);
     }
@@ -190,7 +195,7 @@ Deno.serve(async (req) => {
     // Vincula. MERGE no jsonb: a versão do Harmonia substituía `data` inteiro
     // por quatro campos, apagando o resto do cadastro do jogador.
     const mergedData = {
-      ...(target.data && typeof target.data === "object" ? target.data : {}),
+      ...alvoData,
       auth_user_id: authUserId,
       email,
       login_phone: phone,
