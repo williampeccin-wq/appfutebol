@@ -247,3 +247,35 @@ Falta gerar as **capturas de tela** do telefone. O ícone 512×512
 (`appfutebol_run/img/icon-512.png`) e o feature graphic 1024×500
 (`appfutebol_run/img/play-feature-graphic.png`) já existem e estão no tamanho
 certo.
+
+## Enviado para análise — 18/11/2026, 16:21
+
+Versão `1 (1.0.0)` enviada para a faixa de **produção**, lançamento completo,
+país **Brasil**. Doze mudanças foram para análise de uma vez: a versão, a ficha
+da loja, classificação indicativa, público-alvo, política de privacidade,
+declaração de anúncios, segurança dos dados, apps de saúde, status de
+comerciante, categoria do app, detalhes do login e recursos financeiros.
+
+Nenhuma etapa de teste fechado foi exigida — que era o motivo de existir a conta
+de organização.
+
+O que foi resolvido no mesmo dia e sustentou o envio:
+
+- `assetlinks.json` com o pacote novo e o SHA-256 da chave de assinatura do
+  Google, validado pela API de Digital Asset Links
+- clube de demonstração anonimizado (`ADHOC_anonimiza_clube_demo.sql`), porque o
+  revisor entra nele e a ficha é pública
+- seis capturas geradas automaticamente (`scripts/capturar-telas-loja.mjs`)
+- credencial do revisor (`48900000001`) testada de verdade: o próprio script de
+  captura entrou com ela e navegou por todas as abas
+- política de privacidade e termos deixaram de se declarar "rascunho"
+- passkey ligada em produção (v1.216.0), com registro e login verificados
+
+### Ainda em aberto
+
+- **Instalar pelo teste interno e conferir que abre sem barra de endereço.** As
+  duas pontas do `assetlinks` conferem, mas a prova no aparelho não foi feita —
+  o Android do dono não liga. Um erro aqui se corrige publicando arquivo no
+  site, sem nova versão no Play.
+- **Verificação de Desenvolvedor Android** para `br.app.convocados.android`: o
+  prazo anotado (30/09/2026) já passou e o pacote mudou de nome. Conferir.
