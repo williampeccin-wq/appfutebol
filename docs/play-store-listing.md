@@ -4,7 +4,7 @@
 
 ## Identidade
 - **Nome do app:** `Convocados` *(máx. 30 caracteres)*
-- **Package name:** `br.app.convocados` *(definitivo — casa com o assetlinks.json)*
+- **Package name:** `br.app.convocados.android` *(conta de organização 7282005806719666194, app ID 4974977379650534239; registrado no assetlinks.json em 18/11/2026 com o SHA-256 `82:81:07:CA:…`). O pacote antigo `br.app.convocados` era da conta pessoal e continua no assetlinks, mas não é mais o que vai para a loja.*
 - **Categoria:** Esportes
 - **Tags/target:** futebol amador, pelada, organização de grupo
 - **E-mail de contato:** `williampeccin@gmail.com`

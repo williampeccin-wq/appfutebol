@@ -209,3 +209,41 @@ duas contas sem trocar de login.
 - URL de rede social no campo de site: "You can't verify social media profile URLs."
 - Confundir isso com o passo 9 do plano (Verificação de Desenvolvedor Android,
   prazo 30/09/2026) — são coisas diferentes.
+
+## Feito — estado em 18/11/2026
+
+A conta de organização está ativa e o app foi criado nela.
+
+| Item | Valor |
+|---|---|
+| ID da conta de organização | `7282005806719666194` |
+| ID do app | `4974977379650534239` |
+| Pacote | `br.app.convocados.android` |
+| SHA-256 da chave de **assinatura do app** (gerada pelo Google) | `82:81:07:CA:00:20:0E:BA:2B:7F:A6:BA:07:84:C7:65:B8:EB:32:18:B3:E8:98:59:E4:68:D4:C9:7B:42:DB:BF` |
+| SHA-256 da chave de **upload** (nossa, no keystore) | começa em `6D:68:` — não é essa que vai no assetlinks |
+| Primeiro AAB | versionCode 1, versionName 1.0.0, minSdk 24, targetSdk 36 |
+| Faixa | teste interno, lista de testadores "William Peccin" (1 usuário) |
+
+O `assetlinks.json` e o `manifest.webmanifest` do `main` já registram o pacote
+novo (commit `80e4fc4`, 18/11/2026), validado pela API de Digital Asset Links do
+Google.
+
+### O que a conta de organização dispensa
+
+O `play-producao-respostas.md` — 28 KB de respostas para o formulário de
+"solicitar acesso de produção" — era exigência da conta **pessoal**. Numa conta
+de organização a faixa de produção aparece direto no painel do app, sem teste
+fechado, sem 12 testadores por 14 dias e sem formulário. O documento fica como
+histórico.
+
+### O que falta
+
+As "tarefas de configuração" do painel do app: detalhes da loja, classificação
+indicativa, público-alvo, segurança dos dados, anúncios, política de privacidade
+e **acesso ao app** (credencial do revisor — o login é por **telefone**, não
+e-mail; foi o que derrubou duas das três reprovações).
+
+Falta gerar as **capturas de tela** do telefone. O ícone 512×512
+(`appfutebol_run/img/icon-512.png`) e o feature graphic 1024×500
+(`appfutebol_run/img/play-feature-graphic.png`) já existem e estão no tamanho
+certo.
