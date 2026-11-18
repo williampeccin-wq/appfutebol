@@ -9,5 +9,15 @@
         "4E:7F:CA:C3:56:13:9F:B3:CC:88:D1:66:AB:1C:48:20:52:8C:96:07:92:48:89:33:FD:A7:5B:F7:F2:03:56:3C"
       ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.app.convocados.android",
+      "sha256_cert_fingerprints": [
+        "82:81:07:CA:00:20:0E:BA:2B:7F:A6:BA:07:84:C7:65:B8:EB:32:18:B3:E8:98:59:E4:68:D4:C9:7B:42:DB:BF"
+      ]
+    }
   }
 ]
