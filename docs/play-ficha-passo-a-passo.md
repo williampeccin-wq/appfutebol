@@ -26,13 +26,15 @@ faz a validação do Google reclamar.
 
 ## 2 · Acesso ao app  ⚠️ o item que já derrubou duas análises
 
-Mesma tela, aparece como **"Detalhes do login"**.
+Mesma tela, aparece como **"Detalhes do login"** — a própria página avisa que
+antes se chamava "Acesso ao app".
 
-Escolha **"Todas ou algumas funcionalidades são restritas"** e cadastre:
+A pergunta é **"Alguma parte do seu app é restrita?"**. Responda **Sim** (o app
+exige login e o conteúdo é por clube). Aí surge o botão de adicionar instruções:
 
 | Campo | Valor |
 |---|---|
-| Nome das instruções | `Login de demonstração` |
+| Nome | `Login de demonstração` |
 | Nome de usuário | `48900000001` |
 | Senha | `123456` |
 
