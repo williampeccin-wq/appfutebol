@@ -9,5 +9,5 @@ window.HARMONIA_SUPABASE = {
   stateKey: 'default',
   environment: 'prod-supabase',
   votingEnabled: true,
-  passkeyEnabled: false
+  passkeyEnabled: true
 };

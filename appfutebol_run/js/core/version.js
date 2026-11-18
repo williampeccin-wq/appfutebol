@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v1.215.0-upsell-sem-link';
+export const APP_VERSION = 'v1.216.0-passkey-ligada';
