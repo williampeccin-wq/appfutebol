@@ -789,6 +789,18 @@ O template de capa é editável: troque etiqueta, duas linhas de título e apoio
 artes se redesenham — com atalhos prontos para os ganchos dos R1–R8. O story e o template
 trazem guias de área segura; **desligue as guias antes de capturar.**
 
+**Para publicar, não capture a tela: gere o PNG.** As artes têm fonte versionada em
+`marketing/instagram/` e saem no tamanho exato com um comando:
+
+```bash
+node marketing/instagram/render.mjs
+```
+
+São 10 PNGs (o post, as 5 telas do carrossel, os 2 stories, a capa de reel e o card de
+feed). Mudou uma legenda ou um título? Muda em `marketing/instagram/pecas.mjs` e roda de
+novo. O combinado de quem publica e quem aprova está em
+[marketing/instagram/README.md](../marketing/instagram/README.md).
+
 Este plano também está publicado como página: <https://claude.ai/artifact/EzpnuCXwxBfht95bXQCbMB>
 
 **Identidade (obrigatória em qualquer arte nova):** navy `#0d1f3c` (fundo), `#1a3a6e`
