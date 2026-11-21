@@ -30,7 +30,7 @@ appfutebol_run/          o app inteiro (é isso que o Pages publica)
 tests/*.regression.mjs   suíte de regressão (node --test, sem dependência)
 supabase/                migrations, edge functions e SQL avulso (ADHOC_*, CRON_*)
 docs/                    decisões de produto e design
-landing/                 landing page, publicada à parte
+landing/                 landing page, publicada à parte em www.convocados.app.br
 ```
 
 A migração do markup para `js/modules/` está **pela metade**: home, jogo da semana e
@@ -77,17 +77,25 @@ no fim:
 fix(players): a linha volta a ser uma só, com o nome ganhando a largura (v1.191.0)
 ```
 
-## Deploy: duas branches, dois destinos
+## Deploy: duas branches, três destinos
 
-| Branch | Vai para | O quê |
-|---|---|---|
-| `main` | https://convocados.app.br | o produto, o que vai para o Play |
-| `production` | https://harmoniafc-prod.pages.dev | Harmonia FC, o clube real |
+| Branch | Diretório | Vai para | O quê |
+|---|---|---|---|
+| `main` | `appfutebol_run/` | https://convocados.app.br | o produto, o que vai para o Play |
+| `main` | `landing/` | https://www.convocados.app.br | a landing, projeto separado no Cloudflare |
+| `production` | `appfutebol_run/` | https://harmoniafc-prod.pages.dev | Harmonia FC, o clube real |
+
+Repare no **`www`**: a landing e o app são dois projetos do Cloudflare que saem da
+**mesma branch**, separados só por subdomínio. Sem o `www` você cai no app.
 
 Push para a branch → o Cloudflare publica sozinho. Conferir se subiu:
 
 ```bash
 curl -s https://convocados.app.br/js/core/version.js
+```
+
+```bash
+curl -s https://www.convocados.app.br/ | grep -o '<title>[^<]*</title>'
 ```
 
 **As branches divergiram.** A `production` tem commits específicos do Harmonia que
