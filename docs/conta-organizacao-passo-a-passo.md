@@ -271,11 +271,34 @@ O que foi resolvido no mesmo dia e sustentou o envio:
 - política de privacidade e termos deixaram de se declarar "rascunho"
 - passkey ligada em produção (v1.216.0), com registro e login verificados
 
+## Aprovado e publicado — 21/11/2026
+
+O Convocados saiu da análise e está **no ar na Play Store**, três dias depois do
+envio (18/11, 16:20 → 21/11, manhã). Primeira análise de conta nova costuma levar
+mais que isso.
+
+```
+https://play.google.com/store/apps/details?id=br.app.convocados.android
+```
+
+A página pública abre com a ficha montada, botão Instalar e classificação Livre,
+sob o desenvolvedor `7282005806719666194`.
+
+O IARC mandou no mesmo dia o **Live Rating Notice**, com o Global Rating ID
+`9d56706d-ff38-8c0c-8750-3fc7de776104`. É aviso automático: a classificação
+gerada pelo questionário passou a valer. Guardar esse ID — é o que outra loja
+pede, se um dia o app for para uma.
+
+Atenção à cláusula 5 do aviso: atualização que **mude uma resposta do
+questionário** (passar a ter compra dentro do app, abrir conteúdo entre clubes,
+etc.) obriga a refazê-lo. Atualização que não mude resposta nenhuma não exige
+nada.
+
 ### Ainda em aberto
 
-- **Instalar pelo teste interno e conferir que abre sem barra de endereço.** As
-  duas pontas do `assetlinks` conferem, mas a prova no aparelho não foi feita —
-  o Android do dono não liga. Um erro aqui se corrige publicando arquivo no
-  site, sem nova versão no Play.
+- **Instalar e conferir que abre sem barra de endereço.** Agora dá para baixar
+  direto da loja, sem o link de teste. As duas pontas do `assetlinks`
+  conferem, mas a prova no aparelho não foi feita — o Android do dono não liga. Um erro aqui se corrige publicando
+  arquivo no site, sem nova versão no Play.
 - **Verificação de Desenvolvedor Android** para `br.app.convocados.android`: o
   prazo anotado (30/09/2026) já passou e o pacote mudou de nome. Conferir.
