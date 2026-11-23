@@ -166,6 +166,42 @@ apagar nada — conta inelegível para recomendação perde o recurso
 
 ## 4. Calendário editorial — 8 semanas
 
+> ### ⏸️ Produção de vídeo parada — revisão de 23/11/2026
+>
+> **O que aconteceu.** Os oito roteiros da seção 5 pressupõem alguém gravando: rosto na
+> câmera em três deles, narração em todos. Isso não é viável para quem toca o projeto, e
+> a descoberta veio no primeiro dia de calendário, não antes.
+>
+> **O que NÃO mudou.** Post único, carrossel e stories seguem exatamente como estavam —
+> são produzidos inteiros aqui e publicados pelo Upload-Post sem gravação nenhuma. As
+> peças de 23/11 e 25/11 já estão agendadas.
+>
+> **O que mudou.** Todo reel saiu do calendário **sem data de volta**. Semanas 1 e 2 foram
+> reescritas abaixo preservando os ganchos e trocando o formato. As semanas 3 a 8 ficam
+> como estão, porque dependem da decisão que ainda não foi tomada.
+>
+> #### As três saídas, e o que cada uma custa
+>
+> | Saída | O que exige | O que custa |
+> |---|---|---|
+> | **Voz nativa do editor de Reels** | Escrever o texto no app e aplicar a voz automática. Zero gravação | Nada de credibilidade: o público lê aquela voz como convenção de criador, não como fraude |
+> | **Sem voz** — texto na tela + faixa em alta | Só escolher o áudio no editor | Perde a indexação do áudio falado (seção 5). Formato nativo e muito usado |
+> | **Voz sintética de fora** (`say` do macOS, outras) | Nada | **Não recomendada.** Soa como conta de spam, e contradiz no primeiro segundo a promessa de que aqui tem gente |
+>
+> #### O que destrava quase tudo
+>
+> Uma **gravação de tela do app no celular**, de uns 60 segundos: abrir a convocação,
+> tocar em confirmar, ver a vaga mudar, mostrar a fila de espera. Não é atuar, é usar o
+> app. Desse único clipe saem as cenas de produto do **R2, R3 e R6** — três dos oito
+> roteiros. O que continua precisando de câmera na mão é o pilar 3 (cenas de campo) e o
+> R7, que é a peça de rosto e não tem substituto.
+>
+> #### Enquanto não houver decisão
+>
+> A grade é de carrossel e card. Funciona, converte quem chega, mas **não descobre público
+> novo na mesma velocidade** — ver o custo anotado na semana 2. A compensação de curto
+> prazo é a ativação da rede pessoal, não mais volume de post.
+
 Legenda de pilar: **1** dor do admin · **2** o app resolvendo · **3** resenha ·
 **4** transparência · **5** dica de admin.
 "R1…R8" remetem aos roteiros da seção 5. CTA primário em **negrito**.
@@ -174,23 +210,43 @@ Legenda de pilar: **1** dor do admin · **2** o app resolvendo · **3** resenha 
 
 | Data | Formato | Pilar | Gancho | CTA |
 |---|---|---|---|---|
-| Seg 23/11, 19h | Post único 1080×1080 (arte "Já está no Google Play") | 4 | "Tá no ar. O Convocados saiu do nosso grupo e foi pra loja." | **Link na bio → baixar.** Secundário: "marca o admin da sua pelada aqui 👇" |
-| Ter 24/11, 19h | **Reel** R1 (30–45s) | 1 | "Sua pelada ainda é organizada numa planilha?" | **Manda pro mano que organiza a sua.** |
-| Qua 25/11, 19h | **Carrossel** 1080×1350, 5 telas (arte do PIX com IA) | 2 | "Ele manda o comprovante. O app lê e dá baixa. Você não confere nada." | **Salva** e manda pro tesoureiro do grupo |
-| Qui 26/11, 9h | **Reel** R2 (30–45s) | 2 | "Isso é um comprovante de PIX. Olha o que o app faz com ele." | Link na bio |
-| Dom 29/11 | Stories: sequência **A** (bastidor do lançamento, 4 cards) | 4 | — | Enquete + caixinha de pergunta |
+| Seg 23/11, 19h | Post único 1080×1080 (arte "Já está no Google Play") · **agendado** | 4 | "Tá no ar. O Convocados saiu do nosso grupo e foi pra loja." | **Link na bio → baixar.** Secundário: "marca o admin da sua pelada aqui 👇" |
+| ~~Ter 24/11, 19h~~ | ~~**Reel** R1~~ · **adiado, sem data** | 1 | "Sua pelada ainda é organizada numa planilha?" | — |
+| Qua 25/11, 19h | **Carrossel** 1080×1350, 5 telas (arte do PIX com IA) · **agendado** | 2 | "Ele manda o comprovante. O app lê e dá baixa. Você não confere nada." | **Salva** e manda pro tesoureiro do grupo |
+| ~~Qui 26/11, 9h~~ | ~~**Reel** R2~~ · **adiado, sem data** | 2 | "Isso é um comprovante de PIX. Olha o que o app faz com ele." | — |
+| Dom 29/11 | Stories: sequência **A** (bastidor do lançamento) | 4 | — | Enquete + caixinha de pergunta |
 
-> Semana 1 tem 4 peças de feed em vez de 3 — é a única. Só funciona porque os reels
-> R1 e R2 foram gravados no fim de semana anterior.
+> **Revisado em 23/11/2026.** A semana de lançamento sai com **duas peças de feed**, não
+> quatro. As duas que ficaram são as que não dependem de gravar nada, e as duas que
+> caíram são as duas que dependiam. Isso não é um atraso de um dia: é a produção de vídeo
+> inteira parada até a decisão da caixa abaixo.
+>
+> **Por que não preenchi os buracos com card:** inventar duas peças estáticas só pra
+> tapar terça e quinta gasta gancho bom em formato fraco. O R1 é a peça mais mandável do
+> plano inteiro; vira card e perde justamente o que fazia ele ser mandado. Melhor a
+> semana com duas peças fortes do que quatro mornas — a seção 3 já dizia que consistência
+> ganha de volume.
 
 ### Semana 2 — 30/11 a 06/12
 
 | Data | Formato | Pilar | Gancho | CTA |
 |---|---|---|---|---|
-| Ter 01/12, 19h | **Reel** R3 (30–40s) | 2 | "Sorteio de time sem ninguém reclamar. 20 segundos." | **Manda no grupo da pelada** |
+| Ter 01/12, 19h | **Carrossel** 5 telas — "23h47: a noite de quem organiza" (o gancho do R4, em carrossel) | 1 | "23h47. 'Quem confirmou pra quarta?'" | **Manda pro admin do seu grupo** |
 | Qua 02/12, 19h | **Carrossel** 6 telas — "O que é grátis no Convocados" | 4 | "Preço na cara, sem enrolação." | **Salva.** Link na bio |
-| Qui 03/12, 9h | **Reel** R4 (40–50s) | 1 | "23h47. 'Quem confirmou pra quarta?'" | **Manda pro admin do seu grupo** |
+| Qui 03/12, 9h | **Post único** — "Sorteio de times em 20 segundos" (o gancho do R3, em card) | 2 | "Sorteio de time sem ninguém reclamar." | **Manda no grupo da pelada** |
 | Ter + Qui | Stories: sequência **B** (antes/depois da planilha) | 1 | — | Enquete "quantos você tem no grupo?" |
+
+> **Revisado em 23/11/2026.** Os reels R3 e R4 saíram; no lugar entraram um carrossel e um
+> card, que eu produzo inteiros. **Os ganchos foram preservados** — "23h47" e o sorteio
+> continuam sendo o assunto da semana, só mudaram de formato. Quando o vídeo destravar,
+> esses mesmos ganchos viram reel e o carrossel vira o remix.
+>
+> **O custo disso, dito na cara:** a seção 1 mostra que **abaixo de 50 mil seguidores o
+> reel tem a melhor taxa de alcance**, e é o formato que sai da bolha. Carrossel ganha em
+> salvamento e profundidade, não em descoberta. Uma grade só de estáticos cresce, mas
+> cresce devagar e principalmente para quem já chegou por outro caminho — no caso, pela
+> sua divulgação pessoal. **Isso torna a ativação da rede (abaixo) não um complemento, e
+> sim o motor da fase.**
 
 ### Semana 3 — 07 a 13/12
 
