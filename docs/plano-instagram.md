@@ -128,6 +128,22 @@ verdade se performar ([Plumefy](https://plumefy.com/blog/instagram-trial-reels-g
 dias achou 2,3× mais alcance de não seguidores e 0,6× o engajamento — amostra de uma
 conta, não evidência ([CreatorHouse](https://creatorhouse.app/blog/trial-reels-14-day-test-2026)).
 
+> ⚠️ **O recurso exige 200 seguidores — e a @convocados.app começou do zero.**
+> Confirmado no próprio app em 23/11/2026, em *Configurações → Tipo de perfil e
+> ferramentas → Tenha acesso a mais ferramentas*: "Reels de teste — quando você alcançar
+> 200 seguidores". **Enquanto o número não cair, todo reel de teste deste plano está
+> indisponível**, e as linhas das semanas 3 e 7 ficam pendentes.
+>
+> **O substituto, até lá:** publique o gancho alternativo como **reel normal**, na terça,
+> e compare o **alcance de não seguidores** com o da terça anterior. É mais sujo — o
+> público não é 100% frio e a peça fica na grade — mas responde a mesma pergunta, que é
+> "esse gancho segura os 3 primeiros segundos de quem não me conhece?". Se o gancho
+> fracassar, arquive o reel em vez de apagar; apagar não devolve o alcance e suja menos
+> que parece.
+>
+> Confira o número na mesma tela antes da semana 3. Se tiver passado de 200, o plano
+> original volta a valer sem mudança nenhuma.
+
 **Uso neste plano:** da semana 3 em diante, **um reel de teste por semana**, só com
 ganchos novos do pilar 1 ou 3. O que passar vira peça de feed na semana seguinte. Se os
 testes ficarem em zero visualização, confira **Configurações → Status da conta** antes de
@@ -183,7 +199,7 @@ Legenda de pilar: **1** dor do admin · **2** o app resolvendo · **3** resenha 
 | Ter 08/12, 19h | **Reel** R5 (25–35s) | 3 | "Os 5 tipos de jogador que toda pelada tem." | **Marca o número 3 da sua pelada** |
 | Qua 09/12, 19h | **Carrossel** 5 telas — "Como acabar com o caloteiro do grupo (3 jeitos, e nenhum é brigar)" | 5 | "Ninguém gosta de cobrar amigo." | **Salva** |
 | Qui 10/12, 9h | **Reel** R6 (30–40s) | 2 | "Lotou a pelada. E os 4 que ficaram de fora?" | Link na bio |
-| — | **1º reel de teste**: gancho alternativo do R5 | 3 | — | — |
+| — | **1º reel de teste**: gancho alternativo do R5 — *só com 200+ seguidores; senão vai como reel normal na terça (seção 3)* | 3 | — | — |
 | Ter/Qui/Dom | Stories: sequência **C** (prova social: primeiros clubes) | 4 | — | **Toque no link** |
 
 ### Semana 4 — 14 a 20/12 · *primeira revisão de números*
@@ -222,7 +238,7 @@ Legenda de pilar: **1** dor do admin · **2** o app resolvendo · **3** resenha 
 | Ter 05/01, 19h | **Reel** novo — "Como voltar com a pelada em janeiro sem perder metade do grupo" | 1 | "Janeiro é o mês que mais mata pelada. Não é o calor." | **Manda pro admin** |
 | Qua 06/01, 19h | **Carrossel** 6 telas — "Monta sua pelada do zero em 5 minutos" (passo a passo de tela) | 2 | "Do zero ao primeiro jogo marcado: 5 telas." | **Salva.** Link na bio |
 | Qui 07/01, 9h | **Reel** — remix do R2 (PIX com IA) com gancho novo | 2 | "A mensalidade de janeiro você vai conferir na mão de novo?" | Link na bio |
-| — | **Reel de teste**: gancho de janeiro | 1 | — | — |
+| — | **Reel de teste**: gancho de janeiro — *só com 200+ seguidores; senão vai como reel normal (seção 3)* | 1 | — | — |
 
 > **Janeiro é a semana mais importante das oito.** É quando grupo de pelada reinicia,
 > troca de quadra, redefine mensalidade e o admin está receptivo a trocar de método.
@@ -693,7 +709,7 @@ visualização não entram na planilha** — são vaidade para este objetivo. Um
 
 | Trava | Diagnóstico | Ação |
 |---|---|---|
-| **Alcance de não seguidores baixo** (<30% no reel) | O gancho não segura os 3s, ou o tema é interno demais | Refaça só o gancho — mesma peça, abertura nova. Use **reel de teste** para queimar gancho com público frio sem sujar o perfil. Priorize pilar 1 e 3; o 2 e o 4 quase não saem da bolha |
+| **Alcance de não seguidores baixo** (<30% no reel) | O gancho não segura os 3s, ou o tema é interno demais | Refaça só o gancho — mesma peça, abertura nova. Use **reel de teste** para queimar gancho com público frio sem sujar o perfil (precisa de 200 seguidores — seção 3). Priorize pilar 1 e 3; o 2 e o 4 quase não saem da bolha |
 | **Alcance ok, envios baixos** | Não há destinatário óbvio | Reescreva o CTA: nomeie a pessoa ("manda pro mano que organiza", "marca o número 3"). Peça **um** envio, não três coisas |
 | **Envios ok, toques no link baixos** | Não há o que fazer depois de rir | Insira o CTA de link no **meio** do reel, não só no fim. Link direto da Play na bio, sem agregador. Confira que os destaques respondem "e agora?" |
 | **Toques ok, instalações baixas** | O problema é a ficha da loja, não o Instagram | Play Console: compare visitantes × instalações. Se cair aí, troque as **capturas de tela** (as duas primeiras decidem) e a descrição curta. Veja [play-store-listing.md](play-store-listing.md) |
