@@ -51,10 +51,10 @@ O sorteio de times e a confirmação de presença são de graça.
 };
 
 // ------------------------------------------------------------ 2 · carrossel PIX
-const slide = (n, badge, corpo, mod = '') => `
+const slide = (n, badge, corpo, mod = '', total = 5) => `
 <div class="art slide ${mod}">
   <div class="ring"></div>
-  ${bolinhas(n - 1)}
+  ${bolinhas(n - 1, total)}
   ${olho(String(n).padStart(2, '0'), badge)}
   ${corpo}
   ${ASSINATURA}
@@ -216,5 +216,183 @@ const template = (t) => [
   },
 ];
 
+// ------------------------------------------------- 5 · carrossel "23h47"
+// Semana 2, ter 01/12, 19h · pilar 1. É o gancho do reel R4 em carrossel, porque
+// a produção de vídeo está parada (plano, seção 4).
+const noite = [
+  {
+    id: '05-noite-1', nome: '23h47 · capa', w: 1080, h: 1350,
+    quando: 'Semana 2 · ter 01/12, 19h · pilar 1',
+    legenda: `Quem organiza pelada conhece o 23h47: contando quem confirmou no grupo do zap, no meio de 87 mensagens não lidas.
+
+Confirmação de presença, vaga de goleiro separada e fila de espera automática. Você abre e já está contado.
+
+Isso é de graça no Convocados.
+
+👉 Link na bio.
+📲 Manda pro admin do seu grupo. Ele tá acordado agora fazendo isso.
+
+#pelada #futebolamador #organizarpelada #appdepelada`,
+    html: slide(1, '23:47', `
+      <h2>23:47.<br><em>E você ainda<br>tá contando.</em></h2>
+      <p class="sub">A noite de quem organiza a pelada.</p>
+      <div class="swipe"><span>arrasta</span><span class="ar">→</span></div>`, 'capa'),
+  },
+  {
+    id: '05-noite-2', nome: '23h47 · o grupo', w: 1080, h: 1350,
+    html: slide(2, 'O grupo do zap', `
+      <h2>87 mensagens.<br><em>Nenhuma lista.</em></h2>
+      <p class="sub wide">“Vou”, “acho que vou”, “se der eu vou”. Conta isso aí.</p>
+      <div class="stack">
+        <div class="rec msg a"><div class="t">22:14</div><div class="v">vou</div></div>
+        <div class="rec msg b"><div class="t">23:02</div><div class="v">acho que vou</div></div>
+        <div class="rec msg c"><div class="t">23:41</div><div class="v">se der eu vou</div></div>
+        <span class="count">+84</span>
+      </div>`),
+  },
+  {
+    id: '05-noite-3', nome: '23h47 · o goleiro', w: 1080, h: 1350,
+    html: slide(3, 'A conta não fecha', `
+      <h2>E o goleiro?<br><em>Confirmou dois?</em></h2>
+      <div class="flow">
+        <div class="fb"><div class="k">VOCÊ CONTOU</div><div class="v">14 confirmados no grupo</div></div>
+        <span class="fa">→</span>
+        <div class="fb"><div class="k">MAS</div><div class="v">dois zagueiros e nenhum goleiro</div></div>
+      </div>
+      <p class="sub wide">Rolar o grupo não separa quem joga na linha de quem vai no gol.</p>`),
+  },
+  {
+    id: '05-noite-4', nome: '23h47 · o app', w: 1080, h: 1350,
+    html: slide(4, 'No Convocados', `
+      <h2>Ou você abre<br><em>e já tá contado.</em></h2>
+      <div class="phone">
+        <div class="top"><i></i></div>
+        <div class="bd">
+          <p class="ph-t">Convocação · quarta</p>
+          <div class="row hl"><span class="av">L</span><span class="nmz">Linha</span><span class="st pago">12/14</span></div>
+          <div class="row hl"><span class="av">G</span><span class="nmz">Goleiro</span><span class="st pago">2/2</span></div>
+          <div class="row"><span class="av">F</span><span class="nmz">Fila de espera</span><span class="st pend">4 NA FILA</span></div>
+          <div class="btn">Confirmar presença</div>
+        </div>
+      </div>
+      <p class="sub wide">Linha e gol contados separado. Sem rolar nada.</p>`),
+  },
+  {
+    id: '05-noite-5', nome: '23h47 · CTA', w: 1080, h: 1350,
+    html: slide(5, 'Convocados', `
+      <h2>Lotou?<br><em>A fila corre só.</em></h2>
+      <div class="badges">
+        <div class="bdg"><span class="ck">✓</span>Presença num toque</div>
+        <div class="bdg"><span class="ck">✓</span>Fila por ordem de chegada</div>
+        <div class="bdg"><span class="ck">✓</span>Desistiu um, o próximo é avisado</div>
+      </div>
+      <div class="freebox">A <b>confirmação de presença</b>, a <b>fila de espera</b> e o <b>sorteio de times</b> são, e sempre vão ser, <b>de graça</b>.</div>
+      <div class="ctaB"><span><b>Baixe no Google Play</b><small>convocados.app.br · só Brasil</small></span></div>`),
+  },
+];
+
+// --------------------------------------------- 6 · carrossel "O que é grátis"
+// Semana 2, qua 02/12, 19h · pilar 4. A peça que mais fala de preço do plano
+// inteiro — cada palavra aqui passou pela seção 10. Nada diz que o PIX com IA é
+// grátis; a fala é "hoje tá liberado pra quem está começando com a gente".
+const gratis = [
+  {
+    id: '06-gratis-1', nome: 'Grátis · capa', w: 1080, h: 1350,
+    quando: 'Semana 2 · qua 02/12, 19h · pilar 4',
+    legenda: `O que é de graça num app de pelada, e o que não é. Preço na cara, sem precisar chamar ninguém no WhatsApp pra descobrir.
+
+Organizar o jogo é de graça: confirmar presença, sortear os times, fila de espera e aprovar quem entra no clube. Isso não vira pago.
+
+O Pro é R$39,90 por mês pelo clube todo — dá menos de uma água por jogador.
+
+E preço combinado é preço mantido. Se um dia mudar, você fica sabendo antes, aqui, e não numa fatura.
+
+👉 Link na bio.
+💾 Salva pra quando for escolher.
+
+#pelada #futebolamador #appdepelada #organizarpelada`,
+    html: slide(1, 'Preço na cara', `
+      <h2>O que é<br>de graça <em>e o<br>que não é.</em></h2>
+      <p class="sub">Sem chamar ninguém no WhatsApp pra descobrir.</p>
+      <div class="swipe"><span>arrasta</span><span class="ar">→</span></div>`, 'capa', 6),
+  },
+  {
+    id: '06-gratis-2', nome: 'Grátis · o jogo', w: 1080, h: 1350,
+    html: slide(2, 'De graça, sempre', `
+      <h2>Organizar<br><em>o jogo.</em></h2>
+      <div class="badges">
+        <div class="bdg"><span class="ck">✓</span>Confirmar presença</div>
+        <div class="bdg"><span class="ck">✓</span>Sorteio de times</div>
+        <div class="bdg"><span class="ck">✓</span>Fila de espera</div>
+        <div class="bdg"><span class="ck">✓</span>Aprovar quem entra no clube</div>
+      </div>
+      <p class="sub wide">Isso não vira pago depois.</p>`, '', 6),
+  },
+  {
+    id: '06-gratis-3', nome: 'Grátis · o Pro', w: 1080, h: 1350,
+    html: slide(3, 'O que o Pro abre', `
+      <h2>A gestão<br><em>do clube.</em></h2>
+      <div class="badges">
+        <div class="bdg"><span class="ck pro">★</span>PIX com IA: o comprovante dá baixa sozinho</div>
+        <div class="bdg"><span class="ck pro">★</span>Lembrete de quem está atrasado</div>
+        <div class="bdg"><span class="ck pro">★</span>Campeonato completo e sorteio por nota</div>
+      </div>`, '', 6),
+  },
+  {
+    id: '06-gratis-4', nome: 'Grátis · o preço', w: 1080, h: 1350,
+    html: slide(4, 'Quanto custa', `
+      <h2>R$ 39,90<br><em>o clube todo.</em></h2>
+      <p class="sub wide">Por mês, não por jogador. Num grupo de 20, dá menos de uma água por pessoa — e dá pra ratear.</p>
+      <div class="flow">
+        <div class="fb"><div class="k">VOCÊ PAGA</div><div class="v">R$ 39,90 pelo clube</div></div>
+        <span class="fa">→</span>
+        <div class="fb"><div class="k">NÃO PAGA</div><div class="v">por cada jogador que entra</div></div>
+      </div>`, '', 6),
+  },
+  {
+    id: '06-gratis-5', nome: 'Grátis · a promessa', w: 1080, h: 1350,
+    html: slide(5, 'O combinado', `
+      <h2>Se o preço mudar,<br><em>você sabe antes.</em></h2>
+      <p class="sub wide">Preço combinado é preço mantido. Se um dia mudar, você fica sabendo aqui, com antecedência — nunca por uma surpresa na fatura.</p>
+      <div class="freebox">O <b>PIX com IA</b> faz parte do Pro. Hoje ele tá liberado pra quem está começando com a gente.</div>`, 'folga', 6),
+  },
+  {
+    id: '06-gratis-6', nome: 'Grátis · CTA', w: 1080, h: 1350,
+    html: slide(6, 'Convocados', `
+      <h2>Testa com um<br><em>mês de jogo.</em></h2>
+      <p class="sub wide">Se faltar alguma coisa, me fala nos comentários. Eu respondo e eu conserto.</p>
+      <div class="ctaB"><span><b>Baixe no Google Play</b><small>convocados.app.br · só Brasil</small></span></div>`, '', 6),
+  },
+];
+
+// ------------------------------------------------- 7 · card do sorteio
+// Semana 2, qui 03/12, 9h · pilar 2. Gancho do reel R3 em card.
+const sorteio = {
+  id: '07-sorteio', nome: 'Card · sorteio de times', w: 1080, h: 1080,
+  quando: 'Semana 2 · qui 03/12, 9h · pilar 2',
+  legenda: `Sortear time de pelada sem ninguém reclamar: o app equilibra por posição, conta o goleiro separado e respeita dupla fixa. Vinte segundos.
+
+Depois joga os times prontos no grupo do zap.
+
+O sorteio de times no Convocados é, e sempre vai ser, de graça.
+
+👉 Link na bio.
+⚽ Manda no grupo da sua pelada.
+
+#pelada #sorteiodetimes #futebolamador #appdepelada`,
+  html: `
+<div class="art card">
+  <div class="ring"></div>
+  ${pilula('Vinte segundos')}
+  <h2>Sorteio de times<br><em>sem reclamação.</em></h2>
+  <p class="kick">Equilibrado por posição, goleiro na conta, dupla fixa respeitada — e pronto no grupo do zap.</p>
+  ${ASSINATURA}
+  ${BARRA}
+</div>`,
+};
+
 export const LINK_LOJA = LOJA;
-export const PECAS = [lancamento, ...carrossel, ...stories, ...template(TEMPLATE)];
+export const PECAS = [
+  lancamento, ...carrossel, ...stories, ...template(TEMPLATE),
+  ...noite, ...gratis, sorteio,
+];

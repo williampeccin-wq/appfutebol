@@ -74,6 +74,9 @@ h2 em,h1 em{font-style:normal;color:var(--gold)}
 .slide .eyebrow .ln{flex:1;height:1px;background:rgba(150,195,255,.2)}
 .slide .eyebrow .bd{font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)}
 .slide h2{font-size:108px;line-height:1.06}
+/* Título com cedilha numa linha e acento na de baixo precisa de mais entrelinha:
+   a 1.06 o Ç desce em cima da linha seguinte. Use .folga no slide. */
+.slide.folga h2{line-height:1.2}
 .slide .sub{font-size:33px;line-height:1.38;color:rgba(255,255,255,.62);margin-top:28px;max-width:19ch}
 .slide .sub.wide{max-width:none}
 .slide .dots{position:absolute;right:76px;top:84px;z-index:3;display:flex;gap:7px}
@@ -97,6 +100,11 @@ h2 em,h1 em{font-style:normal;color:var(--gold)}
 .rec.b{left:120px;top:120px;transform:rotate(2.5deg)}
 .rec.c{left:40px;top:244px;transform:rotate(-1.5deg);opacity:.5}
 .count{position:absolute;right:0;bottom:12px;font-family:var(--ff-display);font-size:150px;line-height:.8;color:rgba(255,255,255,.07)}
+/* cena: mensagem do grupo — variante do comprovante, texto em corpo e não em mono */
+.rec.msg .t{font-family:var(--ff-mono);letter-spacing:.06em}
+.rec.msg .v{font-family:var(--ff-body);font-size:29px;font-weight:600;line-height:1.2}
+/* selo do Pro: ouro, pra não dar a entender que é da lista do que é de graça */
+.bdg .ck.pro{background:rgba(240,165,0,.16);border-color:rgba(240,165,0,.45);color:var(--gold)}
 /* cena: fluxo */
 .flow{display:flex;align-items:center;gap:26px;margin-top:auto}
 .flow .fb{flex:1;min-width:0;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);border-radius:18px;padding:26px 24px}
