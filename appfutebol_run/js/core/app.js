@@ -3762,18 +3762,9 @@ async function maybeShowCarneVote(snapshot, currentPlayer) {
   if (carneVoteGameKey !== key) { carneVoteGameKey = key; carneVoteStatus = 'idle'; }
   if (!active || ratingsUnavailable) { unmountCarneVote(); return; }
 
-  // Quem esteve no jogo vota — mais o sócio de carnê, que não joga e por isso
-  // nunca confirma presença, mas come o churrasco e avalia a dupla. Antes o
-  // modal era de TODOS os membros: no jogo de 26/08, 3 dos 9 votos vieram de
-  // quem não estava lá, e só 1 deles era sócio de carnê. O servidor aplica a
-  // mesma regra (submit-rating); esta checagem é só para não abrir um modal que
-  // ia falhar na hora de gravar.
-  const confirmacoesCarne = await confirmationsForVotingGame(snapshot, game);
-  if (confirmacoesCarne === null) return; // leitura em voo: decide no próximo render
-  const noJogo = getInGamePlayers(snapshot, game, confirmacoesCarne);
-  const podeVotarCarne = noJogo.some((p) => String(p.id) === String(currentPlayer.id))
-    || authzIsCarneOnly(currentPlayer);
-  if (!podeVotarCarne) { unmountCarneVote(); return; }
+  // Qualquer integrante vota no churrasco, tenha ou não confirmado o jogo:
+  // presença no jogo não diz quem comeu. O servidor (submit-rating) aplica a
+  // mesma regra. Só o desempenho exige ter estado no jogo.
 
   if (carneVoteStatus === 'voted' || carneVoteStatus === 'active' || carneVoteStatus === 'checking') return;
 
