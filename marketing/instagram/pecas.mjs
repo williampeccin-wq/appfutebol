@@ -340,7 +340,7 @@ E preço combinado é preço mantido. Se um dia mudar, você fica sabendo antes,
       <div class="badges">
         <div class="bdg"><span class="ck pro">★</span>PIX com IA: o comprovante dá baixa sozinho</div>
         <div class="bdg"><span class="ck pro">★</span>Lembrete de quem está atrasado</div>
-        <div class="bdg"><span class="ck pro">★</span>Campeonato completo e sorteio por nota</div>
+        <div class="bdg"><span class="ck pro">★</span>Mais de um admin no clube</div>
       </div>`, '', 6),
   },
   {
