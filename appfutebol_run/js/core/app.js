@@ -6087,6 +6087,7 @@ const NOTIF_TYPES = [
   { key: 'fila_promovido', label: 'Entrou pela fila', desc: 'Quando alguém sai da fila de espera e é confirmado. Só para ele.' },
   { key: 'votacao_desempenho', label: 'Votação de desempenho', desc: 'Quando abre a votação das notas (1h após o jogo). Para quem jogou.' },
   { key: 'votacao_churrasco', label: 'Votação do churrasco', desc: 'Quando abre a votação da dupla da carne (23h do dia do jogo). Para todos.' },
+  { key: 'aniversario', label: 'Aniversário', desc: 'Às 8h do dia, com o nome de quem faz aniversário. Para todos, inclusive quem é só do churrasco.' },
   { key: 'saiu_da_escalacao', label: 'Saiu da escalação', desc: 'Quando alguém já sorteado cancela a presença. Só para os administradores.' },
 ];
 function isNotifEnabled(snapshot, key) {
