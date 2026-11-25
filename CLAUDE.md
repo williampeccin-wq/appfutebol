@@ -161,6 +161,13 @@ conflito quase sempre é vocabulário: o Harmonia diz "carnê" onde o Convocados
   relógio (23h → 12h). Votação de jogador "que não apareceu" quase sempre é resultado
   ausente no aparelho ou no servidor — confira `app_meta` e `push_log` antes de
   culpar o celular. Relançar o resultado empurra o início da janela.
+- **`ratings_public` não devolve `created_at`.** A view que o app lê expõe só
+  `kind, game_key, target_id, score`: o instante do voto saiu de propósito na
+  migration de 20/08/2026, porque agrupar por ele remontava a cédula de cada
+  votante. Quem ordenar voto por `created_at` **não ordena nada e não quebra nada**
+  — o campo é `undefined` em toda linha e o sort fica estável na ordem em que o
+  PostgREST devolveu. Para recortar nota por período, use `dateOfGameKey`, que lê a
+  data do próprio `game_key`.
 
 ## Pendências conhecidas
 
@@ -174,6 +181,15 @@ conflito quase sempre é vocabulário: o Harmonia diz "carnê" onde o Convocados
 - **Resultado lançado tarde trava a votação de jogador.** Não está decidido entre
   (a) avisar o admin quando o jogo termina sem resultado e (b) abrir a votação
   sozinha um tempo depois do jogo, mesmo sem resultado.
+- **O ranking dos churrascos não recorta o ciclo.** `renderChurrascoRanking`
+  (`players.view.js`) fatia "os N jogos mais recentes" ordenando por `created_at`,
+  que não vem na leitura (armadilha acima). Enquanto houver menos jogos votados do
+  que duplas no rodízio ninguém percebe: o cartão mostra tudo desde o primeiro voto,
+  embora o texto prometa "ciclo atual do rodízio". Passando disso, o corte fica com
+  os jogos **mais antigos** e os churrascos novos param de entrar — no Harmonia isso
+  começou em 22/10/2026, com 18 jogos votados para 16 duplas. **Decidido em
+  09/10/2026, ainda não aplicado:** recortar por data do jogo (`dateOfGameKey`) a
+  partir do `start_date` do `carne_rotation`.
 - **Edge Function não sobe com o push.** O push publica só o PWA. Mudou algo em
   `supabase/functions/*`, faça o deploy à mão nos **dois** projetos Supabase: o do
   Harmonia sai da branch `production` e o do Convocados sai do `main`.
@@ -188,6 +204,16 @@ conflito quase sempre é vocabulário: o Harmonia diz "carnê" onde o Convocados
 A regra fica em dois lugares, que têm de bater: `maybeShowCarneVote` /
 `maybeShowPerfVote` em `core/app.js` (decide se o modal abre) e a Edge Function
 `submit-rating` (decide se o voto é gravado).
+
+**A nota da dupla soma, não zera.** Cada voto é uma linha em `public.ratings` com
+`unique (kind, game_key, voter_id, target_id)`, e o `submit-rating` grava por
+upsert: votar de novo no mesmo jogo corrige o voto, não cria outro. A média é a
+média plana de todos os votos da dupla dentro do recorte (`soma / nº de votos`),
+então dois churrascos da mesma dupla viram uma média só, com o mais votado pesando
+mais. O que "zera" é o recorte — jogo fora da janela para de contar, mas o voto fica
+no banco para sempre; só *excluir o jogo* apaga. E trocar um integrante cria **chave
+nova** (o `target_id` são os dois ids ordenados): a média não acompanha, a dupla
+recomeça do zero no ranking.
 
 **Por que o churrasco é aberto (24/11/2026, v1.217.0 no Convocados e v1.203.0 no
 Harmonia).** Antes só votava quem tinha confirmado o jogo, mais quem era "Somente
