@@ -1,0 +1,191 @@
+/* Artes do Instagram do Convocados — navy + ouro, display condensado de pôster.
+   Este arquivo é a fonte das artes que vão publicadas. Os artifacts publicados são
+   a superfície de revisão; o PNG que sai daqui é o que sobe pro feed.
+   Paleta e regras: docs/plano-instagram.md (seção 11) e a skill design-convocados. */
+
+:root{
+  --navy-900:#060f22; --navy-850:#0a1830; --navy-800:#0d1f3c; --navy-700:#1a3a6e; --navy-600:#234b8d;
+  --gold:#f0a500; --gold-200:#ffc23d; --gold-dim:#c98900;
+  --grass:#19c37d;
+  --ff-display:'Anton',Impact,'Haettenschweiler','Arial Black',sans-serif;
+  --ff-body:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --ff-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--navy-800)}
+
+/* ---------- base comum ---------- */
+.art{position:relative;overflow:hidden;background:var(--navy-800);display:flex;flex-direction:column;font-family:var(--ff-body)}
+.art::before{content:'';position:absolute;inset:0;z-index:0}
+.art>*{position:relative;z-index:2}
+.ring,.ring2{position:absolute;z-index:1;border-radius:50%}
+.ring::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(240,165,0,.22)}
+.goldbar{position:absolute;bottom:0;left:0;right:0;z-index:3;
+  background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold) 70%,transparent)}
+.pill{display:inline-flex;align-items:center;background:rgba(240,165,0,.11);
+  border:1.4px solid rgba(240,165,0,.3);border-radius:100px}
+.pill i{background:var(--gold);border-radius:50%;flex:none}
+.pill span{font-weight:700;text-transform:uppercase;color:var(--gold)}
+h1,h2{font-family:var(--ff-display);font-weight:400;text-transform:uppercase;letter-spacing:.02em;color:#fff}
+h2 em,h1 em{font-style:normal;color:var(--gold)}
+.mark{position:absolute;z-index:3;display:flex;flex-direction:column}
+.mark .sg{font-family:var(--ff-display);letter-spacing:.22em;text-transform:uppercase;color:var(--gold-dim)}
+.mark .hn{color:rgba(255,255,255,.3);letter-spacing:.04em}
+.ck{border-radius:50%;flex:none;display:grid;place-items:center;
+  background:rgba(25,195,125,.16);border:1px solid rgba(25,195,125,.45);color:var(--grass);font-weight:700}
+
+/* ---------- 1080×1080 · post de lançamento ---------- */
+.post{width:1080px;height:1080px;align-items:center;justify-content:center}
+.post::before{background:
+  repeating-linear-gradient(-45deg,transparent 0,transparent 32px,rgba(255,255,255,.018) 32px,rgba(255,255,255,.018) 33px),
+  radial-gradient(ellipse 90% 70% at 50% 44%,var(--navy-700) 0%,var(--navy-800) 68%)}
+.post .ring{width:700px;height:700px;left:50%;top:44%;transform:translate(-50%,-50%);border:1.5px solid rgba(240,165,0,.075)}
+.post .ring::after{width:12px;height:12px}
+.post .ring2{width:410px;height:410px;left:50%;top:44%;transform:translate(-50%,-50%);border:1px solid rgba(240,165,0,.035)}
+.post .ct{display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;padding:0 64px}
+.post .pill{gap:11px;padding:11px 30px;margin-bottom:44px}
+.post .pill i{width:9px;height:9px}
+.post .pill span{font-size:21px;letter-spacing:.12em}
+.post h1{font-size:180px;line-height:.88;letter-spacing:.02em;margin-bottom:28px}
+.post .tag{font-size:37px;color:rgba(255,255,255,.55);margin-bottom:16px;letter-spacing:-.01em}
+.post .rule{width:84px;height:3px;background:var(--gold);border-radius:2px;margin:0 auto 46px}
+.post .feats{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:52px}
+.post .feat{display:flex;align-items:center;gap:9px;padding:14px 26px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);border-radius:11px;font-size:23px;font-weight:500;color:#fff}
+.post .cta{display:flex;align-items:center;gap:16px;padding:18px 34px;background:var(--gold);border-radius:14px;
+  box-shadow:0 14px 40px rgba(240,165,0,.18)}
+.post .cta b{display:block;font-family:var(--ff-display);font-size:30px;letter-spacing:.03em;text-transform:uppercase;color:var(--navy-800);line-height:1.08}
+.post .cta small{display:block;font-size:16px;font-weight:600;color:rgba(13,31,60,.72);letter-spacing:.02em;margin-top:2px}
+.post .foot{position:absolute;left:0;right:0;bottom:46px;z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px}
+.post .foot .sg{font-family:var(--ff-display);font-size:19px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold-dim)}
+.post .foot .hn{font-size:26px;color:rgba(255,255,255,.26);letter-spacing:.04em}
+.post .goldbar{height:5px}
+
+/* ---------- 1080×1350 · carrossel ---------- */
+.slide{width:1080px;height:1350px;padding:78px 76px 200px}
+.slide::before{background:
+  repeating-linear-gradient(-45deg,transparent 0,transparent 34px,rgba(255,255,255,.016) 34px,rgba(255,255,255,.016) 35px),
+  radial-gradient(ellipse 95% 62% at 50% 0%,var(--navy-700) 0%,var(--navy-800) 72%)}
+.slide .ring{width:860px;height:860px;left:50%;top:-240px;transform:translateX(-50%);border:1.5px solid rgba(240,165,0,.06)}
+.slide .ring::after{display:none}
+.slide .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:54px;padding-right:118px}
+.slide.capa .eyebrow{margin-bottom:auto}
+.slide .eyebrow .n{font-family:var(--ff-mono);font-size:19px;font-weight:600;color:var(--gold);letter-spacing:.06em}
+.slide .eyebrow .ln{flex:1;height:1px;background:rgba(150,195,255,.2)}
+.slide .eyebrow .bd{font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.slide h2{font-size:108px;line-height:1.06}
+/* Título com cedilha numa linha e acento na de baixo precisa de mais entrelinha:
+   a 1.06 o Ç desce em cima da linha seguinte. Use .folga no slide. */
+.slide.folga h2{line-height:1.2}
+.slide .sub{font-size:33px;line-height:1.38;color:rgba(255,255,255,.62);margin-top:28px;max-width:19ch}
+.slide .sub.wide{max-width:none}
+.slide .dots{position:absolute;right:76px;top:84px;z-index:3;display:flex;gap:7px}
+.slide .dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18)}
+.slide .dots i.on{background:var(--gold);width:26px;border-radius:5px}
+.slide .swipe{position:absolute;right:76px;bottom:88px;z-index:3;display:flex;align-items:center;gap:12px;
+  font-size:22px;font-weight:600;color:var(--gold);letter-spacing:.04em}
+.slide .swipe .ar{font-family:var(--ff-display);font-size:30px;line-height:1}
+.slide .mark{left:76px;bottom:84px;gap:5px}
+.slide .mark .sg{font-size:16px}
+.slide .mark .hn{font-size:20px}
+.slide .goldbar{height:5px}
+/* cena: pilha de comprovantes */
+.stack{margin-top:auto;position:relative;height:430px}
+.rec{position:absolute;width:560px;background:#fff;border-radius:16px;padding:22px 26px;color:#0d1f3c;
+  box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.rec .t{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:9px}
+.rec .v{font-family:var(--ff-mono);font-size:34px;font-weight:600;line-height:1}
+.rec .m{font-size:17px;color:#64748b;margin-top:7px}
+.rec.a{left:0;top:0;transform:rotate(-4deg)}
+.rec.b{left:120px;top:120px;transform:rotate(2.5deg)}
+.rec.c{left:40px;top:244px;transform:rotate(-1.5deg);opacity:.5}
+.count{position:absolute;right:0;bottom:12px;font-family:var(--ff-display);font-size:150px;line-height:.8;color:rgba(255,255,255,.07)}
+/* cena: mensagem do grupo — variante do comprovante, texto em corpo e não em mono */
+.rec.msg .t{font-family:var(--ff-mono);letter-spacing:.06em}
+.rec.msg .v{font-family:var(--ff-body);font-size:29px;font-weight:600;line-height:1.2}
+/* selo do Pro: ouro, pra não dar a entender que é da lista do que é de graça */
+.bdg .ck.pro{background:rgba(240,165,0,.16);border-color:rgba(240,165,0,.45);color:var(--gold)}
+/* cena: fluxo */
+.flow{display:flex;align-items:center;gap:26px;margin-top:auto}
+.flow .fb{flex:1;min-width:0;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);border-radius:18px;padding:26px 24px}
+.flow .fb .k{font-family:var(--ff-mono);font-size:15px;color:var(--gold);letter-spacing:.08em;margin-bottom:10px}
+.flow .fb .v{font-size:25px;font-weight:600;line-height:1.3;color:#fff}
+.flow .fa{font-family:var(--ff-display);font-size:46px;color:var(--gold);flex:none;line-height:1}
+/* cena: celular */
+.phone{width:472px;border-radius:38px;border:9px solid #0a1324;background:var(--navy-850);
+  box-shadow:0 26px 60px rgba(0,0,0,.42);overflow:hidden;margin:auto auto 0}
+.phone .top{height:34px;background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center}
+.phone .top i{width:84px;height:7px;border-radius:4px;background:rgba(255,255,255,.14);display:block}
+.phone .bd{padding:22px 22px 26px;display:flex;flex-direction:column;gap:13px}
+.phone .ph-t{font-family:var(--ff-display);font-size:25px;text-transform:uppercase;letter-spacing:.04em;color:#fff;margin-bottom:3px}
+.row{display:flex;align-items:center;gap:13px;padding:15px 16px;border-radius:13px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.row .av{width:38px;height:38px;border-radius:50%;flex:none;background:var(--navy-600);display:grid;place-items:center;font-size:16px;font-weight:700;color:#fff}
+.row .nmz{flex:1;min-width:0;font-size:21px;font-weight:600;color:#fff}
+.row .st{font-family:var(--ff-mono);font-size:15px;font-weight:600;padding:5px 11px;border-radius:7px;white-space:nowrap}
+.st.pago{background:rgba(25,195,125,.16);border:1px solid rgba(25,195,125,.4);color:var(--grass)}
+.st.pend{background:rgba(240,165,0,.14);border:1px solid rgba(240,165,0,.38);color:var(--gold-200)}
+.row.hl{border-color:rgba(25,195,125,.5);background:rgba(25,195,125,.08)}
+.phone .btn{margin-top:4px;height:56px;border-radius:14px;background:var(--gold);display:grid;place-items:center;
+  font-family:var(--ff-display);font-size:22px;letter-spacing:.05em;text-transform:uppercase;color:var(--navy-800)}
+/* cena: selos + aviso de grátis */
+.badges{display:flex;flex-direction:column;gap:14px;margin-top:auto}
+.bdg{display:flex;align-items:center;gap:16px;padding:20px 24px;border-radius:15px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:27px;font-weight:600;color:#fff}
+.bdg .ck{width:36px;height:36px;font-size:20px}
+.freebox{margin-top:40px;border-left:4px solid var(--gold);background:linear-gradient(90deg,rgba(240,165,0,.1),transparent 72%);
+  padding:20px 24px;border-radius:0 14px 14px 0;font-size:25px;line-height:1.42;color:rgba(255,255,255,.78);max-width:34ch}
+.freebox b{color:#fff}
+.ctaB{display:flex;align-items:center;padding:22px 38px;background:var(--gold);border-radius:16px;
+  margin-top:52px;align-self:flex-start;box-shadow:0 16px 44px rgba(240,165,0,.2)}
+.ctaB b{display:block;font-family:var(--ff-display);font-size:34px;letter-spacing:.03em;text-transform:uppercase;color:var(--navy-800);line-height:1.05}
+.ctaB small{display:block;font-size:18px;font-weight:600;color:rgba(13,31,60,.72);margin-top:3px}
+
+/* ---------- 1080×1920 · story e capa de reel ---------- */
+.tall{width:1080px;height:1920px;padding:300px 92px 330px}
+.tall::before{background:
+  repeating-linear-gradient(-45deg,transparent 0,transparent 36px,rgba(255,255,255,.017) 36px,rgba(255,255,255,.017) 37px),
+  radial-gradient(ellipse 100% 55% at 50% 30%,var(--navy-700) 0%,var(--navy-800) 72%)}
+.tall .ring{width:900px;height:900px;left:50%;top:560px;transform:translate(-50%,-50%);border:1.5px solid rgba(240,165,0,.07)}
+.tall .ring::after{width:14px;height:14px;background:rgba(240,165,0,.2)}
+.tall.centro{justify-content:center}
+.tall .pill{gap:12px;padding:13px 32px;align-self:flex-start;margin-bottom:46px}
+.tall .pill i{width:10px;height:10px}
+.tall .pill span{font-size:22px;letter-spacing:.12em}
+.tall h2{font-size:118px;line-height:1.08}
+.tall .sub{font-size:36px;line-height:1.4;color:rgba(255,255,255,.6);margin-top:34px;max-width:22ch}
+.tall .rule{width:92px;height:4px;background:var(--gold);border-radius:2px;margin:44px 0}
+.tall .feats{display:flex;flex-direction:column;gap:16px}
+.tall .feat{display:flex;align-items:center;gap:16px;font-size:30px;font-weight:600;color:#fff}
+.tall .feat .ck{width:40px;height:40px;font-size:21px}
+.tall .down{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:16px}
+.tall .down .tx{font-family:var(--ff-display);font-size:42px;letter-spacing:.05em;text-transform:uppercase;color:var(--gold);text-align:center;line-height:1.1}
+.tall .down .ar{font-family:var(--ff-display);font-size:58px;color:var(--gold);line-height:.8}
+.tall .mark{left:92px;bottom:250px;gap:7px}
+.tall .mark .sg{font-size:18px}
+.tall .mark .hn{font-size:24px}
+.tall .goldbar{height:6px}
+.qbox{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:22px;padding:34px 32px;margin-top:40px}
+.qbox .q{font-size:34px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:24px}
+.qbox .op{display:flex;align-items:center;gap:14px;padding:20px 22px;border-radius:14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);font-size:28px;font-weight:600;color:#fff;margin-bottom:12px}
+.qbox .op:last-child{margin-bottom:0}
+.qbox .op i{width:14px;height:14px;border-radius:50%;background:var(--gold);flex:none}
+.tall .kick{font-size:36px;line-height:1.4;color:rgba(255,255,255,.6);margin-top:38px;max-width:21ch}
+
+/* ---------- 1080×1080 · card de feed (variante do template) ---------- */
+.card{width:1080px;height:1080px;padding:92px 86px 150px;justify-content:center}
+.card::before{background:
+  repeating-linear-gradient(-45deg,transparent 0,transparent 34px,rgba(255,255,255,.017) 34px,rgba(255,255,255,.017) 35px),
+  radial-gradient(ellipse 98% 58% at 50% 26%,var(--navy-700) 0%,var(--navy-800) 72%)}
+.card .ring{width:700px;height:700px;left:50%;top:50%;transform:translate(-50%,-50%);border:1.5px solid rgba(240,165,0,.07)}
+.card .ring::after{width:13px;height:13px;background:rgba(240,165,0,.2)}
+.card .pill{gap:9px;padding:10px 26px;align-self:flex-start;margin-bottom:38px}
+.card .pill i{width:9px;height:9px}
+.card .pill span{font-size:19px;letter-spacing:.12em}
+.card h2{font-size:96px;line-height:1.08}
+.card .kick{font-size:31px;line-height:1.38;color:rgba(255,255,255,.6);margin-top:30px;max-width:22ch}
+.card .mark{left:86px;bottom:62px;gap:5px}
+.card .mark .sg{font-size:15px}
+.card .mark .hn{font-size:21px}
+.card .goldbar{height:5px}
