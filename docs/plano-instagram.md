@@ -210,7 +210,7 @@ Legenda de pilar: **1** dor do admin · **2** o app resolvendo · **3** resenha 
 
 | Data | Formato | Pilar | Gancho | CTA |
 |---|---|---|---|---|
-| Seg 23/11, 19h | Post único 1080×1080 (arte "Já está no Google Play") · **agendado** | 4 | "Tá no ar. O Convocados saiu do nosso grupo e foi pra loja." | **Link na bio → baixar.** Secundário: "marca o admin da sua pelada aqui 👇" |
+| Seg 23/11, 19h | Post único 1080×1080 (arte "Já está no Google Play") · **agendado** | 4 | "Organizar pelada não precisa ser planilha, caderno e 'quem confirmou?' às 23h." | **Link na bio → baixar.** Secundário: "marca o admin da sua pelada aqui 👇" |
 | ~~Ter 24/11, 19h~~ | ~~**Reel** R1~~ · **adiado, sem data** | 1 | "Sua pelada ainda é organizada numa planilha?" | — |
 | Qua 25/11, 19h | **Carrossel** 1080×1350, 5 telas (arte do PIX com IA) · **agendado** | 2 | "Ele manda o comprovante. O app lê e dá baixa. Você não confere nada." | **Salva** e manda pro tesoureiro do grupo |
 | ~~Qui 26/11, 9h~~ | ~~**Reel** R2~~ · **adiado, sem data** | 2 | "Isso é um comprovante de PIX. Olha o que o app faz com ele." | — |

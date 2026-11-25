@@ -49,6 +49,19 @@ de título e apoio) e rode o render. Os ganchos dos R1–R8 estão na seção 5 
   recorte some na grade do perfil. É por isso que `.tall.centro` existe.
 - **Confira o PNG, não o HTML.** Três desses defeitos passaram pela revisão na tela e
   só apareceram no PNG exportado.
+- **A legenda fala com quem organiza a pelada DELE, não com o nosso grupo.** Primeira
+  pessoa do plural só para dizer quem fez o app ("feito por quem joga pelada"); nunca
+  para pôr o leitor dentro de um grupo que não é dele. O post de lançamento saiu com
+  "o Convocados saiu do nosso grupo de pelada": para quem conhece o William lê como
+  origem do produto, para o admin que nunca ouviu falar — exatamente quem o post tem
+  que alcançar — "nosso grupo" é um grupo do qual ele não faz parte, e o convite vira
+  aviso interno. O teste antes de publicar: *um admin que nunca ouviu falar do app lê
+  essa frase e se sente convidado ou excluído?* Essa passou pela revisão e só apareceu
+  com o post no ar.
+- **Legenda de Instagram não se edita por API.** O `edit_post` do Upload-Post cobre
+  Facebook, LinkedIn, X, Google Business, Telegram e YouTube — Instagram, TikTok e
+  Threads, não. Legenda errada no ar só se corrige à mão, no app. Mais uma razão para
+  o pente passar antes do agendamento, não depois.
 
 ## Quem faz o quê
 

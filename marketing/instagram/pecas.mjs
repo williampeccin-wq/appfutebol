@@ -20,11 +20,16 @@ const lancamento = {
   nome: 'Post de lançamento',
   w: 1080, h: 1080,
   quando: 'Semana 1 · seg 23/11, 19h · pilar 4',
-  legenda: `Tá no ar. O Convocados saiu do nosso grupo de pelada e foi pra loja.
+  // Abre em "Organizar pelada" de propósito: é a palavra que tem que cair nos ~125
+  // caracteres que o Instagram mostra na busca. Primeira pessoa do plural só pra
+  // falar de quem fez o app — nunca pra pôr o leitor num grupo que não é dele.
+  legenda: `Organizar pelada não precisa ser planilha, caderno e "quem confirmou?" às 23h.
 
-Confirmar presença, sortear os times, fila de espera automática quando lota, churrasco, campeonato — e a mensalidade que se confere sozinha.
+O Convocados tá no Google Play: presença num toque, vaga de goleiro contada na hora, fila de espera automática quando lota, sorteio de times equilibrado, churrasco, campeonato — e a mensalidade que se confere sozinha.
 
 O sorteio de times e a confirmação de presença são de graça.
+
+Feito por quem joga pelada e cansou de ser o cara da planilha.
 
 👉 Link na bio pra baixar no Google Play.
 ⚽ Marca o admin da sua pelada aqui 👇
